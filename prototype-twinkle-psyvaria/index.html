@@ -30,6 +30,26 @@
           <span>かするとレベルが上がり、攻撃は増えるが、かすりコンボもしやすくなる</span>
           <span>連続かすりで倍率が上がる</span>
         </div>
+        <div class="debug-panel" id="debug-panel">
+          <label for="bullet-density"><strong>デバッグ: 敵弾量</strong></label>
+          <input id="bullet-density" type="range" min="1" max="10" step="1" value="2" />
+          <span><b id="bullet-density-value">2</b> / 10</span>
+          <label class="debug-toggle">
+            <input id="player-hitbox-toggle" type="checkbox" checked />
+            <span>自機の当たり判定あり</span>
+          </label>
+          <label class="debug-toggle">
+            <input id="debug-ranking-preview-toggle" type="checkbox" />
+            <span>ゲーム開始3秒後にランキング登録を表示</span>
+          </label>
+          <div class="debug-stepper" aria-label="レベルごとの必要ゲージ増加量">
+            <strong>デバッグ: ゲージ増加難度</strong>
+            <button id="gauge-growth-down" type="button">−</button>
+            <b id="gauge-growth-value">30</b>
+            <button id="gauge-growth-up" type="button">＋</button>
+            <span>レベルごとに必要ゲージ +<b id="gauge-growth-label">30</b></span>
+          </div>
+        </div>
       </section>
 
       <div class="game-frame">

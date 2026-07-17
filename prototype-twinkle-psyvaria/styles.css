@@ -100,6 +100,72 @@ p {
   line-height: 1.7;
 }
 
+.debug-panel {
+  display: none;
+  grid-column: 1 / -1;
+}
+
+.is-local-dev .debug-panel {
+  display: block;
+}
+
+.debug-panel input {
+  width: 100%;
+  margin: 8px 0 4px;
+  accent-color: var(--accent);
+}
+
+.debug-panel b {
+  color: var(--accent);
+}
+
+.debug-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.debug-toggle input {
+  width: auto;
+  margin: 0;
+}
+
+.debug-stepper {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.debug-stepper strong {
+  width: 100%;
+  color: var(--text);
+}
+
+.debug-stepper button {
+  width: 34px;
+  height: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: rgba(105, 247, 255, 0.12);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.debug-stepper b {
+  min-width: 32px;
+  color: var(--accent);
+  text-align: center;
+}
+
 .game-frame {
   position: relative;
 }

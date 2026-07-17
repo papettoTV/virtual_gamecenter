@@ -3,6 +3,7 @@ const context = canvas.getContext("2d");
 const bulletDensityInput = document.querySelector("#bullet-density");
 const bulletDensityValue = document.querySelector("#bullet-density-value");
 const playerHitboxToggle = document.querySelector("#player-hitbox-toggle");
+const debugRankingPreviewToggle = document.querySelector("#debug-ranking-preview-toggle");
 const gaugeGrowthDown = document.querySelector("#gauge-growth-down");
 const gaugeGrowthUp = document.querySelector("#gauge-growth-up");
 const gaugeGrowthValue = document.querySelector("#gauge-growth-value");
@@ -87,6 +88,8 @@ let nextBulletId = 1;
 let clearGame = false;
 let lastClearResult = null;
 let rankingSubmittedForClear = false;
+let debugRankingPreviewEnabled = false;
+let debugRankingPreviewShown = false;
 
 const boss = {
   active: false,
@@ -106,6 +109,10 @@ const players = [
   createPlayer("YOU", LEFT_X, "#69f7ff", false),
   createPlayer("CPU", RIGHT_X, "#ff4e8a", true),
 ];
+
+if (isLocalDevelopment()) {
+  document.body.classList.add("is-local-dev");
+}
 
 function createPlayer(label, x, color, cpu) {
   return {
@@ -182,6 +189,7 @@ function resetGame() {
   clearGame = false;
   lastClearResult = null;
   rankingSubmittedForClear = false;
+  debugRankingPreviewShown = false;
   rankingSubmitPanel?.classList.remove("is-visible");
   updateRankingSubmitState();
   resetBossProgress();
@@ -227,6 +235,19 @@ if (bulletDensityInput && bulletDensityValue) {
 if (playerHitboxToggle) {
   playerHitboxToggle.addEventListener("change", () => {
     playerHitboxEnabled = playerHitboxToggle.checked;
+  });
+}
+
+if (debugRankingPreviewToggle) {
+  debugRankingPreviewToggle.addEventListener("change", () => {
+    debugRankingPreviewEnabled = debugRankingPreviewToggle.checked;
+    debugRankingPreviewShown = false;
+    if (!debugRankingPreviewEnabled && !clearGame) {
+      lastClearResult = null;
+      rankingSubmittedForClear = false;
+      rankingSubmitPanel?.classList.remove("is-visible");
+      updateRankingSubmitState();
+    }
   });
 }
 
@@ -336,6 +357,7 @@ function update(delta) {
   tryAutoAttack(players[0], players[1]);
   tryAutoAttack(players[1], players[0]);
   updateBoss(gameDelta);
+  updateDebugRankingPreview();
 
   updateParticles(gameDelta);
   slowMotionTimer = Math.max(0, slowMotionTimer - delta);
@@ -423,18 +445,38 @@ function clearAllBullets() {
   }
 }
 
+function updateDebugRankingPreview() {
+  if (!debugRankingPreviewEnabled || debugRankingPreviewShown || clearGame || gameOver || elapsedRound < 3) return;
+  debugRankingPreviewShown = true;
+  showRankingRegistration("デバッグ: ゲーム開始3秒後のランキング登録表示です。");
+}
+
 function recordClearResult() {
+  showRankingRegistration(`クリアタイム ${formatRankingTime(Math.round(elapsedRound * 1000))} を登録できます。`);
+}
+
+function showRankingRegistration(message) {
   lastClearResult = {
     clearTimeMs: Math.round(elapsedRound * 1000),
     score: players[0].score,
     maxLevel: players[0].level,
   };
   rankingSubmittedForClear = false;
-  if (rankingResult) {
-    rankingResult.textContent = `クリアタイム ${formatRankingTime(lastClearResult.clearTimeMs)} を登録できます。`;
-  }
+  if (rankingResult) rankingResult.textContent = message;
   rankingSubmitPanel?.classList.add("is-visible");
   updateRankingSubmitState();
+}
+
+function isLocalDevelopment() {
+  const hostname = window.location.hostname;
+  return (
+    window.location.protocol === "file:" ||
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname.startsWith("192.168.") ||
+    hostname.startsWith("10.") ||
+    /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname)
+  );
 }
 
 function updateRankingSubmitState() {
