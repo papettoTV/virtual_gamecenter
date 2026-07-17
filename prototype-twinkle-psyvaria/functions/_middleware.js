@@ -1,6 +1,10 @@
 const REALM = "virtual-gamecenter";
 
 export async function onRequest(context) {
+  if (isLocalRequest(context.request)) {
+    return context.next();
+  }
+
   const username = context.env.BASIC_AUTH_USERNAME;
   const password = context.env.BASIC_AUTH_PASSWORD;
 
@@ -21,6 +25,11 @@ export async function onRequest(context) {
   }
 
   return context.next();
+}
+
+function isLocalRequest(request) {
+  const { hostname } = new URL(request.url);
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
 }
 
 function parseBasicAuthorization(authorization) {

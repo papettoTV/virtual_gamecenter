@@ -4,16 +4,29 @@
 
 ## 遊び方
 
-`index.html` をブラウザで開きます。
-
-ローカルサーバで起動する場合:
+ローカルサーバで起動します。
 
 ```bash
 npm install
-npm run start
+npm run dev
 ```
 
 スマホで遊ぶ場合は、PCとスマホを同じWi-Fiにつなぎ、起動時に表示される `Network` のURLをスマホのブラウザで開きます。
+
+公開前のビルド確認:
+
+```bash
+npm run build
+npm run preview
+```
+
+Cloudflare Pagesへ反映:
+
+```bash
+npm run deploy
+```
+
+ローカル開発中はBasic認証を無効化し、Cloudflare Pages上ではBasic認証を有効にしています。
 
 - 移動: 矢印キー / WASD
 - スマホ移動: ゲーム画面内をタップし、その位置を中心にスライドした方向へ移動

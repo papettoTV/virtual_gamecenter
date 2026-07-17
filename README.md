@@ -8,6 +8,35 @@
 
 - `prototype-twinkle-psyvaria/`
 
+## Development Workflow
+
+基本方針は、ローカルで開発・確認し、まとまったタイミングでCloudflareへデプロイします。
+
+```bash
+cd prototype-twinkle-psyvaria
+npm install
+npm run dev
+```
+
+ローカルサーバ起動後、表示された `Local` または `Network` のURLをブラウザで開きます。
+スマホで確認する場合は、PCとスマホを同じWi-Fiにつなぎ、`Network` のURLをスマホで開きます。
+
+ローカル開発中はBasic認証を無効化しています。
+Cloudflare Pages上ではBasic認証が有効です。
+
+公開前のビルド確認:
+
+```bash
+npm run build
+npm run preview
+```
+
+Cloudflareへ反映:
+
+```bash
+npm run deploy
+```
+
 ## Deployment
 
 - Game: https://virtual-gamecenter.pages.dev/

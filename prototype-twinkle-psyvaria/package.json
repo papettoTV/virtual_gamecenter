@@ -1,8 +1,11 @@
 {
   "scripts": {
+    "dev": "vite --host 0.0.0.0",
     "start": "vite --host 0.0.0.0",
     "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0"
+    "preview": "vite preview --host 0.0.0.0",
+    "pages:dev": "npm run build && npx wrangler pages dev dist --project-name virtual-gamecenter",
+    "deploy": "npm run build && npx wrangler pages deploy dist --project-name virtual-gamecenter"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
