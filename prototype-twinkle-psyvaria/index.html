@@ -34,6 +34,14 @@
 
       <div class="game-frame">
         <canvas id="game" width="960" height="640" aria-label="Graze Duel game canvas"></canvas>
+        <div class="ranking-submit ranking-overlay" id="ranking-submit-panel">
+          <h2>ランキング登録</h2>
+          <p id="ranking-result">クリアするとタイムを登録できます。</p>
+          <div class="ranking-form">
+            <input id="ranking-name" maxlength="24" placeholder="名前" autocomplete="nickname" />
+            <button id="ranking-submit" type="button" disabled>登録</button>
+          </div>
+        </div>
       </div>
 
       <div class="touch-controls" aria-label="スマホ操作">
@@ -44,14 +52,6 @@
       </div>
 
       <section class="ranking-panel">
-        <div class="ranking-submit" id="ranking-submit-panel">
-          <h2>ランキング登録</h2>
-          <p id="ranking-result">クリアするとタイムを登録できます。</p>
-          <div class="ranking-form">
-            <input id="ranking-name" maxlength="24" placeholder="名前" autocomplete="nickname" />
-            <button id="ranking-submit" type="button" disabled>登録</button>
-          </div>
-        </div>
         <div class="ranking-list">
           <h2>クリアタイムランキング</h2>
           <ol id="ranking-list"></ol>

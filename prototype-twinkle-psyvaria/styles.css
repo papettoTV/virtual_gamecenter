@@ -159,6 +159,26 @@ canvas {
   display: block;
 }
 
+.ranking-overlay {
+  position: absolute;
+  left: 50%;
+  top: 57%;
+  width: min(520px, calc(100% - 48px));
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 16px;
+  background: rgba(8, 10, 24, 0.84);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.42);
+  padding: 14px 16px 16px;
+  text-align: center;
+  pointer-events: auto;
+  backdrop-filter: blur(8px);
+}
+
+.ranking-overlay h2 {
+  color: var(--text);
+}
+
 .ranking-panel h2 {
   margin: 0 0 8px;
   font-size: 18px;
@@ -226,6 +246,16 @@ canvas {
 
   .intro p {
     display: none;
+  }
+
+  .ranking-overlay {
+    top: 59%;
+    width: min(88vw, 420px);
+    padding: 12px;
+  }
+
+  .ranking-form {
+    flex-direction: column;
   }
 
   .touch-controls {
