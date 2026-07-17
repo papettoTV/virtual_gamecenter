@@ -10,6 +10,7 @@ const gaugeGrowthValue = document.querySelector("#gauge-growth-value");
 const gaugeGrowthLabel = document.querySelector("#gauge-growth-label");
 const touchRestart = document.querySelector("#touch-restart");
 const touchPause = document.querySelector("#touch-pause");
+const clearRestart = document.querySelector("#clear-restart");
 const rankingNameInput = document.querySelector("#ranking-name");
 const rankingSubmitButton = document.querySelector("#ranking-submit");
 const rankingSubmitPanel = document.querySelector("#ranking-submit-panel");
@@ -279,6 +280,10 @@ canvas.addEventListener("pointercancel", resetTouchMove);
 
 if (touchRestart) {
   touchRestart.addEventListener("click", () => resetGame());
+}
+
+if (clearRestart) {
+  clearRestart.addEventListener("click", () => resetGame());
 }
 
 if (touchPause) {
@@ -1521,8 +1526,10 @@ function drawGameOver() {
   context.textAlign = "center";
   context.font = "800 58px system-ui";
   context.fillText(winner, WIDTH / 2, HEIGHT / 2 + (clearGame ? -118 : -28));
-  context.font = "500 20px system-ui";
-  context.fillText("Rキーでリスタート", WIDTH / 2, HEIGHT / 2 + (clearGame ? 198 : 18));
+  if (!clearGame) {
+    context.font = "500 20px system-ui";
+    context.fillText("Rキーでリスタート", WIDTH / 2, HEIGHT / 2 + 18);
+  }
   context.textAlign = "left";
 }
 
