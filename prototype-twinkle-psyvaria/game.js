@@ -1520,9 +1520,9 @@ function drawGameOver() {
   context.fillStyle = "#f4f7ff";
   context.textAlign = "center";
   context.font = "800 58px system-ui";
-  context.fillText(winner, WIDTH / 2, HEIGHT / 2 - 28);
+  context.fillText(winner, WIDTH / 2, HEIGHT / 2 + (clearGame ? -118 : -28));
   context.font = "500 20px system-ui";
-  context.fillText("Rキーでリスタート", WIDTH / 2, HEIGHT / 2 + (clearGame ? 148 : 18));
+  context.fillText("Rキーでリスタート", WIDTH / 2, HEIGHT / 2 + (clearGame ? 198 : 18));
   context.textAlign = "left";
 }
 

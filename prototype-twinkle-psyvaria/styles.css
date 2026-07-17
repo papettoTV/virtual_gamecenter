@@ -228,7 +228,7 @@ canvas {
 .ranking-overlay {
   position: absolute;
   left: 50%;
-  top: 57%;
+  top: 64%;
   width: min(520px, calc(100% - 48px));
   transform: translate(-50%, -50%);
   border: 1px solid rgba(255, 255, 255, 0.16);
@@ -315,7 +315,7 @@ canvas {
   }
 
   .ranking-overlay {
-    top: 59%;
+    top: 63%;
     width: min(88vw, 420px);
     padding: 12px;
   }
