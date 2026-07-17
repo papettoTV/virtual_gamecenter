@@ -448,6 +448,9 @@ function clearAllBullets() {
 function updateDebugRankingPreview() {
   if (!debugRankingPreviewEnabled || debugRankingPreviewShown || clearGame || gameOver || elapsedRound < 3) return;
   debugRankingPreviewShown = true;
+  clearGame = true;
+  gameOver = true;
+  clearAllBullets();
   showRankingRegistration("デバッグ: ゲーム開始3秒後のランキング登録表示です。");
 }
 
