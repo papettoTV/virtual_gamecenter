@@ -66,3 +66,7 @@ wrangler.toml
 # Vite files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Local planning documents
+企画と戦略.md
+市場分析.md
