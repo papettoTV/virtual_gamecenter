@@ -59,7 +59,8 @@ const BOSS_DEFEAT_SLOW_SCALE = 0.28;
 const START_BULLET_DELAY = 2.0;
 const HIT_MARKER_RADIUS = 3;
 const CLIENT_VERSION = "prototype-boss-rush-1";
-const RANKING_API_BASE = localStorage.getItem("grazeDuelRankingApiBase") || "";
+const DEFAULT_RANKING_API_BASE = "https://graze-duel-ranking-api.aegfrompsbt.workers.dev";
+const RANKING_API_BASE = localStorage.getItem("grazeDuelRankingApiBase") || DEFAULT_RANKING_API_BASE;
 
 const BOSS_PHASES = [
   { level: 1, spawnLevel: 10, name: "BOSS LV1", shape: "circle", hp: 25, radius: 34, color: "#5a1f65" },

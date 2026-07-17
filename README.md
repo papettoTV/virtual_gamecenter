@@ -8,6 +8,11 @@
 
 - `prototype-twinkle-psyvaria/`
 
+## Deployment
+
+- Game: https://virtual-gamecenter.pages.dev/
+- Ranking API: https://graze-duel-ranking-api.aegfrompsbt.workers.dev/api/ranking
+
 ## License
 
 このリポジトリのソースコードは MIT License で公開します。
