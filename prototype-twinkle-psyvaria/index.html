@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Graze Duel Prototype</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="intro">
+        <p class="eyebrow">Virtual Arcade Prototype</p>
+        <h1>Graze Duel</h1>
+        <p>
+          対戦型縦スクロール弾幕かすりゲームの試作です。敵弾をギリギリで避けてコンボを伸ばし、溜めたゲージで相手側に弾幕を送り込みます。
+        </p>
+      </section>
+
+      <section class="hud">
+        <div>
+          <strong>操作</strong>
+          <span>移動: 矢印キー / WASD</span>
+          <span>攻撃: ゲージが溜まると自動発射</span>
+          <span>低速移動: Shift</span>
+          <span>一時停止: Space</span>
+          <span>リスタート: R</span>
+        </div>
+        <div>
+          <strong>評価ポイント</strong>
+          <span>攻撃すると相手は危険になるが、かすりコンボもしやすくなる</span>
+          <span>連続かすりで倍率が上がる</span>
+        </div>
+        <div class="debug-panel">
+          <label for="bullet-density"><strong>デバッグ: 敵弾量</strong></label>
+          <input id="bullet-density" type="range" min="1" max="10" step="1" value="2" />
+          <span><b id="bullet-density-value">2</b> / 10</span>
+          <label class="debug-toggle">
+            <input id="player-hitbox-toggle" type="checkbox" checked />
+            <span>自機の当たり判定あり</span>
+          </label>
+          <div class="debug-stepper" aria-label="レベルごとの必要ゲージ増加量">
+            <strong>デバッグ: ゲージ増加難度</strong>
+            <button id="gauge-growth-down" type="button">−</button>
+            <b id="gauge-growth-value">30</b>
+            <button id="gauge-growth-up" type="button">＋</button>
+            <span>レベルごとに必要ゲージ +<b id="gauge-growth-label">30</b></span>
+          </div>
+        </div>
+      </section>
+
+      <div class="game-frame">
+        <canvas id="game" width="960" height="640" aria-label="Graze Duel game canvas"></canvas>
+      </div>
+
+      <div class="touch-controls" aria-label="スマホ操作">
+        <div class="touch-actions">
+          <button id="touch-restart" class="touch-button" type="button">リスタート</button>
+          <button id="touch-pause" class="touch-button" type="button">一時停止</button>
+        </div>
+      </div>
+
+      <section class="notes">
+        <h2>今回の試作で見ること</h2>
+        <ul>
+          <li>かすり続ける緊張感が楽しいか</li>
+          <li>攻撃が相手へのリスクと報酬の両方になっているか</li>
+          <li>短い試合で盛り上がりが生まれるか</li>
+        </ul>
+      </section>
+
+      <section class="ranking-panel">
+        <div class="ranking-submit">
+          <h2>ランキング登録</h2>
+          <p id="ranking-result">クリアするとタイムを登録できます。</p>
+          <div class="ranking-form">
+            <input id="ranking-name" maxlength="24" placeholder="名前" autocomplete="nickname" />
+            <button id="ranking-submit" type="button" disabled>登録</button>
+          </div>
+        </div>
+        <div class="ranking-list">
+          <h2>クリアタイムランキング</h2>
+          <ol id="ranking-list"></ol>
+          <button id="ranking-refresh" type="button">更新</button>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="./game.js"></script>
+  </body>
+</html>

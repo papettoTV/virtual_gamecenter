@@ -1,0 +1,8 @@
+name = "graze-duel-ranking-api"
+main = "src/index.js"
+compatibility_date = "2026-07-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "graze-duel-rankings"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"

@@ -1,0 +1,334 @@
+:root {
+  color-scheme: dark;
+  --bg: #090b18;
+  --panel: #14182c;
+  --text: #f4f7ff;
+  --muted: #aab4d6;
+  --accent: #69f7ff;
+  --danger: #ff4e8a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+button,
+canvas,
+.game-frame,
+.touch-controls,
+.touch-actions,
+.touch-button {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(105, 247, 255, 0.16), transparent 32rem),
+    radial-gradient(circle at top right, rgba(255, 78, 138, 0.14), transparent 28rem),
+    var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  overscroll-behavior: none;
+}
+
+.shell {
+  width: min(1040px, calc(100vw - 24px));
+  margin: 0 auto;
+  padding: 28px 0 48px;
+}
+
+.intro {
+  margin-bottom: 18px;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 0 0 8px;
+  font-size: clamp(36px, 7vw, 72px);
+  line-height: 0.95;
+}
+
+p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.8;
+}
+
+.hud {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0;
+}
+
+.hud div,
+.notes,
+.ranking-panel {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  background: rgba(20, 24, 44, 0.72);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.22);
+  padding: 14px 16px;
+}
+
+.hud strong,
+.hud span {
+  display: block;
+}
+
+.hud strong {
+  margin-bottom: 6px;
+  color: var(--text);
+}
+
+.hud span {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.debug-panel {
+  grid-column: 1 / -1;
+}
+
+.debug-panel input {
+  width: 100%;
+  margin: 8px 0 4px;
+  accent-color: var(--accent);
+}
+
+.debug-panel b {
+  color: var(--accent);
+}
+
+.debug-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.debug-toggle input {
+  width: auto;
+  margin: 0;
+}
+
+.debug-stepper {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.debug-stepper strong {
+  width: 100%;
+  color: var(--text);
+}
+
+.debug-stepper button {
+  width: 34px;
+  height: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: rgba(105, 247, 255, 0.12);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.debug-stepper b {
+  min-width: 32px;
+  color: var(--accent);
+  text-align: center;
+}
+
+.game-frame {
+  position: relative;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 20px;
+  background: #050713;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+  touch-action: none;
+}
+
+.touch-controls {
+  display: none;
+  color: var(--muted);
+  font-size: 14px;
+  touch-action: none;
+}
+
+.touch-help {
+  line-height: 1.6;
+}
+
+.touch-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.touch-button {
+  min-width: 118px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+  background: rgba(20, 24, 44, 0.86);
+  color: var(--text);
+  font: inherit;
+  font-weight: 800;
+  padding: 10px 12px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.notes {
+  margin-top: 18px;
+}
+
+.ranking-panel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.ranking-panel h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.ranking-panel p {
+  min-height: 1.8em;
+  font-size: 14px;
+}
+
+.ranking-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.ranking-form input {
+  min-width: 0;
+  flex: 1;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  font: inherit;
+  padding: 10px 12px;
+}
+
+.ranking-form button,
+.ranking-list button {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  background: rgba(105, 247, 255, 0.12);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  padding: 10px 12px;
+}
+
+.ranking-form button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.ranking-list ol {
+  margin: 0 0 10px;
+  padding-left: 1.4em;
+  color: var(--muted);
+  line-height: 1.8;
+}
+
+.ranking-list li strong {
+  color: var(--text);
+}
+
+.notes h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.notes ul {
+  margin: 0;
+  padding-left: 1.3em;
+  color: var(--muted);
+  line-height: 1.8;
+}
+
+@media (max-width: 720px) {
+  .hud {
+    grid-template-columns: 1fr;
+  }
+
+  .shell {
+    width: min(100vw - 12px, 1040px);
+    padding-top: 14px;
+  }
+
+  .intro p,
+  .notes {
+    display: none;
+  }
+
+  .ranking-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .touch-controls {
+    display: block;
+    margin: 12px 0 0;
+    pointer-events: none;
+  }
+
+  .touch-actions {
+    pointer-events: auto;
+  }
+
+  .touch-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .touch-button {
+    min-width: 0;
+    width: 100%;
+    padding: 9px 10px;
+    background: rgba(8, 10, 24, 0.72);
+    backdrop-filter: blur(6px);
+  }
+
+  canvas {
+    aspect-ratio: 9 / 14;
+    height: min(72vh, 760px);
+    object-fit: cover;
+    object-position: center;
+  }
+}
