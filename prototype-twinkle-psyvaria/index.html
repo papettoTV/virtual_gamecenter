@@ -30,22 +30,6 @@
           <span>攻撃すると相手は危険になるが、かすりコンボもしやすくなる</span>
           <span>連続かすりで倍率が上がる</span>
         </div>
-        <div class="debug-panel">
-          <label for="bullet-density"><strong>デバッグ: 敵弾量</strong></label>
-          <input id="bullet-density" type="range" min="1" max="10" step="1" value="2" />
-          <span><b id="bullet-density-value">2</b> / 10</span>
-          <label class="debug-toggle">
-            <input id="player-hitbox-toggle" type="checkbox" checked />
-            <span>自機の当たり判定あり</span>
-          </label>
-          <div class="debug-stepper" aria-label="レベルごとの必要ゲージ増加量">
-            <strong>デバッグ: ゲージ増加難度</strong>
-            <button id="gauge-growth-down" type="button">−</button>
-            <b id="gauge-growth-value">30</b>
-            <button id="gauge-growth-up" type="button">＋</button>
-            <span>レベルごとに必要ゲージ +<b id="gauge-growth-label">30</b></span>
-          </div>
-        </div>
       </section>
 
       <div class="game-frame">
@@ -59,17 +43,8 @@
         </div>
       </div>
 
-      <section class="notes">
-        <h2>今回の試作で見ること</h2>
-        <ul>
-          <li>かすり続ける緊張感が楽しいか</li>
-          <li>攻撃が相手へのリスクと報酬の両方になっているか</li>
-          <li>短い試合で盛り上がりが生まれるか</li>
-        </ul>
-      </section>
-
       <section class="ranking-panel">
-        <div class="ranking-submit">
+        <div class="ranking-submit" id="ranking-submit-panel">
           <h2>ランキング登録</h2>
           <p id="ranking-result">クリアするとタイムを登録できます。</p>
           <div class="ranking-form">

@@ -11,6 +11,7 @@ const touchRestart = document.querySelector("#touch-restart");
 const touchPause = document.querySelector("#touch-pause");
 const rankingNameInput = document.querySelector("#ranking-name");
 const rankingSubmitButton = document.querySelector("#ranking-submit");
+const rankingSubmitPanel = document.querySelector("#ranking-submit-panel");
 const rankingResult = document.querySelector("#ranking-result");
 const rankingList = document.querySelector("#ranking-list");
 const rankingRefresh = document.querySelector("#ranking-refresh");
@@ -181,6 +182,7 @@ function resetGame() {
   clearGame = false;
   lastClearResult = null;
   rankingSubmittedForClear = false;
+  rankingSubmitPanel?.classList.remove("is-visible");
   updateRankingSubmitState();
   resetBossProgress();
 }
@@ -431,6 +433,7 @@ function recordClearResult() {
   if (rankingResult) {
     rankingResult.textContent = `クリアタイム ${formatRankingTime(lastClearResult.clearTimeMs)} を登録できます。`;
   }
+  rankingSubmitPanel?.classList.add("is-visible");
   updateRankingSubmitState();
 }
 

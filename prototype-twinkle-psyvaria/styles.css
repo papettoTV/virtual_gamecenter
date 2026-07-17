@@ -76,7 +76,6 @@ p {
 }
 
 .hud div,
-.notes,
 .ranking-panel {
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 16px;
@@ -99,67 +98,6 @@ p {
   color: var(--muted);
   font-size: 14px;
   line-height: 1.7;
-}
-
-.debug-panel {
-  grid-column: 1 / -1;
-}
-
-.debug-panel input {
-  width: 100%;
-  margin: 8px 0 4px;
-  accent-color: var(--accent);
-}
-
-.debug-panel b {
-  color: var(--accent);
-}
-
-.debug-toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-  color: var(--muted);
-  font-size: 14px;
-}
-
-.debug-toggle input {
-  width: auto;
-  margin: 0;
-}
-
-.debug-stepper {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 10px;
-  color: var(--muted);
-  font-size: 14px;
-}
-
-.debug-stepper strong {
-  width: 100%;
-  color: var(--text);
-}
-
-.debug-stepper button {
-  width: 34px;
-  height: 30px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 8px;
-  background: rgba(105, 247, 255, 0.12);
-  color: var(--text);
-  cursor: pointer;
-  font-size: 18px;
-  font-weight: 800;
-}
-
-.debug-stepper b {
-  min-width: 32px;
-  color: var(--accent);
-  text-align: center;
 }
 
 .game-frame {
@@ -206,15 +144,19 @@ canvas {
   -webkit-tap-highlight-color: transparent;
 }
 
-.notes {
+.ranking-panel {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 18px;
   margin-top: 18px;
 }
 
-.ranking-panel {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
-  margin-top: 18px;
+.ranking-submit {
+  display: none;
+}
+
+.ranking-submit.is-visible {
+  display: block;
 }
 
 .ranking-panel h2 {
@@ -272,18 +214,6 @@ canvas {
   color: var(--text);
 }
 
-.notes h2 {
-  margin: 0 0 8px;
-  font-size: 18px;
-}
-
-.notes ul {
-  margin: 0;
-  padding-left: 1.3em;
-  color: var(--muted);
-  line-height: 1.8;
-}
-
 @media (max-width: 720px) {
   .hud {
     grid-template-columns: 1fr;
@@ -294,13 +224,8 @@ canvas {
     padding-top: 14px;
   }
 
-  .intro p,
-  .notes {
+  .intro p {
     display: none;
-  }
-
-  .ranking-panel {
-    grid-template-columns: 1fr;
   }
 
   .touch-controls {
