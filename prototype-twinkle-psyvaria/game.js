@@ -1428,6 +1428,11 @@ function drawLevelUpLightning(player) {
 }
 
 function drawPlayerHud(player) {
+  if (isCompactView() && !player.cpu) {
+    drawCompactPlayerHud(player);
+    return;
+  }
+
   const panelX = isCompactView() && !player.cpu ? 44 : player.fieldX;
   const panelY = 18;
   context.fillStyle = "rgba(0,0,0,0.3)";
@@ -1443,7 +1448,7 @@ function drawPlayerHud(player) {
   context.fillText(`SCORE ${player.score}`, panelX + 78, panelY + 28);
   context.fillText(`LV ${player.level}`, panelX + 190, panelY + 28);
   context.fillText(`x${player.multiplier.toFixed(1)} / ${player.combo}`, panelX + 250, panelY + 28);
-  context.fillText(player.cpu ? "♥ ∞" : `♥ ${player.lives}`, panelX + 316, panelY + 28);
+  context.fillText(formatLives(player), panelX + 316, panelY + 28);
 
   const gaugeWidth = FIELD_WIDTH - 32;
   const attackCost = getAttackCost(player);
@@ -1464,6 +1469,55 @@ function drawPlayerHud(player) {
     context.font = "700 12px system-ui";
     context.fillText(`GAUGE ${Math.floor(player.gauge)} / ${attackCost}`, panelX + 16, panelY + 58);
   }
+}
+
+function drawCompactPlayerHud(player) {
+  const visibleLeft = WIDTH / 2 - FIELD_WIDTH / 2;
+  const panelY = 18;
+  const leftPanelWidth = 150;
+  const rightPanelX = WIDTH / 2 + 62;
+  const rightPanelWidth = 134;
+
+  context.save();
+  context.fillStyle = "rgba(0,0,0,0.42)";
+  roundRect(visibleLeft, panelY, leftPanelWidth, 58, 12);
+  context.fill();
+  roundRect(rightPanelX, panelY, rightPanelWidth, 58, 12);
+  context.fill();
+
+  context.fillStyle = player.color;
+  context.font = "800 13px system-ui";
+  context.fillText(player.label, visibleLeft + 12, panelY + 22);
+
+  context.fillStyle = "#f4f7ff";
+  context.font = "700 12px system-ui";
+  context.fillText(`SCORE ${player.score}`, visibleLeft + 12, panelY + 42);
+
+  const attackCost = getAttackCost(player);
+  const gaugeRatio = Math.min(1, player.gauge / attackCost);
+  context.fillStyle = "rgba(255,255,255,0.14)";
+  roundRect(visibleLeft + 12, panelY + 48, leftPanelWidth - 24, 5, 5);
+  context.fill();
+  context.fillStyle = player.gauge >= attackCost ? player.color : "rgba(255,255,255,0.55)";
+  roundRect(visibleLeft + 12, panelY + 48, (leftPanelWidth - 24) * gaugeRatio, 5, 5);
+  context.fill();
+
+  context.fillStyle = "#f4f7ff";
+  context.font = "700 12px system-ui";
+  context.fillText(`LV ${player.level}`, rightPanelX + 12, panelY + 22);
+  context.fillText(formatLives(player), rightPanelX + 66, panelY + 22);
+
+  context.fillStyle = "rgba(255,255,255,0.72)";
+  context.font = "700 11px system-ui";
+  context.fillText(`x${player.multiplier.toFixed(1)} / ${player.combo}`, rightPanelX + 12, panelY + 43);
+  context.restore();
+}
+
+function formatLives(player) {
+  if (player.cpu) return "♥∞";
+  const filled = "♥".repeat(Math.max(0, player.lives));
+  const empty = "♡".repeat(Math.max(0, MAX_LIVES - player.lives));
+  return filled + empty;
 }
 
 function drawOpponentInfoHud(opponent) {
