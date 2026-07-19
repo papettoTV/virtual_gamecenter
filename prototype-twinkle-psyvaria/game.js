@@ -1,5 +1,12 @@
 const canvas = document.querySelector("#game");
 const context = canvas.getContext("2d");
+const arcadeScreen = document.querySelector("#arcade-screen");
+const cabinetScreen = document.querySelector("#cabinet-screen");
+const gameScreen = document.querySelector("#game-screen");
+const selectGameButton = document.querySelector("#select-game");
+const startSoloButton = document.querySelector("#start-solo");
+const backToArcadeButton = document.querySelector("#back-to-arcade");
+const cabinetStatusLabel = document.querySelector("#cabinet-status-label");
 const bulletDensityInput = document.querySelector("#bullet-density");
 const bulletDensityValue = document.querySelector("#bullet-density-value");
 const playerHitboxToggle = document.querySelector("#player-hitbox-toggle");
@@ -91,6 +98,8 @@ let lastClearResult = null;
 let rankingSubmittedForClear = false;
 let debugRankingPreviewEnabled = false;
 let debugRankingPreviewShown = false;
+let currentScreen = "arcade";
+let gameSessionActive = false;
 
 const boss = {
   active: false,
@@ -225,6 +234,26 @@ function startBossPhase(phaseIndex) {
 }
 
 resetGame();
+showScreen("arcade");
+
+if (selectGameButton) {
+  selectGameButton.addEventListener("click", () => {
+    showScreen("cabinet");
+  });
+}
+
+if (backToArcadeButton) {
+  backToArcadeButton.addEventListener("click", () => {
+    gameSessionActive = false;
+    showScreen("arcade");
+  });
+}
+
+if (startSoloButton) {
+  startSoloButton.addEventListener("click", () => {
+    startSoloPlay();
+  });
+}
 
 if (bulletDensityInput && bulletDensityValue) {
   bulletDensityInput.addEventListener("input", () => {
@@ -315,14 +344,31 @@ function updateGaugeGrowth(delta) {
   gaugeGrowthLabel.textContent = String(gaugeGrowthPerLevel);
 }
 
+function showScreen(screen) {
+  currentScreen = screen;
+  arcadeScreen?.classList.toggle("is-hidden", screen !== "arcade");
+  cabinetScreen?.classList.toggle("is-hidden", screen !== "cabinet");
+  gameScreen?.classList.toggle("is-hidden", screen !== "game");
+  if (cabinetStatusLabel) {
+    cabinetStatusLabel.textContent = gameSessionActive ? "ソロプレイ中" : "空き";
+  }
+}
+
+function startSoloPlay() {
+  resetGame();
+  gameSessionActive = true;
+  lastTime = performance.now();
+  showScreen("game");
+}
+
 window.addEventListener("keydown", (event) => {
   if (event.code === "Space") {
     event.preventDefault();
-    if (!gameOver) paused = !paused;
+    if (currentScreen === "game" && !gameOver) paused = !paused;
     return;
   }
   keys.add(event.code);
-  if (event.code === "KeyR") resetGame();
+  if (event.code === "KeyR" && currentScreen === "game") startSoloPlay();
 });
 
 window.addEventListener("keyup", (event) => {
@@ -341,6 +387,7 @@ requestAnimationFrame(loop);
 loadRanking();
 
 function update(delta) {
+  if (currentScreen !== "game" || !gameSessionActive) return;
   if (paused) return;
 
   if (!gameOver) elapsedRound += delta;
@@ -1090,6 +1137,7 @@ function createHitExplosion(x, y, color) {
 }
 
 function draw() {
+  if (currentScreen !== "game") return;
   context.clearRect(0, 0, WIDTH, HEIGHT);
   drawBackground();
   if (isCompactView()) {

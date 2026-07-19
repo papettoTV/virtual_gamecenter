@@ -16,7 +16,40 @@
         </p>
       </section>
 
-      <section class="hud">
+      <section class="arcade-screen" id="arcade-screen">
+        <div class="arcade-card">
+          <p class="eyebrow">Game Center</p>
+          <h2>ゲームセンター</h2>
+          <p>遊ぶゲームを選んでください。現在は1ゲーム・1筐体のフリープレイです。</p>
+          <div class="game-select-card">
+            <div>
+              <strong>Graze Duel</strong>
+              <span>弾幕かすり・無敵体当たり・ボス撃破型シューティング</span>
+              <small>筐体1: 空き / Free Play</small>
+            </div>
+            <button id="select-game" type="button">このゲームを選ぶ</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="cabinet-screen is-hidden" id="cabinet-screen">
+        <div class="arcade-card">
+          <p class="eyebrow">Cabinet 1</p>
+          <h2>Graze Duel</h2>
+          <p>筐体1を選択中です。現在はフリープレイのため、クレジット消費なしで開始できます。</p>
+          <div class="cabinet-status">
+            <strong>筐体状態</strong>
+            <span id="cabinet-status-label">空き</span>
+          </div>
+          <div class="screen-actions">
+            <button id="start-solo" type="button">ゲームスタート</button>
+            <button id="back-to-arcade" class="secondary-button" type="button">ゲームセンターに戻る</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="game-screen is-hidden" id="game-screen">
+        <section class="hud">
         <div>
           <strong>操作</strong>
           <span>移動: 矢印キー / WASD</span>
@@ -50,9 +83,9 @@
             <span>レベルごとに必要ゲージ +<b id="gauge-growth-label">30</b></span>
           </div>
         </div>
-      </section>
+        </section>
 
-      <div class="game-frame">
+        <div class="game-frame">
         <canvas id="game" width="960" height="640" aria-label="Graze Duel game canvas"></canvas>
         <div class="ranking-submit ranking-overlay" id="ranking-submit-panel">
           <h2>ランキング登録</h2>
@@ -63,21 +96,22 @@
           </div>
           <button id="clear-restart" class="clear-restart-button" type="button">リスタート</button>
         </div>
-      </div>
+        </div>
 
-      <div class="touch-controls" aria-label="スマホ操作">
+        <div class="touch-controls" aria-label="スマホ操作">
         <div class="touch-actions">
           <button id="touch-restart" class="touch-button" type="button">リスタート</button>
           <button id="touch-pause" class="touch-button" type="button">一時停止</button>
         </div>
-      </div>
+        </div>
 
-      <section class="ranking-panel">
+        <section class="ranking-panel">
         <div class="ranking-list">
           <h2>クリアタイムランキング</h2>
           <ol id="ranking-list"></ol>
           <button id="ranking-refresh" type="button">更新</button>
         </div>
+        </section>
       </section>
     </main>
     <script type="module" src="./game.js"></script>
