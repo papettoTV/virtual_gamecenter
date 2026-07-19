@@ -14,6 +14,10 @@ const cabinetStatusLabel = document.querySelector("#cabinet-status-label");
 const cabinetSummary = document.querySelector("#cabinet-summary");
 const cabinetDescription = document.querySelector("#cabinet-description");
 const cabinetRoleLabel = document.querySelector("#cabinet-role-label");
+const cabinetIdLabel = document.querySelector("#cabinet-id-label");
+const cabinetUrlInput = document.querySelector("#cabinet-url");
+const copyCabinetUrlButton = document.querySelector("#copy-cabinet-url");
+const cabinetCopyStatus = document.querySelector("#cabinet-copy-status");
 const spectatorBanner = document.querySelector("#spectator-banner");
 const bulletDensityInput = document.querySelector("#bullet-density");
 const bulletDensityValue = document.querySelector("#bullet-density-value");
@@ -114,6 +118,7 @@ let latestViewerSnapshot = null;
 let snapshotSequence = 0;
 let snapshotTimer = 0;
 let cabinetConnected = false;
+let currentCabinetId = null;
 
 const boss = {
   active: false,
@@ -137,7 +142,6 @@ const players = [
 const cabinetClient = createCabinetClient({
   onConnectionChange: (connected) => {
     cabinetConnected = connected;
-    if (!connected && cabinetSummary) cabinetSummary.textContent = "筐体1: サーバー未接続 / Free Play";
     updateCabinetUi();
   },
   onMessage: handleCabinetMessage,
@@ -260,11 +264,11 @@ function startBossPhase(phaseIndex) {
 }
 
 resetGame();
-showScreen("arcade");
+syncScreenWithUrl();
 
 if (selectGameButton) {
   selectGameButton.addEventListener("click", () => {
-    enterCabinet();
+    enterCabinet(crypto.randomUUID());
   });
 }
 
@@ -291,6 +295,12 @@ if (startSoloButton) {
     startSoloPlay();
   });
 }
+
+if (copyCabinetUrlButton) {
+  copyCabinetUrlButton.addEventListener("click", copyCabinetUrl);
+}
+
+window.addEventListener("popstate", syncScreenWithUrl);
 
 if (bulletDensityInput && bulletDensityValue) {
   bulletDensityInput.addEventListener("input", () => {
@@ -393,24 +403,29 @@ function showScreen(screen) {
   arcadeScreen?.classList.toggle("is-hidden", screen !== "arcade");
   cabinetScreen?.classList.toggle("is-hidden", screen !== "cabinet");
   gameScreen?.classList.toggle("is-hidden", screen !== "game");
-  if (cabinetStatusLabel) {
-    cabinetStatusLabel.textContent = gameSessionActive ? "ソロプレイ中" : "空き";
-  }
 }
 
-function enterCabinet() {
+function enterCabinet(cabinetId, updateUrl = true) {
+  if (!cabinetId) return;
+  if (currentCabinetId && currentCabinetId !== cabinetId) cabinetClient.leave();
+  currentCabinetId = cabinetId;
   cabinetRole = "joining";
+  cabinetConnected = false;
+  cabinetState = null;
   latestViewerSnapshot = null;
+  if (updateUrl) history.pushState({ cabinetId }, "", `/cabinets/${cabinetId}`);
+  if (cabinetIdLabel) cabinetIdLabel.textContent = `Cabinet ${cabinetId.slice(0, 8)}`;
+  updateCabinetShareUrl();
   updateCabinetUi();
   showScreen("cabinet");
-  cabinetClient.join();
+  cabinetClient.join(cabinetId);
 }
 
 function startSoloPlay() {
   if (!cabinetConnected) {
     cabinetRole = "joining";
     updateCabinetUi();
-    cabinetClient.join();
+    cabinetClient.join(currentCabinetId);
     return;
   }
   if (cabinetRole === "spectator") {
@@ -438,16 +453,65 @@ function startSpectating() {
   showScreen("game");
 }
 
-function leaveCabinet() {
+function leaveCabinet(updateUrl = true) {
   cabinetClient.leave();
+  currentCabinetId = null;
   cabinetRole = "visitor";
+  cabinetConnected = false;
+  cabinetState = null;
   latestViewerSnapshot = null;
   gameSessionActive = false;
   paused = false;
   document.body.classList.remove("is-spectator");
   spectatorBanner?.classList.add("is-hidden");
   if (touchPause) touchPause.textContent = "一時停止";
+  if (updateUrl) history.pushState({}, "", "/");
+  if (cabinetSummary) cabinetSummary.textContent = "新しい筐体を作成 / Free Play";
   showScreen("arcade");
+}
+
+function syncScreenWithUrl() {
+  const cabinetId = getCabinetIdFromPath();
+  if (cabinetId) {
+    enterCabinet(cabinetId, false);
+    return;
+  }
+  if (currentCabinetId) leaveCabinet(false);
+  else showScreen("arcade");
+}
+
+function getCabinetIdFromPath() {
+  const match = window.location.pathname.match(/^\/cabinets\/([a-zA-Z0-9-]+)\/?$/);
+  return match?.[1] ?? null;
+}
+
+async function updateCabinetShareUrl() {
+  if (!cabinetUrlInput || !currentCabinetId) return;
+  let shareOrigin = window.location.origin;
+  if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+    try {
+      const response = await fetch("/api/local-address");
+      if (response.ok) {
+        const localAddress = await response.json();
+        shareOrigin = `http://${localAddress.address}:${localAddress.port}`;
+      }
+    } catch {
+      shareOrigin = window.location.origin;
+    }
+  }
+  cabinetUrlInput.value = `${shareOrigin}/cabinets/${currentCabinetId}`;
+}
+
+async function copyCabinetUrl() {
+  if (!cabinetUrlInput?.value) return;
+  try {
+    await navigator.clipboard.writeText(cabinetUrlInput.value);
+  } catch {
+    cabinetUrlInput.select();
+    document.execCommand("copy");
+    cabinetUrlInput.setSelectionRange(0, 0);
+  }
+  if (cabinetCopyStatus) cabinetCopyStatus.textContent = "コピーしました。同じWi-Fiの端末で開けます。";
 }
 
 function handleCabinetMessage(message) {
@@ -487,12 +551,7 @@ function updateCabinetUi() {
     soloPlaying: "ソロプレイ中",
   };
   const statusLabel = statusLabels[cabinetState?.status] ?? "接続中";
-  const spectatorCount = cabinetState?.spectatorCount ?? 0;
 
-  if (cabinetSummary) {
-    const spectators = spectatorCount > 0 ? `・観戦 ${spectatorCount}人` : "";
-    cabinetSummary.textContent = `筐体1: ${statusLabel}${spectators} / Free Play`;
-  }
   if (cabinetStatusLabel) cabinetStatusLabel.textContent = statusLabel;
   if (!startSoloButton) return;
 
@@ -510,7 +569,7 @@ function updateCabinetUi() {
     startSoloButton.disabled = false;
     startSoloButton.textContent = "ゲームスタート";
     if (cabinetDescription) {
-      cabinetDescription.textContent = "筐体1に着席しています。フリープレイでソロプレイを開始できます。";
+      cabinetDescription.textContent = "この筐体に着席しています。フリープレイでソロプレイを開始できます。";
     }
     if (cabinetRoleLabel) cabinetRoleLabel.textContent = "あなたがプレイヤーです";
     return;

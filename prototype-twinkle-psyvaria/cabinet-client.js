@@ -5,15 +5,16 @@ export function createCabinetClient(handlers = {}) {
   }
 
   let socket = null;
+  let cabinetId = null;
   let wantsCabinet = false;
   let reconnectTimer = null;
 
   function connect() {
-    if (socket && socket.readyState <= WebSocket.OPEN) return;
+    if (!cabinetId || (socket && socket.readyState <= WebSocket.OPEN)) return;
     clearTimeout(reconnectTimer);
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     try {
-      socket = new WebSocket(`${protocol}//${window.location.host}/api/cabinets/cabinet-1/ws`);
+      socket = new WebSocket(`${protocol}//${window.location.host}/api/cabinets/${cabinetId}/ws`);
     } catch {
       socket = null;
       handlers.onConnectionChange?.(false);
@@ -28,7 +29,7 @@ export function createCabinetClient(handlers = {}) {
     socket.addEventListener("close", () => {
       socket = null;
       handlers.onConnectionChange?.(false);
-      reconnectTimer = setTimeout(connect, 1000);
+      if (wantsCabinet) reconnectTimer = setTimeout(connect, 1000);
     });
     socket.addEventListener("error", () => handlers.onConnectionChange?.(false));
     socket.addEventListener("message", (event) => {
@@ -49,17 +50,26 @@ export function createCabinetClient(handlers = {}) {
     return false;
   }
 
-  function join() {
+  function join(nextCabinetId) {
+    if (cabinetId !== nextCabinetId) {
+      wantsCabinet = false;
+      socket?.close();
+      socket = null;
+      cabinetId = nextCabinetId;
+    }
     wantsCabinet = true;
     send({ type: "joinCabinet" });
   }
 
   function leave() {
     wantsCabinet = false;
-    send({ type: "leaveCabinet" });
+    clearTimeout(reconnectTimer);
+    if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "leaveCabinet" }));
+    socket?.close();
+    socket = null;
+    cabinetId = null;
+    handlers.onConnectionChange?.(false);
   }
-
-  connect();
 
   return { join, leave, send };
 }

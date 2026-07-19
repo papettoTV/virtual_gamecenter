@@ -26,7 +26,7 @@
             <div class="section-heading">
               <div>
                 <h2>ゲーム一覧</h2>
-                <p>遊ぶゲームを選んでください。現在は1ゲーム・1筐体のフリープレイです。</p>
+                <p>遊ぶゲームを選ぶと、新しい筐体URLを発行します。URLを共有すると他の人が観戦できます。</p>
               </div>
             </div>
             <div class="game-select-card">
@@ -34,9 +34,9 @@
               <div class="game-card-body">
                 <strong>Graze Duel</strong>
                 <span>弾幕かすり・無敵体当たり・ボス撃破型シューティング</span>
-                <small id="cabinet-summary">筐体1: 接続中 / Free Play</small>
+                <small id="cabinet-summary">新しい筐体を作成 / Free Play</small>
               </div>
-              <button id="select-game" type="button">このゲームを選ぶ</button>
+              <button id="select-game" type="button">筐体を作成</button>
             </div>
             <div class="game-select-card is-disabled">
               <div class="game-card-thumb" aria-hidden="true">?</div>
@@ -60,9 +60,9 @@
           </nav>
           <div class="arcade-heading">
             <div>
-              <p class="eyebrow">Cabinet 1</p>
+              <p class="eyebrow" id="cabinet-id-label">Cabinet</p>
               <h2>Graze Duel</h2>
-              <p id="cabinet-description">筐体1へ接続しています。</p>
+              <p id="cabinet-description">筐体へ接続しています。</p>
             </div>
           </div>
 
@@ -70,6 +70,14 @@
             <strong>筐体状態</strong>
             <span id="cabinet-status-label">空き</span>
             <small id="cabinet-role-label">接続中</small>
+          </div>
+          <div class="cabinet-share">
+            <label for="cabinet-url"><strong>筐体共有URL</strong></label>
+            <div>
+              <input id="cabinet-url" type="text" readonly />
+              <button id="copy-cabinet-url" type="button">URLをコピー</button>
+            </div>
+            <small id="cabinet-copy-status">このURLを開くと同じ筐体を観戦できます。</small>
           </div>
           <section class="cabinet-help-grid" aria-label="遊び方">
             <div>
@@ -99,7 +107,7 @@
         </div>
         <div class="game-nav">
           <button id="game-back-to-arcade" class="secondary-button" type="button">ゲームセンターに戻る</button>
-          <span>ゲームセンター &gt; ゲーム一覧 &gt; Graze Duel &gt; 筐体1</span>
+          <span>ゲームセンター &gt; ゲーム一覧 &gt; Graze Duel &gt; 共有筐体</span>
         </div>
         <details class="debug-panel" id="debug-panel">
           <summary>デバッグ設定</summary>
