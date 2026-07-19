@@ -18,25 +18,59 @@
 
       <section class="arcade-screen" id="arcade-screen">
         <div class="arcade-card">
-          <p class="eyebrow">Game Center</p>
-          <h2>ゲームセンター</h2>
-          <p>遊ぶゲームを選んでください。現在は1ゲーム・1筐体のフリープレイです。</p>
-          <div class="game-select-card">
+          <nav class="breadcrumb" aria-label="現在位置">
+            <span>ゲームセンター</span>
+          </nav>
+          <div class="arcade-heading">
             <div>
-              <strong>Graze Duel</strong>
-              <span>弾幕かすり・無敵体当たり・ボス撃破型シューティング</span>
-              <small>筐体1: 空き / Free Play</small>
+              <p class="eyebrow">Game Center</p>
+              <h2>ゲームセンター</h2>
+              <p>遊ぶゲームを選んでください。現在は1ゲーム・1筐体のフリープレイです。</p>
             </div>
-            <button id="select-game" type="button">このゲームを選ぶ</button>
           </div>
+
+          <section class="game-list" aria-label="ゲーム一覧">
+            <div class="section-heading">
+              <h3>ゲーム一覧</h3>
+              <span>Games</span>
+            </div>
+            <div class="game-select-card">
+              <div class="game-card-thumb" aria-hidden="true">GD</div>
+              <div class="game-card-body">
+                <strong>Graze Duel</strong>
+                <span>弾幕かすり・無敵体当たり・ボス撃破型シューティング</span>
+                <small>筐体1: 空き / Free Play</small>
+              </div>
+              <button id="select-game" type="button">このゲームを選ぶ</button>
+            </div>
+            <div class="game-select-card is-disabled">
+              <div class="game-card-thumb" aria-hidden="true">?</div>
+              <div class="game-card-body">
+                <strong>Coming Soon</strong>
+                <span>今後、別ゲームやレトロゲームを追加予定</span>
+                <small>準備中</small>
+              </div>
+              <button type="button" disabled>準備中</button>
+            </div>
+          </section>
         </div>
       </section>
 
       <section class="cabinet-screen is-hidden" id="cabinet-screen">
         <div class="arcade-card">
-          <p class="eyebrow">Cabinet 1</p>
-          <h2>Graze Duel</h2>
-          <p>筐体1を選択中です。現在はフリープレイのため、クレジット消費なしで開始できます。</p>
+          <nav class="breadcrumb" aria-label="現在位置">
+            <button id="cabinet-breadcrumb-arcade" type="button">ゲームセンター</button>
+            <span>ゲーム一覧</span>
+            <span>Graze Duel</span>
+          </nav>
+          <div class="arcade-heading">
+            <div>
+              <p class="eyebrow">Cabinet 1</p>
+              <h2>Graze Duel</h2>
+              <p>筐体1を選択中です。現在はフリープレイのため、クレジット消費なしで開始できます。</p>
+            </div>
+          </div>
+
           <div class="cabinet-status">
             <strong>筐体状態</strong>
             <span id="cabinet-status-label">空き</span>
@@ -49,6 +83,10 @@
       </section>
 
       <section class="game-screen is-hidden" id="game-screen">
+        <div class="game-nav">
+          <button id="game-back-to-arcade" class="secondary-button" type="button">ゲームセンターに戻る</button>
+          <span>ゲームセンター &gt; ゲーム一覧 &gt; Graze Duel &gt; 筐体1</span>
+        </div>
         <section class="hud">
         <div>
           <strong>操作</strong>

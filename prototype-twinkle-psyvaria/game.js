@@ -6,6 +6,8 @@ const gameScreen = document.querySelector("#game-screen");
 const selectGameButton = document.querySelector("#select-game");
 const startSoloButton = document.querySelector("#start-solo");
 const backToArcadeButton = document.querySelector("#back-to-arcade");
+const cabinetBreadcrumbArcade = document.querySelector("#cabinet-breadcrumb-arcade");
+const gameBackToArcadeButton = document.querySelector("#game-back-to-arcade");
 const cabinetStatusLabel = document.querySelector("#cabinet-status-label");
 const bulletDensityInput = document.querySelector("#bullet-density");
 const bulletDensityValue = document.querySelector("#bullet-density-value");
@@ -244,8 +246,19 @@ if (selectGameButton) {
 
 if (backToArcadeButton) {
   backToArcadeButton.addEventListener("click", () => {
-    gameSessionActive = false;
-    showScreen("arcade");
+    leaveCabinet();
+  });
+}
+
+if (cabinetBreadcrumbArcade) {
+  cabinetBreadcrumbArcade.addEventListener("click", () => {
+    leaveCabinet();
+  });
+}
+
+if (gameBackToArcadeButton) {
+  gameBackToArcadeButton.addEventListener("click", () => {
+    leaveCabinet();
   });
 }
 
@@ -359,6 +372,13 @@ function startSoloPlay() {
   gameSessionActive = true;
   lastTime = performance.now();
   showScreen("game");
+}
+
+function leaveCabinet() {
+  gameSessionActive = false;
+  paused = false;
+  if (touchPause) touchPause.textContent = "一時停止";
+  showScreen("arcade");
 }
 
 window.addEventListener("keydown", (event) => {
