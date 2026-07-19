@@ -47,6 +47,10 @@ body {
   margin-bottom: 18px;
 }
 
+.is-game-screen .intro {
+  display: none;
+}
+
 .eyebrow {
   margin: 0 0 6px;
   color: var(--accent);
@@ -127,19 +131,24 @@ p {
 }
 
 .game-list {
-  margin-top: 22px;
+  margin-top: 4px;
 }
 
 .section-heading {
   display: flex;
-  align-items: baseline;
+  align-items: flex-end;
+  justify-content: space-between;
   gap: 10px;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
-.section-heading h3 {
-  margin: 0;
-  font-size: 22px;
+.section-heading h2 {
+  margin: 0 0 4px;
+  font-size: clamp(24px, 4vw, 36px);
+}
+
+.section-heading p {
+  font-size: 14px;
 }
 
 .section-heading span {
@@ -234,12 +243,41 @@ p {
   padding: 14px 16px;
 }
 
+.cabinet-help-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.cabinet-help-grid > div {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  background: rgba(8, 10, 24, 0.34);
+  padding: 14px 16px;
+}
+
+.cabinet-help-grid strong,
+.cabinet-help-grid span {
+  display: block;
+}
+
+.cabinet-help-grid strong {
+  margin-bottom: 6px;
+}
+
+.cabinet-help-grid span {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
 .game-nav {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin: 18px 0 0;
+  margin: 0 0 12px;
   color: var(--muted);
   font-size: 13px;
 }
@@ -255,14 +293,6 @@ p {
   padding: 9px 12px;
 }
 
-.hud {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin: 18px 0;
-}
-
-.hud div,
 .ranking-panel {
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 16px;
@@ -271,29 +301,34 @@ p {
   padding: 14px 16px;
 }
 
-.hud strong,
-.hud span {
-  display: block;
-}
-
-.hud strong {
-  margin-bottom: 6px;
-  color: var(--text);
-}
-
-.hud span {
-  color: var(--muted);
-  font-size: 14px;
-  line-height: 1.7;
-}
-
 .debug-panel {
   display: none;
-  grid-column: 1 / -1;
+  margin: 0 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(20, 24, 44, 0.72);
+  color: var(--text);
 }
 
 .is-local-dev .debug-panel {
   display: block;
+}
+
+.debug-panel summary {
+  cursor: pointer;
+  padding: 10px 14px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  touch-action: manipulation;
+}
+
+.debug-panel[open] summary {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.debug-panel-body {
+  padding: 12px 14px 14px;
 }
 
 .debug-panel input {
@@ -500,12 +535,10 @@ canvas {
   .game-select-card,
   .arcade-heading,
   .game-nav,
-  .screen-actions {
+  .screen-actions,
+  .cabinet-help-grid,
+  .section-heading {
     display: grid;
-    grid-template-columns: 1fr;
-  }
-
-  .hud {
     grid-template-columns: 1fr;
   }
 
@@ -515,6 +548,14 @@ canvas {
   }
 
   .intro p {
+    display: none;
+  }
+
+  .is-game-screen .shell {
+    padding-top: 8px;
+  }
+
+  .game-nav span {
     display: none;
   }
 

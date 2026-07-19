@@ -21,18 +21,13 @@
           <nav class="breadcrumb" aria-label="現在位置">
             <span>ゲームセンター</span>
           </nav>
-          <div class="arcade-heading">
-            <div>
-              <p class="eyebrow">Game Center</p>
-              <h2>ゲームセンター</h2>
-              <p>遊ぶゲームを選んでください。現在は1ゲーム・1筐体のフリープレイです。</p>
-            </div>
-          </div>
 
           <section class="game-list" aria-label="ゲーム一覧">
             <div class="section-heading">
-              <h3>ゲーム一覧</h3>
-              <span>Games</span>
+              <div>
+                <h2>ゲーム一覧</h2>
+                <p>遊ぶゲームを選んでください。現在は1ゲーム・1筐体のフリープレイです。</p>
+              </div>
             </div>
             <div class="game-select-card">
               <div class="game-card-thumb" aria-hidden="true">GD</div>
@@ -75,6 +70,20 @@
             <strong>筐体状態</strong>
             <span id="cabinet-status-label">空き</span>
           </div>
+          <section class="cabinet-help-grid" aria-label="遊び方">
+            <div>
+              <strong>操作</strong>
+              <span>移動: 矢印キー / WASD</span>
+              <span>低速移動: Shift</span>
+              <span>一時停止: Space</span>
+              <span>リスタート: R</span>
+            </div>
+            <div>
+              <strong>ゲームのコツ</strong>
+              <span>弾をかするとレベルが上がり、ゲージが溜まると自動攻撃します。</span>
+              <span>無敵の膜をボスに当てて、ラスボス撃破を目指します。</span>
+            </div>
+          </section>
           <div class="screen-actions">
             <button id="start-solo" type="button">ゲームスタート</button>
             <button id="back-to-arcade" class="secondary-button" type="button">ゲームセンターに戻る</button>
@@ -87,21 +96,9 @@
           <button id="game-back-to-arcade" class="secondary-button" type="button">ゲームセンターに戻る</button>
           <span>ゲームセンター &gt; ゲーム一覧 &gt; Graze Duel &gt; 筐体1</span>
         </div>
-        <section class="hud">
-        <div>
-          <strong>操作</strong>
-          <span>移動: 矢印キー / WASD</span>
-          <span>攻撃: ゲージが溜まると自動発射</span>
-          <span>低速移動: Shift</span>
-          <span>一時停止: Space</span>
-          <span>リスタート: R</span>
-        </div>
-        <div>
-          <strong>コツ</strong>
-          <span>かするとレベルが上がり、攻撃は増えるが、かすりコンボもしやすくなる</span>
-          <span>連続かすりで倍率が上がる</span>
-        </div>
-        <div class="debug-panel" id="debug-panel">
+        <details class="debug-panel" id="debug-panel">
+          <summary>デバッグ設定</summary>
+          <div class="debug-panel-body">
           <label for="bullet-density"><strong>デバッグ: 敵弾量</strong></label>
           <input id="bullet-density" type="range" min="1" max="10" step="1" value="2" />
           <span><b id="bullet-density-value">2</b> / 10</span>
@@ -120,8 +117,8 @@
             <button id="gauge-growth-up" type="button">＋</button>
             <span>レベルごとに必要ゲージ +<b id="gauge-growth-label">30</b></span>
           </div>
-        </div>
-        </section>
+          </div>
+        </details>
 
         <div class="game-frame">
         <canvas id="game" width="960" height="640" aria-label="Graze Duel game canvas"></canvas>

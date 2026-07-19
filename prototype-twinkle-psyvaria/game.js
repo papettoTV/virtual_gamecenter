@@ -359,6 +359,7 @@ function updateGaugeGrowth(delta) {
 
 function showScreen(screen) {
   currentScreen = screen;
+  document.body.classList.toggle("is-game-screen", screen === "game");
   arcadeScreen?.classList.toggle("is-hidden", screen !== "arcade");
   cabinetScreen?.classList.toggle("is-hidden", screen !== "cabinet");
   gameScreen?.classList.toggle("is-hidden", screen !== "game");
@@ -1255,15 +1256,20 @@ function drawBoss() {
 function drawBossSpawnHint() {
   if (boss.active || clearGame || boss.phaseIndex >= BOSS_PHASES.length) return;
   const nextPhase = BOSS_PHASES[boss.phaseIndex];
-  const labelX = LEFT_X + FIELD_WIDTH / 2;
+  const compact = isCompactView();
+  const labelX = compact ? WIDTH / 2 : LEFT_X + FIELD_WIDTH / 2;
+  const labelWidth = compact ? 220 : 248;
+  const label = compact
+    ? `${nextPhase.name} AT LV ${boss.nextSpawnLevel}`
+    : `${nextPhase.name} APPEARS AT LV ${boss.nextSpawnLevel}`;
   context.save();
   context.fillStyle = "rgba(0,0,0,0.38)";
-  roundRect(labelX - 124, FIELD_TOP + 14, 248, 26, 10);
+  roundRect(labelX - labelWidth / 2, FIELD_TOP + 14, labelWidth, 26, 10);
   context.fill();
   context.fillStyle = "rgba(255,255,255,0.78)";
   context.font = "800 12px system-ui";
   context.textAlign = "center";
-  context.fillText(`${nextPhase.name} APPEARS AT LV ${boss.nextSpawnLevel}`, labelX, FIELD_TOP + 32);
+  context.fillText(label, labelX, FIELD_TOP + 32);
   context.restore();
 }
 
