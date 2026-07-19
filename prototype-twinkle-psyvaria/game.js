@@ -113,6 +113,7 @@ let cabinetState = null;
 let latestViewerSnapshot = null;
 let snapshotSequence = 0;
 let snapshotTimer = 0;
+let cabinetConnected = false;
 
 const boss = {
   active: false,
@@ -135,7 +136,9 @@ const players = [
 
 const cabinetClient = createCabinetClient({
   onConnectionChange: (connected) => {
-    if (!connected && cabinetSummary) cabinetSummary.textContent = "筐体1: 再接続中 / Free Play";
+    cabinetConnected = connected;
+    if (!connected && cabinetSummary) cabinetSummary.textContent = "筐体1: サーバー未接続 / Free Play";
+    updateCabinetUi();
   },
   onMessage: handleCabinetMessage,
   onError: (message) => {
@@ -404,6 +407,12 @@ function enterCabinet() {
 }
 
 function startSoloPlay() {
+  if (!cabinetConnected) {
+    cabinetRole = "joining";
+    updateCabinetUi();
+    cabinetClient.join();
+    return;
+  }
   if (cabinetRole === "spectator") {
     startSpectating();
     return;
@@ -486,6 +495,16 @@ function updateCabinetUi() {
   }
   if (cabinetStatusLabel) cabinetStatusLabel.textContent = statusLabel;
   if (!startSoloButton) return;
+
+  if (!cabinetConnected) {
+    startSoloButton.disabled = false;
+    startSoloButton.textContent = "再接続する";
+    if (cabinetDescription) {
+      cabinetDescription.textContent = "筐体サーバーに接続できません。ローカルサーバーのURLから開いてください。";
+    }
+    if (cabinetRoleLabel) cabinetRoleLabel.textContent = "サーバー未接続";
+    return;
+  }
 
   if (cabinetRole === "player") {
     startSoloButton.disabled = false;

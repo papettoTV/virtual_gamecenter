@@ -1,4 +1,9 @@
 export function createCabinetClient(handlers = {}) {
+  if (window.location.protocol === "file:") {
+    window.location.replace("http://localhost:5174/");
+    return { join() {}, leave() {}, send() { return false; } };
+  }
+
   let socket = null;
   let wantsCabinet = false;
   let reconnectTimer = null;
@@ -7,7 +12,14 @@ export function createCabinetClient(handlers = {}) {
     if (socket && socket.readyState <= WebSocket.OPEN) return;
     clearTimeout(reconnectTimer);
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    socket = new WebSocket(`${protocol}//${window.location.host}/api/cabinets/cabinet-1/ws`);
+    try {
+      socket = new WebSocket(`${protocol}//${window.location.host}/api/cabinets/cabinet-1/ws`);
+    } catch {
+      socket = null;
+      handlers.onConnectionChange?.(false);
+      reconnectTimer = setTimeout(connect, 1000);
+      return;
+    }
 
     socket.addEventListener("open", () => {
       handlers.onConnectionChange?.(true);

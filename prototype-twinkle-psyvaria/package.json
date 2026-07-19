@@ -1,7 +1,7 @@
 {
   "scripts": {
-    "dev": "vite --host 0.0.0.0",
-    "start": "vite --host 0.0.0.0",
+    "dev": "vite --host 0.0.0.0 --port 5174 --strictPort",
+    "start": "vite --host 0.0.0.0 --port 5174 --strictPort",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
     "pages:dev": "npm run build && npx wrangler pages dev dist --project-name virtual-gamecenter",

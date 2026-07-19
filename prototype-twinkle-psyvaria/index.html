@@ -154,6 +154,11 @@
         </section>
       </section>
     </main>
+    <script>
+      if (window.location.protocol === "file:") {
+        window.location.replace("http://localhost:5174/");
+      }
+    </script>
     <script type="module" src="./game.js"></script>
   </body>
 </html>
