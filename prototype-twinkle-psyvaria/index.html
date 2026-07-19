@@ -34,7 +34,7 @@
               <div class="game-card-body">
                 <strong>Graze Duel</strong>
                 <span>弾幕かすり・無敵体当たり・ボス撃破型シューティング</span>
-                <small>筐体1: 空き / Free Play</small>
+                <small id="cabinet-summary">筐体1: 接続中 / Free Play</small>
               </div>
               <button id="select-game" type="button">このゲームを選ぶ</button>
             </div>
@@ -62,13 +62,14 @@
             <div>
               <p class="eyebrow">Cabinet 1</p>
               <h2>Graze Duel</h2>
-              <p>筐体1を選択中です。現在はフリープレイのため、クレジット消費なしで開始できます。</p>
+              <p id="cabinet-description">筐体1へ接続しています。</p>
             </div>
           </div>
 
           <div class="cabinet-status">
             <strong>筐体状態</strong>
             <span id="cabinet-status-label">空き</span>
+            <small id="cabinet-role-label">接続中</small>
           </div>
           <section class="cabinet-help-grid" aria-label="遊び方">
             <div>
@@ -92,6 +93,10 @@
       </section>
 
       <section class="game-screen is-hidden" id="game-screen">
+        <div class="spectator-banner is-hidden" id="spectator-banner">
+          <strong>観戦中</strong>
+          <span>この画面は操作できません。プレイヤーのゲーム状態をリアルタイム表示しています。</span>
+        </div>
         <div class="game-nav">
           <button id="game-back-to-arcade" class="secondary-button" type="button">ゲームセンターに戻る</button>
           <span>ゲームセンター &gt; ゲーム一覧 &gt; Graze Duel &gt; 筐体1</span>

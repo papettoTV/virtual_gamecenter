@@ -610,6 +610,8 @@ type CreditAction =
 
 - 「誰かが遊んでいる筐体を見る」を成立させる。
 
+ローカル検証ではViteの開発サーバーに筐体用WebSocketを追加し、本番移行時に同じメッセージ形式をCloudflare Durable Objectsへ置き換える。
+
 ### Phase 3: 対戦申し込み
 
 - Bが対戦申し込み

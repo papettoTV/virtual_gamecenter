@@ -1,3 +1,5 @@
+import { createCabinetClient } from "./cabinet-client.js";
+
 const canvas = document.querySelector("#game");
 const context = canvas.getContext("2d");
 const arcadeScreen = document.querySelector("#arcade-screen");
@@ -9,6 +11,10 @@ const backToArcadeButton = document.querySelector("#back-to-arcade");
 const cabinetBreadcrumbArcade = document.querySelector("#cabinet-breadcrumb-arcade");
 const gameBackToArcadeButton = document.querySelector("#game-back-to-arcade");
 const cabinetStatusLabel = document.querySelector("#cabinet-status-label");
+const cabinetSummary = document.querySelector("#cabinet-summary");
+const cabinetDescription = document.querySelector("#cabinet-description");
+const cabinetRoleLabel = document.querySelector("#cabinet-role-label");
+const spectatorBanner = document.querySelector("#spectator-banner");
 const bulletDensityInput = document.querySelector("#bullet-density");
 const bulletDensityValue = document.querySelector("#bullet-density-value");
 const playerHitboxToggle = document.querySelector("#player-hitbox-toggle");
@@ -102,6 +108,11 @@ let debugRankingPreviewEnabled = false;
 let debugRankingPreviewShown = false;
 let currentScreen = "arcade";
 let gameSessionActive = false;
+let cabinetRole = "visitor";
+let cabinetState = null;
+let latestViewerSnapshot = null;
+let snapshotSequence = 0;
+let snapshotTimer = 0;
 
 const boss = {
   active: false,
@@ -121,6 +132,16 @@ const players = [
   createPlayer("YOU", LEFT_X, "#69f7ff", false),
   createPlayer("CPU", RIGHT_X, "#ff4e8a", true),
 ];
+
+const cabinetClient = createCabinetClient({
+  onConnectionChange: (connected) => {
+    if (!connected && cabinetSummary) cabinetSummary.textContent = "筐体1: 再接続中 / Free Play";
+  },
+  onMessage: handleCabinetMessage,
+  onError: (message) => {
+    if (cabinetRoleLabel) cabinetRoleLabel.textContent = message;
+  },
+});
 
 if (isLocalDevelopment()) {
   document.body.classList.add("is-local-dev");
@@ -240,7 +261,7 @@ showScreen("arcade");
 
 if (selectGameButton) {
   selectGameButton.addEventListener("click", () => {
-    showScreen("cabinet");
+    enterCabinet();
   });
 }
 
@@ -300,7 +321,7 @@ if (gaugeGrowthDown && gaugeGrowthUp && gaugeGrowthValue && gaugeGrowthLabel) {
 }
 
 canvas.addEventListener("pointerdown", (event) => {
-  if (isCompactView()) {
+  if (isCompactView() && cabinetRole !== "spectator") {
     event.preventDefault();
     canvas.setPointerCapture(event.pointerId);
     touchMove.active = true;
@@ -321,17 +342,23 @@ canvas.addEventListener("pointerup", resetTouchMove);
 canvas.addEventListener("pointercancel", resetTouchMove);
 
 if (touchRestart) {
-  touchRestart.addEventListener("click", () => resetGame());
+  touchRestart.addEventListener("click", () => {
+    if (cabinetRole !== "spectator") resetGame();
+  });
 }
 
 if (clearRestart) {
-  clearRestart.addEventListener("click", () => resetGame());
+  clearRestart.addEventListener("click", () => {
+    if (cabinetRole !== "spectator") resetGame();
+  });
 }
 
 if (touchPause) {
   touchPause.addEventListener("click", () => {
+    if (cabinetRole === "spectator") return;
     if (!gameOver) paused = !paused;
     touchPause.textContent = paused ? "再開" : "一時停止";
+    broadcastViewerSnapshot(0, true);
   });
 }
 
@@ -368,24 +395,211 @@ function showScreen(screen) {
   }
 }
 
+function enterCabinet() {
+  cabinetRole = "joining";
+  latestViewerSnapshot = null;
+  updateCabinetUi();
+  showScreen("cabinet");
+  cabinetClient.join();
+}
+
 function startSoloPlay() {
+  if (cabinetRole === "spectator") {
+    startSpectating();
+    return;
+  }
+  if (cabinetRole !== "player") return;
   resetGame();
   gameSessionActive = true;
+  document.body.classList.remove("is-spectator");
+  spectatorBanner?.classList.add("is-hidden");
+  snapshotTimer = 0;
+  cabinetClient.send({ type: "startSolo" });
+  lastTime = performance.now();
+  showScreen("game");
+}
+
+function startSpectating() {
+  resetGame();
+  gameSessionActive = true;
+  document.body.classList.add("is-spectator");
+  spectatorBanner?.classList.remove("is-hidden");
+  if (latestViewerSnapshot) applyViewerSnapshot(latestViewerSnapshot);
   lastTime = performance.now();
   showScreen("game");
 }
 
 function leaveCabinet() {
+  cabinetClient.leave();
+  cabinetRole = "visitor";
+  latestViewerSnapshot = null;
   gameSessionActive = false;
   paused = false;
+  document.body.classList.remove("is-spectator");
+  spectatorBanner?.classList.add("is-hidden");
   if (touchPause) touchPause.textContent = "一時停止";
   showScreen("arcade");
 }
 
+function handleCabinetMessage(message) {
+  if (message.type === "cabinetState") {
+    cabinetState = message.state;
+    updateCabinetUi();
+    return;
+  }
+
+  if (message.type === "joinedCabinet") {
+    cabinetRole = message.role;
+    updateCabinetUi();
+    return;
+  }
+
+  if (message.type === "viewerSnapshot") {
+    latestViewerSnapshot = message.snapshot;
+    if (cabinetRole === "spectator" && currentScreen === "game") applyViewerSnapshot(message.snapshot);
+    return;
+  }
+
+  if (message.type === "playerLeft" && cabinetRole === "spectator") {
+    gameSessionActive = false;
+    latestViewerSnapshot = null;
+    showScreen("cabinet");
+    if (cabinetRoleLabel) cabinetRoleLabel.textContent = "プレイヤーが筐体を離れました。";
+    return;
+  }
+
+  if (message.type === "error" && cabinetRoleLabel) cabinetRoleLabel.textContent = message.message;
+}
+
+function updateCabinetUi() {
+  const statusLabels = {
+    empty: "空き",
+    occupied: "開始待ち",
+    soloPlaying: "ソロプレイ中",
+  };
+  const statusLabel = statusLabels[cabinetState?.status] ?? "接続中";
+  const spectatorCount = cabinetState?.spectatorCount ?? 0;
+
+  if (cabinetSummary) {
+    const spectators = spectatorCount > 0 ? `・観戦 ${spectatorCount}人` : "";
+    cabinetSummary.textContent = `筐体1: ${statusLabel}${spectators} / Free Play`;
+  }
+  if (cabinetStatusLabel) cabinetStatusLabel.textContent = statusLabel;
+  if (!startSoloButton) return;
+
+  if (cabinetRole === "player") {
+    startSoloButton.disabled = false;
+    startSoloButton.textContent = "ゲームスタート";
+    if (cabinetDescription) {
+      cabinetDescription.textContent = "筐体1に着席しています。フリープレイでソロプレイを開始できます。";
+    }
+    if (cabinetRoleLabel) cabinetRoleLabel.textContent = "あなたがプレイヤーです";
+    return;
+  }
+
+  if (cabinetRole === "spectator") {
+    startSoloButton.disabled = cabinetState?.status !== "soloPlaying";
+    startSoloButton.textContent = cabinetState?.status === "soloPlaying" ? "観戦する" : "プレイ開始を待っています";
+    if (cabinetDescription) {
+      cabinetDescription.textContent = "この筐体は使用中です。プレイヤーのゲームをリアルタイムで観戦できます。";
+    }
+    if (cabinetRoleLabel) cabinetRoleLabel.textContent = "あなたは観戦者です";
+    return;
+  }
+
+  startSoloButton.disabled = true;
+  startSoloButton.textContent = "筐体に接続中";
+  if (cabinetRoleLabel) cabinetRoleLabel.textContent = "接続中";
+}
+
+function broadcastViewerSnapshot(delta, force = false) {
+  if (cabinetRole !== "player") return;
+  snapshotTimer += delta;
+  if (!force && snapshotTimer < 0.1) return;
+  snapshotTimer = force ? 0 : snapshotTimer % 0.1;
+  snapshotSequence += 1;
+  cabinetClient.send({
+    type: "gameSnapshot",
+    seq: snapshotSequence,
+    snapshot: createViewerSnapshot(),
+  });
+}
+
+function createViewerSnapshot() {
+  return {
+    elapsedRound,
+    gameOver,
+    clearGame,
+    paused,
+    defeatedBossCount,
+    players: players.map((player) => ({
+      x: player.x,
+      y: player.y,
+      lives: player.lives,
+      score: player.score,
+      gauge: player.gauge,
+      level: player.level,
+      combo: player.combo,
+      multiplier: player.multiplier,
+      invincible: player.invincible,
+      levelUpInvincible: player.levelUpInvincible,
+      barrierRatio: player.barrierRatio,
+      hitInvincible: player.hitInvincible,
+      attackFlash: player.attackFlash,
+      levelUpFlash: player.levelUpFlash,
+      tilt: player.tilt,
+      bullets: player.bullets.map((bullet) => ({
+        id: bullet.id,
+        x: bullet.x,
+        y: bullet.y,
+        vx: bullet.vx,
+        vy: bullet.vy,
+        radius: bullet.radius,
+        color: bullet.color,
+        type: bullet.type,
+        age: bullet.age,
+        shape: bullet.shape,
+        rotation: bullet.rotation,
+      })),
+    })),
+    boss: {
+      active: boss.active,
+      phaseIndex: boss.phaseIndex,
+      nextSpawnLevel: boss.nextSpawnLevel,
+      x: boss.x,
+      y: boss.y,
+      baseY: boss.baseY,
+      radius: boss.radius,
+      hp: boss.hp,
+      maxHp: boss.maxHp,
+      flash: boss.flash,
+    },
+  };
+}
+
+function applyViewerSnapshot(snapshot) {
+  elapsedRound = snapshot.elapsedRound;
+  gameOver = snapshot.gameOver;
+  clearGame = snapshot.clearGame;
+  paused = snapshot.paused;
+  defeatedBossCount = snapshot.defeatedBossCount;
+  snapshot.players.forEach((snapshotPlayer, index) => {
+    const { bullets, ...playerState } = snapshotPlayer;
+    Object.assign(players[index], playerState);
+    players[index].bullets = bullets;
+  });
+  Object.assign(boss, snapshot.boss);
+}
+
 window.addEventListener("keydown", (event) => {
+  if (cabinetRole === "spectator") return;
   if (event.code === "Space") {
     event.preventDefault();
-    if (currentScreen === "game" && !gameOver) paused = !paused;
+    if (currentScreen === "game" && !gameOver) {
+      paused = !paused;
+      if (touchPause) touchPause.textContent = paused ? "再開" : "一時停止";
+      broadcastViewerSnapshot(0, true);
+    }
     return;
   }
   keys.add(event.code);
@@ -409,6 +623,7 @@ loadRanking();
 
 function update(delta) {
   if (currentScreen !== "game" || !gameSessionActive) return;
+  if (cabinetRole === "spectator") return;
   if (paused) return;
 
   if (!gameOver) elapsedRound += delta;
@@ -434,6 +649,7 @@ function update(delta) {
 
   updateParticles(gameDelta);
   slowMotionTimer = Math.max(0, slowMotionTimer - delta);
+  broadcastViewerSnapshot(delta);
 }
 
 function getGameDelta(delta) {
