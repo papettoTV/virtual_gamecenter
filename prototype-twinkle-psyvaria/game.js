@@ -268,7 +268,7 @@ syncScreenWithUrl();
 
 if (selectGameButton) {
   selectGameButton.addEventListener("click", () => {
-    enterCabinet(crypto.randomUUID());
+    enterCabinet(createCabinetId());
   });
 }
 
@@ -403,6 +403,21 @@ function showScreen(screen) {
   arcadeScreen?.classList.toggle("is-hidden", screen !== "arcade");
   cabinetScreen?.classList.toggle("is-hidden", screen !== "cabinet");
   gameScreen?.classList.toggle("is-hidden", screen !== "game");
+}
+
+function createCabinetId() {
+  const randomBytes = new Uint8Array(16);
+  if (window.crypto?.getRandomValues) {
+    window.crypto.getRandomValues(randomBytes);
+  } else {
+    for (let index = 0; index < randomBytes.length; index += 1) {
+      randomBytes[index] = Math.floor(Math.random() * 256);
+    }
+  }
+  randomBytes[6] = (randomBytes[6] & 0x0f) | 0x40;
+  randomBytes[8] = (randomBytes[8] & 0x3f) | 0x80;
+  const hex = [...randomBytes].map((value) => value.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 function enterCabinet(cabinetId, updateUrl = true) {
