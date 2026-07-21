@@ -1,7 +1,7 @@
 export function createCabinetClient(handlers = {}) {
   if (window.location.protocol === "file:") {
     window.location.replace("http://localhost:5174/");
-    return { join() {}, leave() {}, send() { return false; } };
+    return { join() {}, leave() {}, send() { return false; }, getBufferedAmount() { return 0; } };
   }
 
   let socket = null;
@@ -71,5 +71,9 @@ export function createCabinetClient(handlers = {}) {
     handlers.onConnectionChange?.(false);
   }
 
-  return { join, leave, send };
+  function getBufferedAmount() {
+    return socket?.bufferedAmount ?? 0;
+  }
+
+  return { join, leave, send, getBufferedAmount };
 }

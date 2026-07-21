@@ -112,6 +112,7 @@ function localCabinetServer() {
       const webSocketServer = new WebSocketServer({ noServer: true });
 
       function send(socket, message) {
+        if (message.type === "viewerSnapshot" && socket.bufferedAmount > 512 * 1024) return;
         if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
       }
 

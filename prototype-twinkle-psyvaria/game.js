@@ -73,6 +73,9 @@ const ATTACK_BULLET_CLEAR_BONUS = 0.15;
 const BASE_BULLET_CLEAR_BONUS = 0.25;
 const INVINCIBLE_WARNING_TIME = 0.5;
 const MAX_PARTICLES = 180;
+const MAX_SNAPSHOT_BUFFERED_BYTES = 256 * 1024;
+const SPECTATOR_POSITION_CORRECTION = 18;
+const SPECTATOR_BULLET_CORRECTION = 24;
 const HIT_DEBUG_ENABLED = false;
 const PLAYER_TILT_MAX = 1;
 const PLAYER_TILT_LERP = 0.2;
@@ -115,6 +118,8 @@ let gameSessionActive = false;
 let cabinetRole = "visitor";
 let cabinetState = null;
 let latestViewerSnapshot = null;
+let previousViewerSnapshot = null;
+let lastViewerSnapshotSequence = 0;
 let snapshotSequence = 0;
 let snapshotTimer = 0;
 let cabinetConnected = false;
@@ -428,6 +433,8 @@ function enterCabinet(cabinetId, updateUrl = true) {
   cabinetConnected = false;
   cabinetState = null;
   latestViewerSnapshot = null;
+  previousViewerSnapshot = null;
+  lastViewerSnapshotSequence = 0;
   if (updateUrl) history.pushState({ cabinetId }, "", `/cabinets/${cabinetId}`);
   if (cabinetIdLabel) cabinetIdLabel.textContent = `Cabinet ${cabinetId.slice(0, 8)}`;
   updateCabinetShareUrl();
@@ -463,7 +470,7 @@ function startSpectating() {
   gameSessionActive = true;
   document.body.classList.add("is-spectator");
   spectatorBanner?.classList.remove("is-hidden");
-  if (latestViewerSnapshot) applyViewerSnapshot(latestViewerSnapshot);
+  if (latestViewerSnapshot) applyViewerSnapshot(latestViewerSnapshot, previousViewerSnapshot);
   lastTime = performance.now();
   showScreen("game");
 }
@@ -475,6 +482,8 @@ function leaveCabinet(updateUrl = true) {
   cabinetConnected = false;
   cabinetState = null;
   latestViewerSnapshot = null;
+  previousViewerSnapshot = null;
+  lastViewerSnapshotSequence = 0;
   gameSessionActive = false;
   paused = false;
   document.body.classList.remove("is-spectator");
@@ -543,14 +552,21 @@ function handleCabinetMessage(message) {
   }
 
   if (message.type === "viewerSnapshot") {
+    if (message.seq <= lastViewerSnapshotSequence) return;
+    lastViewerSnapshotSequence = message.seq;
+    previousViewerSnapshot = latestViewerSnapshot;
     latestViewerSnapshot = message.snapshot;
-    if (cabinetRole === "spectator" && currentScreen === "game") applyViewerSnapshot(message.snapshot);
+    if (cabinetRole === "spectator" && currentScreen === "game") {
+      applyViewerSnapshot(message.snapshot, previousViewerSnapshot);
+    }
     return;
   }
 
   if (message.type === "playerLeft" && cabinetRole === "spectator") {
     gameSessionActive = false;
     latestViewerSnapshot = null;
+    previousViewerSnapshot = null;
+    lastViewerSnapshotSequence = 0;
     showScreen("cabinet");
     if (cabinetRoleLabel) cabinetRoleLabel.textContent = "プレイヤーが筐体を離れました。";
     return;
@@ -609,6 +625,10 @@ function broadcastViewerSnapshot(delta, force = false) {
   if (cabinetRole !== "player") return;
   snapshotTimer += delta;
   if (!force && snapshotTimer < 0.1) return;
+  if (!force && cabinetClient.getBufferedAmount() > MAX_SNAPSHOT_BUFFERED_BYTES) {
+    snapshotTimer = 0;
+    return;
+  }
   snapshotTimer = force ? 0 : snapshotTimer % 0.1;
   snapshotSequence += 1;
   cabinetClient.send({
@@ -620,6 +640,7 @@ function broadcastViewerSnapshot(delta, force = false) {
 
 function createViewerSnapshot() {
   return {
+    capturedAt: performance.now(),
     elapsedRound,
     gameOver,
     clearGame,
@@ -670,18 +691,84 @@ function createViewerSnapshot() {
   };
 }
 
-function applyViewerSnapshot(snapshot) {
+function applyViewerSnapshot(snapshot, previousSnapshot = null) {
+  const snapshotDelta = Math.max(0.001, (snapshot.capturedAt - (previousSnapshot?.capturedAt ?? snapshot.capturedAt)) / 1000);
   elapsedRound = snapshot.elapsedRound;
   gameOver = snapshot.gameOver;
   clearGame = snapshot.clearGame;
   paused = snapshot.paused;
   defeatedBossCount = snapshot.defeatedBossCount;
   snapshot.players.forEach((snapshotPlayer, index) => {
-    const { bullets, ...playerState } = snapshotPlayer;
+    const player = players[index];
+    const previousPlayer = previousSnapshot?.players[index];
+    const { bullets, x, y, ...playerState } = snapshotPlayer;
     Object.assign(players[index], playerState);
-    players[index].bullets = bullets;
+    if (!previousPlayer) {
+      player.x = x;
+      player.y = y;
+    }
+    player.spectatorTargetX = x;
+    player.spectatorTargetY = y;
+    player.spectatorVx = previousPlayer ? (x - previousPlayer.x) / snapshotDelta : 0;
+    player.spectatorVy = previousPlayer ? (y - previousPlayer.y) / snapshotDelta : 0;
+    syncSpectatorBullets(player, bullets, !previousPlayer);
   });
-  Object.assign(boss, snapshot.boss);
+  const { x: bossX, y: bossY, ...bossState } = snapshot.boss;
+  Object.assign(boss, bossState);
+  if (!previousSnapshot) {
+    boss.x = bossX;
+    boss.y = bossY;
+  }
+  boss.spectatorTargetX = bossX;
+  boss.spectatorTargetY = bossY;
+  boss.spectatorVx = previousSnapshot ? (bossX - previousSnapshot.boss.x) / snapshotDelta : 0;
+  boss.spectatorVy = previousSnapshot ? (bossY - previousSnapshot.boss.y) / snapshotDelta : 0;
+}
+
+function syncSpectatorBullets(player, snapshotBullets, immediate) {
+  const currentBullets = new Map(player.bullets.map((bullet) => [bullet.id, bullet]));
+  player.bullets = snapshotBullets.map((snapshotBullet) => {
+    const bullet = currentBullets.get(snapshotBullet.id) ?? { ...snapshotBullet };
+    const currentX = bullet.x;
+    const currentY = bullet.y;
+    Object.assign(bullet, snapshotBullet);
+    if (!immediate && currentBullets.has(snapshotBullet.id)) {
+      bullet.x = currentX;
+      bullet.y = currentY;
+    }
+    bullet.spectatorTargetX = snapshotBullet.x;
+    bullet.spectatorTargetY = snapshotBullet.y;
+    return bullet;
+  });
+}
+
+function updateSpectatorView(delta) {
+  if (paused) return;
+  const correctionRatio = Math.min(1, delta * SPECTATOR_POSITION_CORRECTION);
+  const bulletCorrectionRatio = Math.min(1, delta * SPECTATOR_BULLET_CORRECTION);
+  if (!gameOver) elapsedRound += delta;
+
+  for (const player of players) {
+    player.spectatorTargetX = (player.spectatorTargetX ?? player.x) + (player.spectatorVx ?? 0) * delta;
+    player.spectatorTargetY = (player.spectatorTargetY ?? player.y) + (player.spectatorVy ?? 0) * delta;
+    player.x += (player.spectatorTargetX - player.x) * correctionRatio;
+    player.y += (player.spectatorTargetY - player.y) * correctionRatio;
+    player.invincible = Math.max(0, player.invincible - delta);
+    player.levelUpInvincible = Math.max(0, player.levelUpInvincible - delta);
+
+    for (const bullet of player.bullets) {
+      bullet.spectatorTargetX = (bullet.spectatorTargetX ?? bullet.x) + bullet.vx * delta;
+      bullet.spectatorTargetY = (bullet.spectatorTargetY ?? bullet.y) + bullet.vy * delta;
+      bullet.x += (bullet.spectatorTargetX - bullet.x) * bulletCorrectionRatio;
+      bullet.y += (bullet.spectatorTargetY - bullet.y) * bulletCorrectionRatio;
+      bullet.age += delta;
+    }
+  }
+
+  boss.spectatorTargetX = (boss.spectatorTargetX ?? boss.x) + (boss.spectatorVx ?? 0) * delta;
+  boss.spectatorTargetY = (boss.spectatorTargetY ?? boss.y) + (boss.spectatorVy ?? 0) * delta;
+  boss.x += (boss.spectatorTargetX - boss.x) * correctionRatio;
+  boss.y += (boss.spectatorTargetY - boss.y) * correctionRatio;
 }
 
 window.addEventListener("keydown", (event) => {
@@ -716,7 +803,10 @@ loadRanking();
 
 function update(delta) {
   if (currentScreen !== "game" || !gameSessionActive) return;
-  if (cabinetRole === "spectator") return;
+  if (cabinetRole === "spectator") {
+    updateSpectatorView(delta);
+    return;
+  }
   if (paused) return;
 
   if (!gameOver) elapsedRound += delta;
