@@ -96,6 +96,12 @@ function createCabinetRoom(cabinetId, send) {
         return;
       }
 
+      if (message.type === "stopSolo" && socket === playerSocket) {
+        status = "occupied";
+        broadcastState();
+        return;
+      }
+
       if (message.type === "gameKeyframe" && socket === playerSocket) {
         latestKeyframe = { type: "viewerKeyframe", snapshot: message.snapshot, seq: message.seq };
         eventsSinceKeyframe = [];

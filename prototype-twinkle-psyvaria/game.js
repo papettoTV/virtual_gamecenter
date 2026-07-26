@@ -300,7 +300,7 @@ if (cabinetBreadcrumbArcade) {
 
 if (gameBackToArcadeButton) {
   gameBackToArcadeButton.addEventListener("click", () => {
-    leaveCabinet();
+    returnToCabinet();
   });
 }
 
@@ -485,6 +485,19 @@ function startSpectating() {
   if (latestViewerMotion) applyViewerMotion(latestViewerMotion, previousViewerMotion);
   lastTime = performance.now();
   showScreen("game");
+}
+
+function returnToCabinet() {
+  gameSessionActive = false;
+  paused = false;
+  resetTouchMove();
+  rankingSubmitPanel?.classList.remove("is-visible");
+  if (cabinetRole === "player") cabinetClient.send({ type: "stopSolo" });
+  document.body.classList.remove("is-spectator");
+  spectatorBanner?.classList.add("is-hidden");
+  if (touchPause) touchPause.textContent = "一時停止";
+  updateCabinetUi();
+  showScreen("cabinet");
 }
 
 function leaveCabinet(updateUrl = true) {
@@ -2292,7 +2305,10 @@ function drawGameOver() {
   context.textAlign = "center";
   context.font = "800 58px system-ui";
   context.fillText(winner, WIDTH / 2, HEIGHT / 2 + (clearGame ? -118 : -28));
-  if (!clearGame) {
+  if (cabinetRole === "spectator") {
+    context.font = "600 20px system-ui";
+    context.fillText("プレイヤーが続けるか辞めるか選ぶのを待っています", WIDTH / 2, HEIGHT / 2 + (clearGame ? -72 : 18));
+  } else if (!clearGame) {
     context.font = "500 20px system-ui";
     context.fillText("Rキーでリスタート", WIDTH / 2, HEIGHT / 2 + 18);
   }

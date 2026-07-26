@@ -314,8 +314,14 @@ p {
 
 .is-spectator .debug-panel,
 .is-spectator .touch-controls,
-.is-spectator .ranking-overlay {
+.is-spectator .ranking-overlay,
+.is-spectator .ranking-panel {
   display: none !important;
+}
+
+.is-spectator .game-frame,
+.is-spectator canvas {
+  touch-action: pan-y pinch-zoom;
 }
 
 .cabinet-help-grid {
