@@ -2396,7 +2396,7 @@ function drawPaused() {
   const instructions = [
     "移動: 矢印キー / WASD",
     "低速移動: Shift",
-    "ボスへの攻撃: レベルアップ無敵時のシールド",
+    "ボス攻撃: 無敵シールドを当てる",
   ];
 
   context.fillStyle = "rgba(0,0,0,0.7)";

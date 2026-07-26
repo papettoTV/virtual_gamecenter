@@ -61,7 +61,7 @@ export function CabinetScreen() {
             <strong>操作</strong>
             <span>移動: 矢印キー / WASD</span>
             <span>低速移動: Shift</span>
-            <span>ボスへの攻撃: レベルアップ無敵時のシールド</span>
+            <span>ボス攻撃: 無敵シールドを当てる</span>
             <span>一時停止: Space</span>
           </div>
           <div>
