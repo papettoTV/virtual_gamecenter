@@ -120,6 +120,7 @@ let slowMotionTimer = 0;
 let defeatedBossCount = 0;
 let gameOver = false;
 let paused = false;
+let waitingForStart = false;
 let nextBulletId = 1;
 let clearGame = false;
 let lastClearResult = null;
@@ -248,8 +249,9 @@ function resetGame() {
   slowMotionTimer = 0;
   defeatedBossCount = 0;
   gameOver = false;
-  paused = false;
-  if (touchPause) touchPause.textContent = "一時停止";
+  paused = true;
+  waitingForStart = true;
+  updatePauseButton();
   clearGame = false;
   lastClearResult = null;
   rankingSubmittedForClear = false;
@@ -400,10 +402,7 @@ if (clearRestart) {
 if (touchPause) {
   touchPause.addEventListener("click", () => {
     if (cabinetRole === "spectator") return;
-    if (!gameOver) paused = !paused;
-    touchPause.textContent = paused ? "再開" : "一時停止";
-    queueSyncEvent({ type: "pauseChanged", paused }, true);
-    broadcastMotionFrame(true);
+    togglePauseState();
   });
 }
 
@@ -509,6 +508,7 @@ function startSpectating() {
 function returnToCabinet() {
   gameSessionActive = false;
   paused = false;
+  waitingForStart = false;
   resetTouchMove();
   rankingSubmitPanel?.classList.remove("is-visible");
   if (cabinetRole === "player") cabinetClient.send({ type: "stopSolo" });
@@ -529,6 +529,7 @@ function leaveCabinet(updateUrl = true) {
   resetViewerSyncState();
   gameSessionActive = false;
   paused = false;
+  waitingForStart = false;
   document.body.classList.remove("is-spectator");
   spectatorBanner?.classList.add("is-hidden");
   if (touchPause) touchPause.textContent = "一時停止";
@@ -780,6 +781,7 @@ function createViewerSnapshot() {
     gameOver,
     clearGame,
     paused,
+    waitingForStart,
     defeatedBossCount,
     players: players.map((player) => ({
       x: player.x,
@@ -833,6 +835,7 @@ function createViewerMotionFrame() {
     gameOver,
     clearGame,
     paused,
+    waitingForStart,
     defeatedBossCount,
     slowMotionTimer,
     players: players.map(({ bullets: _bullets, grazeIds: _grazeIds, ...player }) => ({
@@ -876,6 +879,8 @@ function applyViewerSnapshot(snapshot) {
   gameOver = snapshot.gameOver;
   clearGame = snapshot.clearGame;
   paused = snapshot.paused;
+  waitingForStart = snapshot.waitingForStart ?? false;
+  updatePauseButton();
   defeatedBossCount = snapshot.defeatedBossCount;
   snapshot.players.forEach((snapshotPlayer, index) => {
     const player = players[index];
@@ -909,6 +914,8 @@ function applyViewerMotion(frame, previousFrame = null) {
   gameOver = frame.gameOver;
   clearGame = frame.clearGame;
   paused = frame.paused;
+  waitingForStart = frame.waitingForStart ?? false;
+  updatePauseButton();
   defeatedBossCount = frame.defeatedBossCount;
   slowMotionTimer = frame.slowMotionTimer;
   frame.players.forEach((framePlayer, index) => {
@@ -961,7 +968,8 @@ function applyViewerEvent(event) {
   }
   if (event.type === "pauseChanged") {
     paused = event.paused;
-    if (touchPause) touchPause.textContent = paused ? "再開" : "一時停止";
+    waitingForStart = event.waitingForStart ?? false;
+    updatePauseButton();
     return;
   }
   if (event.type === "gameState") {
@@ -1029,10 +1037,7 @@ window.addEventListener("keydown", (event) => {
   if (event.code === "Space") {
     event.preventDefault();
     if (currentScreen === "game" && !gameOver) {
-      paused = !paused;
-      if (touchPause) touchPause.textContent = paused ? "再開" : "一時停止";
-      queueSyncEvent({ type: "pauseChanged", paused }, true);
-      broadcastMotionFrame(true);
+      togglePauseState();
     }
     return;
   }
@@ -1087,6 +1092,24 @@ function update(delta) {
   updateParticles(gameDelta);
   slowMotionTimer = Math.max(0, slowMotionTimer - delta);
   updateViewerSync(delta);
+}
+
+function togglePauseState() {
+  if (gameOver) return;
+  if (waitingForStart) {
+    waitingForStart = false;
+    paused = false;
+  } else {
+    paused = !paused;
+  }
+  updatePauseButton();
+  queueSyncEvent({ type: "pauseChanged", paused, waitingForStart }, true);
+  broadcastMotionFrame(true);
+}
+
+function updatePauseButton() {
+  if (!touchPause) return;
+  touchPause.textContent = waitingForStart ? "ゲーム開始" : paused ? "再開" : "一時停止";
 }
 
 function getGameDelta(delta) {
@@ -2366,14 +2389,40 @@ function drawHitDebug() {
 }
 
 function drawPaused() {
-  context.fillStyle = "rgba(0,0,0,0.56)";
+  const compact = isCompactView();
+  const title = waitingForStart ? "READY" : "PAUSED";
+  const action = waitingForStart ? "Spaceでゲーム開始" : "Spaceで再開";
+  const instructions = compact
+    ? [
+        "移動: ゲーム画面をスライド",
+        "かすり: 敵弾を自機の近くで避ける",
+        "攻撃: ゲージ満タンで自動",
+        "画面下のボタンでも開始・再開できます",
+      ]
+    : [
+        "移動: 矢印キー / WASD",
+        "低速移動: Shift",
+        "かすり: 敵弾を自機の近くで避ける",
+        "攻撃: ゲージ満タンで自動",
+      ];
+
+  context.fillStyle = "rgba(0,0,0,0.7)";
   context.fillRect(0, 0, WIDTH, HEIGHT);
   context.fillStyle = "#f4f7ff";
   context.textAlign = "center";
-  context.font = "800 64px system-ui";
-  context.fillText("PAUSED", WIDTH / 2, HEIGHT / 2 - 18);
-  context.font = "500 20px system-ui";
-  context.fillText("Spaceで再開 / Rでリスタート", WIDTH / 2, HEIGHT / 2 + 26);
+  context.font = `800 ${compact ? 52 : 64}px system-ui`;
+  context.fillText(title, WIDTH / 2, HEIGHT / 2 - 126);
+  context.fillStyle = "#69f7ff";
+  context.font = `800 ${compact ? 22 : 24}px system-ui`;
+  context.fillText(action, WIDTH / 2, HEIGHT / 2 - 76);
+  context.fillStyle = "#f4f7ff";
+  context.font = `600 ${compact ? 17 : 19}px system-ui`;
+  instructions.forEach((instruction, index) => {
+    context.fillText(instruction, WIDTH / 2, HEIGHT / 2 - 18 + index * 34);
+  });
+  context.fillStyle = "#aab4d6";
+  context.font = `500 ${compact ? 15 : 17}px system-ui`;
+  context.fillText("Rでリスタート", WIDTH / 2, HEIGHT / 2 + 142);
   context.textAlign = "left";
 }
 
