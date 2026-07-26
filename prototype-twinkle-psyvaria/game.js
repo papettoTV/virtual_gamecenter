@@ -7,9 +7,11 @@ const cabinetScreen = document.querySelector("#cabinet-screen");
 const gameScreen = document.querySelector("#game-screen");
 const selectGameButton = document.querySelector("#select-game");
 const startSoloButton = document.querySelector("#start-solo");
+const spectatorWatchButton = document.querySelector("#spectator-watch");
 const backToArcadeButton = document.querySelector("#back-to-arcade");
 const cabinetBreadcrumbArcade = document.querySelector("#cabinet-breadcrumb-arcade");
 const gameBackToArcadeButton = document.querySelector("#game-back-to-arcade");
+const spectatorGameBackButton = document.querySelector("#spectator-game-back");
 const cabinetStatusLabel = document.querySelector("#cabinet-status-label");
 const cabinetSummary = document.querySelector("#cabinet-summary");
 const cabinetDescription = document.querySelector("#cabinet-description");
@@ -304,8 +306,20 @@ if (gameBackToArcadeButton) {
   });
 }
 
+if (spectatorGameBackButton) {
+  spectatorGameBackButton.addEventListener("click", () => {
+    returnToCabinet();
+  });
+}
+
 if (startSoloButton) {
   startSoloButton.addEventListener("click", () => {
+    startSoloPlay();
+  });
+}
+
+if (spectatorWatchButton) {
+  spectatorWatchButton.addEventListener("click", () => {
     startSoloPlay();
   });
 }
@@ -465,6 +479,7 @@ function startSoloPlay() {
   if (cabinetRole !== "player") return;
   resetGame();
   gameSessionActive = true;
+  document.body.classList.remove("is-cabinet-spectator");
   document.body.classList.remove("is-spectator");
   spectatorBanner?.classList.add("is-hidden");
   resetHostSyncState();
@@ -477,6 +492,7 @@ function startSoloPlay() {
 function startSpectating() {
   resetGame();
   gameSessionActive = true;
+  document.body.classList.remove("is-cabinet-spectator");
   document.body.classList.add("is-spectator");
   spectatorBanner?.classList.remove("is-hidden");
   if (latestViewerKeyframe) applyViewerSnapshot(latestViewerKeyframe);
@@ -494,6 +510,7 @@ function returnToCabinet() {
   rankingSubmitPanel?.classList.remove("is-visible");
   if (cabinetRole === "player") cabinetClient.send({ type: "stopSolo" });
   document.body.classList.remove("is-spectator");
+  document.body.classList.remove("is-cabinet-spectator");
   spectatorBanner?.classList.add("is-hidden");
   if (touchPause) touchPause.textContent = "一時停止";
   updateCabinetUi();
@@ -626,6 +643,7 @@ function updateCabinetUi() {
   };
   const statusLabel = statusLabels[cabinetState?.status] ?? "接続中";
 
+  document.body.classList.toggle("is-cabinet-spectator", cabinetRole === "spectator");
   if (cabinetStatusLabel) cabinetStatusLabel.textContent = statusLabel;
   if (!startSoloButton) return;
 
@@ -650,8 +668,13 @@ function updateCabinetUi() {
   }
 
   if (cabinetRole === "spectator") {
-    startSoloButton.disabled = cabinetState?.status !== "soloPlaying";
-    startSoloButton.textContent = cabinetState?.status === "soloPlaying" ? "観戦する" : "プレイ開始を待っています";
+    const canWatch = cabinetState?.status === "soloPlaying";
+    startSoloButton.disabled = !canWatch;
+    startSoloButton.textContent = canWatch ? "観戦する" : "プレイ開始を待っています";
+    if (spectatorWatchButton) {
+      spectatorWatchButton.disabled = !canWatch;
+      spectatorWatchButton.textContent = canWatch ? "観戦する" : "プレイ開始を待っています";
+    }
     if (cabinetDescription) {
       cabinetDescription.textContent = "この筐体は使用中です。プレイヤーのゲームをリアルタイムで観戦できます。";
     }
