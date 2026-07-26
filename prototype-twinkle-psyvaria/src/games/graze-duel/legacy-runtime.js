@@ -74,6 +74,13 @@ const BOSS_RADIUS = 34;
 const BOSS_CONTACT_DAMAGE = 4;
 const BOSS_INVINCIBLE_COST = 0.22;
 const BOSS_DAMAGE_COOLDOWN = 0.12;
+const BOSS_ATTACK_TELEGRAPH_TIME = 0.85;
+const BOSS_ATTACK_RECOVERY_TIME = 0.7;
+const BOSS_ATTACK_PATTERNS = [
+  { id: "fan", duration: 2.5, shotInterval: 0.42 },
+  { id: "aimedBurst", duration: 2.2, shotInterval: 0.5 },
+  { id: "crossSweep", duration: 2.6, shotInterval: 0.34 },
+];
 const HIT_INVINCIBLE_TIME = 2.2;
 const INVINCIBLE_RING_INNER_RADIUS = 18;
 const INVINCIBLE_RING_INNER_SCALE = 28;
@@ -102,9 +109,9 @@ const HIT_MARKER_RADIUS = 3;
 const CLIENT_VERSION = "prototype-boss-rush-1";
 
 const BOSS_PHASES = [
-  { level: 1, spawnLevel: 10, name: "BOSS LV1", shape: "circle", hp: 25, radius: 34, color: "#5a1f65" },
-  { level: 2, spawnLevel: 20, name: "MID BOSS LV2", shape: "invertedTriangle", hp: 30, radius: 38, color: "#245f7a" },
-  { level: 3, spawnLevel: 30, name: "LAST BOSS LV3", shape: "star", hp: 38, radius: 42, color: "#6d2a8f" },
+  { level: 1, spawnLevel: 10, name: "BOSS LV1", shape: "circle", hp: 25, radius: 44, color: "#18051f" },
+  { level: 2, spawnLevel: 20, name: "MID BOSS LV2", shape: "invertedTriangle", hp: 30, radius: 48, color: "#071722" },
+  { level: 3, spawnLevel: 30, name: "LAST BOSS LV3", shape: "star", hp: 38, radius: 52, color: "#1c0628" },
 ];
 
 const keys = new Set();
@@ -157,6 +164,13 @@ const boss = {
   maxHp: BOSS_PHASES[0].hp,
   damageCooldown: 0,
   flash: 0,
+  attackState: "telegraph",
+  attackPatternIndex: 0,
+  attackTimer: BOSS_ATTACK_TELEGRAPH_TIME,
+  attackShotTimer: 0,
+  attackStep: 0,
+  attackTargetX: LEFT_X + FIELD_WIDTH / 2,
+  attackTargetY: FIELD_BOTTOM - 58,
 };
 
 const players = [
@@ -273,6 +287,7 @@ function resetBossProgress() {
   boss.maxHp = BOSS_PHASES[0].hp;
   boss.damageCooldown = 0;
   boss.flash = 0;
+  resetBossAttackState();
 }
 
 function startBossPhase(phaseIndex) {
@@ -287,7 +302,20 @@ function startBossPhase(phaseIndex) {
   boss.maxHp = phase.hp;
   boss.damageCooldown = 0;
   boss.flash = 0;
+  resetBossAttackState();
+  clearAllBullets();
+  playBossAttackSound();
   queueSyncEvent({ type: "bossState", boss: createBossSyncState() }, true);
+}
+
+function resetBossAttackState() {
+  boss.attackState = "telegraph";
+  boss.attackPatternIndex = 0;
+  boss.attackTimer = BOSS_ATTACK_TELEGRAPH_TIME;
+  boss.attackShotTimer = 0;
+  boss.attackStep = 0;
+  boss.attackTargetX = players[0]?.x ?? LEFT_X + FIELD_WIDTH / 2;
+  boss.attackTargetY = players[0]?.y ?? FIELD_BOTTOM - 58;
 }
 
 resetGame();
@@ -824,6 +852,13 @@ function createViewerSnapshot() {
       hp: boss.hp,
       maxHp: boss.maxHp,
       flash: boss.flash,
+      attackState: boss.attackState,
+      attackPatternIndex: boss.attackPatternIndex,
+      attackTimer: boss.attackTimer,
+      attackShotTimer: boss.attackShotTimer,
+      attackStep: boss.attackStep,
+      attackTargetX: boss.attackTargetX,
+      attackTargetY: boss.attackTargetY,
     },
   };
 }
@@ -871,6 +906,13 @@ function createBossSyncState() {
     hp: boss.hp,
     maxHp: boss.maxHp,
     flash: boss.flash,
+    attackState: boss.attackState,
+    attackPatternIndex: boss.attackPatternIndex,
+    attackTimer: boss.attackTimer,
+    attackShotTimer: boss.attackShotTimer,
+    attackStep: boss.attackStep,
+    attackTargetX: boss.attackTargetX,
+    attackTargetY: boss.attackTargetY,
   };
 }
 
@@ -1079,13 +1121,13 @@ function update(delta) {
 
   for (const player of players) {
     updatePlayerState(player, gameDelta);
-    if (!gameOver) spawnBaseBullets(player, gameDelta);
+    if (!gameOver && !boss.active) spawnBaseBullets(player, gameDelta);
     updateBullets(player, gameDelta);
     updateGrazeAndHits(player);
   }
 
   tryAutoAttack(players[0], players[1]);
-  tryAutoAttack(players[1], players[0]);
+  if (!boss.active) tryAutoAttack(players[1], players[0]);
   updateBoss(gameDelta);
   updateDebugRankingPreview();
 
@@ -1123,6 +1165,7 @@ function updateBoss(delta) {
   boss.damageCooldown = Math.max(0, boss.damageCooldown - delta);
   boss.flash = Math.max(0, boss.flash - delta);
   if (gameOver || boss.hp <= 0) return;
+  updateBossAttack(delta);
 
   const player = players[0];
   const touchingBoss = Math.hypot(player.x - boss.x, player.y - boss.y) < boss.radius + getInvincibleRingDamageRadius(player);
@@ -1138,6 +1181,140 @@ function updateBoss(delta) {
   playBossHitSound();
   if (boss.hp <= 0) {
     handleBossDefeated();
+  }
+}
+
+function updateBossAttack(delta) {
+  boss.attackTimer -= delta;
+
+  if (boss.attackState === "telegraph") {
+    if (boss.attackTimer > 0) return;
+    const pattern = BOSS_ATTACK_PATTERNS[boss.attackPatternIndex];
+    boss.attackState = "active";
+    boss.attackTimer = pattern.duration;
+    boss.attackShotTimer = 0;
+    boss.attackStep = 0;
+    boss.flash = 0.24;
+    playBossAttackSound();
+    queueSyncEvent({ type: "bossState", boss: createBossSyncState() }, true);
+    return;
+  }
+
+  if (boss.attackState === "recovery") {
+    if (boss.attackTimer > 0) return;
+    beginNextBossAttack();
+    return;
+  }
+
+  const pattern = BOSS_ATTACK_PATTERNS[boss.attackPatternIndex];
+  boss.attackShotTimer -= delta;
+  while (boss.attackShotTimer <= 0 && boss.attackTimer > 0) {
+    spawnBossAttackPattern(pattern.id);
+    boss.attackShotTimer += pattern.shotInterval;
+    boss.attackStep += 1;
+  }
+
+  if (boss.attackTimer <= 0) {
+    clearAllBullets();
+    boss.attackState = "recovery";
+    boss.attackTimer = BOSS_ATTACK_RECOVERY_TIME;
+    boss.attackShotTimer = 0;
+    queueSyncEvent({ type: "bossState", boss: createBossSyncState() }, true);
+  }
+}
+
+function beginNextBossAttack() {
+  boss.attackPatternIndex = (boss.attackPatternIndex + 1) % BOSS_ATTACK_PATTERNS.length;
+  boss.attackState = "telegraph";
+  boss.attackTimer = BOSS_ATTACK_TELEGRAPH_TIME;
+  boss.attackShotTimer = 0;
+  boss.attackStep = 0;
+  boss.attackTargetX = players[0].x;
+  boss.attackTargetY = players[0].y;
+  queueSyncEvent({ type: "bossState", boss: createBossSyncState() }, true);
+}
+
+function spawnBossAttackPattern(patternId) {
+  if (patternId === "fan") {
+    spawnBossFanAttack();
+    return;
+  }
+  if (patternId === "aimedBurst") {
+    spawnBossAimedBurst();
+    return;
+  }
+  spawnBossCrossSweep();
+}
+
+function spawnBossFanAttack() {
+  const phaseScale = 1 + boss.phaseIndex * 0.18;
+  const count = 9 + boss.phaseIndex * 2;
+  const spread = 1.45;
+  const speed = 128 * phaseScale;
+  const originY = boss.y + boss.radius * 0.5;
+
+  for (let index = 0; index < count; index += 1) {
+    const ratio = count === 1 ? 0 : index / (count - 1) - 0.5;
+    const angle = Math.PI / 2 + ratio * spread;
+    addBullet(
+      players[0],
+      boss.x,
+      originY,
+      Math.cos(angle) * speed,
+      Math.sin(angle) * speed,
+      7,
+      "#d92b52",
+      "bossAttack",
+      { shape: "diamond" },
+    );
+  }
+}
+
+function spawnBossAimedBurst() {
+  const phaseScale = 1 + boss.phaseIndex * 0.2;
+  const angle = Math.atan2(boss.attackTargetY - boss.y, boss.attackTargetX - boss.x);
+  const speed = (154 + boss.attackStep * 7) * phaseScale;
+  const count = 5 + boss.phaseIndex * 2;
+  const spread = 0.34 + boss.phaseIndex * 0.05;
+
+  for (let index = 0; index < count; index += 1) {
+    const ratio = count === 1 ? 0 : index / (count - 1) - 0.5;
+    const bulletAngle = angle + ratio * spread;
+    addBullet(
+      players[0],
+      boss.x,
+      boss.y + boss.radius * 0.35,
+      Math.cos(bulletAngle) * speed,
+      Math.sin(bulletAngle) * speed,
+      7,
+      "#ff6b4a",
+      "bossAttack",
+      { shape: "line", rotation: bulletAngle - Math.PI / 2 },
+    );
+  }
+}
+
+function spawnBossCrossSweep() {
+  const phaseScale = 1 + boss.phaseIndex * 0.18;
+  const direction = boss.attackStep % 2 === 0 ? -1 : 1;
+  const centerAngle = Math.PI / 2 + direction * 0.43;
+  const count = 5 + boss.phaseIndex;
+  const speed = 142 * phaseScale;
+
+  for (let index = 0; index < count; index += 1) {
+    const offset = (index - (count - 1) / 2) * 0.075;
+    const angle = centerAngle + offset;
+    addBullet(
+      players[0],
+      boss.x + direction * boss.radius * 0.35,
+      boss.y + boss.radius * 0.3,
+      Math.cos(angle) * speed,
+      Math.sin(angle) * speed,
+      8,
+      "#a62cff",
+      "bossAttack",
+      { shape: "pill" },
+    );
   }
 }
 
@@ -1625,9 +1802,19 @@ function updateBullets(player, delta) {
     bullet.age += delta;
     bullet.x += bullet.vx * delta;
     bullet.y += bullet.vy * delta;
-    if (bullet.x < player.fieldX + 20 || bullet.x > player.fieldX + FIELD_WIDTH - 20) bullet.vx *= -1;
+    if (
+      bullet.type !== "bossAttack" &&
+      (bullet.x < player.fieldX + 20 || bullet.x > player.fieldX + FIELD_WIDTH - 20)
+    ) {
+      bullet.vx *= -1;
+    }
   }
-  player.bullets = player.bullets.filter((bullet) => bullet.y < FIELD_BOTTOM + 48);
+  player.bullets = player.bullets.filter(
+    (bullet) =>
+      bullet.y < FIELD_BOTTOM + 48 &&
+      bullet.x > player.fieldX - 48 &&
+      bullet.x < player.fieldX + FIELD_WIDTH + 48,
+  );
 }
 
 function updateGrazeAndHits(player) {
@@ -1696,14 +1883,17 @@ function getOpponent(player) {
 function tryAttack(attacker, defender) {
   const attackCost = getAttackCost(attacker);
   if (gameOver || attacker.gauge < attackCost) return;
+  const attackingBoss = boss.active && attacker === players[0];
   attacker.gauge -= attackCost;
   attacker.level += 1;
   attacker.levelUpInvincible = getNextInvincibleTime(attacker.levelUpInvincible);
   attacker.levelUpFlash = 0.42;
   attacker.attackFlash = 0.35;
   attacker.attackCooldown = AUTO_ATTACK_COOLDOWN;
-  defender.attackFlash = 0.55;
+  if (!attackingBoss) defender.attackFlash = 0.55;
   playAttackSound();
+
+  if (attackingBoss) return;
 
   const shouldSendBoss = attacker.level >= attacker.nextBossLevel;
   if (shouldSendBoss) {
@@ -1925,22 +2115,55 @@ function drawBoss() {
   if (!boss.active || boss.hp <= 0) return;
   context.save();
   const phase = BOSS_PHASES[boss.phaseIndex];
-  const pulse = 0.5 + Math.sin(elapsedRound * 4) * 0.16;
+  const pulse = 0.5 + Math.sin(elapsedRound * 3.2) * 0.16;
   const flash = boss.flash > 0 ? 1 : 0;
+  const warningPulse = boss.attackState === "telegraph" ? 0.5 + Math.sin(elapsedRound * 18) * 0.5 : 0;
 
-  context.shadowBlur = 30 + flash * 24;
-  context.shadowColor = flash ? "#ffffff" : "#ffd166";
+  drawBossAttackTelegraph(warningPulse);
+
+  context.strokeStyle = `rgba(255, 51, 85, ${0.38 + warningPulse * 0.48})`;
+  context.lineWidth = 2;
+  context.shadowBlur = 22 + warningPulse * 20;
+  context.shadowColor = "#ff3355";
+  for (let index = 0; index < 10; index += 1) {
+    const angle = elapsedRound * 0.18 + (Math.PI * 2 * index) / 10;
+    const innerRadius = boss.radius + 9 + pulse * 4;
+    const outerRadius = boss.radius + 22 + warningPulse * 8;
+    context.beginPath();
+    context.moveTo(boss.x + Math.cos(angle) * innerRadius, boss.y + Math.sin(angle) * innerRadius);
+    context.lineTo(boss.x + Math.cos(angle) * outerRadius, boss.y + Math.sin(angle) * outerRadius);
+    context.stroke();
+  }
+
+  context.shadowBlur = 34 + flash * 28;
+  context.shadowColor = flash ? "#ffffff" : "#ff3355";
   context.fillStyle = flash ? "#ffffff" : phase.color;
-  context.strokeStyle = "#ffd166";
-  context.lineWidth = 4;
+  context.strokeStyle = warningPulse > 0.2 ? "#ff3355" : "#8f1739";
+  context.lineWidth = 5;
   drawBossShape(phase.shape, boss.x, boss.y, boss.radius + pulse * 5);
 
   context.shadowBlur = 0;
-  context.fillStyle = "#ffd166";
+  const coreGradient = context.createRadialGradient(boss.x, boss.y, 1, boss.x, boss.y, boss.radius * 0.52);
+  coreGradient.addColorStop(0, flash ? "#ffffff" : "#ffeff3");
+  coreGradient.addColorStop(0.18, "#ff3355");
+  coreGradient.addColorStop(0.56, "#5d071d");
+  coreGradient.addColorStop(1, "rgba(20, 0, 8, 0)");
+  context.fillStyle = coreGradient;
   context.beginPath();
-  context.arc(boss.x - 11, boss.y - 5, 5, 0, Math.PI * 2);
-  context.arc(boss.x + 11, boss.y - 5, 5, 0, Math.PI * 2);
+  context.arc(boss.x, boss.y, boss.radius * 0.54, 0, Math.PI * 2);
   context.fill();
+
+  context.fillStyle = "#fff4f6";
+  context.shadowBlur = 16;
+  context.shadowColor = "#ff3355";
+  context.beginPath();
+  context.ellipse(boss.x, boss.y, boss.radius * 0.34, boss.radius * 0.09, 0, 0, Math.PI * 2);
+  context.fill();
+  context.fillStyle = "#180008";
+  context.beginPath();
+  context.ellipse(boss.x, boss.y, boss.radius * 0.07, boss.radius * 0.1, 0, 0, Math.PI * 2);
+  context.fill();
+  context.shadowBlur = 0;
 
   const barWidth = 260;
   const barX = LEFT_X + FIELD_WIDTH / 2 - barWidth / 2;
@@ -1957,6 +2180,50 @@ function drawBoss() {
   context.textAlign = "center";
   context.fillText(phase.name, labelX, FIELD_TOP + 10);
   context.textAlign = "left";
+  context.restore();
+}
+
+function drawBossAttackTelegraph(pulse) {
+  if (boss.attackState !== "telegraph") return;
+  const pattern = BOSS_ATTACK_PATTERNS[boss.attackPatternIndex]?.id;
+  context.save();
+  context.globalAlpha = 0.32 + pulse * 0.5;
+  context.strokeStyle = "#ff3355";
+  context.fillStyle = "rgba(255, 51, 85, 0.12)";
+  context.lineWidth = 3;
+  context.setLineDash([10, 8]);
+
+  if (pattern === "fan") {
+    const spread = 1.45;
+    for (const angle of [Math.PI / 2 - spread / 2, Math.PI / 2 + spread / 2]) {
+      context.beginPath();
+      context.moveTo(boss.x, boss.y);
+      context.lineTo(boss.x + Math.cos(angle) * 330, boss.y + Math.sin(angle) * 330);
+      context.stroke();
+    }
+  } else if (pattern === "aimedBurst") {
+    context.beginPath();
+    context.moveTo(boss.x, boss.y);
+    context.lineTo(boss.attackTargetX, boss.attackTargetY);
+    context.stroke();
+    context.beginPath();
+    context.arc(boss.attackTargetX, boss.attackTargetY, 24 + pulse * 8, 0, Math.PI * 2);
+    context.stroke();
+  } else {
+    for (const direction of [-1, 1]) {
+      const angle = Math.PI / 2 + direction * 0.43;
+      context.beginPath();
+      context.moveTo(boss.x, boss.y);
+      context.lineTo(boss.x + Math.cos(angle) * 340, boss.y + Math.sin(angle) * 340);
+      context.stroke();
+    }
+  }
+
+  context.setLineDash([]);
+  context.font = "900 13px system-ui";
+  context.textAlign = "center";
+  context.fillStyle = "#ff8da4";
+  context.fillText("DANGER", boss.x, boss.y - boss.radius - 36);
   context.restore();
 }
 
@@ -2015,6 +2282,17 @@ function drawBackground() {
   gradient.addColorStop(1, "#101327");
   context.fillStyle = gradient;
   context.fillRect(0, 0, WIDTH, HEIGHT);
+
+  if (boss.active) {
+    const dangerPulse = 0.08 + (Math.sin(elapsedRound * 3.4) + 1) * 0.025;
+    const dangerX = isCompactView() ? WIDTH / 2 : boss.x;
+    const dangerGradient = context.createRadialGradient(dangerX, boss.y, 20, dangerX, boss.y, 440);
+    dangerGradient.addColorStop(0, `rgba(110, 0, 30, ${dangerPulse + 0.08})`);
+    dangerGradient.addColorStop(0.5, `rgba(55, 0, 20, ${dangerPulse})`);
+    dangerGradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+    context.fillStyle = dangerGradient;
+    context.fillRect(0, 0, WIDTH, HEIGHT);
+  }
 
   context.strokeStyle = "rgba(255,255,255,0.045)";
   for (let y = (elapsedRound * 40) % 32; y < HEIGHT; y += 32) {
