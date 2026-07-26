@@ -9,6 +9,9 @@ function createCabinetRoom(cabinetId, send) {
   const clients = new Map();
   let playerSocket = null;
   let status = "empty";
+  let latestKeyframe = null;
+  let latestMotionFrame = null;
+  let eventsSinceKeyframe = [];
 
   function state() {
     const spectatorCount = [...clients.values()].filter((client) => client.role === "spectator").length;
@@ -39,6 +42,9 @@ function createCabinetRoom(cabinetId, send) {
     if (socket === playerSocket) {
       playerSocket = null;
       status = "empty";
+      latestKeyframe = null;
+      latestMotionFrame = null;
+      eventsSinceKeyframe = [];
       broadcast({ type: "playerLeft" }, (target) => target.role === "spectator");
     }
     client.role = "visitor";
@@ -70,6 +76,16 @@ function createCabinetRoom(cabinetId, send) {
           client.role = "spectator";
         }
         send(socket, { type: "joinedCabinet", clientId: client.id, role: client.role });
+        if (client.role === "spectator") {
+          const replayMessages = [
+            latestKeyframe,
+            ...eventsSinceKeyframe,
+            latestMotionFrame,
+          ]
+            .filter(Boolean)
+            .sort((left, right) => left.seq - right.seq);
+          for (const replayMessage of replayMessages) send(socket, replayMessage);
+        }
         broadcastState();
         return;
       }
@@ -80,11 +96,23 @@ function createCabinetRoom(cabinetId, send) {
         return;
       }
 
-      if (message.type === "gameSnapshot" && socket === playerSocket) {
-        broadcast(
-          { type: "viewerSnapshot", snapshot: message.snapshot, seq: message.seq },
-          (target) => target.role === "spectator",
-        );
+      if (message.type === "gameKeyframe" && socket === playerSocket) {
+        latestKeyframe = { type: "viewerKeyframe", snapshot: message.snapshot, seq: message.seq };
+        eventsSinceKeyframe = [];
+        broadcast(latestKeyframe, (target) => target.role === "spectator");
+        return;
+      }
+
+      if (message.type === "gameEvents" && socket === playerSocket) {
+        const viewerEvents = { type: "viewerEvents", events: message.events, seq: message.seq };
+        eventsSinceKeyframe.push(viewerEvents);
+        broadcast(viewerEvents, (target) => target.role === "spectator");
+        return;
+      }
+
+      if (message.type === "gameMotionFrame" && socket === playerSocket) {
+        latestMotionFrame = { type: "viewerMotionFrame", frame: message.frame, seq: message.seq };
+        broadcast(latestMotionFrame, (target) => target.role === "spectator");
         return;
       }
 
@@ -112,7 +140,12 @@ function localCabinetServer() {
       const webSocketServer = new WebSocketServer({ noServer: true });
 
       function send(socket, message) {
-        if (message.type === "viewerSnapshot" && socket.bufferedAmount > 512 * 1024) return;
+        if (
+          (message.type === "viewerMotionFrame" || message.type === "viewerKeyframe")
+          && socket.bufferedAmount > 512 * 1024
+        ) {
+          return;
+        }
         if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
       }
 

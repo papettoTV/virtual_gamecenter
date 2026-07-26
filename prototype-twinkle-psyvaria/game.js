@@ -74,6 +74,9 @@ const BASE_BULLET_CLEAR_BONUS = 0.25;
 const INVINCIBLE_WARNING_TIME = 0.5;
 const MAX_PARTICLES = 180;
 const MAX_SNAPSHOT_BUFFERED_BYTES = 256 * 1024;
+const MOTION_FRAME_INTERVAL = 0.1;
+const KEYFRAME_INTERVAL = 1;
+const EVENT_FLUSH_INTERVAL = 0.05;
 const SPECTATOR_POSITION_CORRECTION = 18;
 const SPECTATOR_BULLET_CORRECTION = 24;
 const HIT_DEBUG_ENABLED = false;
@@ -117,11 +120,16 @@ let currentScreen = "arcade";
 let gameSessionActive = false;
 let cabinetRole = "visitor";
 let cabinetState = null;
-let latestViewerSnapshot = null;
-let previousViewerSnapshot = null;
-let lastViewerSnapshotSequence = 0;
-let snapshotSequence = 0;
-let snapshotTimer = 0;
+let latestViewerKeyframe = null;
+let latestViewerMotion = null;
+let previousViewerMotion = null;
+let pendingViewerEvents = [];
+let lastViewerSequence = 0;
+let syncSequence = 0;
+let motionFrameTimer = 0;
+let keyframeTimer = 0;
+let eventFlushTimer = 0;
+let pendingSyncEvents = [];
 let cabinetConnected = false;
 let currentCabinetId = null;
 
@@ -266,6 +274,7 @@ function startBossPhase(phaseIndex) {
   boss.maxHp = phase.hp;
   boss.damageCooldown = 0;
   boss.flash = 0;
+  queueSyncEvent({ type: "bossState", boss: createBossSyncState() }, true);
 }
 
 resetGame();
@@ -376,7 +385,8 @@ if (touchPause) {
     if (cabinetRole === "spectator") return;
     if (!gameOver) paused = !paused;
     touchPause.textContent = paused ? "再開" : "一時停止";
-    broadcastViewerSnapshot(0, true);
+    queueSyncEvent({ type: "pauseChanged", paused }, true);
+    broadcastMotionFrame(true);
   });
 }
 
@@ -432,9 +442,7 @@ function enterCabinet(cabinetId, updateUrl = true) {
   cabinetRole = "joining";
   cabinetConnected = false;
   cabinetState = null;
-  latestViewerSnapshot = null;
-  previousViewerSnapshot = null;
-  lastViewerSnapshotSequence = 0;
+  resetViewerSyncState();
   if (updateUrl) history.pushState({ cabinetId }, "", `/cabinets/${cabinetId}`);
   if (cabinetIdLabel) cabinetIdLabel.textContent = `Cabinet ${cabinetId.slice(0, 8)}`;
   updateCabinetShareUrl();
@@ -459,8 +467,9 @@ function startSoloPlay() {
   gameSessionActive = true;
   document.body.classList.remove("is-spectator");
   spectatorBanner?.classList.add("is-hidden");
-  snapshotTimer = 0;
+  resetHostSyncState();
   cabinetClient.send({ type: "startSolo" });
+  broadcastGameKeyframe(true);
   lastTime = performance.now();
   showScreen("game");
 }
@@ -470,7 +479,10 @@ function startSpectating() {
   gameSessionActive = true;
   document.body.classList.add("is-spectator");
   spectatorBanner?.classList.remove("is-hidden");
-  if (latestViewerSnapshot) applyViewerSnapshot(latestViewerSnapshot, previousViewerSnapshot);
+  if (latestViewerKeyframe) applyViewerSnapshot(latestViewerKeyframe);
+  for (const event of pendingViewerEvents) applyViewerEvent(event);
+  pendingViewerEvents = [];
+  if (latestViewerMotion) applyViewerMotion(latestViewerMotion, previousViewerMotion);
   lastTime = performance.now();
   showScreen("game");
 }
@@ -481,9 +493,7 @@ function leaveCabinet(updateUrl = true) {
   cabinetRole = "visitor";
   cabinetConnected = false;
   cabinetState = null;
-  latestViewerSnapshot = null;
-  previousViewerSnapshot = null;
-  lastViewerSnapshotSequence = 0;
+  resetViewerSyncState();
   gameSessionActive = false;
   paused = false;
   document.body.classList.remove("is-spectator");
@@ -551,22 +561,42 @@ function handleCabinetMessage(message) {
     return;
   }
 
-  if (message.type === "viewerSnapshot") {
-    if (message.seq <= lastViewerSnapshotSequence) return;
-    lastViewerSnapshotSequence = message.seq;
-    previousViewerSnapshot = latestViewerSnapshot;
-    latestViewerSnapshot = message.snapshot;
+  if (message.type === "viewerKeyframe") {
+    if (message.seq <= lastViewerSequence) return;
+    lastViewerSequence = message.seq;
+    latestViewerKeyframe = message.snapshot;
+    pendingViewerEvents = [];
     if (cabinetRole === "spectator" && currentScreen === "game") {
-      applyViewerSnapshot(message.snapshot, previousViewerSnapshot);
+      applyViewerSnapshot(message.snapshot);
+    }
+    return;
+  }
+
+  if (message.type === "viewerEvents") {
+    if (message.seq <= lastViewerSequence) return;
+    lastViewerSequence = message.seq;
+    if (cabinetRole === "spectator" && currentScreen === "game") {
+      for (const event of message.events) applyViewerEvent(event);
+    } else {
+      pendingViewerEvents.push(...message.events);
+    }
+    return;
+  }
+
+  if (message.type === "viewerMotionFrame") {
+    if (message.seq <= lastViewerSequence) return;
+    lastViewerSequence = message.seq;
+    previousViewerMotion = latestViewerMotion;
+    latestViewerMotion = message.frame;
+    if (cabinetRole === "spectator" && currentScreen === "game") {
+      applyViewerMotion(message.frame, previousViewerMotion);
     }
     return;
   }
 
   if (message.type === "playerLeft" && cabinetRole === "spectator") {
     gameSessionActive = false;
-    latestViewerSnapshot = null;
-    previousViewerSnapshot = null;
-    lastViewerSnapshotSequence = 0;
+    resetViewerSyncState();
     showScreen("cabinet");
     if (cabinetRoleLabel) cabinetRoleLabel.textContent = "プレイヤーが筐体を離れました。";
     return;
@@ -621,20 +651,84 @@ function updateCabinetUi() {
   if (cabinetRoleLabel) cabinetRoleLabel.textContent = "接続中";
 }
 
-function broadcastViewerSnapshot(delta, force = false) {
+function resetHostSyncState() {
+  motionFrameTimer = 0;
+  keyframeTimer = 0;
+  eventFlushTimer = 0;
+  pendingSyncEvents = [];
+}
+
+function resetViewerSyncState() {
+  latestViewerKeyframe = null;
+  latestViewerMotion = null;
+  previousViewerMotion = null;
+  pendingViewerEvents = [];
+  lastViewerSequence = 0;
+}
+
+function nextSyncSequence() {
+  syncSequence += 1;
+  return syncSequence;
+}
+
+function updateViewerSync(delta) {
   if (cabinetRole !== "player") return;
-  snapshotTimer += delta;
-  if (!force && snapshotTimer < 0.1) return;
-  if (!force && cabinetClient.getBufferedAmount() > MAX_SNAPSHOT_BUFFERED_BYTES) {
-    snapshotTimer = 0;
+  motionFrameTimer += delta;
+  keyframeTimer += delta;
+  eventFlushTimer += delta;
+
+  if (pendingSyncEvents.length > 0 && eventFlushTimer >= EVENT_FLUSH_INTERVAL) {
+    flushSyncEvents();
+  }
+  if (motionFrameTimer >= MOTION_FRAME_INTERVAL) {
+    motionFrameTimer %= MOTION_FRAME_INTERVAL;
+    broadcastMotionFrame();
+  }
+  if (keyframeTimer >= KEYFRAME_INTERVAL) {
+    keyframeTimer %= KEYFRAME_INTERVAL;
+    broadcastGameKeyframe();
+  }
+}
+
+function broadcastMotionFrame(force = false) {
+  if (cabinetRole !== "player") return;
+  if (!force && cabinetClient.getBufferedAmount() > MAX_SNAPSHOT_BUFFERED_BYTES) return;
+  cabinetClient.send({
+    type: "gameMotionFrame",
+    seq: nextSyncSequence(),
+    frame: createViewerMotionFrame(),
+  });
+}
+
+function broadcastGameKeyframe(force = false) {
+  if (cabinetRole !== "player") return;
+  if (!force && cabinetClient.getBufferedAmount() > MAX_SNAPSHOT_BUFFERED_BYTES) return;
+  flushSyncEvents();
+  cabinetClient.send({
+    type: "gameKeyframe",
+    seq: nextSyncSequence(),
+    snapshot: createViewerSnapshot(),
+  });
+}
+
+function queueSyncEvent(event, flush = false) {
+  if (cabinetRole !== "player" || !gameSessionActive) return;
+  pendingSyncEvents.push(event);
+  if (flush) flushSyncEvents();
+}
+
+function flushSyncEvents() {
+  if (cabinetRole !== "player" || pendingSyncEvents.length === 0) {
+    eventFlushTimer = 0;
     return;
   }
-  snapshotTimer = force ? 0 : snapshotTimer % 0.1;
-  snapshotSequence += 1;
+  const events = pendingSyncEvents;
+  pendingSyncEvents = [];
+  eventFlushTimer = 0;
   cabinetClient.send({
-    type: "gameSnapshot",
-    seq: snapshotSequence,
-    snapshot: createViewerSnapshot(),
+    type: "gameEvents",
+    seq: nextSyncSequence(),
+    events,
   });
 }
 
@@ -691,8 +785,52 @@ function createViewerSnapshot() {
   };
 }
 
-function applyViewerSnapshot(snapshot, previousSnapshot = null) {
-  const snapshotDelta = Math.max(0.001, (snapshot.capturedAt - (previousSnapshot?.capturedAt ?? snapshot.capturedAt)) / 1000);
+function createViewerMotionFrame() {
+  return {
+    capturedAt: performance.now(),
+    elapsedRound,
+    gameOver,
+    clearGame,
+    paused,
+    defeatedBossCount,
+    slowMotionTimer,
+    players: players.map(({ bullets: _bullets, grazeIds: _grazeIds, ...player }) => ({
+      x: player.x,
+      y: player.y,
+      lives: player.lives,
+      score: player.score,
+      gauge: player.gauge,
+      level: player.level,
+      combo: player.combo,
+      multiplier: player.multiplier,
+      invincible: player.invincible,
+      levelUpInvincible: player.levelUpInvincible,
+      barrierRatio: player.barrierRatio,
+      hitInvincible: player.hitInvincible,
+      attackFlash: player.attackFlash,
+      levelUpFlash: player.levelUpFlash,
+      tilt: player.tilt,
+    })),
+    boss: createBossSyncState(),
+  };
+}
+
+function createBossSyncState() {
+  return {
+    active: boss.active,
+    phaseIndex: boss.phaseIndex,
+    nextSpawnLevel: boss.nextSpawnLevel,
+    x: boss.x,
+    y: boss.y,
+    baseY: boss.baseY,
+    radius: boss.radius,
+    hp: boss.hp,
+    maxHp: boss.maxHp,
+    flash: boss.flash,
+  };
+}
+
+function applyViewerSnapshot(snapshot) {
   elapsedRound = snapshot.elapsedRound;
   gameOver = snapshot.gameOver;
   clearGame = snapshot.clearGame;
@@ -700,29 +838,93 @@ function applyViewerSnapshot(snapshot, previousSnapshot = null) {
   defeatedBossCount = snapshot.defeatedBossCount;
   snapshot.players.forEach((snapshotPlayer, index) => {
     const player = players[index];
-    const previousPlayer = previousSnapshot?.players[index];
     const { bullets, x, y, ...playerState } = snapshotPlayer;
-    Object.assign(players[index], playerState);
-    if (!previousPlayer) {
+    Object.assign(player, playerState);
+    if (!latestViewerMotion) {
       player.x = x;
       player.y = y;
     }
     player.spectatorTargetX = x;
     player.spectatorTargetY = y;
-    player.spectatorVx = previousPlayer ? (x - previousPlayer.x) / snapshotDelta : 0;
-    player.spectatorVy = previousPlayer ? (y - previousPlayer.y) / snapshotDelta : 0;
-    syncSpectatorBullets(player, bullets, !previousPlayer);
+    player.spectatorVx = player.spectatorVx ?? 0;
+    player.spectatorVy = player.spectatorVy ?? 0;
+    syncSpectatorBullets(player, bullets, player.bullets.length === 0);
   });
   const { x: bossX, y: bossY, ...bossState } = snapshot.boss;
   Object.assign(boss, bossState);
-  if (!previousSnapshot) {
+  if (!latestViewerMotion) {
     boss.x = bossX;
     boss.y = bossY;
   }
   boss.spectatorTargetX = bossX;
   boss.spectatorTargetY = bossY;
-  boss.spectatorVx = previousSnapshot ? (bossX - previousSnapshot.boss.x) / snapshotDelta : 0;
-  boss.spectatorVy = previousSnapshot ? (bossY - previousSnapshot.boss.y) / snapshotDelta : 0;
+  boss.spectatorVx = boss.spectatorVx ?? 0;
+  boss.spectatorVy = boss.spectatorVy ?? 0;
+}
+
+function applyViewerMotion(frame, previousFrame = null) {
+  const frameDelta = Math.max(0.001, (frame.capturedAt - (previousFrame?.capturedAt ?? frame.capturedAt)) / 1000);
+  elapsedRound = frame.elapsedRound;
+  gameOver = frame.gameOver;
+  clearGame = frame.clearGame;
+  paused = frame.paused;
+  defeatedBossCount = frame.defeatedBossCount;
+  slowMotionTimer = frame.slowMotionTimer;
+  frame.players.forEach((framePlayer, index) => {
+    const player = players[index];
+    const previousPlayer = previousFrame?.players[index];
+    const { x, y, ...playerState } = framePlayer;
+    Object.assign(player, playerState);
+    player.spectatorTargetX = x;
+    player.spectatorTargetY = y;
+    player.spectatorVx = previousPlayer ? (x - previousPlayer.x) / frameDelta : 0;
+    player.spectatorVy = previousPlayer ? (y - previousPlayer.y) / frameDelta : 0;
+  });
+  const { x: bossX, y: bossY, ...bossState } = frame.boss;
+  const previousBoss = previousFrame?.boss;
+  Object.assign(boss, bossState);
+  boss.spectatorTargetX = bossX;
+  boss.spectatorTargetY = bossY;
+  boss.spectatorVx = previousBoss ? (bossX - previousBoss.x) / frameDelta : 0;
+  boss.spectatorVy = previousBoss ? (bossY - previousBoss.y) / frameDelta : 0;
+}
+
+function applyViewerEvent(event) {
+  if (event.type === "bulletSpawn") {
+    const player = players[event.playerIndex];
+    if (!player || player.bullets.some((bullet) => bullet.id === event.bullet.id)) return;
+    player.bullets.push({
+      ...event.bullet,
+      spectatorTargetX: event.bullet.x,
+      spectatorTargetY: event.bullet.y,
+    });
+    return;
+  }
+  if (event.type === "bulletsCleared") {
+    for (const player of players) {
+      player.bullets = [];
+      player.grazeIds.clear();
+    }
+    return;
+  }
+  if (event.type === "bossState") {
+    const { x, y, ...bossState } = event.boss;
+    Object.assign(boss, bossState);
+    boss.spectatorTargetX = x;
+    boss.spectatorTargetY = y;
+    return;
+  }
+  if (event.type === "pauseChanged") {
+    paused = event.paused;
+    if (touchPause) touchPause.textContent = paused ? "再開" : "一時停止";
+    return;
+  }
+  if (event.type === "gameState") {
+    gameOver = event.gameOver;
+    clearGame = event.clearGame;
+    defeatedBossCount = event.defeatedBossCount;
+    slowMotionTimer = event.slowMotionTimer;
+  }
 }
 
 function syncSpectatorBullets(player, snapshotBullets, immediate) {
@@ -762,7 +964,12 @@ function updateSpectatorView(delta) {
       bullet.x += (bullet.spectatorTargetX - bullet.x) * bulletCorrectionRatio;
       bullet.y += (bullet.spectatorTargetY - bullet.y) * bulletCorrectionRatio;
       bullet.age += delta;
+      if (bullet.x < player.fieldX + 20 || bullet.x > player.fieldX + FIELD_WIDTH - 20) {
+        bullet.vx *= -1;
+        bullet.spectatorTargetX = bullet.x;
+      }
     }
+    player.bullets = player.bullets.filter((bullet) => bullet.y < FIELD_BOTTOM + 48);
   }
 
   boss.spectatorTargetX = (boss.spectatorTargetX ?? boss.x) + (boss.spectatorVx ?? 0) * delta;
@@ -778,7 +985,8 @@ window.addEventListener("keydown", (event) => {
     if (currentScreen === "game" && !gameOver) {
       paused = !paused;
       if (touchPause) touchPause.textContent = paused ? "再開" : "一時停止";
-      broadcastViewerSnapshot(0, true);
+      queueSyncEvent({ type: "pauseChanged", paused }, true);
+      broadcastMotionFrame(true);
     }
     return;
   }
@@ -832,7 +1040,7 @@ function update(delta) {
 
   updateParticles(gameDelta);
   slowMotionTimer = Math.max(0, slowMotionTimer - delta);
-  broadcastViewerSnapshot(delta);
+  updateViewerSync(delta);
 }
 
 function getGameDelta(delta) {
@@ -854,6 +1062,7 @@ function updateBoss(delta) {
   boss.hp = Math.max(0, boss.hp - BOSS_CONTACT_DAMAGE);
   boss.damageCooldown = BOSS_DAMAGE_COOLDOWN;
   boss.flash = 0.14;
+  queueSyncEvent({ type: "bossState", boss: createBossSyncState() });
   player.hitInvincible = player.levelUpInvincible > 0 || player.invincible > 0;
   player.score += 250;
   burst(boss.x, boss.y, "#ffd166", 8);
@@ -897,6 +1106,16 @@ function handleBossDefeated() {
   if (nextPhaseIndex >= BOSS_PHASES.length) {
     clearGame = true;
     gameOver = true;
+    queueSyncEvent(
+      {
+        type: "gameState",
+        gameOver,
+        clearGame,
+        defeatedBossCount,
+        slowMotionTimer,
+      },
+      true,
+    );
     recordClearResult();
     return;
   }
@@ -908,6 +1127,7 @@ function handleBossDefeated() {
   boss.maxHp = BOSS_PHASES[nextPhaseIndex].hp;
   boss.damageCooldown = 0;
   boss.flash = 0;
+  queueSyncEvent({ type: "bossState", boss: createBossSyncState() }, true);
 }
 
 function clearAllBullets() {
@@ -915,6 +1135,7 @@ function clearAllBullets() {
     player.bullets = [];
     player.grazeIds.clear();
   }
+  queueSyncEvent({ type: "bulletsCleared" }, true);
 }
 
 function updateDebugRankingPreview() {
@@ -1300,7 +1521,7 @@ function randomBaseBulletSpeed(intensity) {
 }
 
 function addBullet(player, x, y, vx, vy, radius, color, type, options = {}) {
-  player.bullets.push({
+  const bullet = {
     id: nextBulletId++,
     x,
     y,
@@ -1311,6 +1532,24 @@ function addBullet(player, x, y, vx, vy, radius, color, type, options = {}) {
     type,
     age: 0,
     ...options,
+  };
+  player.bullets.push(bullet);
+  queueSyncEvent({
+    type: "bulletSpawn",
+    playerIndex: player === players[0] ? 0 : 1,
+    bullet: {
+      id: bullet.id,
+      x: bullet.x,
+      y: bullet.y,
+      vx: bullet.vx,
+      vy: bullet.vy,
+      radius: bullet.radius,
+      color: bullet.color,
+      type: bullet.type,
+      age: bullet.age,
+      shape: bullet.shape,
+      rotation: bullet.rotation,
+    },
   });
 }
 

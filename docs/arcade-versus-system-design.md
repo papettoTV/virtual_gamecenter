@@ -87,8 +87,9 @@ Bは観戦モードになり、Aのプレイ映像をリアルタイムに見る
 
 初期版の観戦同期:
 
-- A側が定期的にゲーム状態スナップショットを送る。
-- B側はそのスナップショットを描画する。
+- A側が軽量な位置更新、弾生成などのイベント、定期キーフレームを送る。
+- B側はイベントから弾を生成して毎フレーム動かし、定期キーフレームでずれを補正する。
+- 途中参加時はサーバーが最新キーフレームと後続イベントを再送する。
 - 入力は送らない。
 
 将来:
@@ -357,7 +358,9 @@ type ClientMessage =
   | { type: "rejectChallenge" }
   | { type: "leaveCabinet" }
   | { type: "playerInput"; input: InputState; seq: number }
-  | { type: "gameSnapshot"; snapshot: GameSnapshot; seq: number }
+  | { type: "gameMotionFrame"; frame: GameMotionFrame; seq: number }
+  | { type: "gameEvents"; events: GameEvent[]; seq: number }
+  | { type: "gameKeyframe"; snapshot: GameSnapshot; seq: number }
   | { type: "attackEvent"; event: AttackEvent; seq: number }
   | { type: "gameResult"; result: GameResult };
 ```
@@ -367,7 +370,9 @@ Server -> Client:
 ```ts
 type ServerMessage =
   | { type: "cabinetState"; state: CabinetState }
-  | { type: "viewerSnapshot"; snapshot: GameSnapshot }
+  | { type: "viewerMotionFrame"; frame: GameMotionFrame; seq: number }
+  | { type: "viewerEvents"; events: GameEvent[]; seq: number }
+  | { type: "viewerKeyframe"; snapshot: GameSnapshot; seq: number }
   | { type: "challengeRequested"; challengerName: string }
   | { type: "challengeAccepted" }
   | { type: "challengeRejected" }
@@ -401,7 +406,7 @@ type ServerMessage =
    - クリア、ゲームオーバー、スコア、最大レベルを送る。
    - Durable Objectが勝敗を確定する。
 
-### スナップショット
+### 観戦用ハイブリッド同期
 
 ```ts
 type GameSnapshot = {
@@ -428,11 +433,15 @@ type GameSnapshot = {
 };
 ```
 
-初期版では観戦用に10〜15fps程度で送る。
+自機・CPU・ボスの座標とHUD状態は、弾を含まない軽量な `GameMotionFrame` として約10fpsで送る。
 
-観戦側は受信した座標をそのまま10〜15fpsで切り替えず、自機とボスは直前スナップショットから速度を推定し、弾は送信済みの速度を使って毎フレーム予測移動する。次のスナップショット受信時に権威状態へ滑らかに補正する。
+弾生成、全弾消去、ボス出現・被弾・撃破、一時停止、ゲーム終了は `GameEvent` として送る。弾生成時にはID、初期座標、速度、形、回転情報を含め、観戦側が60fpsで移動を再現する。
 
-古いシーケンス番号のスナップショットは破棄する。送信元または観戦先のWebSocketに一定量以上のデータが滞留した場合は中間スナップショットを省略し、遅延の増加よりも最新状態への追従を優先する。
+全弾を含む `GameSnapshot` は1秒ごとのキーフレームとして送り、長時間の計算誤差やイベント取りこぼしを修正する。位置は瞬間移動させず、権威状態へ滑らかに補正する。
+
+サーバーは最新キーフレーム、キーフレーム以降のイベント、最新位置更新を保持する。途中参加した観戦者にはシーケンス番号順で再送し、現在のゲーム状態を復元する。
+
+古いシーケンス番号のメッセージは破棄する。通信が滞留した場合は中間の位置更新とキーフレームを省略できるが、弾生成などのイベントは省略しない。
 
 対戦中は全弾を完全同期するのではなく、相手に影響する攻撃イベントを同期する。
 
