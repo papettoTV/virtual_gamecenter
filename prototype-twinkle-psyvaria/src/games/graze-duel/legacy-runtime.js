@@ -71,13 +71,14 @@ const ATTACK_BULLET_COLOR = "#ff4e8a";
 const BOSS_ATTACK_INTERVAL = 10;
 const BOSS_MAX_HP = 100;
 const BOSS_RADIUS = 34;
-const BOSS_CONTACT_DAMAGE = 4;
 const BOSS_INVINCIBLE_COST = 0.22;
 const BOSS_DAMAGE_COOLDOWN = 0.12;
+const BOSS_HIT_STOP_TIME = 0.1;
 const BOSS_ATTACK_TELEGRAPH_TIME = 0;
 const BOSS_ATTACK_RECOVERY_TIME = 0.7;
 const BOSS_ARRIVAL_WAIT_TIME = 2.4;
 const BOSS_ARRIVAL_DURATION = 5;
+const BOSS_BONUS_ATTACK_PATTERN = { id: "bonusStream", duration: 4.8, shotInterval: 0.08 };
 const BOSS_ATTACK_PATTERNS = [
   { id: "fan", duration: 4.2, shotInterval: 0.48 },
   { id: "aimedBurst", duration: 4, shotInterval: 0.55 },
@@ -111,9 +112,9 @@ const HIT_MARKER_RADIUS = 3;
 const CLIENT_VERSION = "prototype-boss-rush-1";
 
 const BOSS_PHASES = [
-  { level: 1, spawnLevel: 10, name: "BOSS LV1", shape: "circle", hp: 25, radius: 44, color: "#18051f" },
-  { level: 2, spawnLevel: 20, name: "MID BOSS LV2", shape: "invertedTriangle", hp: 30, radius: 48, color: "#071722" },
-  { level: 3, spawnLevel: 30, name: "LAST BOSS LV3", shape: "star", hp: 38, radius: 52, color: "#1c0628" },
+  { level: 1, spawnLevel: 10, name: "BOSS LV1", shape: "circle", hp: 3, radius: 44, color: "#18051f" },
+  { level: 2, spawnLevel: 20, name: "MID BOSS LV2", shape: "invertedTriangle", hp: 5, radius: 48, color: "#071722" },
+  { level: 3, spawnLevel: 30, name: "LAST BOSS LV3", shape: "star", hp: 7, radius: 52, color: "#1c0628" },
 ];
 
 const keys = new Set();
@@ -126,6 +127,7 @@ let lastHitDebug = null;
 let lastTime = performance.now();
 let elapsedRound = 0;
 let slowMotionTimer = 0;
+let bossHitStopTimer = 0;
 let defeatedBossCount = 0;
 let gameOver = false;
 let paused = false;
@@ -176,6 +178,11 @@ const boss = {
   attackStep: 0,
   attackTargetX: LEFT_X + FIELD_WIDTH / 2,
   attackTargetY: FIELD_BOTTOM - 58,
+  shieldAttackCharges: 0,
+  bonusUsed: false,
+  bonusPending: false,
+  bonusActive: false,
+  bonusStreamX: LEFT_X + FIELD_WIDTH / 2,
 };
 
 const players = [
@@ -266,6 +273,7 @@ function resetGame() {
   lastHitDebug = null;
   elapsedRound = 0;
   slowMotionTimer = 0;
+  bossHitStopTimer = 0;
   defeatedBossCount = 0;
   gameOver = false;
   paused = true;
@@ -295,6 +303,11 @@ function resetBossProgress() {
   boss.encounterState = "idle";
   boss.arrivalTimer = 0;
   boss.arrivalProgress = 0;
+  boss.shieldAttackCharges = 0;
+  boss.bonusUsed = false;
+  boss.bonusPending = false;
+  boss.bonusActive = false;
+  boss.bonusStreamX = LEFT_X + FIELD_WIDTH / 2;
   resetBossAttackState();
 }
 
@@ -313,6 +326,11 @@ function scheduleBossPhase(phaseIndex) {
   boss.encounterState = "waiting";
   boss.arrivalTimer = BOSS_ARRIVAL_WAIT_TIME;
   boss.arrivalProgress = 0;
+  boss.shieldAttackCharges = 0;
+  boss.bonusUsed = false;
+  boss.bonusPending = false;
+  boss.bonusActive = false;
+  boss.bonusStreamX = boss.x;
   resetBossAttackState();
   queueSyncEvent({ type: "bossState", boss: createBossSyncState() }, true);
 }
@@ -332,6 +350,7 @@ function completeBossEntrance() {
   boss.arrivalTimer = 0;
   boss.arrivalProgress = 1;
   boss.flash = 0.65;
+  boss.shieldAttackCharges = 0;
   resetBossAttackState();
   queueSyncEvent({ type: "bossState", boss: createBossSyncState() }, true);
 }
@@ -894,6 +913,11 @@ function createViewerSnapshot() {
       attackStep: boss.attackStep,
       attackTargetX: boss.attackTargetX,
       attackTargetY: boss.attackTargetY,
+      shieldAttackCharges: boss.shieldAttackCharges,
+      bonusUsed: boss.bonusUsed,
+      bonusPending: boss.bonusPending,
+      bonusActive: boss.bonusActive,
+      bonusStreamX: boss.bonusStreamX,
     },
   };
 }
@@ -951,6 +975,11 @@ function createBossSyncState() {
     attackStep: boss.attackStep,
     attackTargetX: boss.attackTargetX,
     attackTargetY: boss.attackTargetY,
+    shieldAttackCharges: boss.shieldAttackCharges,
+    bonusUsed: boss.bonusUsed,
+    bonusPending: boss.bonusPending,
+    bonusActive: boss.bonusActive,
+    bonusStreamX: boss.bonusStreamX,
   };
 }
 
@@ -1171,6 +1200,7 @@ function update(delta) {
 
   updateParticles(gameDelta);
   slowMotionTimer = Math.max(0, slowMotionTimer - delta);
+  bossHitStopTimer = Math.max(0, bossHitStopTimer - delta);
   updateViewerSync(delta);
 }
 
@@ -1193,6 +1223,7 @@ function updatePauseButton() {
 }
 
 function getGameDelta(delta) {
+  if (bossHitStopTimer > 0) return delta * 0.08;
   return slowMotionTimer > 0 ? delta * BOSS_DEFEAT_SLOW_SCALE : delta;
 }
 
@@ -1216,11 +1247,27 @@ function updateBoss(delta) {
 
   const player = players[0];
   const touchingBoss = Math.hypot(player.x - boss.x, player.y - boss.y) < boss.radius + getInvincibleRingDamageRadius(player);
-  if (!touchingBoss || player.levelUpInvincible <= 0 || boss.damageCooldown > 0) return;
+  const hasUnusedShieldAttack = boss.shieldAttackCharges > 0;
+  const waitingForBonusAttack = boss.bonusPending && !boss.bonusActive;
+  if (
+    !touchingBoss ||
+    player.levelUpInvincible <= 0 ||
+    !hasUnusedShieldAttack ||
+    waitingForBonusAttack ||
+    boss.damageCooldown > 0
+  ) {
+    return;
+  }
 
-  boss.hp = Math.max(0, boss.hp - BOSS_CONTACT_DAMAGE);
+  boss.hp = Math.max(0, boss.hp - 1);
+  boss.shieldAttackCharges -= 1;
   boss.damageCooldown = BOSS_DAMAGE_COOLDOWN;
   boss.flash = 0.14;
+  bossHitStopTimer = BOSS_HIT_STOP_TIME;
+  if (!boss.bonusUsed && !boss.bonusPending && !boss.bonusActive && boss.hp > 0) {
+    boss.bonusPending = true;
+    boss.attackTimer = Math.min(boss.attackTimer, 0.7);
+  }
   queueSyncEvent({ type: "bossState", boss: createBossSyncState() });
   player.hitInvincible = player.levelUpInvincible > 0 || player.invincible > 0;
   player.score += 250;
@@ -1246,7 +1293,7 @@ function updateBossAttack(delta) {
 
   if (boss.attackState === "telegraph") {
     if (boss.attackTimer > 0) return;
-    const pattern = BOSS_ATTACK_PATTERNS[boss.attackPatternIndex];
+    const pattern = getCurrentBossAttackPattern();
     boss.attackState = "active";
     boss.attackTimer = pattern.duration;
     boss.attackShotTimer = 0;
@@ -1263,7 +1310,7 @@ function updateBossAttack(delta) {
     return;
   }
 
-  const pattern = BOSS_ATTACK_PATTERNS[boss.attackPatternIndex];
+  const pattern = getCurrentBossAttackPattern();
   boss.attackShotTimer -= delta;
   while (boss.attackShotTimer <= 0 && boss.attackTimer > 0) {
     spawnBossAttackPattern(pattern.id);
@@ -1280,7 +1327,22 @@ function updateBossAttack(delta) {
 }
 
 function beginNextBossAttack() {
-  boss.attackPatternIndex = (boss.attackPatternIndex + 1) % BOSS_ATTACK_PATTERNS.length;
+  if (boss.bonusPending) {
+    boss.bonusPending = false;
+    boss.bonusActive = true;
+    boss.bonusUsed = true;
+    const player = players[0];
+    const fieldCenter = player.fieldX + FIELD_WIDTH / 2;
+    const direction = player.x <= fieldCenter ? 1 : -1;
+    boss.bonusStreamX = clamp(
+      player.x + direction * 24,
+      player.fieldX + FIELD_MARGIN + 12,
+      player.fieldX + FIELD_WIDTH - FIELD_MARGIN - 12,
+    );
+  } else {
+    if (boss.bonusActive) boss.bonusActive = false;
+    boss.attackPatternIndex = (boss.attackPatternIndex + 1) % BOSS_ATTACK_PATTERNS.length;
+  }
   boss.attackState = "telegraph";
   boss.attackTimer = BOSS_ATTACK_TELEGRAPH_TIME;
   boss.attackShotTimer = 0;
@@ -1288,6 +1350,10 @@ function beginNextBossAttack() {
   boss.attackTargetX = players[0].x;
   boss.attackTargetY = players[0].y;
   queueSyncEvent({ type: "bossState", boss: createBossSyncState() }, true);
+}
+
+function getCurrentBossAttackPattern() {
+  return boss.bonusActive ? BOSS_BONUS_ATTACK_PATTERN : BOSS_ATTACK_PATTERNS[boss.attackPatternIndex];
 }
 
 function spawnBossAttackPattern(patternId) {
@@ -1299,7 +1365,11 @@ function spawnBossAttackPattern(patternId) {
     spawnBossAimedBurst();
     return;
   }
-  spawnBossCenterPressure();
+  if (patternId === "centerPressure") {
+    spawnBossCenterPressure();
+    return;
+  }
+  spawnBossBonusStream();
 }
 
 function spawnBossFanAttack() {
@@ -1394,6 +1464,21 @@ function spawnBossCenterPressure() {
       { shape: "spinner" },
     );
   }
+}
+
+function spawnBossBonusStream() {
+  const phaseScale = 1 + boss.phaseIndex * 0.12;
+  addBullet(
+    players[0],
+    boss.bonusStreamX,
+    boss.y + boss.radius * 0.52,
+    0,
+    212 * phaseScale,
+    7,
+    "#ffd166",
+    "bossAttack",
+    { shape: "circle" },
+  );
 }
 
 function checkBossSpawn() {
@@ -1691,6 +1776,9 @@ function updatePlayerState(player, delta) {
   }
   player.invincible = Math.max(0, player.invincible - delta);
   player.levelUpInvincible = Math.max(0, player.levelUpInvincible - delta);
+  if (player === players[0] && boss.encounterState === "active" && player.levelUpInvincible <= 0) {
+    boss.shieldAttackCharges = 0;
+  }
   player.barrierRatio += (getInvincibleRingRatio(player) - player.barrierRatio) * Math.min(1, delta * 12);
   player.attackFlash = Math.max(0, player.attackFlash - delta);
   player.attackCooldown = Math.max(0, player.attackCooldown - delta);
@@ -1973,6 +2061,9 @@ function tryAttack(attacker, defender) {
   if (!attackingBoss) defender.attackFlash = 0.55;
   playAttackSound();
 
+  if (boss.encounterState === "active" && attacker === players[0]) {
+    boss.shieldAttackCharges += 1;
+  }
   if (attackingBoss) return;
 
   const shouldSendBoss = attacker.level >= attacker.nextBossLevel;
