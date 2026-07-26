@@ -215,10 +215,18 @@ export function PlatformExperience() {
         {profileOpen && (
           <section id="platform-profile-menu" className="platform-profile-menu" aria-label="プレイヤー情報">
             <p className="eyebrow">Player Profile</p>
-            <strong className="platform-profile-name">プレイヤー</strong>
-            <span className="platform-player-id">
-              {platform ? `ID ${platform.playerId.slice(0, 8)}` : "読み込み中"}
-            </span>
+            <div className="platform-profile-summary">
+              <span className="platform-profile-avatar" aria-label="ゲスト用プロフィールアイコン">
+                <span />
+              </span>
+              <div>
+                <span className="platform-account-state">ゲスト</span>
+                <strong className="platform-profile-name">ゲストプレイヤー</strong>
+                <span className="platform-player-id">
+                  {platform ? `ID ${platform.playerId.slice(0, 8)}` : "読み込み中"}
+                </span>
+              </div>
+            </div>
             <div className="platform-wallet">
               <span>利用可能クレジット</span>
               <strong>{wallet ? wallet.availableTotal : "—"}</strong>
