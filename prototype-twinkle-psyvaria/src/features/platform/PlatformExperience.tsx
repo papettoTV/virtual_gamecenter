@@ -25,7 +25,9 @@ export function PlatformExperience() {
   const [playDialog, setPlayDialog] = useState<"confirm" | "insufficient" | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [profileOpen, setProfileOpen] = useState(false);
   const bypassGate = useRef(false);
+  const profileRef = useRef<HTMLDivElement>(null);
 
   const loadPlatform = useCallback(async () => {
     setLoadingError("");
@@ -39,6 +41,26 @@ export function PlatformExperience() {
   useEffect(() => {
     void loadPlatform();
   }, [loadPlatform]);
+
+  useEffect(() => {
+    if (!profileOpen) return;
+
+    const closeProfile = (event: MouseEvent) => {
+      if (!profileRef.current?.contains(event.target as Node)) {
+        setProfileOpen(false);
+      }
+    };
+    const closeProfileWithEscape = (event: KeyboardEvent) => {
+      if (event.code === "Escape") setProfileOpen(false);
+    };
+
+    document.addEventListener("click", closeProfile);
+    window.addEventListener("keydown", closeProfileWithEscape);
+    return () => {
+      document.removeEventListener("click", closeProfile);
+      window.removeEventListener("keydown", closeProfileWithEscape);
+    };
+  }, [profileOpen]);
 
   const requestPlay = useCallback((action: PendingPlayAction) => {
     if (!platform?.consent.accepted) return;
@@ -175,16 +197,40 @@ export function PlatformExperience() {
 
   return (
     <>
-      <section className="platform-status" aria-label="プレイヤー情報">
-        <div>
-          <span>クレジット</span>
-          <strong>{wallet ? wallet.availableTotal : "—"}</strong>
-          {wallet && <small>無料 {wallet.availableFree} / 購入 {wallet.availablePurchased}</small>}
-        </div>
-        <span className="platform-player-id">
-          {platform ? `PLAYER ${platform.playerId.slice(0, 8)}` : "PLAYER 読み込み中"}
-        </span>
-      </section>
+      <div className="platform-profile" ref={profileRef}>
+        <button
+          className="platform-profile-button"
+          type="button"
+          aria-label="プロフィールを表示"
+          aria-expanded={profileOpen}
+          aria-controls="platform-profile-menu"
+          onClick={() => setProfileOpen((open) => !open)}
+        >
+          <span className="platform-profile-icon" aria-hidden="true">
+            <span />
+          </span>
+          {wallet && <span className="platform-credit-badge">{wallet.availableTotal}</span>}
+        </button>
+
+        {profileOpen && (
+          <section id="platform-profile-menu" className="platform-profile-menu" aria-label="プレイヤー情報">
+            <p className="eyebrow">Player Profile</p>
+            <strong className="platform-profile-name">プレイヤー</strong>
+            <span className="platform-player-id">
+              {platform ? `ID ${platform.playerId.slice(0, 8)}` : "読み込み中"}
+            </span>
+            <div className="platform-wallet">
+              <span>利用可能クレジット</span>
+              <strong>{wallet ? wallet.availableTotal : "—"}</strong>
+              {wallet && (
+                <small>
+                  無料 {wallet.availableFree} / 購入 {wallet.availablePurchased}
+                </small>
+              )}
+            </div>
+          </section>
+        )}
+      </div>
 
       {loadingError && (
         <div className="platform-error" role="alert">
