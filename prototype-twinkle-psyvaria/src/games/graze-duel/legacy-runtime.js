@@ -74,10 +74,10 @@ const BOSS_RADIUS = 34;
 const BOSS_CONTACT_DAMAGE = 4;
 const BOSS_INVINCIBLE_COST = 0.22;
 const BOSS_DAMAGE_COOLDOWN = 0.12;
-const BOSS_ATTACK_TELEGRAPH_TIME = 0.85;
+const BOSS_ATTACK_TELEGRAPH_TIME = 0;
 const BOSS_ATTACK_RECOVERY_TIME = 0.7;
 const BOSS_ARRIVAL_WAIT_TIME = 2.4;
-const BOSS_ARRIVAL_DURATION = 3;
+const BOSS_ARRIVAL_DURATION = 5;
 const BOSS_ATTACK_PATTERNS = [
   { id: "fan", duration: 2.5, shotInterval: 0.42 },
   { id: "aimedBurst", duration: 2.2, shotInterval: 0.5 },
@@ -1272,7 +1272,6 @@ function updateBossAttack(delta) {
   }
 
   if (boss.attackTimer <= 0) {
-    clearAllBullets();
     boss.attackState = "recovery";
     boss.attackTimer = BOSS_ATTACK_RECOVERY_TIME;
     boss.attackShotTimer = 0;
@@ -2179,23 +2178,18 @@ function drawBoss() {
   const visualRadius = boss.radius * (0.68 + entranceProgress * 0.32);
   const pulse = 0.5 + Math.sin(elapsedRound * 3.2) * 0.16;
   const flash = boss.flash > 0 ? 1 : 0;
-  const warningPulse =
-    boss.encounterState === "active" && boss.attackState === "telegraph"
-      ? 0.5 + Math.sin(elapsedRound * 18) * 0.5
-      : 0;
 
   if (entering) drawBossArrivalShadow(entranceProgress);
   context.globalAlpha = entering ? 0.08 + entranceProgress * 0.92 : 1;
-  drawBossAttackTelegraph(warningPulse);
 
-  context.strokeStyle = `rgba(255, 51, 85, ${0.38 + warningPulse * 0.48})`;
+  context.strokeStyle = "rgba(255, 51, 85, 0.38)";
   context.lineWidth = 2;
-  context.shadowBlur = 22 + warningPulse * 20;
+  context.shadowBlur = 22;
   context.shadowColor = "#ff3355";
   for (let index = 0; index < 10; index += 1) {
     const angle = elapsedRound * 0.18 + (Math.PI * 2 * index) / 10;
     const innerRadius = visualRadius + 9 + pulse * 4;
-    const outerRadius = visualRadius + 22 + warningPulse * 8;
+    const outerRadius = visualRadius + 22;
     context.beginPath();
     context.moveTo(boss.x + Math.cos(angle) * innerRadius, boss.y + Math.sin(angle) * innerRadius);
     context.lineTo(boss.x + Math.cos(angle) * outerRadius, boss.y + Math.sin(angle) * outerRadius);
@@ -2205,7 +2199,7 @@ function drawBoss() {
   context.shadowBlur = 34 + flash * 28;
   context.shadowColor = flash ? "#ffffff" : "#ff3355";
   context.fillStyle = flash ? "#ffffff" : phase.color;
-  context.strokeStyle = warningPulse > 0.2 ? "#ff3355" : "#8f1739";
+  context.strokeStyle = "#8f1739";
   context.lineWidth = 5;
   drawBossShape(phase.shape, boss.x, boss.y, visualRadius + pulse * 5);
 
@@ -2275,50 +2269,6 @@ function drawBossArrivalShadow(progress) {
   context.beginPath();
   context.arc(boss.x, boss.y, shadowRadius, 0, Math.PI * 2);
   context.fill();
-  context.restore();
-}
-
-function drawBossAttackTelegraph(pulse) {
-  if (boss.encounterState !== "active" || boss.attackState !== "telegraph") return;
-  const pattern = BOSS_ATTACK_PATTERNS[boss.attackPatternIndex]?.id;
-  context.save();
-  context.globalAlpha = 0.32 + pulse * 0.5;
-  context.strokeStyle = "#ff3355";
-  context.fillStyle = "rgba(255, 51, 85, 0.12)";
-  context.lineWidth = 3;
-  context.setLineDash([10, 8]);
-
-  if (pattern === "fan") {
-    const spread = 1.45;
-    for (const angle of [Math.PI / 2 - spread / 2, Math.PI / 2 + spread / 2]) {
-      context.beginPath();
-      context.moveTo(boss.x, boss.y);
-      context.lineTo(boss.x + Math.cos(angle) * 330, boss.y + Math.sin(angle) * 330);
-      context.stroke();
-    }
-  } else if (pattern === "aimedBurst") {
-    context.beginPath();
-    context.moveTo(boss.x, boss.y);
-    context.lineTo(boss.attackTargetX, boss.attackTargetY);
-    context.stroke();
-    context.beginPath();
-    context.arc(boss.attackTargetX, boss.attackTargetY, 24 + pulse * 8, 0, Math.PI * 2);
-    context.stroke();
-  } else {
-    for (const direction of [-1, 1]) {
-      const angle = Math.PI / 2 + direction * 0.43;
-      context.beginPath();
-      context.moveTo(boss.x, boss.y);
-      context.lineTo(boss.x + Math.cos(angle) * 340, boss.y + Math.sin(angle) * 340);
-      context.stroke();
-    }
-  }
-
-  context.setLineDash([]);
-  context.font = "900 13px system-ui";
-  context.textAlign = "center";
-  context.fillStyle = "#ff8da4";
-  context.fillText("DANGER", boss.x, boss.y - boss.radius - 36);
   context.restore();
 }
 
