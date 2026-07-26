@@ -76,6 +76,8 @@ const BOSS_INVINCIBLE_COST = 0.22;
 const BOSS_DAMAGE_COOLDOWN = 0.12;
 const BOSS_ATTACK_TELEGRAPH_TIME = 0.85;
 const BOSS_ATTACK_RECOVERY_TIME = 0.7;
+const BOSS_ARRIVAL_WAIT_TIME = 2.4;
+const BOSS_ARRIVAL_DURATION = 3;
 const BOSS_ATTACK_PATTERNS = [
   { id: "fan", duration: 2.5, shotInterval: 0.42 },
   { id: "aimedBurst", duration: 2.2, shotInterval: 0.5 },
@@ -164,6 +166,9 @@ const boss = {
   maxHp: BOSS_PHASES[0].hp,
   damageCooldown: 0,
   flash: 0,
+  encounterState: "idle",
+  arrivalTimer: 0,
+  arrivalProgress: 0,
   attackState: "telegraph",
   attackPatternIndex: 0,
   attackTimer: BOSS_ATTACK_TELEGRAPH_TIME,
@@ -287,12 +292,15 @@ function resetBossProgress() {
   boss.maxHp = BOSS_PHASES[0].hp;
   boss.damageCooldown = 0;
   boss.flash = 0;
+  boss.encounterState = "idle";
+  boss.arrivalTimer = 0;
+  boss.arrivalProgress = 0;
   resetBossAttackState();
 }
 
-function startBossPhase(phaseIndex) {
+function scheduleBossPhase(phaseIndex) {
   const phase = BOSS_PHASES[phaseIndex];
-  boss.active = true;
+  boss.active = false;
   boss.phaseIndex = phaseIndex;
   boss.x = LEFT_X + FIELD_WIDTH / 2;
   boss.baseY = FIELD_TOP + FIELD_HEIGHT * 0.38;
@@ -302,9 +310,29 @@ function startBossPhase(phaseIndex) {
   boss.maxHp = phase.hp;
   boss.damageCooldown = 0;
   boss.flash = 0;
+  boss.encounterState = "waiting";
+  boss.arrivalTimer = BOSS_ARRIVAL_WAIT_TIME;
+  boss.arrivalProgress = 0;
   resetBossAttackState();
-  clearAllBullets();
+  queueSyncEvent({ type: "bossState", boss: createBossSyncState() }, true);
+}
+
+function startBossEntrance() {
+  boss.active = true;
+  boss.encounterState = "entering";
+  boss.arrivalTimer = BOSS_ARRIVAL_DURATION;
+  boss.arrivalProgress = 0;
+  boss.flash = 0;
   playBossAttackSound();
+  queueSyncEvent({ type: "bossState", boss: createBossSyncState() }, true);
+}
+
+function completeBossEntrance() {
+  boss.encounterState = "active";
+  boss.arrivalTimer = 0;
+  boss.arrivalProgress = 1;
+  boss.flash = 0.65;
+  resetBossAttackState();
   queueSyncEvent({ type: "bossState", boss: createBossSyncState() }, true);
 }
 
@@ -316,6 +344,10 @@ function resetBossAttackState() {
   boss.attackStep = 0;
   boss.attackTargetX = players[0]?.x ?? LEFT_X + FIELD_WIDTH / 2;
   boss.attackTargetY = players[0]?.y ?? FIELD_BOTTOM - 58;
+}
+
+function isBossEncounterInProgress() {
+  return boss.encounterState !== "idle";
 }
 
 resetGame();
@@ -852,6 +884,9 @@ function createViewerSnapshot() {
       hp: boss.hp,
       maxHp: boss.maxHp,
       flash: boss.flash,
+      encounterState: boss.encounterState,
+      arrivalTimer: boss.arrivalTimer,
+      arrivalProgress: boss.arrivalProgress,
       attackState: boss.attackState,
       attackPatternIndex: boss.attackPatternIndex,
       attackTimer: boss.attackTimer,
@@ -906,6 +941,9 @@ function createBossSyncState() {
     hp: boss.hp,
     maxHp: boss.maxHp,
     flash: boss.flash,
+    encounterState: boss.encounterState,
+    arrivalTimer: boss.arrivalTimer,
+    arrivalProgress: boss.arrivalProgress,
     attackState: boss.attackState,
     attackPatternIndex: boss.attackPatternIndex,
     attackTimer: boss.attackTimer,
@@ -1121,13 +1159,13 @@ function update(delta) {
 
   for (const player of players) {
     updatePlayerState(player, gameDelta);
-    if (!gameOver && !boss.active) spawnBaseBullets(player, gameDelta);
+    if (!gameOver && !isBossEncounterInProgress()) spawnBaseBullets(player, gameDelta);
     updateBullets(player, gameDelta);
     updateGrazeAndHits(player);
   }
 
   tryAutoAttack(players[0], players[1]);
-  if (!boss.active) tryAutoAttack(players[1], players[0]);
+  if (!isBossEncounterInProgress()) tryAutoAttack(players[1], players[0]);
   updateBoss(gameDelta);
   updateDebugRankingPreview();
 
@@ -1160,7 +1198,16 @@ function getGameDelta(delta) {
 
 function updateBoss(delta) {
   checkBossSpawn();
-  if (!boss.active) return;
+  if (boss.encounterState === "waiting") {
+    boss.arrivalTimer = Math.max(0, boss.arrivalTimer - delta);
+    if (boss.arrivalTimer <= 0) startBossEntrance();
+    return;
+  }
+  if (boss.encounterState === "entering") {
+    updateBossEntrance(delta);
+    return;
+  }
+  if (boss.encounterState !== "active" || !boss.active) return;
   updateBossMovement();
   boss.damageCooldown = Math.max(0, boss.damageCooldown - delta);
   boss.flash = Math.max(0, boss.flash - delta);
@@ -1182,6 +1229,16 @@ function updateBoss(delta) {
   if (boss.hp <= 0) {
     handleBossDefeated();
   }
+}
+
+function updateBossEntrance(delta) {
+  boss.arrivalTimer = Math.max(0, boss.arrivalTimer - delta);
+  const progress = 1 - boss.arrivalTimer / BOSS_ARRIVAL_DURATION;
+  boss.arrivalProgress = boss.arrivalTimer <= 0 && players[0].levelUpInvincible > 0
+    ? 0.94
+    : clamp(progress, 0, 1);
+  if (boss.arrivalTimer > 0 || players[0].levelUpInvincible > 0) return;
+  completeBossEntrance();
 }
 
 function updateBossAttack(delta) {
@@ -1319,10 +1376,9 @@ function spawnBossCrossSweep() {
 }
 
 function checkBossSpawn() {
-  if (boss.active || clearGame || boss.phaseIndex >= BOSS_PHASES.length) return;
+  if (isBossEncounterInProgress() || clearGame || boss.phaseIndex >= BOSS_PHASES.length) return;
   if (players[0].level >= boss.nextSpawnLevel) {
-    startBossPhase(boss.phaseIndex);
-    boss.flash = 0.65;
+    scheduleBossPhase(boss.phaseIndex);
   }
 }
 
@@ -1353,6 +1409,10 @@ function handleBossDefeated() {
   createExplosion(boss.x, boss.y, "#ffd166");
   playExplosionSound();
   clearAllBullets();
+  boss.active = false;
+  boss.encounterState = "idle";
+  boss.arrivalTimer = 0;
+  boss.arrivalProgress = 0;
 
   const nextPhaseIndex = boss.phaseIndex + 1;
   if (nextPhaseIndex >= BOSS_PHASES.length) {
@@ -1372,7 +1432,6 @@ function handleBossDefeated() {
     return;
   }
 
-  boss.active = false;
   boss.phaseIndex = nextPhaseIndex;
   boss.nextSpawnLevel = players[0].level + 10;
   boss.hp = 0;
@@ -1883,7 +1942,7 @@ function getOpponent(player) {
 function tryAttack(attacker, defender) {
   const attackCost = getAttackCost(attacker);
   if (gameOver || attacker.gauge < attackCost) return;
-  const attackingBoss = boss.active && attacker === players[0];
+  const attackingBoss = isBossEncounterInProgress() && attacker === players[0];
   attacker.gauge -= attackCost;
   attacker.level += 1;
   attacker.levelUpInvincible = getNextInvincibleTime(attacker.levelUpInvincible);
@@ -2115,10 +2174,18 @@ function drawBoss() {
   if (!boss.active || boss.hp <= 0) return;
   context.save();
   const phase = BOSS_PHASES[boss.phaseIndex];
+  const entering = boss.encounterState === "entering";
+  const entranceProgress = entering ? boss.arrivalProgress : 1;
+  const visualRadius = boss.radius * (0.68 + entranceProgress * 0.32);
   const pulse = 0.5 + Math.sin(elapsedRound * 3.2) * 0.16;
   const flash = boss.flash > 0 ? 1 : 0;
-  const warningPulse = boss.attackState === "telegraph" ? 0.5 + Math.sin(elapsedRound * 18) * 0.5 : 0;
+  const warningPulse =
+    boss.encounterState === "active" && boss.attackState === "telegraph"
+      ? 0.5 + Math.sin(elapsedRound * 18) * 0.5
+      : 0;
 
+  if (entering) drawBossArrivalShadow(entranceProgress);
+  context.globalAlpha = entering ? 0.08 + entranceProgress * 0.92 : 1;
   drawBossAttackTelegraph(warningPulse);
 
   context.strokeStyle = `rgba(255, 51, 85, ${0.38 + warningPulse * 0.48})`;
@@ -2127,8 +2194,8 @@ function drawBoss() {
   context.shadowColor = "#ff3355";
   for (let index = 0; index < 10; index += 1) {
     const angle = elapsedRound * 0.18 + (Math.PI * 2 * index) / 10;
-    const innerRadius = boss.radius + 9 + pulse * 4;
-    const outerRadius = boss.radius + 22 + warningPulse * 8;
+    const innerRadius = visualRadius + 9 + pulse * 4;
+    const outerRadius = visualRadius + 22 + warningPulse * 8;
     context.beginPath();
     context.moveTo(boss.x + Math.cos(angle) * innerRadius, boss.y + Math.sin(angle) * innerRadius);
     context.lineTo(boss.x + Math.cos(angle) * outerRadius, boss.y + Math.sin(angle) * outerRadius);
@@ -2140,30 +2207,35 @@ function drawBoss() {
   context.fillStyle = flash ? "#ffffff" : phase.color;
   context.strokeStyle = warningPulse > 0.2 ? "#ff3355" : "#8f1739";
   context.lineWidth = 5;
-  drawBossShape(phase.shape, boss.x, boss.y, boss.radius + pulse * 5);
+  drawBossShape(phase.shape, boss.x, boss.y, visualRadius + pulse * 5);
 
   context.shadowBlur = 0;
-  const coreGradient = context.createRadialGradient(boss.x, boss.y, 1, boss.x, boss.y, boss.radius * 0.52);
+  const coreGradient = context.createRadialGradient(boss.x, boss.y, 1, boss.x, boss.y, visualRadius * 0.52);
   coreGradient.addColorStop(0, flash ? "#ffffff" : "#ffeff3");
   coreGradient.addColorStop(0.18, "#ff3355");
   coreGradient.addColorStop(0.56, "#5d071d");
   coreGradient.addColorStop(1, "rgba(20, 0, 8, 0)");
   context.fillStyle = coreGradient;
   context.beginPath();
-  context.arc(boss.x, boss.y, boss.radius * 0.54, 0, Math.PI * 2);
+  context.arc(boss.x, boss.y, visualRadius * 0.54, 0, Math.PI * 2);
   context.fill();
 
   context.fillStyle = "#fff4f6";
   context.shadowBlur = 16;
   context.shadowColor = "#ff3355";
   context.beginPath();
-  context.ellipse(boss.x, boss.y, boss.radius * 0.34, boss.radius * 0.09, 0, 0, Math.PI * 2);
+  context.ellipse(boss.x, boss.y, visualRadius * 0.34, visualRadius * 0.09, 0, 0, Math.PI * 2);
   context.fill();
   context.fillStyle = "#180008";
   context.beginPath();
-  context.ellipse(boss.x, boss.y, boss.radius * 0.07, boss.radius * 0.1, 0, 0, Math.PI * 2);
+  context.ellipse(boss.x, boss.y, visualRadius * 0.07, visualRadius * 0.1, 0, 0, Math.PI * 2);
   context.fill();
   context.shadowBlur = 0;
+
+  if (boss.encounterState !== "active") {
+    context.restore();
+    return;
+  }
 
   const barWidth = 260;
   const barX = LEFT_X + FIELD_WIDTH / 2 - barWidth / 2;
@@ -2183,8 +2255,31 @@ function drawBoss() {
   context.restore();
 }
 
+function drawBossArrivalShadow(progress) {
+  context.save();
+  const shadowRadius = boss.radius * (2.25 - progress * 0.65);
+  const shadowGradient = context.createRadialGradient(
+    boss.x,
+    boss.y,
+    boss.radius * (0.2 + progress * 0.28),
+    boss.x,
+    boss.y,
+    shadowRadius,
+  );
+  shadowGradient.addColorStop(0, `rgba(0, 0, 0, ${0.96 - progress * 0.46})`);
+  shadowGradient.addColorStop(0.5, `rgba(10, 0, 14, ${0.9 - progress * 0.55})`);
+  shadowGradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+  context.fillStyle = shadowGradient;
+  context.shadowBlur = 46;
+  context.shadowColor = "#000000";
+  context.beginPath();
+  context.arc(boss.x, boss.y, shadowRadius, 0, Math.PI * 2);
+  context.fill();
+  context.restore();
+}
+
 function drawBossAttackTelegraph(pulse) {
-  if (boss.attackState !== "telegraph") return;
+  if (boss.encounterState !== "active" || boss.attackState !== "telegraph") return;
   const pattern = BOSS_ATTACK_PATTERNS[boss.attackPatternIndex]?.id;
   context.save();
   context.globalAlpha = 0.32 + pulse * 0.5;
@@ -2228,7 +2323,7 @@ function drawBossAttackTelegraph(pulse) {
 }
 
 function drawBossSpawnHint() {
-  if (boss.active || clearGame || boss.phaseIndex >= BOSS_PHASES.length) return;
+  if (isBossEncounterInProgress() || clearGame || boss.phaseIndex >= BOSS_PHASES.length) return;
   const nextPhase = BOSS_PHASES[boss.phaseIndex];
   const compact = isCompactView();
   const labelX = compact ? WIDTH / 2 : LEFT_X + FIELD_WIDTH / 2;
@@ -2283,7 +2378,7 @@ function drawBackground() {
   context.fillStyle = gradient;
   context.fillRect(0, 0, WIDTH, HEIGHT);
 
-  if (boss.active) {
+  if (isBossEncounterInProgress()) {
     const dangerPulse = 0.08 + (Math.sin(elapsedRound * 3.4) + 1) * 0.025;
     const dangerX = isCompactView() ? WIDTH / 2 : boss.x;
     const dangerGradient = context.createRadialGradient(dangerX, boss.y, 20, dangerX, boss.y, 440);
