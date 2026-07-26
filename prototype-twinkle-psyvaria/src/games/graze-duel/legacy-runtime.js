@@ -1,4 +1,20 @@
-import { createCabinetClient } from "./cabinet-client.js";
+import { createCabinetClient } from "../../realtime/cabinet-client";
+import {
+  fetchTimeRanking,
+  submitRankingEntry,
+} from "../../features/ranking/ranking-client";
+import {
+  calculateAttackCost,
+  calculateNextInvincibleTime,
+  LEVEL_UP_INVINCIBLE_TIME,
+} from "./core";
+import {
+  playAttackSound,
+  playBossAttackSound,
+  playBossHitSound,
+  playExplosionSound,
+  playGrazeSound,
+} from "./audio";
 
 const canvas = document.querySelector("#game");
 const context = canvas.getContext("2d");
@@ -51,13 +67,10 @@ const RIGHT_X = WIDTH - LEFT_X - FIELD_WIDTH;
 const PLAYER_RADIUS = 7;
 const HIT_RADIUS = 1;
 const GRAZE_RADIUS = 24;
-const ATTACK_COST = 420;
 const MAX_LIVES = 3;
 const AUTO_ATTACK_COOLDOWN = 0.45;
 const ATTACK_BULLET_COLOR = "#ff4e8a";
 const BOSS_ATTACK_INTERVAL = 10;
-const LEVEL_UP_INVINCIBLE_TIME = 2.4;
-const INVINCIBLE_CHAIN_EXTENSION = 0.4;
 const BOSS_MAX_HP = 100;
 const BOSS_RADIUS = 34;
 const BOSS_CONTACT_DAMAGE = 4;
@@ -89,8 +102,6 @@ const BOSS_DEFEAT_SLOW_SCALE = 0.28;
 const START_BULLET_DELAY = 2.0;
 const HIT_MARKER_RADIUS = 3;
 const CLIENT_VERSION = "prototype-boss-rush-1";
-const DEFAULT_RANKING_API_BASE = "https://graze-duel-ranking-api.aegfrompsbt.workers.dev";
-const RANKING_API_BASE = localStorage.getItem("grazeDuelRankingApiBase") || DEFAULT_RANKING_API_BASE;
 
 const BOSS_PHASES = [
   { level: 1, spawnLevel: 10, name: "BOSS LV1", shape: "circle", hp: 25, radius: 34, color: "#5a1f65" },
@@ -101,7 +112,6 @@ const BOSS_PHASES = [
 const keys = new Set();
 const particles = [];
 const touchMove = { active: false, startX: 0, startY: 0, x: 0, y: 0 };
-let audioContext = null;
 let bulletDensity = 2;
 let playerHitboxEnabled = true;
 let gaugeGrowthPerLevel = 30;
@@ -1240,19 +1250,14 @@ async function submitRanking() {
   rankingSubmitButton.disabled = true;
 
   try {
-    const response = await fetch(`${RANKING_API_BASE}/api/ranking`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        playerName,
-        clearTimeMs: lastClearResult.clearTimeMs,
-        score: lastClearResult.score,
-        maxLevel: lastClearResult.maxLevel,
-        clientVersion: CLIENT_VERSION,
-      }),
+    await submitRankingEntry({
+      playerName,
+      clearTimeMs: lastClearResult.clearTimeMs,
+      score: lastClearResult.score,
+      maxLevel: lastClearResult.maxLevel,
+      defeatedBossCount,
+      clientVersion: CLIENT_VERSION,
     });
-
-    if (!response.ok) throw new Error(`ranking post failed: ${response.status}`);
     rankingSubmittedForClear = true;
     setRankingMessage("登録しました。");
     updateRankingSubmitState();
@@ -1272,10 +1277,7 @@ async function loadRanking() {
   rankingList.append(loadingItem);
 
   try {
-    const response = await fetch(`${RANKING_API_BASE}/api/ranking?type=time&limit=20`);
-    if (!response.ok) throw new Error(`ranking get failed: ${response.status}`);
-    const data = await response.json();
-    renderRanking(data.rankings ?? []);
+    renderRanking(await fetchTimeRanking(20));
   } catch (error) {
     console.warn(error);
     rankingList.innerHTML = "";
@@ -1717,12 +1719,11 @@ function tryAttack(attacker, defender) {
 }
 
 function getAttackCost(player) {
-  return ATTACK_COST + Math.max(0, player.level - 1) * gaugeGrowthPerLevel;
+  return calculateAttackCost(player.level, gaugeGrowthPerLevel);
 }
 
 function getNextInvincibleTime(currentTime) {
-  if (currentTime <= 0) return LEVEL_UP_INVINCIBLE_TIME;
-  return Math.min(LEVEL_UP_INVINCIBLE_TIME, currentTime + INVINCIBLE_CHAIN_EXTENSION);
+  return calculateNextInvincibleTime(currentTime);
 }
 
 function addBossBullets(defender, level) {
@@ -2413,122 +2414,4 @@ function weightedRandom(entries) {
     if (roll <= 0) return value;
   }
   return entries[entries.length - 1][0];
-}
-
-function playGrazeSound(combo) {
-  const audio = getAudioContext();
-
-  const now = audio.currentTime;
-  const oscillator = audio.createOscillator();
-  const gainNode = audio.createGain();
-  const pitch = 520 + Math.min(combo, 24) * 18;
-
-  oscillator.type = "triangle";
-  oscillator.frequency.setValueAtTime(pitch, now);
-  oscillator.frequency.exponentialRampToValueAtTime(pitch * 1.35, now + 0.045);
-
-  gainNode.gain.setValueAtTime(0.0001, now);
-  gainNode.gain.exponentialRampToValueAtTime(0.045, now + 0.006);
-  gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.055);
-
-  oscillator.connect(gainNode);
-  gainNode.connect(audio.destination);
-  oscillator.start(now);
-  oscillator.stop(now + 0.06);
-}
-
-function playAttackSound() {
-  const audio = getAudioContext();
-  const now = audio.currentTime;
-  const oscillator = audio.createOscillator();
-  const gainNode = audio.createGain();
-
-  oscillator.type = "sawtooth";
-  oscillator.frequency.setValueAtTime(180, now);
-  oscillator.frequency.exponentialRampToValueAtTime(760, now + 0.11);
-
-  gainNode.gain.setValueAtTime(0.0001, now);
-  gainNode.gain.exponentialRampToValueAtTime(0.08, now + 0.012);
-  gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
-
-  oscillator.connect(gainNode);
-  gainNode.connect(audio.destination);
-  oscillator.start(now);
-  oscillator.stop(now + 0.18);
-}
-
-function playBossAttackSound() {
-  const audio = getAudioContext();
-  const now = audio.currentTime;
-  const oscillator = audio.createOscillator();
-  const gainNode = audio.createGain();
-
-  oscillator.type = "square";
-  oscillator.frequency.setValueAtTime(92, now);
-  oscillator.frequency.exponentialRampToValueAtTime(280, now + 0.22);
-
-  gainNode.gain.setValueAtTime(0.0001, now);
-  gainNode.gain.exponentialRampToValueAtTime(0.11, now + 0.02);
-  gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.28);
-
-  oscillator.connect(gainNode);
-  gainNode.connect(audio.destination);
-  oscillator.start(now);
-  oscillator.stop(now + 0.3);
-}
-
-function playBossHitSound() {
-  const audio = getAudioContext();
-  const now = audio.currentTime;
-  const oscillator = audio.createOscillator();
-  const gainNode = audio.createGain();
-
-  oscillator.type = "triangle";
-  oscillator.frequency.setValueAtTime(380, now);
-  oscillator.frequency.exponentialRampToValueAtTime(120, now + 0.08);
-
-  gainNode.gain.setValueAtTime(0.0001, now);
-  gainNode.gain.exponentialRampToValueAtTime(0.09, now + 0.008);
-  gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.11);
-
-  oscillator.connect(gainNode);
-  gainNode.connect(audio.destination);
-  oscillator.start(now);
-  oscillator.stop(now + 0.12);
-}
-
-function playExplosionSound() {
-  const audio = getAudioContext();
-  const now = audio.currentTime;
-  const noiseLength = Math.floor(audio.sampleRate * 0.38);
-  const buffer = audio.createBuffer(1, noiseLength, audio.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let index = 0; index < noiseLength; index += 1) {
-    data[index] = (Math.random() * 2 - 1) * (1 - index / noiseLength);
-  }
-
-  const noise = audio.createBufferSource();
-  const filter = audio.createBiquadFilter();
-  const gainNode = audio.createGain();
-
-  noise.buffer = buffer;
-  filter.type = "lowpass";
-  filter.frequency.setValueAtTime(1200, now);
-  filter.frequency.exponentialRampToValueAtTime(90, now + 0.35);
-  gainNode.gain.setValueAtTime(0.16, now);
-  gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.38);
-
-  noise.connect(filter);
-  filter.connect(gainNode);
-  gainNode.connect(audio.destination);
-  noise.start(now);
-  noise.stop(now + 0.4);
-}
-
-function getAudioContext() {
-  if (!audioContext) {
-    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-  }
-  if (audioContext.state === "suspended") audioContext.resume();
-  return audioContext;
 }

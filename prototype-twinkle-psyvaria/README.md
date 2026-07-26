@@ -1,32 +1,62 @@
-# Graze Duel Prototype
+# Virtual Game Center
 
-「ティンクルスタースプライツ x サイヴァリア」を仮説にした、弾幕かすり・無敵体当たり・ボス撃破型シューティングの試作です。
+オンライン上にゲームセンター体験を再現するためのプラットフォーム試作です。最初のゲームとして、弾幕かすり・無敵体当たり・ボス撃破型シューティング「Graze Duel」を収録しています。
 
-## 遊び方
+## ローカル開発
 
-ローカルサーバで起動します。
+初回のみ依存パッケージとローカルD1を準備します。
 
 ```bash
 npm install
+npm run db:migrate:local
 npm run dev
 ```
 
-スマホで遊ぶ場合は、PCとスマホを同じWi-Fiにつなぎ、起動時に表示される `Network` のURLをスマホのブラウザで開きます。
+PCでは `http://localhost:5174/`、スマホではPCと同じWi-Fiにつなぎ、起動時に表示される `Network` のURLを開きます。ローカルとプライベートネットワーク内ではBasic認証を要求しません。
 
-公開前のビルド確認:
+変更後の確認:
 
 ```bash
+npm test
 npm run build
 npm run preview
 ```
 
-Cloudflare Pagesへ反映:
+## Cloudflare
+
+フロントエンド、API、ランキング、筐体のリアルタイム通信を1つのCloudflare Workerへ統合しています。
+
+- 静的画面: Workers Static Assets
+- API: Cloudflare Workers
+- 筐体ルーム・WebSocket: Durable Objects + Hibernation API
+- ランキング・ゲーム結果・クレジット: D1
+- ローカル実行: Cloudflare Vite plugin
+
+本番反映時は、先にD1マイグレーションとBasic認証のSecretを設定します。
 
 ```bash
+npm run db:migrate:remote
+npx wrangler secret put BASIC_AUTH_USERNAME
+npx wrangler secret put BASIC_AUTH_PASSWORD
 npm run deploy
 ```
 
-ローカル開発中はBasic認証を無効化し、Cloudflare Pages上ではBasic認証を有効にしています。
+`npm run deploy` は本番公開を行うため、明示的にデプロイするときだけ実行します。
+
+## 構成
+
+- `src/app`: Reactの画面構成と起動
+- `src/features`: ゲームセンター、筐体、ゲーム、ランキング
+- `src/domain`: 筐体、ゲーム、結果、クレジットの業務ルール
+- `src/realtime`: ブラウザ側WebSocket通信
+- `src/worker`: Worker API、Durable Object、認証
+- `src/games/graze-duel`: Graze Duel固有のルール、音、互換ランタイム
+- `migrations`: D1スキーマ
+- `tests`: ドメインルールとWorker統合テスト
+
+詳細は [`docs/architecture.md`](docs/architecture.md) を参照してください。
+
+## 遊び方
 
 ローカル起動後は、ゲームセンタートップから `Graze Duel` を選び、筐体画面で `ゲームスタート` を押すとソロプレイが始まります。
 
@@ -73,7 +103,6 @@ npm run deploy
 - ラスボスは星型で、左右に往復しながら上下にも細かく動きます。
 - ボスには弾やかすりではダメージを与えられません。
 - 無敵中のリングをボスに当てた時だけ、ボスにダメージを与えます。
-- ボスにダメージを与えるたび、残り無敵時間が短くなります。
 - ボスを倒すたびに画面内の弾がすべて消え、次のボスが登場します。
 - ボス撃破時は、数秒間ゲーム全体がスローになります。
 - ラスボスを倒すとクリアです。
@@ -81,7 +110,7 @@ npm run deploy
 - 自分のライフは3で、被弾するとライフを1失います。
 - 被弾時は軽い爆発演出と効果音が出て、その後数秒間点滅しながら無敵になります。
 - レベルが10上がるごとに、通常攻撃に加えて大きなボス弾を送ります。
-- 自分が被弾した時点でゲームオーバーです。
+- ライフをすべて失うとゲームオーバーです。
 
 ## 評価したいこと
 
@@ -98,10 +127,10 @@ npm run deploy
 - ゲージ増加難度の上下ボタンで、レベルごとの必要ゲージ増加量を調整できます。
 - HUDに現在ゲージとレベルアップに必要な最大ゲージを表示します。
 
-## 次に試す候補
+## 次の開発
 
-- 2人ローカル対戦。
-- オンライン対戦。
-- 攻撃パターンの複数化。
-- コンボ中の無敵/レベルアップ演出。
-- リプレイ・観戦向けの見せ方。
+- 観戦者からプレイヤーへの対戦申込み
+- 対戦開始、再戦、筐体離席の状態遷移
+- 対戦結果とランキング
+- ログインとプレイヤー識別
+- フリープレイからクレジット消費への切替

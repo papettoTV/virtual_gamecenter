@@ -35,6 +35,7 @@ coverage
 .temp
 .svelte-kit/
 .vite/
+.wrangler/
 **/.vitepress/dist
 **/.vitepress/cache
 .docusaurus
