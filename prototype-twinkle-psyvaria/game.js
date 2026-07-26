@@ -950,6 +950,10 @@ function applyViewerEvent(event) {
     boss.spectatorTargetY = y;
     return;
   }
+  if (event.type === "bossDefeated") {
+    createExplosion(event.x, event.y, event.color);
+    return;
+  }
   if (event.type === "pauseChanged") {
     paused = event.paused;
     if (touchPause) touchPause.textContent = paused ? "再開" : "一時停止";
@@ -1012,6 +1016,7 @@ function updateSpectatorView(delta) {
   boss.spectatorTargetY = (boss.spectatorTargetY ?? boss.y) + (boss.spectatorVy ?? 0) * delta;
   boss.x += (boss.spectatorTargetX - boss.x) * correctionRatio;
   boss.y += (boss.spectatorTargetY - boss.y) * correctionRatio;
+  updateParticles(getGameDelta(delta));
 }
 
 window.addEventListener("keydown", (event) => {
@@ -1134,6 +1139,12 @@ function updateBossMovement() {
 function handleBossDefeated() {
   slowMotionTimer = BOSS_DEFEAT_SLOW_TIME;
   defeatedBossCount += 1;
+  queueSyncEvent({
+    type: "bossDefeated",
+    x: boss.x,
+    y: boss.y,
+    color: "#ffd166",
+  });
   createExplosion(boss.x, boss.y, "#ffd166");
   playExplosionSound();
   clearAllBullets();
@@ -1878,7 +1889,10 @@ function drawCompactGame() {
 
 function withCompactWorldTransform(drawCallback) {
   context.save();
-  const scale = 1.44;
+  const visibleSourceWidth = HEIGHT * (canvas.clientWidth / Math.max(1, canvas.clientHeight));
+  const horizontalScale = visibleSourceWidth / FIELD_WIDTH;
+  const verticalScale = (HEIGHT - 92) / FIELD_HEIGHT;
+  const scale = clamp(Math.min(horizontalScale, verticalScale), 0.82, 1.05);
   const focusX = players[0].fieldX + FIELD_WIDTH / 2;
   const focusY = FIELD_TOP + FIELD_HEIGHT / 2;
   context.translate(WIDTH / 2, HEIGHT / 2 + 24);
