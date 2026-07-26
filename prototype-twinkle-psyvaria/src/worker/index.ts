@@ -1,5 +1,6 @@
 import { authorizeRequest, type BasicAuthEnv } from "./auth";
 import { CabinetRoom } from "./cabinet-room";
+import { handlePlatformRequest } from "./platform";
 import { handleRankingRequest } from "./ranking";
 
 export { CabinetRoom };
@@ -31,6 +32,9 @@ export default {
     if (url.pathname === "/api/ranking") {
       return handleRankingRequest(request, env.DB);
     }
+
+    const platformResponse = await handlePlatformRequest(request, env.DB);
+    if (platformResponse) return platformResponse;
 
     if (url.pathname === "/api/health") {
       return Response.json({ ok: true, runtime: "cloudflare-workers" });

@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { ArcadeScreen } from "../features/arcade/ArcadeScreen";
 import { CabinetScreen } from "../features/cabinet/CabinetScreen";
 import { GameScreen } from "../features/game/GameScreen";
+import { PlatformExperience } from "../features/platform/PlatformExperience";
 
 export function App() {
   useEffect(() => {
@@ -17,6 +18,7 @@ export function App() {
           オンライン上にゲームセンター体験を再現する試作です。ゲーム一覧から遊びたいゲームを選び、筐体に入ってプレイします。
         </p>
       </section>
+      <PlatformExperience />
       <ArcadeScreen />
       <CabinetScreen />
       <GameScreen />
