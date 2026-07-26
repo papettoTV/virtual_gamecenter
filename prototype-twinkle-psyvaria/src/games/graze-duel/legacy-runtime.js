@@ -23,7 +23,6 @@ const cabinetScreen = document.querySelector("#cabinet-screen");
 const gameScreen = document.querySelector("#game-screen");
 const selectGameButton = document.querySelector("#select-game");
 const startSoloButton = document.querySelector("#start-solo");
-const spectatorWatchButton = document.querySelector("#spectator-watch");
 const backToArcadeButton = document.querySelector("#back-to-arcade");
 const cabinetBreadcrumbArcade = document.querySelector("#cabinet-breadcrumb-arcade");
 const gameBackToArcadeButton = document.querySelector("#game-back-to-arcade");
@@ -33,7 +32,6 @@ const cabinetSummary = document.querySelector("#cabinet-summary");
 const cabinetDescription = document.querySelector("#cabinet-description");
 const cabinetRoleLabel = document.querySelector("#cabinet-role-label");
 const cabinetIdLabel = document.querySelector("#cabinet-id-label");
-const cabinetUrlInput = document.querySelector("#cabinet-url");
 const copyCabinetUrlButton = document.querySelector("#copy-cabinet-url");
 const cabinetCopyStatus = document.querySelector("#cabinet-copy-status");
 const spectatorBanner = document.querySelector("#spectator-banner");
@@ -144,6 +142,7 @@ let eventFlushTimer = 0;
 let pendingSyncEvents = [];
 let cabinetConnected = false;
 let currentCabinetId = null;
+let cabinetShareUrl = "";
 
 const boss = {
   active: false,
@@ -324,12 +323,6 @@ if (spectatorGameBackButton) {
 
 if (startSoloButton) {
   startSoloButton.addEventListener("click", () => {
-    startSoloPlay();
-  });
-}
-
-if (spectatorWatchButton) {
-  spectatorWatchButton.addEventListener("click", () => {
     startSoloPlay();
   });
 }
@@ -560,7 +553,7 @@ function getCabinetIdFromPath() {
 }
 
 async function updateCabinetShareUrl() {
-  if (!cabinetUrlInput || !currentCabinetId) return;
+  if (!currentCabinetId) return;
   let shareOrigin = window.location.origin;
   if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
     try {
@@ -573,17 +566,23 @@ async function updateCabinetShareUrl() {
       shareOrigin = window.location.origin;
     }
   }
-  cabinetUrlInput.value = `${shareOrigin}/cabinets/${currentCabinetId}`;
+  cabinetShareUrl = `${shareOrigin}/cabinets/${currentCabinetId}`;
 }
 
 async function copyCabinetUrl() {
-  if (!cabinetUrlInput?.value) return;
+  if (!cabinetShareUrl) return;
   try {
-    await navigator.clipboard.writeText(cabinetUrlInput.value);
+    await navigator.clipboard.writeText(cabinetShareUrl);
   } catch {
-    cabinetUrlInput.select();
+    const copyTarget = document.createElement("textarea");
+    copyTarget.value = cabinetShareUrl;
+    copyTarget.setAttribute("readonly", "");
+    copyTarget.style.position = "fixed";
+    copyTarget.style.opacity = "0";
+    document.body.append(copyTarget);
+    copyTarget.select();
     document.execCommand("copy");
-    cabinetUrlInput.setSelectionRange(0, 0);
+    copyTarget.remove();
   }
   if (cabinetCopyStatus) cabinetCopyStatus.textContent = "コピーしました。同じWi-Fiの端末で開けます。";
 }
@@ -681,10 +680,6 @@ function updateCabinetUi() {
     const canWatch = cabinetState?.status === "soloPlaying";
     startSoloButton.disabled = !canWatch;
     startSoloButton.textContent = canWatch ? "観戦する" : "プレイ開始を待っています";
-    if (spectatorWatchButton) {
-      spectatorWatchButton.disabled = !canWatch;
-      spectatorWatchButton.textContent = canWatch ? "観戦する" : "プレイ開始を待っています";
-    }
     if (cabinetDescription) {
       cabinetDescription.textContent = "この筐体は使用中です。プレイヤーのゲームをリアルタイムで観戦できます。";
     }

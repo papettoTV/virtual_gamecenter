@@ -16,19 +16,46 @@ export function CabinetScreen() {
         </div>
 
         <div className="cabinet-status">
-          <strong>筐体状態</strong>
-          <span id="cabinet-status-label">空き</span>
-          <small id="cabinet-role-label">接続中</small>
-          <button id="spectator-watch" className="cabinet-watch-button" type="button">観戦する</button>
-        </div>
-        <div className="cabinet-share">
-          <label htmlFor="cabinet-url"><strong>筐体共有URL</strong></label>
-          <div>
-            <input id="cabinet-url" type="text" readOnly />
-            <button id="copy-cabinet-url" type="button">URLをコピー</button>
+          <div className="cabinet-status-copy">
+            <strong>筐体状態</strong>
+            <span id="cabinet-status-label">空き</span>
+            <small id="cabinet-role-label">接続中</small>
           </div>
-          <small id="cabinet-copy-status">このURLを開くと同じ筐体を観戦できます。</small>
+          <div className="cabinet-status-actions">
+            <button id="start-solo" className="cabinet-start-button" type="button">
+              ゲームスタート
+            </button>
+            <button
+              id="copy-cabinet-url"
+              className="cabinet-share-button"
+              type="button"
+              aria-label="筐体共有URLをコピー"
+              title="筐体共有URLをコピー"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="18" cy="5" r="3" />
+                <circle cx="6" cy="12" r="3" />
+                <circle cx="18" cy="19" r="3" />
+                <path d="m8.7 10.7 6.6-4.2M8.7 13.3l6.6 4.2" />
+              </svg>
+            </button>
+          </div>
+          <small id="cabinet-copy-status" className="cabinet-copy-status" aria-live="polite">
+            共有アイコンで筐体URLをコピーできます
+          </small>
         </div>
+
+        <section className="cabinet-promo" aria-labelledby="cabinet-promo-title">
+          <div className="cabinet-promo-heading">
+            <strong id="cabinet-promo-title">プレイイメージ</strong>
+            <small>Graze Duel Gameplay</small>
+          </div>
+          <video autoPlay muted loop playsInline preload="metadata" poster="/graze-duel-promo-poster.jpg">
+            <source src="/graze-duel-promo.mp4" type="video/mp4" />
+            お使いのブラウザでは動画を再生できません。
+          </video>
+        </section>
+
         <section className="cabinet-help-grid" aria-label="遊び方">
           <div>
             <strong>操作</strong>
@@ -44,7 +71,6 @@ export function CabinetScreen() {
           </div>
         </section>
         <div className="screen-actions">
-          <button id="start-solo" type="button">ゲームスタート</button>
           <button id="back-to-arcade" className="secondary-button" type="button">ゲームセンターに戻る</button>
         </div>
       </div>
