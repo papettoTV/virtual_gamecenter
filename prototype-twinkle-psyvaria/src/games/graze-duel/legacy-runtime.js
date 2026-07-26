@@ -2393,19 +2393,11 @@ function drawPaused() {
   const title = waitingForStart ? "READY" : "PAUSED";
   const action = waitingForStart ? "Spaceでゲーム開始" : "Spaceで再開";
   const instructionX = WIDTH / 2 - (compact ? 165 : 195);
-  const instructions = compact
-    ? [
-        "移動: ゲーム画面をスライド",
-        "かすり: 敵弾を自機の近くで避ける",
-        "攻撃: ゲージ満タンで自動",
-        "画面下のボタンでも開始・再開できます",
-      ]
-    : [
-        "移動: 矢印キー / WASD",
-        "低速移動: Shift",
-        "かすり: 敵弾を自機の近くで避ける",
-        "攻撃: ゲージ満タンで自動",
-      ];
+  const instructions = [
+    "移動: 矢印キー / WASD",
+    "低速移動: Shift",
+    "ボスへの攻撃: レベルアップ無敵時のシールド",
+  ];
 
   context.fillStyle = "rgba(0,0,0,0.7)";
   context.fillRect(0, 0, WIDTH, HEIGHT);
