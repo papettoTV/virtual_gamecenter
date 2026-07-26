@@ -2392,6 +2392,7 @@ function drawPaused() {
   const compact = isCompactView();
   const title = waitingForStart ? "READY" : "PAUSED";
   const action = waitingForStart ? "Spaceでゲーム開始" : "Spaceで再開";
+  const instructionX = WIDTH / 2 - (compact ? 165 : 195);
   const instructions = compact
     ? [
         "移動: ゲーム画面をスライド",
@@ -2416,13 +2417,11 @@ function drawPaused() {
   context.font = `800 ${compact ? 22 : 24}px system-ui`;
   context.fillText(action, WIDTH / 2, HEIGHT / 2 - 76);
   context.fillStyle = "#f4f7ff";
-  context.font = `600 ${compact ? 17 : 19}px system-ui`;
+  context.font = `600 ${compact ? 15 : 17}px system-ui`;
+  context.textAlign = "left";
   instructions.forEach((instruction, index) => {
-    context.fillText(instruction, WIDTH / 2, HEIGHT / 2 - 18 + index * 34);
+    context.fillText(instruction, instructionX, HEIGHT / 2 - 18 + index * 31);
   });
-  context.fillStyle = "#aab4d6";
-  context.font = `500 ${compact ? 15 : 17}px system-ui`;
-  context.fillText("Rでリスタート", WIDTH / 2, HEIGHT / 2 + 142);
   context.textAlign = "left";
 }
 
