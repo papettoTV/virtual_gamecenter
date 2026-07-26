@@ -79,9 +79,9 @@ const BOSS_ATTACK_RECOVERY_TIME = 0.7;
 const BOSS_ARRIVAL_WAIT_TIME = 2.4;
 const BOSS_ARRIVAL_DURATION = 5;
 const BOSS_ATTACK_PATTERNS = [
-  { id: "fan", duration: 2.5, shotInterval: 0.42 },
-  { id: "aimedBurst", duration: 2.2, shotInterval: 0.5 },
-  { id: "crossSweep", duration: 2.6, shotInterval: 0.34 },
+  { id: "fan", duration: 4.2, shotInterval: 0.48 },
+  { id: "aimedBurst", duration: 4, shotInterval: 0.55 },
+  { id: "centerPressure", duration: 5, shotInterval: 0.38 },
 ];
 const HIT_INVINCIBLE_TIME = 2.2;
 const INVINCIBLE_RING_INNER_RADIUS = 18;
@@ -1299,7 +1299,7 @@ function spawnBossAttackPattern(patternId) {
     spawnBossAimedBurst();
     return;
   }
-  spawnBossCrossSweep();
+  spawnBossCenterPressure();
 }
 
 function spawnBossFanAttack() {
@@ -1350,26 +1350,48 @@ function spawnBossAimedBurst() {
   }
 }
 
-function spawnBossCrossSweep() {
+function spawnBossCenterPressure() {
   const phaseScale = 1 + boss.phaseIndex * 0.18;
-  const direction = boss.attackStep % 2 === 0 ? -1 : 1;
-  const centerAngle = Math.PI / 2 + direction * 0.43;
-  const count = 5 + boss.phaseIndex;
-  const speed = 142 * phaseScale;
+  const centerCount = 9 + boss.phaseIndex * 2;
+  const centerSpread = 0.38;
+  const centerSpeed = 148 * phaseScale;
+  const originY = boss.y + boss.radius * 0.34;
 
-  for (let index = 0; index < count; index += 1) {
-    const offset = (index - (count - 1) / 2) * 0.075;
-    const angle = centerAngle + offset;
+  for (let index = 0; index < centerCount; index += 1) {
+    const ratio = centerCount === 1 ? 0 : index / (centerCount - 1) - 0.5;
+    const angle = Math.PI / 2 + ratio * centerSpread;
     addBullet(
       players[0],
-      boss.x + direction * boss.radius * 0.35,
-      boss.y + boss.radius * 0.3,
-      Math.cos(angle) * speed,
-      Math.sin(angle) * speed,
-      8,
+      boss.x,
+      originY,
+      Math.cos(angle) * centerSpeed,
+      Math.sin(angle) * centerSpeed,
+      9,
       "#a62cff",
       "bossAttack",
       { shape: "pill" },
+    );
+  }
+
+  const edgeSpeed = 164 * phaseScale;
+  const edgeOffset = Math.sin(boss.attackStep * 0.78) * 16;
+  for (const side of [-1, 1]) {
+    const targetX =
+      side < 0
+        ? players[0].fieldX + FIELD_MARGIN + 24 + edgeOffset
+        : players[0].fieldX + FIELD_WIDTH - FIELD_MARGIN - 24 - edgeOffset;
+    const targetY = FIELD_BOTTOM - 54;
+    const angle = Math.atan2(targetY - originY, targetX - boss.x);
+    addBullet(
+      players[0],
+      boss.x + side * boss.radius * 0.16,
+      originY,
+      Math.cos(angle) * edgeSpeed,
+      Math.sin(angle) * edgeSpeed,
+      7,
+      "#cf78ff",
+      "bossAttack",
+      { shape: "spinner" },
     );
   }
 }
