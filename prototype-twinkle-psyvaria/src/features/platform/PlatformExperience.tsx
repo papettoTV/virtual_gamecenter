@@ -43,6 +43,12 @@ export function PlatformExperience() {
   }, [loadPlatform]);
 
   useEffect(() => {
+    if (notice !== "1クレジットを使用しました。") return;
+    const closeTimer = window.setTimeout(() => setNotice(""), 5000);
+    return () => window.clearTimeout(closeTimer);
+  }, [notice]);
+
+  useEffect(() => {
     if (!profileOpen) return;
 
     const closeProfile = (event: MouseEvent) => {
