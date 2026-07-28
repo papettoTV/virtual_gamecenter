@@ -1,43 +1,31 @@
-.cabinet-directory {
+.game-card-actions {
   display: grid;
-  gap: 8px;
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.cabinet-directory-heading,
-.cabinet-dot-legend {
-  display: flex;
-  align-items: center;
+  flex: 0 0 auto;
+  justify-items: center;
   gap: 10px;
 }
 
-.cabinet-directory-heading {
-  justify-content: space-between;
+.cabinet-directory {
+  min-height: 22px;
 }
 
-.cabinet-directory-heading strong {
-  margin: 0;
-  font-size: 13px;
-}
-
-.cabinet-directory-heading span,
-.cabinet-directory small,
-.cabinet-dot-legend {
+.cabinet-directory small {
   color: var(--muted);
   font-size: 11px;
+  white-space: nowrap;
 }
 
 .cabinet-dots {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 10px;
+  max-width: 156px;
 }
 
 .game-select-card .cabinet-dot {
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   padding: 0;
   border: 3px solid rgba(255, 255, 255, 0.16);
   border-radius: 50%;
@@ -58,38 +46,21 @@
   box-shadow: 0 0 16px rgba(255, 78, 104, 0.58);
 }
 
-.cabinet-dot-legend {
-  flex-wrap: wrap;
-}
-
-.cabinet-dot-legend span {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.cabinet-dot-legend i {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #45df83;
-}
-
-.cabinet-dot-legend i.is-popular {
-  background: #ff4e68;
-}
-
 .game-nav span {
   display: none;
 }
 
 @media (max-width: 720px) {
+  .game-card-actions {
+    width: 100%;
+  }
+
   .cabinet-directory {
-    grid-column: 1 / -1;
+    min-height: 26px;
   }
 
   .game-select-card .cabinet-dot {
-    width: 28px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
   }
 }

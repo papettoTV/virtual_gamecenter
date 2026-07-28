@@ -117,10 +117,6 @@ export function CabinetDirectory() {
 
   return (
     <div className="cabinet-directory" aria-label="プレイ中の筐体一覧">
-      <div className="cabinet-directory-heading">
-        <strong>プレイ中の筐体</strong>
-        <span>{loading ? "確認中" : `${cabinets.length}台`}</span>
-      </div>
       {cabinets.length > 0 ? (
         <div className="cabinet-dots">
           {cabinets.map((cabinet, index) => {
@@ -141,12 +137,8 @@ export function CabinetDirectory() {
           })}
         </div>
       ) : (
-        <small>{loading ? "筐体を確認しています…" : "現在プレイ中の筐体はありません"}</small>
+        <small>{loading ? "確認中…" : "プレイ中なし"}</small>
       )}
-      <div className="cabinet-dot-legend" aria-hidden="true">
-        <span><i />プレイ中</span>
-        <span><i className="is-popular" />盛り上がり中</span>
-      </div>
     </div>
   );
 }
