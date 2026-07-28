@@ -1,7 +1,7 @@
 .game-card-actions {
   display: grid;
   flex: 0 0 auto;
-  justify-items: center;
+  justify-items: start;
   gap: 10px;
 }
 
@@ -18,7 +18,7 @@
 .cabinet-dots {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 10px;
   max-width: 156px;
 }
@@ -28,7 +28,7 @@
   height: 18px;
   padding: 0;
   border: 3px solid rgba(255, 255, 255, 0.16);
-  border-radius: 50%;
+  border-radius: 4px;
   background: #45df83;
   box-shadow: 0 0 14px rgba(69, 223, 131, 0.46);
   cursor: pointer;
