@@ -38,7 +38,15 @@ export async function handleCabinetDirectoryRequest(
     .prepare(
       `SELECT cabinet_id, game_id, status, player_count, spectator_count, updated_at
        FROM cabinet_directory
-       WHERE game_id = ? AND player_count > 0
+       WHERE game_id = ?
+         AND player_count > 0
+         AND status IN (
+           'soloPlaying',
+           'challengePending',
+           'versusReady',
+           'versusPlaying',
+           'result'
+         )
        ORDER BY spectator_count DESC, updated_at DESC`,
     )
     .bind(gameId)

@@ -69,9 +69,6 @@ export function CabinetDirectory() {
       const role = document.querySelector<HTMLElement>("#cabinet-role-label");
       if (role?.textContent !== "あなたがプレイヤーです") return;
 
-      const status = document.querySelector<HTMLElement>("#cabinet-status-label");
-      if (status?.textContent === "開始待ち") status.textContent = "プレイ中";
-
       const description = document.querySelector<HTMLElement>("#cabinet-description");
       if (description?.textContent?.includes("フリープレイ")) {
         description.textContent = "この筐体に着席しています。1クレジットでソロプレイを開始できます。";
