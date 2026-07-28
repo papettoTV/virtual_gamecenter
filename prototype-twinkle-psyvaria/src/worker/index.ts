@@ -1,4 +1,5 @@
 import { authorizeRequest, type BasicAuthEnv } from "./auth";
+import { handleCabinetDirectoryRequest } from "./cabinet-directory";
 import { CabinetRoom } from "./cabinet-room";
 import { handlePlatformRequest } from "./platform";
 import { handleRankingRequest } from "./ranking";
@@ -32,6 +33,9 @@ export default {
     if (url.pathname === "/api/ranking") {
       return handleRankingRequest(request, env.DB);
     }
+
+    const cabinetDirectoryResponse = await handleCabinetDirectoryRequest(request, env.DB);
+    if (cabinetDirectoryResponse) return cabinetDirectoryResponse;
 
     const platformResponse = await handlePlatformRequest(request, env.DB);
     if (platformResponse) return platformResponse;

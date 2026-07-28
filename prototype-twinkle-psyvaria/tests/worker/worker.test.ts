@@ -22,4 +22,14 @@ describe("Cloudflare Worker", () => {
       error: "invalid_player_name",
     });
   });
+
+  it("rejects writes to the cabinet directory endpoint", async () => {
+    const response = await exports.default.fetch("http://localhost/api/cabinets", {
+      method: "POST",
+    });
+    expect(response.status).toBe(405);
+    await expect(response.json()).resolves.toEqual({
+      error: "method_not_allowed",
+    });
+  });
 });

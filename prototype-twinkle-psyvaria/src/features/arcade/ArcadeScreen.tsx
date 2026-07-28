@@ -1,3 +1,5 @@
+import { CabinetDirectory } from "./CabinetDirectory";
+
 export function ArcadeScreen() {
   return (
     <section className="arcade-screen" id="arcade-screen">
@@ -10,7 +12,7 @@ export function ArcadeScreen() {
           <div className="section-heading">
             <div>
               <h2>ゲーム一覧</h2>
-              <p>遊ぶゲームを選ぶと、新しい筐体URLを発行します。URLを共有すると他の人が観戦できます。</p>
+              <p>プレイ中の筐体を観戦するか、新しい筐体に入ってゲームを始められます。</p>
             </div>
           </div>
           <div className="game-select-card">
@@ -18,9 +20,10 @@ export function ArcadeScreen() {
             <div className="game-card-body">
               <strong>Graze Duel</strong>
               <span>弾幕かすり・無敵体当たり・ボス撃破型シューティング</span>
-              <small id="cabinet-summary">新しい筐体を作成 / Free Play</small>
+              <small id="cabinet-summary">筐体を選択 / 1 Credit</small>
+              <CabinetDirectory />
             </div>
-            <button id="select-game" type="button">筐体を作成</button>
+            <button id="select-game" type="button">筐体を選択</button>
           </div>
           <div className="game-select-card is-disabled">
             <div className="game-card-thumb" aria-hidden="true">?</div>

@@ -1,0 +1,95 @@
+.cabinet-directory {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.cabinet-directory-heading,
+.cabinet-dot-legend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cabinet-directory-heading {
+  justify-content: space-between;
+}
+
+.cabinet-directory-heading strong {
+  margin: 0;
+  font-size: 13px;
+}
+
+.cabinet-directory-heading span,
+.cabinet-directory small,
+.cabinet-dot-legend {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.cabinet-dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.game-select-card .cabinet-dot {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 3px solid rgba(255, 255, 255, 0.16);
+  border-radius: 50%;
+  background: #45df83;
+  box-shadow: 0 0 14px rgba(69, 223, 131, 0.46);
+  cursor: pointer;
+}
+
+.game-select-card .cabinet-dot:hover,
+.game-select-card .cabinet-dot:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 3px;
+  transform: scale(1.12);
+}
+
+.game-select-card .cabinet-dot.is-popular {
+  background: #ff4e68;
+  box-shadow: 0 0 16px rgba(255, 78, 104, 0.58);
+}
+
+.cabinet-dot-legend {
+  flex-wrap: wrap;
+}
+
+.cabinet-dot-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.cabinet-dot-legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #45df83;
+}
+
+.cabinet-dot-legend i.is-popular {
+  background: #ff4e68;
+}
+
+.game-nav span {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .cabinet-directory {
+    grid-column: 1 / -1;
+  }
+
+  .game-select-card .cabinet-dot {
+    width: 28px;
+    height: 28px;
+  }
+}

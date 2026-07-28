@@ -6,6 +6,7 @@ import {
   type CabinetRole,
   type CabinetState,
 } from "../domain/cabinet";
+import { syncCabinetDirectory } from "./cabinet-directory";
 import type {
   ClientMessage,
   GameEvent,
@@ -219,5 +220,6 @@ export class CabinetRoom extends DurableObject<Env> {
       cabinetId: this.cabinetId,
       state: this.state,
     });
+    await syncCabinetDirectory(this.env.DB, this.state);
   }
 }

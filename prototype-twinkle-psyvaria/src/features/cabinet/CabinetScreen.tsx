@@ -2,11 +2,6 @@ export function CabinetScreen() {
   return (
     <section className="cabinet-screen is-hidden" id="cabinet-screen">
       <div className="arcade-card">
-        <nav className="breadcrumb" aria-label="現在位置">
-          <button id="cabinet-breadcrumb-arcade" type="button">ゲームセンター</button>
-          <span>ゲーム一覧</span>
-          <span>Graze Duel</span>
-        </nav>
         <div className="arcade-heading">
           <div>
             <p className="eyebrow" id="cabinet-id-label">Cabinet</p>
