@@ -278,7 +278,7 @@
 
 .cabinet-machine-empty strong {
   margin-top: 13px;
-  color: var(--text);
+  color: rgba(177, 187, 207, 0.58);
   font-size: 18px;
 }
 
