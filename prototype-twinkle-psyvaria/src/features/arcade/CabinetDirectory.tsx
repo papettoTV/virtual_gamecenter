@@ -42,7 +42,7 @@ export function CabinetDirectory() {
       const target = event.target;
       if (!(target instanceof Element)) return;
       const button = target.closest<HTMLButtonElement>(
-        "#game-back-to-arcade, #spectator-game-back",
+        "#cabinet-top-back, #game-back-to-arcade, #spectator-game-back",
       );
       if (!button) return;
       event.preventDefault();
@@ -82,9 +82,28 @@ export function CabinetDirectory() {
       subtree: true,
     });
 
+    const syncScreenClass = () => {
+      const cabinetScreen = document.querySelector("#cabinet-screen");
+      document.body.classList.toggle(
+        "is-cabinet-screen",
+        Boolean(cabinetScreen && !cabinetScreen.classList.contains("is-hidden")),
+      );
+    };
+    syncScreenClass();
+    const screenObserver = new MutationObserver(syncScreenClass);
+    const cabinetScreen = document.querySelector("#cabinet-screen");
+    if (cabinetScreen) {
+      screenObserver.observe(cabinetScreen, {
+        attributes: true,
+        attributeFilter: ["class"],
+      });
+    }
+
     document.addEventListener("click", leaveForAnotherGame, true);
     return () => {
       labelObserver.disconnect();
+      screenObserver.disconnect();
+      document.body.classList.remove("is-cabinet-screen");
       document.removeEventListener("click", leaveForAnotherGame, true);
     };
   }, []);

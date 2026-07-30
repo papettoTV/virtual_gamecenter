@@ -4,14 +4,9 @@ export function ArcadeScreen() {
   return (
     <section className="arcade-screen" id="arcade-screen">
       <div className="arcade-card">
-        <nav className="breadcrumb" aria-label="現在位置">
-          <span>ゲームセンター</span>
-        </nav>
-
         <section className="game-list" aria-label="ゲーム一覧">
           <div className="section-heading">
             <div>
-              <h2>ゲーム一覧</h2>
               <p>プレイ中の筐体を観戦するか、新しい筐体に入ってゲームを始められます。</p>
             </div>
           </div>

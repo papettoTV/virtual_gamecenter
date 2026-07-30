@@ -2,6 +2,11 @@ export function CabinetScreen() {
   return (
     <section className="cabinet-screen is-hidden" id="cabinet-screen">
       <div className="arcade-card">
+        <div className="cabinet-top-actions">
+          <button id="cabinet-top-back" className="secondary-button" type="button">
+            他のゲームを探す
+          </button>
+        </div>
         <div className="arcade-heading">
           <div>
             <p className="eyebrow" id="cabinet-id-label">Cabinet</p>
@@ -66,7 +71,7 @@ export function CabinetScreen() {
           </div>
         </section>
         <div className="screen-actions">
-          <button id="back-to-arcade" className="secondary-button" type="button">ゲームセンターに戻る</button>
+          <button id="back-to-arcade" className="secondary-button" type="button">他のゲームを探す</button>
         </div>
       </div>
     </section>
