@@ -18,10 +18,10 @@ export function App() {
           オンライン上にゲームセンター体験を再現する試作です。ゲーム一覧から遊びたいゲームを選び、筐体に入ってプレイします。
         </p>
       </section>
-      <PlatformExperience />
       <ArcadeScreen />
       <CabinetScreen />
       <GameScreen />
+      <PlatformExperience />
     </main>
   );
 }
