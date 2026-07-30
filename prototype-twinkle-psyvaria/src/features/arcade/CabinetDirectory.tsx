@@ -200,9 +200,10 @@ export function CabinetSelector() {
       <div className="cabinet-machine-grid">
         <button className="cabinet-machine-card is-solo" type="button" onClick={startSolo}>
           <CabinetMachineScreen mode="ready" />
-          <span className="cabinet-machine-name">新規筐体</span>
           <strong>ソロでプレイ</strong>
-          <small>待機中</small>
+          <small id="cabinet-description">
+            この筐体に着席しています。1クレジットでソロプレイを開始できます。
+          </small>
         </button>
 
         {playingCabinets.map((cabinet, index) => (
@@ -225,6 +226,7 @@ export function CabinetSelector() {
 
         {!loading && playingCabinets.length === 0 && (
           <div className="cabinet-machine-empty">
+            <CabinetMachineScreen mode="empty" />
             <span>LIVE</span>
             <strong>現在プレイ中の筐体はありません</strong>
             <small>プレイが始まると、ここから観戦できます。</small>
@@ -239,17 +241,19 @@ function CabinetMachineScreen({
   mode,
   index = 0,
 }: {
-  mode: "ready" | "playing";
+  mode: "ready" | "playing" | "empty";
   index?: number;
 }) {
   return (
     <span className="cabinet-machine" aria-hidden="true">
       <span className="cabinet-machine-marquee">GRAZE DUEL</span>
       <span className={`cabinet-machine-monitor is-${mode}`}>
-        {mode === "ready" ? (
+        {mode !== "playing" ? (
           <>
             <span className="cabinet-ready-logo">GD</span>
-            <span className="cabinet-ready-text">PRESS START</span>
+            <span className="cabinet-ready-text">
+              {mode === "ready" ? "PRESS START" : "NO PLAYER"}
+            </span>
           </>
         ) : (
           <>

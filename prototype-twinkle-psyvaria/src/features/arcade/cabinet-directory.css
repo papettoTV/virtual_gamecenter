@@ -96,13 +96,20 @@
 }
 
 .cabinet-machine-card strong {
-  margin-top: 3px;
+  margin-top: 13px;
   font-size: 18px;
 }
 
 .cabinet-machine-card small {
   margin-top: 5px;
   color: #5be9f4;
+}
+
+.cabinet-machine-card.is-solo small {
+  max-width: 240px;
+  margin-inline: auto;
+  color: var(--muted);
+  line-height: 1.55;
 }
 
 .cabinet-machine {
@@ -143,6 +150,10 @@
 
 .cabinet-machine-monitor.is-ready {
   background: radial-gradient(circle at 50% 45%, #173451, #050916 68%);
+}
+
+.cabinet-machine-monitor.is-empty {
+  background: radial-gradient(circle at 50% 45%, #242936, #10131b 68%);
 }
 
 .cabinet-ready-logo,
@@ -258,6 +269,12 @@
   flex-direction: column;
   color: var(--muted);
   text-align: center;
+}
+
+.cabinet-machine-empty .cabinet-machine {
+  margin-bottom: 14px;
+  filter: grayscale(1);
+  opacity: 0.42;
 }
 
 .cabinet-machine-empty span {

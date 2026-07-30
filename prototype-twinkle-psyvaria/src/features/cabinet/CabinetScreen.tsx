@@ -13,7 +13,6 @@ export function CabinetScreen() {
           <div>
             <p className="eyebrow" id="cabinet-id-label">Cabinet</p>
             <h2>Graze Duel</h2>
-            <p id="cabinet-description">筐体へ接続しています。</p>
           </div>
           <button
             id="copy-cabinet-url"
