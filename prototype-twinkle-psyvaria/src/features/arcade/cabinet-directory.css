@@ -276,9 +276,15 @@
   opacity: 0.42;
 }
 
+.cabinet-machine-empty strong {
+  margin-top: 13px;
+  color: var(--text);
+  font-size: 18px;
+}
+
 .cabinet-machine-empty small {
   max-width: 220px;
-  margin-top: 13px;
+  margin-top: 5px;
   line-height: 1.55;
 }
 
