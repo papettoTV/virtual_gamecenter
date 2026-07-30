@@ -88,8 +88,8 @@ export function CabinetDirectory() {
       if (role?.textContent !== "あなたがプレイヤーです") return;
 
       const description = document.querySelector<HTMLElement>("#cabinet-description");
-      if (description?.textContent?.includes("フリープレイ")) {
-        description.textContent = "この筐体に着席しています。1クレジットでソロプレイを開始できます。";
+      if (description?.textContent !== "1クレジットでソロプレイを開始できます。") {
+        description.textContent = "1クレジットでソロプレイを開始できます。";
       }
     };
     normalizeCabinetLabels();
@@ -202,7 +202,7 @@ export function CabinetSelector() {
           <CabinetMachineScreen mode="ready" />
           <strong>ソロでプレイ</strong>
           <small id="cabinet-description">
-            この筐体に着席しています。1クレジットでソロプレイを開始できます。
+            1クレジットでソロプレイを開始できます。
           </small>
         </button>
 
@@ -227,7 +227,7 @@ export function CabinetSelector() {
         {!loading && playingCabinets.length === 0 && (
           <div className="cabinet-machine-empty">
             <CabinetMachineScreen mode="empty" />
-            <small>他のプレイヤーのプレイが始まると観戦ができます。</small>
+            <small>他のプレイヤーのゲームが始まると観戦ができます。</small>
           </div>
         )}
       </div>
