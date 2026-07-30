@@ -227,9 +227,7 @@ export function CabinetSelector() {
         {!loading && playingCabinets.length === 0 && (
           <div className="cabinet-machine-empty">
             <CabinetMachineScreen mode="empty" />
-            <span>LIVE</span>
-            <strong>現在プレイ中の筐体はありません</strong>
-            <small>プレイが始まると、ここから観戦できます。</small>
+            <small>誰かのプレイが始まると、ここから観戦できます。</small>
           </div>
         )}
       </div>

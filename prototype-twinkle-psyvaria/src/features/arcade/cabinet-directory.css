@@ -272,25 +272,14 @@
 }
 
 .cabinet-machine-empty .cabinet-machine {
-  margin-bottom: 14px;
   filter: grayscale(1);
   opacity: 0.42;
 }
 
-.cabinet-machine-empty span {
-  color: #ff718e;
-  font-size: 11px;
-  font-weight: 900;
-  letter-spacing: 0.16em;
-}
-
-.cabinet-machine-empty strong {
-  margin-top: 8px;
-  color: var(--text);
-}
-
 .cabinet-machine-empty small {
-  margin-top: 6px;
+  max-width: 220px;
+  margin-top: 13px;
+  line-height: 1.55;
 }
 
 .cabinet-directory {
@@ -367,5 +356,10 @@
     transform: scale(0.9);
     transform-origin: top center;
     margin-bottom: -16px;
+  }
+
+  .cabinet-machine-empty {
+    justify-content: flex-start;
+    padding: 18px 8px 16px;
   }
 }
