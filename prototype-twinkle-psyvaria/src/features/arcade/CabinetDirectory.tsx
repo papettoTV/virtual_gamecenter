@@ -9,8 +9,15 @@ interface CabinetEntry {
 
 const POPULAR_SPECTATOR_COUNT = 3;
 const REFRESH_INTERVAL_MS = 3000;
+const CABINET_PREVIEW_LIMIT = 4;
+const PLAYING_STATUSES = new Set([
+  "soloPlaying",
+  "challengePending",
+  "versusPlaying",
+  "result",
+]);
 
-export function CabinetDirectory() {
+function useCabinets() {
   const [cabinets, setCabinets] = useState<CabinetEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -36,6 +43,17 @@ export function CabinetDirectory() {
       window.removeEventListener("popstate", loadCabinets);
     };
   }, [loadCabinets]);
+
+  return { cabinets, loading };
+}
+
+function openCabinet(cabinetId: string) {
+  history.pushState({ cabinetId }, "", `/cabinets/${cabinetId}?watch=1`);
+  window.dispatchEvent(new PopStateEvent("popstate"));
+}
+
+export function CabinetDirectory() {
+  const { cabinets, loading } = useCabinets();
 
   useEffect(() => {
     const leaveForAnotherGame = (event: MouseEvent) => {
@@ -129,11 +147,6 @@ export function CabinetDirectory() {
     return () => window.clearInterval(watchTimer);
   }, []);
 
-  const openCabinet = (cabinetId: string) => {
-    history.pushState({ cabinetId }, "", `/cabinets/${cabinetId}?watch=1`);
-    window.dispatchEvent(new PopStateEvent("popstate"));
-  };
-
   if (loading || cabinets.length === 0) return null;
 
   return (
@@ -157,5 +170,103 @@ export function CabinetDirectory() {
         })}
       </div>
     </div>
+  );
+}
+
+export function CabinetSelector() {
+  const { cabinets, loading } = useCabinets();
+  const currentCabinetId = window.location.pathname.match(/^\/cabinets\/([^/]+)/)?.[1];
+  const playingCabinets = cabinets
+    .filter((cabinet) => (
+      cabinet.cabinetId !== currentCabinetId
+      && PLAYING_STATUSES.has(cabinet.status)
+    ))
+    .slice(0, CABINET_PREVIEW_LIMIT);
+
+  const startSolo = () => {
+    document.querySelector<HTMLButtonElement>("#start-solo")?.click();
+  };
+
+  return (
+    <section className="cabinet-selector" aria-labelledby="cabinet-selector-title">
+      <div className="cabinet-selector-heading">
+        <div>
+          <p className="eyebrow">SELECT CABINET</p>
+          <h3 id="cabinet-selector-title">遊ぶ筐体を選ぶ</h3>
+        </div>
+        <p>新しい筐体でソロプレイを始めるか、プレイ中の筐体を観戦できます。</p>
+      </div>
+
+      <div className="cabinet-machine-grid">
+        <button className="cabinet-machine-card is-solo" type="button" onClick={startSolo}>
+          <CabinetMachineScreen mode="ready" />
+          <span className="cabinet-machine-name">新規筐体</span>
+          <strong>ソロでプレイ</strong>
+          <small>待機中</small>
+        </button>
+
+        {playingCabinets.map((cabinet, index) => (
+          <button
+            key={cabinet.cabinetId}
+            className="cabinet-machine-card is-playing"
+            type="button"
+            onClick={() => openCabinet(cabinet.cabinetId)}
+          >
+            <CabinetMachineScreen mode="playing" index={index} />
+            <span className="cabinet-machine-name">プレイ中筐体 {index + 1}</span>
+            <strong>観戦する</strong>
+            <small>
+              {cabinet.spectatorCount > 0
+                ? `観戦者 ${cabinet.spectatorCount}人`
+                : "ゲーム進行中"}
+            </small>
+          </button>
+        ))}
+
+        {!loading && playingCabinets.length === 0 && (
+          <div className="cabinet-machine-empty">
+            <span>LIVE</span>
+            <strong>現在プレイ中の筐体はありません</strong>
+            <small>プレイが始まると、ここから観戦できます。</small>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function CabinetMachineScreen({
+  mode,
+  index = 0,
+}: {
+  mode: "ready" | "playing";
+  index?: number;
+}) {
+  return (
+    <span className="cabinet-machine" aria-hidden="true">
+      <span className="cabinet-machine-marquee">GRAZE DUEL</span>
+      <span className={`cabinet-machine-monitor is-${mode}`}>
+        {mode === "ready" ? (
+          <>
+            <span className="cabinet-ready-logo">GD</span>
+            <span className="cabinet-ready-text">PRESS START</span>
+          </>
+        ) : (
+          <>
+            <span className={`cabinet-demo-ship ship-${index % 3}`} />
+            <span className="cabinet-demo-boss" />
+            <span className="cabinet-demo-bullets">
+              <i /><i /><i /><i /><i />
+            </span>
+          </>
+        )}
+      </span>
+      <span className="cabinet-machine-controls">
+        <i />
+        <i />
+        <i />
+      </span>
+      <span className="cabinet-machine-base" />
+    </span>
   );
 }

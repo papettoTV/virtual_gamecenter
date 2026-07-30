@@ -17,7 +17,7 @@ export function ArcadeScreen() {
               <span>弾幕かすり・無敵体当たり・ボス撃破型シューティング</span>
             </div>
             <div className="game-card-actions">
-              <button id="select-game" type="button">筐体を選択</button>
+              <button id="select-game" type="button">ゲームをプレイ</button>
               <CabinetDirectory />
             </div>
           </div>
