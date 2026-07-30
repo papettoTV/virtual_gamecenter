@@ -20,7 +20,6 @@ export function ArcadeScreen() {
             <div className="game-card-body">
               <strong>Graze Duel</strong>
               <span>弾幕かすり・無敵体当たり・ボス撃破型シューティング</span>
-              <small id="cabinet-summary">筐体を選択 / 1 Credit</small>
             </div>
             <div className="game-card-actions">
               <button id="select-game" type="button">筐体を選択</button>

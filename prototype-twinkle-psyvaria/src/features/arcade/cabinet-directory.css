@@ -1,18 +1,13 @@
 .game-card-actions {
   display: grid;
   flex: 0 0 auto;
+  align-content: center;
   justify-items: start;
   gap: 10px;
 }
 
 .cabinet-directory {
-  min-height: 22px;
-}
-
-.cabinet-directory small {
-  color: var(--muted);
-  font-size: 11px;
-  white-space: nowrap;
+  padding-block: 1px;
 }
 
 .cabinet-dots {
@@ -56,7 +51,7 @@
   }
 
   .cabinet-directory {
-    min-height: 26px;
+    padding-block: 2px;
   }
 
   .game-select-card .cabinet-dot {

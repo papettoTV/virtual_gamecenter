@@ -115,30 +115,28 @@ export function CabinetDirectory() {
     window.dispatchEvent(new PopStateEvent("popstate"));
   };
 
+  if (loading || cabinets.length === 0) return null;
+
   return (
     <div className="cabinet-directory" aria-label="プレイ中の筐体一覧">
-      {cabinets.length > 0 ? (
-        <div className="cabinet-dots">
-          {cabinets.map((cabinet, index) => {
-            const popular = cabinet.spectatorCount >= POPULAR_SPECTATOR_COUNT;
-            const label = popular
-              ? `筐体${index + 1}を観戦。盛り上がり中、観戦者${cabinet.spectatorCount}人`
-              : `筐体${index + 1}を観戦。観戦者${cabinet.spectatorCount}人`;
-            return (
-              <button
-                key={cabinet.cabinetId}
-                className={popular ? "cabinet-dot is-popular" : "cabinet-dot"}
-                type="button"
-                aria-label={label}
-                title={label}
-                onClick={() => openCabinet(cabinet.cabinetId)}
-              />
-            );
-          })}
-        </div>
-      ) : (
-        <small>{loading ? "確認中…" : "プレイ中なし"}</small>
-      )}
+      <div className="cabinet-dots">
+        {cabinets.map((cabinet, index) => {
+          const popular = cabinet.spectatorCount >= POPULAR_SPECTATOR_COUNT;
+          const label = popular
+            ? `筐体${index + 1}を観戦。盛り上がり中、観戦者${cabinet.spectatorCount}人`
+            : `筐体${index + 1}を観戦。観戦者${cabinet.spectatorCount}人`;
+          return (
+            <button
+              key={cabinet.cabinetId}
+              className={popular ? "cabinet-dot is-popular" : "cabinet-dot"}
+              type="button"
+              aria-label={label}
+              title={label}
+              onClick={() => openCabinet(cabinet.cabinetId)}
+            />
+          );
+        })}
+      </div>
     </div>
   );
 }
