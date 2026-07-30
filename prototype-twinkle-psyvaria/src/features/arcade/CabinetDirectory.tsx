@@ -227,7 +227,7 @@ export function CabinetSelector() {
         {!loading && playingCabinets.length === 0 && (
           <div className="cabinet-machine-empty">
             <CabinetMachineScreen mode="empty" />
-            <small>誰かのプレイが始まると、ここから観戦できます。</small>
+            <small>他のプレイヤーのプレイが始まると観戦ができます。</small>
           </div>
         )}
       </div>
