@@ -353,6 +353,10 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .cabinet-machine-card.is-solo {
+    grid-column: 1 / -1;
+  }
+
   .cabinet-machine-card {
     padding-inline: 8px;
   }

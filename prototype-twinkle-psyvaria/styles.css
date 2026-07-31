@@ -344,6 +344,88 @@ p {
   padding: 10px 14px;
 }
 
+.spectator-banner > div {
+  display: grid;
+  gap: 3px;
+}
+
+.spectator-banner button,
+.versus-status {
+  border: 1px solid rgba(105, 247, 255, 0.28);
+  border-radius: 10px;
+  background: rgba(105, 247, 255, 0.12);
+  color: var(--text);
+  font: inherit;
+  font-weight: 800;
+  padding: 9px 12px;
+}
+
+.spectator-banner button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.spectator-switch-button {
+  display: none;
+}
+
+.versus-status {
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.versus-overlay {
+  position: absolute;
+  z-index: 8;
+  left: 50%;
+  top: 50%;
+  width: min(500px, calc(100% - 40px));
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(255, 78, 138, 0.34);
+  border-radius: 18px;
+  background: rgba(8, 10, 24, 0.94);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.58);
+  padding: 22px;
+  text-align: center;
+  backdrop-filter: blur(10px);
+}
+
+.versus-overlay h2 {
+  margin: 4px 0 10px;
+  font-size: 30px;
+}
+
+.versus-countdown {
+  display: block;
+  color: var(--accent);
+  font-size: 72px;
+  line-height: 1;
+  margin: 16px 0;
+}
+
+.versus-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.versus-actions button {
+  min-width: 120px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  font: inherit;
+  font-weight: 800;
+  padding: 10px 14px;
+}
+
+#versus-danger {
+  border-color: rgba(255, 78, 138, 0.42);
+  background: rgba(255, 78, 138, 0.14);
+}
+
 .spectator-banner strong {
   flex: 0 0 auto;
   color: var(--accent);
@@ -1022,6 +1104,22 @@ canvas {
 }
 
 @media (max-width: 720px) {
+  .spectator-banner {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .spectator-banner > div {
+    flex: 1 1 100%;
+  }
+
+  .spectator-switch-button:not(.is-hidden) {
+    display: inline-flex;
+    flex: 1 1 auto;
+    align-items: center;
+    justify-content: center;
+  }
+
   .game-select-card,
   .arcade-heading,
   .game-nav,

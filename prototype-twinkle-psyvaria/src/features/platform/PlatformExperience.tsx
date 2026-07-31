@@ -43,6 +43,12 @@ export function PlatformExperience() {
   }, [loadPlatform]);
 
   useEffect(() => {
+    const refreshWallet = () => void loadPlatform();
+    window.addEventListener("platform-wallet-changed", refreshWallet);
+    return () => window.removeEventListener("platform-wallet-changed", refreshWallet);
+  }, [loadPlatform]);
+
+  useEffect(() => {
     if (notice !== "1クレジットを使用しました。") return;
     const closeTimer = window.setTimeout(() => setNotice(""), 5000);
     return () => window.clearTimeout(closeTimer);

@@ -31,16 +31,22 @@ export async function handleRankingRequest(request: Request, db: D1Database): Pr
 async function getRanking(url: URL, db: D1Database): Promise<Response> {
   const type = url.searchParams.get("type") === "score" ? "score" : "time";
   const limit = clamp(Number(url.searchParams.get("limit") || DEFAULT_LIMIT), 1, MAX_LIMIT);
+  const clientVersion = url.searchParams.get("version")?.slice(0, 40);
   const orderBy = type === "score" ? "score DESC, clear_time_ms ASC" : "clear_time_ms ASC, score DESC";
-  const rows = await db
-    .prepare(
-      `SELECT player_name, clear_time_ms, score, max_level, created_at
+  const query = clientVersion
+    ? `SELECT player_name, clear_time_ms, score, max_level, created_at
+       FROM rankings
+       WHERE client_version = ?
+       ORDER BY ${orderBy}
+       LIMIT ?`
+    : `SELECT player_name, clear_time_ms, score, max_level, created_at
        FROM rankings
        ORDER BY ${orderBy}
-       LIMIT ?`,
-    )
-    .bind(limit)
-    .all<RankingEntry>();
+       LIMIT ?`;
+  const statement = db.prepare(query);
+  const rows = clientVersion
+    ? await statement.bind(clientVersion, limit).all<RankingEntry>()
+    : await statement.bind(limit).all<RankingEntry>();
 
   return json({ type, rankings: rows.results ?? [] });
 }

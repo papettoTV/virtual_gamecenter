@@ -84,13 +84,6 @@ export function CabinetDirectory() {
         summary.textContent = "筐体を選択 / 1 Credit";
       }
 
-      const role = document.querySelector<HTMLElement>("#cabinet-role-label");
-      if (role?.textContent !== "あなたがプレイヤーです") return;
-
-      const description = document.querySelector<HTMLElement>("#cabinet-description");
-      if (description && description.textContent !== "1クレジットでプレイ開始") {
-        description.textContent = "1クレジットでプレイ開始";
-      }
     };
     normalizeCabinetLabels();
     const labelObserver = new MutationObserver(normalizeCabinetLabels);
@@ -184,7 +177,7 @@ export function CabinetSelector() {
     .slice(0, CABINET_PREVIEW_LIMIT);
 
   const startSolo = () => {
-    document.querySelector<HTMLButtonElement>("#start-solo")?.click();
+    window.dispatchEvent(new CustomEvent("create-solo-cabinet"));
   };
 
   return (
@@ -201,9 +194,7 @@ export function CabinetSelector() {
         <button className="cabinet-machine-card is-solo" type="button" onClick={startSolo}>
           <CabinetMachineScreen mode="ready" />
           <strong>ソロでプレイ</strong>
-          <small id="cabinet-description">
-            1クレジットでプレイ開始
-          </small>
+          <small>新しい筐体を作成してプレイ開始</small>
         </button>
 
         {playingCabinets.map((cabinet, index) => (

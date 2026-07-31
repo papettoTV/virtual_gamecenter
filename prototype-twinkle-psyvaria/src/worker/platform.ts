@@ -92,17 +92,22 @@ export async function handlePlatformRequest(
 
     const body = await readJson(request);
     const cabinetId = sanitizeId(body?.cabinetId, "cabinet");
+    const purpose = body?.purpose === "challenge" || body?.purpose === "rematch"
+      ? body.purpose
+      : "solo";
     const reservationId = crypto.randomUUID();
     const playSessionId = crypto.randomUUID();
-    const expiresAt = new Date(Date.now() + 2 * 60 * 1000).toISOString();
+    const expiresAt = new Date(
+      Date.now() + (purpose === "solo" ? 2 : purpose === "challenge" ? 120 : 15) * 60 * 1000,
+    ).toISOString();
 
     try {
       await database.batch([
         database.prepare(
           `INSERT INTO play_sessions
             (id, cabinet_id, game_id, mode, status, host_player_id)
-           VALUES (?, ?, 'graze-duel', 'solo', 'credit_reserved', ?)`,
-        ).bind(playSessionId, cabinetId, session.playerId),
+           VALUES (?, ?, 'graze-duel', ?, 'credit_reserved', ?)`,
+        ).bind(playSessionId, cabinetId, purpose === "solo" ? "solo" : "versus", session.playerId),
         database.prepare(
           `INSERT INTO credit_reservations
             (id, player_id, play_session_id, amount, balance_type, status, expires_at)

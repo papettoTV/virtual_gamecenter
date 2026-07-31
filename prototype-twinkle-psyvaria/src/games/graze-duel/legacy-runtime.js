@@ -1,8 +1,13 @@
 import { createCabinetClient } from "../../realtime/cabinet-client";
 import {
-  fetchTimeRanking,
+  fetchScoreRanking,
   submitRankingEntry,
 } from "../../features/ranking/ranking-client";
+import {
+  capturePlayCredit,
+  releasePlayCredit,
+  reservePlayCredit,
+} from "../../features/platform/platform-client";
 import {
   calculateAttackCost,
   calculateNextInvincibleTime,
@@ -49,9 +54,24 @@ const clearRestart = document.querySelector("#clear-restart");
 const rankingNameInput = document.querySelector("#ranking-name");
 const rankingSubmitButton = document.querySelector("#ranking-submit");
 const rankingSubmitPanel = document.querySelector("#ranking-submit-panel");
+const rankingSubmitHeading = document.querySelector("#ranking-submit-heading");
+const rankingSubmitList = document.querySelector("#ranking-submit-list");
 const rankingResult = document.querySelector("#ranking-result");
 const rankingList = document.querySelector("#ranking-list");
 const rankingRefresh = document.querySelector("#ranking-refresh");
+const challengeRequestButton = document.querySelector("#challenge-request");
+const spectatorStatusText = document.querySelector("#spectator-status-text");
+const spectatorViewLabel = document.querySelector("#spectator-view-label");
+const spectatorSwitchPlayer = document.querySelector("#spectator-switch-player");
+const versusStatus = document.querySelector("#versus-status");
+const versusOverlay = document.querySelector("#versus-overlay");
+const versusEyebrow = document.querySelector("#versus-eyebrow");
+const versusTitle = document.querySelector("#versus-title");
+const versusMessage = document.querySelector("#versus-message");
+const versusCountdown = document.querySelector("#versus-countdown");
+const versusPrimary = document.querySelector("#versus-primary");
+const versusSecondary = document.querySelector("#versus-secondary");
+const versusDanger = document.querySelector("#versus-danger");
 
 const WIDTH = canvas.width;
 const HEIGHT = canvas.height;
@@ -78,6 +98,11 @@ const BOSS_ATTACK_TELEGRAPH_TIME = 0;
 const BOSS_ATTACK_RECOVERY_TIME = 0.7;
 const BOSS_ARRIVAL_WAIT_TIME = 2.4;
 const BOSS_ARRIVAL_DURATION = 5;
+const BOSS_BULLET_SPEED_SCALE = 0.88;
+const BOSS_ATTACK_DENSITY_INTERVAL_SCALE = 1.12;
+const MAX_ACTIVE_BULLETS_PER_FIELD = 260;
+const BULLET_GLOW_REDUCE_THRESHOLD = 140;
+const BULLET_GLOW_DISABLE_THRESHOLD = 210;
 const BOSS_BONUS_ATTACK_PATTERN = { id: "bonusStream", duration: 4.8, shotInterval: 0.08 };
 const BOSS_ATTACK_PATTERNS = [
   { id: "fan", duration: 4.2, shotInterval: 0.48 },
@@ -93,6 +118,7 @@ const PLAYER_SPEED_SCALE = 0.75;
 const BULLET_SPEED_SCALE = 0.75;
 const ATTACK_BULLET_COUNT_SCALE = 0.35;
 const ATTACK_BULLET_CLEAR_BONUS = 0.15;
+const BASE_BULLET_DENSITY_SCALE = 0.88;
 const BASE_BULLET_CLEAR_BONUS = 0.25;
 const INVINCIBLE_WARNING_TIME = 0.5;
 const MAX_PARTICLES = 180;
@@ -109,12 +135,13 @@ const BOSS_DEFEAT_SLOW_TIME = 2.2;
 const BOSS_DEFEAT_SLOW_SCALE = 0.28;
 const START_BULLET_DELAY = 2.0;
 const HIT_MARKER_RADIUS = 3;
-const CLIENT_VERSION = "prototype-boss-rush-1";
+const CLEAR_TIME_BONUS_BASE = 600_000;
+const CLIENT_VERSION = "prototype-score-ranking-1";
 
 const BOSS_PHASES = [
-  { level: 1, spawnLevel: 10, name: "BOSS LV1", shape: "circle", hp: 3, radius: 44, color: "#18051f" },
-  { level: 2, spawnLevel: 20, name: "MID BOSS LV2", shape: "invertedTriangle", hp: 5, radius: 48, color: "#071722" },
-  { level: 3, spawnLevel: 30, name: "LAST BOSS LV3", shape: "star", hp: 7, radius: 52, color: "#1c0628" },
+  { level: 1, spawnLevel: 10, name: "BOSS LV1", shape: "circle", hp: 100, hitsToDefeat: 12, radius: 44, color: "#18051f" },
+  { level: 2, spawnLevel: 20, name: "MID BOSS LV2", shape: "invertedTriangle", hp: 120, hitsToDefeat: 20, radius: 48, color: "#071722" },
+  { level: 3, spawnLevel: 30, name: "LAST BOSS LV3", shape: "star", hp: 152, hitsToDefeat: 28, radius: 52, color: "#1c0628" },
 ];
 
 const keys = new Set();
@@ -155,6 +182,29 @@ let pendingSyncEvents = [];
 let cabinetConnected = false;
 let currentCabinetId = null;
 let cabinetShareUrl = "";
+let pendingCreatedSoloStart = false;
+let spectatorPlayerIndex = 0;
+let challengeQueueState = {
+  waitingCount: 0,
+  capacity: 5,
+  position: null,
+  status: "none",
+};
+let pendingChallenge = false;
+let challengeReservationId = null;
+let versusMatchId = null;
+let versusSeat = null;
+let versusPhase = "none";
+let versusUiMode = "none";
+let versusStartsAt = 0;
+let versusStartedAt = 0;
+let versusProgressTimer = 0;
+let versusProgressSequence = 0;
+let versusTerminalReported = false;
+let versusResult = null;
+let rematchDeadline = 0;
+let rematchTimer = null;
+let lastOpponentProgressSequence = 0;
 
 const boss = {
   active: false,
@@ -183,6 +233,23 @@ const boss = {
   bonusPending: false,
   bonusActive: false,
   bonusStreamX: LEFT_X + FIELD_WIDTH / 2,
+  shieldHitsTaken: 0,
+  movementTime: 0,
+};
+
+const opponentBoss = {
+  active: false,
+  phaseIndex: 0,
+  nextSpawnLevel: BOSS_PHASES[0].spawnLevel,
+  x: RIGHT_X + FIELD_WIDTH / 2,
+  y: FIELD_TOP + FIELD_HEIGHT * 0.38,
+  baseY: FIELD_TOP + FIELD_HEIGHT * 0.38,
+  radius: BOSS_RADIUS,
+  hp: 0,
+  maxHp: BOSS_PHASES[0].hp,
+  flash: 0,
+  encounterState: "idle",
+  arrivalProgress: 0,
 };
 
 const players = [
@@ -284,8 +351,10 @@ function resetGame() {
   rankingSubmittedForClear = false;
   debugRankingPreviewShown = false;
   rankingSubmitPanel?.classList.remove("is-visible");
+  rankingSubmitPanel?.classList.remove("is-submitted");
   updateRankingSubmitState();
   resetBossProgress();
+  resetOpponentBossProgress();
 }
 
 function resetBossProgress() {
@@ -308,7 +377,24 @@ function resetBossProgress() {
   boss.bonusPending = false;
   boss.bonusActive = false;
   boss.bonusStreamX = LEFT_X + FIELD_WIDTH / 2;
+  boss.shieldHitsTaken = 0;
+  boss.movementTime = 0;
   resetBossAttackState();
+}
+
+function resetOpponentBossProgress() {
+  opponentBoss.active = false;
+  opponentBoss.phaseIndex = 0;
+  opponentBoss.nextSpawnLevel = BOSS_PHASES[0].spawnLevel;
+  opponentBoss.x = RIGHT_X + FIELD_WIDTH / 2;
+  opponentBoss.baseY = FIELD_TOP + FIELD_HEIGHT * 0.38;
+  opponentBoss.y = opponentBoss.baseY;
+  opponentBoss.radius = BOSS_PHASES[0].radius;
+  opponentBoss.hp = 0;
+  opponentBoss.maxHp = BOSS_PHASES[0].hp;
+  opponentBoss.flash = 0;
+  opponentBoss.encounterState = "idle";
+  opponentBoss.arrivalProgress = 0;
 }
 
 function scheduleBossPhase(phaseIndex) {
@@ -331,6 +417,8 @@ function scheduleBossPhase(phaseIndex) {
   boss.bonusPending = false;
   boss.bonusActive = false;
   boss.bonusStreamX = boss.x;
+  boss.shieldHitsTaken = 0;
+  boss.movementTime = 0;
   resetBossAttackState();
   queueSyncEvent({ type: "bossState", boss: createBossSyncState() }, true);
 }
@@ -351,6 +439,7 @@ function completeBossEntrance() {
   boss.arrivalProgress = 1;
   boss.flash = 0.65;
   boss.shieldAttackCharges = 0;
+  boss.movementTime = 0;
   resetBossAttackState();
   queueSyncEvent({ type: "bossState", boss: createBossSyncState() }, true);
 }
@@ -377,6 +466,11 @@ if (selectGameButton) {
     enterCabinet(createCabinetId());
   });
 }
+
+window.addEventListener("create-solo-cabinet", () => {
+  pendingCreatedSoloStart = true;
+  enterCabinet(createCabinetId());
+});
 
 if (backToArcadeButton) {
   backToArcadeButton.addEventListener("click", () => {
@@ -408,6 +502,22 @@ if (startSoloButton) {
   });
 }
 
+if (challengeRequestButton) {
+  challengeRequestButton.addEventListener("click", () => {
+    openChallengeAction();
+  });
+}
+
+spectatorSwitchPlayer?.addEventListener("click", () => {
+  spectatorPlayerIndex = spectatorPlayerIndex === 0 ? 1 : 0;
+  updateSpectatorViewSwitch();
+});
+window.addEventListener("resize", updateSpectatorViewSwitch);
+
+versusPrimary?.addEventListener("click", () => handleVersusUiAction("primary"));
+versusSecondary?.addEventListener("click", () => handleVersusUiAction("secondary"));
+versusDanger?.addEventListener("click", () => handleVersusUiAction("danger"));
+
 if (copyCabinetUrlButton) {
   copyCabinetUrlButton.addEventListener("click", copyCabinetUrl);
 }
@@ -435,6 +545,7 @@ if (debugRankingPreviewToggle) {
       lastClearResult = null;
       rankingSubmittedForClear = false;
       rankingSubmitPanel?.classList.remove("is-visible");
+      rankingSubmitPanel?.classList.remove("is-submitted");
       updateRankingSubmitState();
     }
   });
@@ -446,7 +557,7 @@ if (gaugeGrowthDown && gaugeGrowthUp && gaugeGrowthValue && gaugeGrowthLabel) {
 }
 
 canvas.addEventListener("pointerdown", (event) => {
-  if (isCompactView() && cabinetRole !== "spectator") {
+  if (isCompactView() && (cabinetRole !== "spectator" || isVersusParticipant())) {
     event.preventDefault();
     canvas.setPointerCapture(event.pointerId);
     touchMove.active = true;
@@ -468,19 +579,19 @@ canvas.addEventListener("pointercancel", resetTouchMove);
 
 if (touchRestart) {
   touchRestart.addEventListener("click", () => {
-    if (cabinetRole !== "spectator") resetGame();
+    if (cabinetRole !== "spectator" && !isVersusParticipant()) resetGame();
   });
 }
 
 if (clearRestart) {
   clearRestart.addEventListener("click", () => {
-    if (cabinetRole !== "spectator") resetGame();
+    if (cabinetRole !== "spectator" && !isVersusParticipant()) resetGame();
   });
 }
 
 if (touchPause) {
   touchPause.addEventListener("click", () => {
-    if (cabinetRole === "spectator") return;
+    if (cabinetRole === "spectator" && !isVersusParticipant()) return;
     togglePauseState();
   });
 }
@@ -505,6 +616,201 @@ function updateGaugeGrowth(delta) {
   gaugeGrowthPerLevel = clamp(gaugeGrowthPerLevel + delta, 0, 200);
   gaugeGrowthValue.textContent = String(gaugeGrowthPerLevel);
   gaugeGrowthLabel.textContent = String(gaugeGrowthPerLevel);
+}
+
+async function requestVersusChallenge() {
+  if (!currentCabinetId || cabinetRole !== "spectator" || challengeReservationId) return;
+  if (challengeRequestButton) {
+    challengeRequestButton.disabled = true;
+    challengeRequestButton.textContent = "クレジット予約中…";
+  }
+  try {
+    const reservation = await reservePlayCredit(currentCabinetId, "challenge");
+    challengeReservationId = reservation.reservationId;
+    window.dispatchEvent(new Event("platform-wallet-changed"));
+    cabinetClient.send({
+      type: "requestChallenge",
+      reservationId: reservation.reservationId,
+    });
+    if (spectatorStatusText) spectatorStatusText.textContent = "対戦申し込みを送信しています。";
+    updateChallengeButton();
+  } catch {
+    if (spectatorStatusText) spectatorStatusText.textContent = "クレジットを予約できませんでした。";
+    challengeReservationId = null;
+    updateChallengeButton();
+  }
+}
+
+function openChallengeAction() {
+  if (challengeQueueState.status === "pending" || challengeQueueState.status === "queued") {
+    const queueLabel = challengeQueueState.status === "queued"
+      ? `現在、あと${challengeQueueState.position}番目です。`
+      : "現在、対戦承認待ちです。";
+    showVersusOverlay(
+      "対戦申し込みをキャンセルしますか？",
+      `${queueLabel} 仮消費したクレジットは返却されます。`,
+      "challengeCancelConfirm",
+    );
+    return;
+  }
+  if (challengeQueueState.status !== "none") return;
+  showVersusOverlay(
+    "対戦を申し込みますか？",
+    `現在の対戦申し込み待ちは${challengeQueueState.waitingCount}人です。申し込み時に1クレジットを仮消費します。`,
+    "challengeJoinConfirm",
+  );
+}
+
+async function releaseVersusReservation(reservationId) {
+  if (!reservationId) return;
+  try {
+    await releasePlayCredit(reservationId);
+    window.dispatchEvent(new Event("platform-wallet-changed"));
+  } catch {
+    if (spectatorStatusText) spectatorStatusText.textContent = "クレジット状態を再読み込みしてください。";
+  }
+  if (challengeReservationId === reservationId) challengeReservationId = null;
+}
+
+async function captureVersusReservation(reservationId) {
+  if (!reservationId) return;
+  try {
+    await capturePlayCredit(reservationId);
+    window.dispatchEvent(new Event("platform-wallet-changed"));
+  } catch {
+    showVersusOverlay("Credit Error", "クレジットを確定できませんでした。再読み込みしてください。", "notice");
+  }
+  if (challengeReservationId === reservationId) challengeReservationId = null;
+}
+
+function handleVersusUiAction(action) {
+  if (versusUiMode === "notice" && action === "secondary") {
+    hideVersusOverlay();
+    return;
+  }
+  if (versusUiMode === "challengeApproval") {
+    cabinetClient.send({ type: "respondChallenge", accept: action === "primary" });
+    hideVersusOverlay();
+    if (action !== "primary") pendingChallenge = false;
+    return;
+  }
+  if (versusUiMode === "challengeJoinConfirm") {
+    if (action === "primary") void requestVersusChallenge();
+    hideVersusOverlay();
+    return;
+  }
+  if (versusUiMode === "challengeCancelConfirm") {
+    if (action === "danger") {
+      cabinetClient.send({ type: "cancelChallenge" });
+      showVersusOverlay("キャンセル中", "対戦申し込みを取り消しています。", "waiting");
+    } else if (action === "secondary") {
+      hideVersusOverlay();
+    }
+    return;
+  }
+  if (versusUiMode === "ready" && action === "primary" && versusMatchId) {
+    cabinetClient.send({ type: "versusReady", matchId: versusMatchId });
+    showVersusOverlay("Ready", "相手のOKを待っています。", "waiting");
+    return;
+  }
+  if (versusUiMode === "resultLoser") {
+    if (action === "primary") void requestVersusRematch();
+    else if (action === "secondary" && versusMatchId) {
+      cabinetClient.send({ type: "declineRematch", matchId: versusMatchId });
+    }
+    return;
+  }
+  if (versusUiMode === "rematchWinner") {
+    if (action === "primary" && versusMatchId) {
+      cabinetClient.send({ type: "respondRematch", matchId: versusMatchId, accept: true });
+    } else if (action === "secondary") {
+      showVersusOverlay("Confirm", "本当に再挑戦を拒否しますか？", "rematchRejectConfirm");
+    }
+    return;
+  }
+  if (versusUiMode === "rematchRejectConfirm") {
+    if (action === "danger" && versusMatchId) {
+      cabinetClient.send({ type: "respondRematch", matchId: versusMatchId, accept: false });
+    } else if (action === "secondary") {
+      showVersusOverlay("Rematch", "相手が再挑戦を希望しています。", "rematchWinner");
+    }
+  }
+}
+
+async function requestVersusRematch() {
+  if (!currentCabinetId || !versusMatchId || challengeReservationId) return;
+  try {
+    const reservation = await reservePlayCredit(currentCabinetId, "rematch");
+    challengeReservationId = reservation.reservationId;
+    window.dispatchEvent(new Event("platform-wallet-changed"));
+    cabinetClient.send({
+      type: "requestRematch",
+      matchId: versusMatchId,
+      reservationId: reservation.reservationId,
+    });
+    showVersusOverlay("Rematch", "再挑戦の承認を待っています。", "waiting");
+  } catch {
+    showVersusOverlay("Credit Error", "再挑戦用クレジットを予約できませんでした。", "resultLoser");
+  }
+}
+
+function showVersusOverlay(title, message, mode) {
+  versusUiMode = mode;
+  versusOverlay?.classList.remove("is-hidden");
+  if (versusEyebrow) versusEyebrow.textContent = mode === "resultLoser" || mode === "resultWinner" ? "Result" : "Versus";
+  if (versusTitle) versusTitle.textContent = title;
+  if (versusMessage) versusMessage.textContent = message;
+  versusCountdown?.classList.add("is-hidden");
+  versusPrimary?.classList.toggle(
+    "is-hidden",
+    !["challengeApproval", "challengeJoinConfirm", "ready", "resultLoser", "rematchWinner"].includes(mode),
+  );
+  versusSecondary?.classList.toggle(
+    "is-hidden",
+    ![
+      "challengeApproval",
+      "challengeJoinConfirm",
+      "challengeCancelConfirm",
+      "resultLoser",
+      "rematchWinner",
+      "rematchRejectConfirm",
+      "notice",
+    ].includes(mode),
+  );
+  versusDanger?.classList.toggle(
+    "is-hidden",
+    !["challengeCancelConfirm", "rematchRejectConfirm"].includes(mode),
+  );
+  if (versusPrimary) {
+    const labels = {
+      challengeApproval: "はい",
+      challengeJoinConfirm: "申し込む",
+      ready: "OK",
+      resultLoser: "1クレジットで再挑戦",
+      rematchWinner: "承諾する",
+    };
+    versusPrimary.textContent = labels[mode] ?? "OK";
+  }
+  if (versusSecondary) {
+    const labels = {
+      challengeApproval: "いいえ",
+      challengeJoinConfirm: "やめる",
+      challengeCancelConfirm: "戻る",
+      resultLoser: "再挑戦しない",
+      rematchWinner: "拒否する",
+      rematchRejectConfirm: "戻る",
+      notice: "閉じる",
+    };
+    versusSecondary.textContent = labels[mode] ?? "閉じる";
+  }
+  if (versusDanger) {
+    versusDanger.textContent = mode === "challengeCancelConfirm" ? "申し込みを取り消す" : "拒否する";
+  }
+}
+
+function hideVersusOverlay() {
+  versusUiMode = "none";
+  versusOverlay?.classList.add("is-hidden");
 }
 
 function showScreen(screen) {
@@ -572,6 +878,7 @@ function startSoloPlay() {
 
 function startSpectating() {
   resetGame();
+  spectatorPlayerIndex = 0;
   gameSessionActive = true;
   document.body.classList.remove("is-cabinet-spectator");
   document.body.classList.add("is-spectator");
@@ -582,14 +889,27 @@ function startSpectating() {
   if (latestViewerMotion) applyViewerMotion(latestViewerMotion, previousViewerMotion);
   lastTime = performance.now();
   showScreen("game");
+  updateSpectatorViewSwitch();
 }
 
 function returnToCabinet() {
+  if (isVersusParticipant()) {
+    showVersusOverlay("対戦中", "対戦終了後に筐体画面へ戻れます。", "notice");
+    return;
+  }
+  if (pendingChallenge && cabinetRole === "player") {
+    showVersusOverlay("対戦申込あり", "対戦申込に回答してから筐体画面へ戻ってください。", "notice");
+    return;
+  }
+  if (challengeReservationId && cabinetRole === "spectator") {
+    cabinetClient.send({ type: "cancelChallenge" });
+  }
   gameSessionActive = false;
   paused = false;
   waitingForStart = false;
   resetTouchMove();
   rankingSubmitPanel?.classList.remove("is-visible");
+  rankingSubmitPanel?.classList.remove("is-submitted");
   if (cabinetRole === "player") cabinetClient.send({ type: "stopSolo" });
   document.body.classList.remove("is-spectator");
   document.body.classList.remove("is-cabinet-spectator");
@@ -677,6 +997,148 @@ function handleCabinetMessage(message) {
   if (message.type === "joinedCabinet") {
     cabinetRole = message.role;
     updateCabinetUi();
+    if (pendingCreatedSoloStart && message.role === "player") {
+      pendingCreatedSoloStart = false;
+      window.setTimeout(() => startSoloButton?.click(), 0);
+    }
+    return;
+  }
+
+  if (message.type === "challengePending") {
+    challengeReservationId = message.reservationId;
+    challengeQueueState = {
+      ...challengeQueueState,
+      position: null,
+      status: "pending",
+    };
+    if (spectatorStatusText) spectatorStatusText.textContent = "対戦承認待ちです。観戦を続けられます。";
+    hideVersusOverlay();
+    updateChallengeButton();
+    return;
+  }
+
+  if (message.type === "challengeQueued") {
+    challengeReservationId = message.reservationId;
+    challengeQueueState = {
+      ...challengeQueueState,
+      waitingCount: message.waitingCount,
+      position: message.position,
+      status: "queued",
+    };
+    if (spectatorStatusText) {
+      spectatorStatusText.textContent = `あと${message.position}番目で対戦スタートです。`;
+    }
+    hideVersusOverlay();
+    updateChallengeButton();
+    return;
+  }
+
+  if (message.type === "challengeQueueStatus") {
+    challengeQueueState = message;
+    updateChallengeButton();
+    return;
+  }
+
+  if (message.type === "challengeReceived") {
+    pendingChallenge = true;
+    versusStatus?.classList.remove("is-hidden");
+    showChallengeApprovalIfStopped();
+    return;
+  }
+
+  if (message.type === "challengeRejected") {
+    void releaseVersusReservation(message.reservationId);
+    pendingChallenge = false;
+    challengeQueueState = {
+      ...challengeQueueState,
+      position: null,
+      status: "none",
+    };
+    versusStatus?.classList.add("is-hidden");
+    if (spectatorStatusText) spectatorStatusText.textContent = `${message.reason} 観戦を続けられます。`;
+    updateChallengeButton();
+    hideVersusOverlay();
+    return;
+  }
+
+  if (message.type === "challengeAccepted") {
+    versusMatchId = message.matchId;
+    versusSeat = message.seat;
+    versusPhase = "accepted";
+    pendingChallenge = false;
+    challengeQueueState = {
+      ...challengeQueueState,
+      position: null,
+      status: "matched",
+    };
+    versusStatus?.classList.add("is-hidden");
+    if (message.reservationId) void captureVersusReservation(message.reservationId);
+    showVersusOverlay("対戦承諾", "2秒後にReady確認へ進みます。", "waiting");
+    window.setTimeout(() => prepareVersusReady(message.matchId), 2000);
+    return;
+  }
+
+  if (message.type === "versusReadyState" && message.matchId === versusMatchId) {
+    const ownReady = versusSeat === "host" ? message.hostReady : message.challengerReady;
+    const opponentReady = versusSeat === "host" ? message.challengerReady : message.hostReady;
+    if (ownReady && !opponentReady) showVersusOverlay("Ready", "相手のOKを待っています。", "waiting");
+    return;
+  }
+
+  if (message.type === "versusCountdown" && message.matchId === versusMatchId) {
+    beginVersusCountdown(message.startsAt);
+    return;
+  }
+
+  if (message.type === "versusOpponentProgress" && message.matchId === versusMatchId) {
+    if (message.seq <= lastOpponentProgressSequence) return;
+    lastOpponentProgressSequence = message.seq;
+    applyVersusOpponentProgress(message.progress);
+    return;
+  }
+
+  if (message.type === "versusAttack" && message.matchId === versusMatchId) {
+    applyVersusAttack(message.level, message.bossAttack);
+    return;
+  }
+
+  if (message.type === "versusClearWaiting" && message.matchId === versusMatchId) {
+    if (versusTerminalReported) {
+      versusPhase = "clearWaiting";
+      showVersusOverlay("CLEAR", "相手のゲーム終了を待っています。", "waiting");
+    } else {
+      versusStatus?.classList.remove("is-hidden");
+      if (versusStatus) versusStatus.textContent = "相手はクリア済みです。ゲーム終了まで対戦を続けます。";
+    }
+    return;
+  }
+
+  if (message.type === "versusResult" && message.matchId === versusMatchId) {
+    versusStatus?.classList.add("is-hidden");
+    showVersusResult(message);
+    return;
+  }
+
+  if (message.type === "rematchRequested" && message.matchId === versusMatchId) {
+    rematchDeadline = message.deadline;
+    showVersusOverlay("Rematch", "相手が再挑戦を希望しています。", "rematchWinner");
+    return;
+  }
+
+  if (message.type === "rematchRejected" && message.matchId === versusMatchId) {
+    void releaseVersusReservation(message.reservationId);
+    showVersusOverlay("Rejected", "再挑戦を拒否されました。", "waiting");
+    return;
+  }
+
+  if (message.type === "roleChanged") {
+    cabinetRole = message.role;
+    updateCabinetUi();
+    return;
+  }
+
+  if (message.type === "versusEnded" && message.matchId === versusMatchId) {
+    finishVersusLocally(message.nextRole, message.reason);
     return;
   }
 
@@ -685,7 +1147,7 @@ function handleCabinetMessage(message) {
     lastViewerSequence = message.seq;
     latestViewerKeyframe = message.snapshot;
     pendingViewerEvents = [];
-    if (cabinetRole === "spectator" && currentScreen === "game") {
+    if (cabinetRole === "spectator" && !isVersusParticipant() && currentScreen === "game") {
       applyViewerSnapshot(message.snapshot);
     }
     return;
@@ -694,9 +1156,9 @@ function handleCabinetMessage(message) {
   if (message.type === "viewerEvents") {
     if (message.seq <= lastViewerSequence) return;
     lastViewerSequence = message.seq;
-    if (cabinetRole === "spectator" && currentScreen === "game") {
+    if (cabinetRole === "spectator" && !isVersusParticipant() && currentScreen === "game") {
       for (const event of message.events) applyViewerEvent(event);
-    } else {
+    } else if (!isVersusParticipant()) {
       pendingViewerEvents.push(...message.events);
     }
     return;
@@ -707,7 +1169,7 @@ function handleCabinetMessage(message) {
     lastViewerSequence = message.seq;
     previousViewerMotion = latestViewerMotion;
     latestViewerMotion = message.frame;
-    if (cabinetRole === "spectator" && currentScreen === "game") {
+    if (cabinetRole === "spectator" && !isVersusParticipant() && currentScreen === "game") {
       applyViewerMotion(message.frame, previousViewerMotion);
     }
     return;
@@ -724,16 +1186,154 @@ function handleCabinetMessage(message) {
   if (message.type === "error" && cabinetRoleLabel) cabinetRoleLabel.textContent = message.message;
 }
 
+function showChallengeApprovalIfStopped() {
+  if (!pendingChallenge || cabinetRole !== "player") return;
+  if (paused || gameOver || clearGame) {
+    showVersusOverlay("対戦を受けますか？", "対戦を開始すると現在のソロプレイは終了します。", "challengeApproval");
+  }
+}
+
+function prepareVersusReady(matchId) {
+  if (versusMatchId !== matchId) return;
+  resetGame();
+  gameSessionActive = true;
+  versusPhase = "ready";
+  players[0].label = "YOU";
+  players[1].label = "RIVAL";
+  players[1].cpu = false;
+  document.body.classList.remove("is-spectator");
+  spectatorBanner?.classList.add("is-hidden");
+  showScreen("game");
+  showVersusOverlay("Ready?", "OKを押すと相手の準備完了を待ちます。", "ready");
+}
+
+function beginVersusCountdown(startsAt) {
+  versusPhase = "countdown";
+  versusStartsAt = startsAt;
+  showVersusOverlay("Battle Start", "", "countdown");
+  versusCountdown?.classList.remove("is-hidden");
+  const updateCountdown = () => {
+    if (versusPhase !== "countdown") return;
+    const remaining = Math.max(0, versusStartsAt - Date.now());
+    const count = Math.ceil(remaining / 1000);
+    if (versusCountdown) versusCountdown.textContent = count > 0 ? String(count) : "0";
+    if (remaining <= 0) {
+      startVersusGameplay();
+      return;
+    }
+    window.setTimeout(updateCountdown, 50);
+  };
+  updateCountdown();
+}
+
+function startVersusGameplay() {
+  resetGame();
+  players[0].label = "YOU";
+  players[1].label = "RIVAL";
+  players[1].cpu = false;
+  paused = false;
+  waitingForStart = false;
+  gameOver = false;
+  clearGame = false;
+  versusPhase = "playing";
+  versusStartedAt = performance.now();
+  versusProgressTimer = 0;
+  versusProgressSequence = 0;
+  versusTerminalReported = false;
+  lastOpponentProgressSequence = 0;
+  hideVersusOverlay();
+}
+
+function showVersusResult(message) {
+  versusPhase = "result";
+  versusResult = message;
+  paused = true;
+  gameOver = true;
+  const won = message.winner === versusSeat;
+  const draw = message.winner === "draw";
+  const title = draw ? "DRAW" : won ? "WINNER" : "LOSER";
+  const description = `${message.reason} ${formatVersusResultScores(message)}`;
+  if (draw) {
+    showVersusOverlay(title, description, "resultWinner");
+    if (versusSeat === "host" && versusMatchId) {
+      window.setTimeout(() => {
+        if (versusPhase === "result" && versusMatchId) {
+          cabinetClient.send({ type: "declineRematch", matchId: versusMatchId });
+        }
+      }, 3000);
+    }
+  } else if (won) {
+    showVersusOverlay(title, description, "resultWinner");
+  } else {
+    rematchDeadline = Date.now() + 10000;
+    showVersusOverlay(title, `${description} 10秒以内に再挑戦できます。`, "resultLoser");
+    startRematchTimer();
+  }
+}
+
+function formatVersusResultScores(message) {
+  const own = versusSeat === "host" ? message.host : message.challenger;
+  const opponent = versusSeat === "host" ? message.challenger : message.host;
+  return `SCORE ${own?.score ?? 0} - ${opponent?.score ?? 0}`;
+}
+
+function startRematchTimer() {
+  if (rematchTimer) window.clearInterval(rematchTimer);
+  rematchTimer = window.setInterval(() => {
+    if (versusPhase !== "result" || !versusMatchId) {
+      window.clearInterval(rematchTimer);
+      rematchTimer = null;
+      return;
+    }
+    const seconds = Math.max(0, Math.ceil((rematchDeadline - Date.now()) / 1000));
+    if (versusMessage) {
+      const base = versusMessage.textContent?.replace(/\s残り\d+秒$/, "") ?? "";
+      versusMessage.textContent = `${base} 残り${seconds}秒`;
+    }
+    if (seconds <= 0) {
+      window.clearInterval(rematchTimer);
+      rematchTimer = null;
+      cabinetClient.send({ type: "declineRematch", matchId: versusMatchId });
+    }
+  }, 250);
+}
+
+function finishVersusLocally(nextRole, reason) {
+  if (rematchTimer) window.clearInterval(rematchTimer);
+  rematchTimer = null;
+  versusPhase = "none";
+  versusMatchId = null;
+  versusSeat = null;
+  versusResult = null;
+  versusTerminalReported = false;
+  players[1].cpu = true;
+  hideVersusOverlay();
+  cabinetRole = nextRole;
+  if (nextRole === "player") {
+    startSoloPlay();
+  } else {
+    document.body.classList.add("is-spectator");
+    spectatorBanner?.classList.remove("is-hidden");
+    if (spectatorStatusText) spectatorStatusText.textContent = `${reason} 観戦モードに戻りました。`;
+    startSpectating();
+  }
+}
+
 function updateCabinetUi() {
   const statusLabels = {
     empty: "空き",
     occupied: "開始待ち",
     soloPlaying: "ソロプレイ中",
+    challengePending: "対戦承認待ち",
+    versusReady: "対戦準備中",
+    versusPlaying: "対戦中",
+    result: "対戦結果",
   };
   const statusLabel = statusLabels[cabinetState?.status] ?? "接続中";
-
   document.body.classList.toggle("is-cabinet-spectator", cabinetRole === "spectator");
   if (cabinetStatusLabel) cabinetStatusLabel.textContent = statusLabel;
+  updateChallengeButton();
+  updateSpectatorViewSwitch();
   if (!startSoloButton) return;
 
   if (!cabinetConnected) {
@@ -747,8 +1347,9 @@ function updateCabinetUi() {
   }
 
   if (cabinetRole === "player") {
-    startSoloButton.disabled = false;
-    startSoloButton.textContent = "ゲームスタート";
+    const canStart = cabinetState?.status === "occupied" || cabinetState?.status === "soloPlaying";
+    startSoloButton.disabled = !canStart;
+    startSoloButton.textContent = canStart ? "ゲームスタート" : statusLabel;
     if (cabinetDescription) {
       cabinetDescription.textContent = "この筐体に着席しています。フリープレイでソロプレイを開始できます。";
     }
@@ -757,7 +1358,7 @@ function updateCabinetUi() {
   }
 
   if (cabinetRole === "spectator") {
-    const canWatch = cabinetState?.status === "soloPlaying";
+    const canWatch = ["soloPlaying", "challengePending", "versusPlaying"].includes(cabinetState?.status);
     startSoloButton.disabled = !canWatch;
     startSoloButton.textContent = canWatch ? "観戦する" : "プレイ開始を待っています";
     if (cabinetDescription) {
@@ -770,6 +1371,69 @@ function updateCabinetUi() {
   startSoloButton.disabled = true;
   startSoloButton.textContent = "筐体に接続中";
   if (cabinetRoleLabel) cabinetRoleLabel.textContent = "接続中";
+}
+
+function updateChallengeButton() {
+  if (!challengeRequestButton) return;
+  const challengeOpen = [
+    "soloPlaying",
+    "challengePending",
+    "versusReady",
+    "versusPlaying",
+    "result",
+  ].includes(cabinetState?.status);
+  const visible =
+    cabinetRole === "spectator"
+    && !isVersusParticipant()
+    && challengeOpen;
+  challengeRequestButton.classList.toggle("is-hidden", !visible);
+  if (!visible) return;
+
+  if (challengeQueueState.status === "pending") {
+    challengeRequestButton.disabled = false;
+    challengeRequestButton.textContent = "対戦承認待ち・キャンセル";
+    return;
+  }
+  if (challengeQueueState.status === "queued") {
+    challengeRequestButton.disabled = false;
+    challengeRequestButton.textContent = `あと${challengeQueueState.position}番目・キャンセル`;
+    if (spectatorStatusText) {
+      spectatorStatusText.textContent = `あと${challengeQueueState.position}番目で対戦スタートです。`;
+    }
+    return;
+  }
+
+  const full = challengeQueueState.waitingCount >= challengeQueueState.capacity;
+  challengeRequestButton.disabled = full || Boolean(challengeReservationId);
+  challengeRequestButton.textContent = full
+    ? `対戦申し込み待ち満員（${challengeQueueState.capacity}人）`
+    : challengeReservationId
+      ? "クレジット予約中…"
+      : "1クレジットで対戦申込";
+}
+
+function isVersusSpectator() {
+  return (
+    cabinetRole === "spectator"
+    && !isVersusParticipant()
+    && ["versusPlaying", "result"].includes(cabinetState?.status)
+  );
+}
+
+function updateSpectatorViewSwitch() {
+  const canSwitch = isVersusSpectator() && isCompactView();
+  if (!canSwitch) spectatorPlayerIndex = 0;
+  spectatorSwitchPlayer?.classList.toggle("is-hidden", !canSwitch);
+  if (spectatorSwitchPlayer) {
+    spectatorSwitchPlayer.textContent =
+      spectatorPlayerIndex === 0 ? "プレイヤーBを見る" : "プレイヤーAを見る";
+    spectatorSwitchPlayer.setAttribute("aria-pressed", spectatorPlayerIndex === 1 ? "true" : "false");
+  }
+  if (spectatorViewLabel) {
+    spectatorViewLabel.textContent = canSwitch
+      ? `観戦中: プレイヤー${spectatorPlayerIndex === 0 ? "A" : "B"}`
+      : "観戦中";
+  }
 }
 
 function resetHostSyncState() {
@@ -863,6 +1527,9 @@ function createViewerSnapshot() {
     waitingForStart,
     defeatedBossCount,
     players: players.map((player) => ({
+      label: player.label,
+      color: player.color,
+      cpu: player.cpu,
       x: player.x,
       y: player.y,
       lives: player.lives,
@@ -890,6 +1557,7 @@ function createViewerSnapshot() {
         age: bullet.age,
         shape: bullet.shape,
         rotation: bullet.rotation,
+        enteredField: bullet.enteredField,
       })),
     })),
     boss: {
@@ -918,7 +1586,10 @@ function createViewerSnapshot() {
       bonusPending: boss.bonusPending,
       bonusActive: boss.bonusActive,
       bonusStreamX: boss.bonusStreamX,
+      shieldHitsTaken: boss.shieldHitsTaken,
+      movementTime: boss.movementTime,
     },
+    opponentBoss: createOpponentBossSyncState(),
   };
 }
 
@@ -933,6 +1604,9 @@ function createViewerMotionFrame() {
     defeatedBossCount,
     slowMotionTimer,
     players: players.map(({ bullets: _bullets, grazeIds: _grazeIds, ...player }) => ({
+      label: player.label,
+      color: player.color,
+      cpu: player.cpu,
       x: player.x,
       y: player.y,
       lives: player.lives,
@@ -950,6 +1624,7 @@ function createViewerMotionFrame() {
       tilt: player.tilt,
     })),
     boss: createBossSyncState(),
+    opponentBoss: createOpponentBossSyncState(),
   };
 }
 
@@ -980,6 +1655,25 @@ function createBossSyncState() {
     bonusPending: boss.bonusPending,
     bonusActive: boss.bonusActive,
     bonusStreamX: boss.bonusStreamX,
+    shieldHitsTaken: boss.shieldHitsTaken,
+    movementTime: boss.movementTime,
+  };
+}
+
+function createOpponentBossSyncState() {
+  return {
+    active: opponentBoss.active,
+    phaseIndex: opponentBoss.phaseIndex,
+    nextSpawnLevel: opponentBoss.nextSpawnLevel,
+    x: opponentBoss.x,
+    y: opponentBoss.y,
+    baseY: opponentBoss.baseY,
+    radius: opponentBoss.radius,
+    hp: opponentBoss.hp,
+    maxHp: opponentBoss.maxHp,
+    flash: opponentBoss.flash,
+    encounterState: opponentBoss.encounterState,
+    arrivalProgress: opponentBoss.arrivalProgress,
   };
 }
 
@@ -1015,6 +1709,7 @@ function applyViewerSnapshot(snapshot) {
   boss.spectatorTargetY = bossY;
   boss.spectatorVx = boss.spectatorVx ?? 0;
   boss.spectatorVy = boss.spectatorVy ?? 0;
+  applyViewerOpponentBoss(snapshot.opponentBoss);
 }
 
 function applyViewerMotion(frame, previousFrame = null) {
@@ -1044,6 +1739,24 @@ function applyViewerMotion(frame, previousFrame = null) {
   boss.spectatorTargetY = bossY;
   boss.spectatorVx = previousBoss ? (bossX - previousBoss.x) / frameDelta : 0;
   boss.spectatorVy = previousBoss ? (bossY - previousBoss.y) / frameDelta : 0;
+  applyViewerOpponentBoss(frame.opponentBoss, previousFrame?.opponentBoss, frameDelta);
+}
+
+function applyViewerOpponentBoss(snapshotBoss, previousBoss = null, frameDelta = 1) {
+  if (!snapshotBoss) {
+    resetOpponentBossProgress();
+    return;
+  }
+  const { x, y, ...bossState } = snapshotBoss;
+  Object.assign(opponentBoss, bossState);
+  opponentBoss.spectatorTargetX = x;
+  opponentBoss.spectatorTargetY = y;
+  opponentBoss.spectatorVx = previousBoss ? (x - previousBoss.x) / frameDelta : 0;
+  opponentBoss.spectatorVy = previousBoss ? (y - previousBoss.y) / frameDelta : 0;
+  if (!latestViewerMotion) {
+    opponentBoss.x = x;
+    opponentBoss.y = y;
+  }
 }
 
 function applyViewerEvent(event) {
@@ -1126,23 +1839,35 @@ function updateSpectatorView(delta) {
       bullet.x += (bullet.spectatorTargetX - bullet.x) * bulletCorrectionRatio;
       bullet.y += (bullet.spectatorTargetY - bullet.y) * bulletCorrectionRatio;
       bullet.age += delta;
-      if (bullet.x < player.fieldX + 20 || bullet.x > player.fieldX + FIELD_WIDTH - 20) {
+      if (isPointInsidePlayerField(player, bullet.x, bullet.y)) {
+        bullet.enteredField = true;
+      }
+      if (
+        bullet.type !== "bossAttack" &&
+        (bullet.x < player.fieldX + 20 || bullet.x > player.fieldX + FIELD_WIDTH - 20)
+      ) {
         bullet.vx *= -1;
         bullet.spectatorTargetX = bullet.x;
       }
     }
-    player.bullets = player.bullets.filter((bullet) => bullet.y < FIELD_BOTTOM + 48);
+    player.bullets = player.bullets.filter((bullet) => shouldKeepBullet(player, bullet));
   }
 
   boss.spectatorTargetX = (boss.spectatorTargetX ?? boss.x) + (boss.spectatorVx ?? 0) * delta;
   boss.spectatorTargetY = (boss.spectatorTargetY ?? boss.y) + (boss.spectatorVy ?? 0) * delta;
   boss.x += (boss.spectatorTargetX - boss.x) * correctionRatio;
   boss.y += (boss.spectatorTargetY - boss.y) * correctionRatio;
+  opponentBoss.spectatorTargetX =
+    (opponentBoss.spectatorTargetX ?? opponentBoss.x) + (opponentBoss.spectatorVx ?? 0) * delta;
+  opponentBoss.spectatorTargetY =
+    (opponentBoss.spectatorTargetY ?? opponentBoss.y) + (opponentBoss.spectatorVy ?? 0) * delta;
+  opponentBoss.x += (opponentBoss.spectatorTargetX - opponentBoss.x) * correctionRatio;
+  opponentBoss.y += (opponentBoss.spectatorTargetY - opponentBoss.y) * correctionRatio;
   updateParticles(getGameDelta(delta));
 }
 
 window.addEventListener("keydown", (event) => {
-  if (cabinetRole === "spectator") return;
+  if (cabinetRole === "spectator" && !isVersusParticipant()) return;
   if (event.code === "Space") {
     event.preventDefault();
     if (currentScreen === "game" && !gameOver) {
@@ -1151,7 +1876,7 @@ window.addEventListener("keydown", (event) => {
     return;
   }
   keys.add(event.code);
-  if (event.code === "KeyR" && currentScreen === "game") startSoloPlay();
+  if (event.code === "KeyR" && currentScreen === "game" && !isVersusParticipant()) startSoloPlay();
 });
 
 window.addEventListener("keyup", (event) => {
@@ -1171,8 +1896,12 @@ loadRanking();
 
 function update(delta) {
   if (currentScreen !== "game" || !gameSessionActive) return;
-  if (cabinetRole === "spectator") {
+  if (cabinetRole === "spectator" && !isVersusParticipant()) {
     updateSpectatorView(delta);
+    return;
+  }
+  if (versusPhase === "playing" || versusPhase === "clearWaiting") {
+    updateVersusGame(delta);
     return;
   }
   if (paused) return;
@@ -1202,10 +1931,158 @@ function update(delta) {
   slowMotionTimer = Math.max(0, slowMotionTimer - delta);
   bossHitStopTimer = Math.max(0, bossHitStopTimer - delta);
   updateViewerSync(delta);
+  if (gameOver) showChallengeApprovalIfStopped();
+}
+
+function updateVersusGame(delta) {
+  if (versusPhase === "clearWaiting" || paused || gameOver) {
+    updateVersusProgressSync(delta);
+    updateViewerSync(delta);
+    return;
+  }
+
+  elapsedRound += delta;
+  const gameDelta = getGameDelta(delta);
+  const livesBeforeUpdate = players[0].lives;
+  updateHuman(players[0], gameDelta);
+  updatePlayerState(players[0], gameDelta);
+  if (!isBossEncounterInProgress()) spawnBaseBullets(players[0], gameDelta);
+  updateBullets(players[0], gameDelta);
+  updateGrazeAndHits(players[0]);
+  tryAutoAttack(players[0], players[1]);
+  updateBoss(gameDelta);
+  updateParticles(gameDelta);
+  slowMotionTimer = Math.max(0, slowMotionTimer - delta);
+  bossHitStopTimer = Math.max(0, bossHitStopTimer - delta);
+
+  if (players[0].lives < livesBeforeUpdate) {
+    reportVersusTerminal("lifeLost");
+  }
+  updateVersusProgressSync(delta);
+  updateViewerSync(delta);
+}
+
+function updateVersusProgressSync(delta) {
+  if (!versusMatchId || !["playing", "clearWaiting"].includes(versusPhase)) return;
+  versusProgressTimer -= delta;
+  if (versusProgressTimer > 0) return;
+  versusProgressTimer = 0.1;
+  versusProgressSequence += 1;
+  cabinetClient.send({
+    type: "versusProgress",
+    matchId: versusMatchId,
+    seq: versusProgressSequence,
+    progress: createVersusProgress(),
+  });
+}
+
+function createVersusProgress() {
+  const player = players[0];
+  return {
+    elapsedRound,
+    clearGame,
+    player: {
+      x: player.x,
+      y: player.y,
+      lives: player.lives,
+      score: player.score,
+      gauge: player.gauge,
+      level: player.level,
+      combo: player.combo,
+      multiplier: player.multiplier,
+      invincible: player.invincible,
+      levelUpInvincible: player.levelUpInvincible,
+      barrierRatio: player.barrierRatio,
+      hitInvincible: player.hitInvincible,
+      attackFlash: player.attackFlash,
+      levelUpFlash: player.levelUpFlash,
+      tilt: player.tilt,
+      bullets: player.bullets.map((bullet) => ({
+        id: bullet.id,
+        x: bullet.x,
+        y: bullet.y,
+        vx: bullet.vx,
+        vy: bullet.vy,
+        radius: bullet.radius,
+        color: bullet.color,
+        type: bullet.type,
+        age: bullet.age,
+        shape: bullet.shape,
+        rotation: bullet.rotation,
+        enteredField: bullet.enteredField,
+      })),
+    },
+    boss: createBossSyncState(),
+  };
+}
+
+function applyVersusOpponentProgress(progress) {
+  if (!progress?.player) return;
+  const offsetX = RIGHT_X - LEFT_X;
+  const remotePlayer = progress.player;
+  const { bullets = [], x, y, ...playerState } = remotePlayer;
+  Object.assign(players[1], playerState);
+  players[1].label = "RIVAL";
+  players[1].cpu = false;
+  players[1].x = x + offsetX;
+  players[1].y = y;
+  players[1].bullets = bullets.map((bullet) => ({
+    ...bullet,
+    x: bullet.x + offsetX,
+  }));
+
+  if (progress.boss) {
+    const defeated = opponentBoss.active && opponentBoss.hp > 0 && (!progress.boss.active || progress.boss.hp <= 0);
+    if (defeated) {
+      createExplosion(opponentBoss.x, opponentBoss.y, "#ffd166");
+      playExplosionSound();
+      queueSyncEvent({
+        type: "bossDefeated",
+        x: opponentBoss.x,
+        y: opponentBoss.y,
+        color: "#ffd166",
+      });
+    }
+    Object.assign(opponentBoss, progress.boss);
+    opponentBoss.x = progress.boss.x + offsetX;
+    opponentBoss.baseY = progress.boss.baseY;
+    opponentBoss.y = progress.boss.y;
+  }
+}
+
+function reportVersusTerminal(reason) {
+  if (!versusMatchId || versusTerminalReported) return;
+  versusTerminalReported = true;
+  paused = true;
+  const clearTimeMs = reason === "cleared" ? Math.round(elapsedRound * 1000) : null;
+  const score = reason === "cleared"
+    ? players[0].score + calculateClearTimeBonus(clearTimeMs)
+    : players[0].score;
+  cabinetClient.send({
+    type: "versusTerminal",
+    matchId: versusMatchId,
+    report: {
+      reason,
+      score,
+      clearTimeMs,
+      matchElapsedMs: Math.round(performance.now() - versusStartedAt),
+    },
+  });
+}
+
+function applyVersusAttack(level, bossAttack) {
+  if (versusPhase !== "playing") return;
+  if (bossAttack) {
+    addBossBullets(players[0], level);
+    playBossAttackSound();
+  }
+  addStandardAttackBullets(players[0], level, 1, 0);
+  players[0].attackFlash = 0.55;
 }
 
 function togglePauseState() {
   if (gameOver) return;
+  if (isVersusParticipant()) return;
   if (waitingForStart) {
     waitingForStart = false;
     paused = false;
@@ -1215,6 +2092,11 @@ function togglePauseState() {
   updatePauseButton();
   queueSyncEvent({ type: "pauseChanged", paused, waitingForStart }, true);
   broadcastMotionFrame(true);
+  showChallengeApprovalIfStopped();
+}
+
+function isVersusParticipant() {
+  return Boolean(versusMatchId && versusSeat && versusPhase !== "none");
 }
 
 function updatePauseButton() {
@@ -1239,7 +2121,7 @@ function updateBoss(delta) {
     return;
   }
   if (boss.encounterState !== "active" || !boss.active) return;
-  updateBossMovement();
+  updateBossMovement(delta);
   boss.damageCooldown = Math.max(0, boss.damageCooldown - delta);
   boss.flash = Math.max(0, boss.flash - delta);
   if (gameOver || boss.hp <= 0) return;
@@ -1259,7 +2141,11 @@ function updateBoss(delta) {
     return;
   }
 
-  boss.hp = Math.max(0, boss.hp - 1);
+  const phase = BOSS_PHASES[boss.phaseIndex];
+  boss.shieldHitsTaken += 1;
+  boss.hp = boss.shieldHitsTaken >= phase.hitsToDefeat
+    ? 0
+    : boss.maxHp * (1 - boss.shieldHitsTaken / phase.hitsToDefeat);
   boss.shieldAttackCharges -= 1;
   boss.damageCooldown = BOSS_DAMAGE_COOLDOWN;
   boss.flash = 0.14;
@@ -1314,7 +2200,7 @@ function updateBossAttack(delta) {
   boss.attackShotTimer -= delta;
   while (boss.attackShotTimer <= 0 && boss.attackTimer > 0) {
     spawnBossAttackPattern(pattern.id);
-    boss.attackShotTimer += pattern.shotInterval;
+    boss.attackShotTimer += getBossAttackShotInterval(pattern);
     boss.attackStep += 1;
   }
 
@@ -1356,6 +2242,12 @@ function getCurrentBossAttackPattern() {
   return boss.bonusActive ? BOSS_BONUS_ATTACK_PATTERN : BOSS_ATTACK_PATTERNS[boss.attackPatternIndex];
 }
 
+function getBossAttackShotInterval(pattern) {
+  const firstBossMultiplier = boss.phaseIndex === 0 ? 1.25 : 1;
+  const densityMultiplier = pattern.id === "bonusStream" ? 1 : BOSS_ATTACK_DENSITY_INTERVAL_SCALE;
+  return pattern.shotInterval * firstBossMultiplier * densityMultiplier;
+}
+
 function spawnBossAttackPattern(patternId) {
   if (patternId === "fan") {
     spawnBossFanAttack();
@@ -1374,9 +2266,9 @@ function spawnBossAttackPattern(patternId) {
 
 function spawnBossFanAttack() {
   const phaseScale = 1 + boss.phaseIndex * 0.18;
-  const count = 9 + boss.phaseIndex * 2;
+  const count = [7, 9, 11][boss.phaseIndex];
   const spread = 1.45;
-  const speed = 128 * phaseScale;
+  const speed = 128 * phaseScale * BOSS_BULLET_SPEED_SCALE;
   const originY = boss.y + boss.radius * 0.5;
 
   for (let index = 0; index < count; index += 1) {
@@ -1399,8 +2291,8 @@ function spawnBossFanAttack() {
 function spawnBossAimedBurst() {
   const phaseScale = 1 + boss.phaseIndex * 0.2;
   const angle = Math.atan2(boss.attackTargetY - boss.y, boss.attackTargetX - boss.x);
-  const speed = (154 + boss.attackStep * 7) * phaseScale;
-  const count = 5 + boss.phaseIndex * 2;
+  const speed = (154 + boss.attackStep * 7) * phaseScale * BOSS_BULLET_SPEED_SCALE;
+  const count = [4, 6, 7][boss.phaseIndex];
   const spread = 0.34 + boss.phaseIndex * 0.05;
 
   for (let index = 0; index < count; index += 1) {
@@ -1422,9 +2314,9 @@ function spawnBossAimedBurst() {
 
 function spawnBossCenterPressure() {
   const phaseScale = 1 + boss.phaseIndex * 0.18;
-  const centerCount = 9 + boss.phaseIndex * 2;
+  const centerCount = [7, 9, 11][boss.phaseIndex];
   const centerSpread = 0.38;
-  const centerSpeed = 148 * phaseScale;
+  const centerSpeed = 148 * phaseScale * BOSS_BULLET_SPEED_SCALE;
   const originY = boss.y + boss.radius * 0.34;
 
   for (let index = 0; index < centerCount; index += 1) {
@@ -1443,7 +2335,7 @@ function spawnBossCenterPressure() {
     );
   }
 
-  const edgeSpeed = 164 * phaseScale;
+  const edgeSpeed = 164 * phaseScale * BOSS_BULLET_SPEED_SCALE;
   const edgeOffset = Math.sin(boss.attackStep * 0.78) * 16;
   for (const side of [-1, 1]) {
     const targetX =
@@ -1468,12 +2360,17 @@ function spawnBossCenterPressure() {
 
 function spawnBossBonusStream() {
   const phaseScale = 1 + boss.phaseIndex * 0.12;
+  const originX = boss.x;
+  const originY = boss.y + boss.radius * 0.28;
+  const targetY = FIELD_BOTTOM - FIELD_MARGIN;
+  const angle = Math.atan2(targetY - originY, boss.bonusStreamX - originX);
+  const speed = 212 * phaseScale * BOSS_BULLET_SPEED_SCALE;
   addBullet(
     players[0],
-    boss.bonusStreamX,
-    boss.y + boss.radius * 0.52,
-    0,
-    212 * phaseScale,
+    originX,
+    originY,
+    Math.cos(angle) * speed,
+    Math.sin(angle) * speed,
     7,
     "#ffd166",
     "bossAttack",
@@ -1488,18 +2385,20 @@ function checkBossSpawn() {
   }
 }
 
-function updateBossMovement() {
+function updateBossMovement(delta) {
   const phase = BOSS_PHASES[boss.phaseIndex];
   if (phase.level === 1) return;
 
+  boss.movementTime += delta;
   const minX = LEFT_X + FIELD_MARGIN + boss.radius;
   const maxX = LEFT_X + FIELD_WIDTH - FIELD_MARGIN - boss.radius;
-  const travel = (Math.sin(elapsedRound * 0.55) + 1) / 2;
-  boss.x = minX + (maxX - minX) * travel;
+  const centerX = (minX + maxX) / 2;
+  const movementEase = smoothstep(clamp(boss.movementTime / 1.5, 0, 1));
+  boss.x = centerX + Math.sin(boss.movementTime * 0.55) * ((maxX - minX) / 2) * movementEase;
   boss.y = boss.baseY;
 
   if (phase.level === 3) {
-    boss.y += Math.sin(elapsedRound * 4.4) * 24;
+    boss.y += Math.sin(boss.movementTime * 4.4) * 24 * movementEase;
   }
 }
 
@@ -1534,7 +2433,12 @@ function handleBossDefeated() {
       },
       true,
     );
-    recordClearResult();
+    if (isVersusParticipant()) {
+      reportVersusTerminal("cleared");
+    } else {
+      recordClearResult();
+      showChallengeApprovalIfStopped();
+    }
     return;
   }
 
@@ -1565,19 +2469,37 @@ function updateDebugRankingPreview() {
 }
 
 function recordClearResult() {
-  showRankingRegistration(`クリアタイム ${formatRankingTime(Math.round(elapsedRound * 1000))} を登録できます。`);
+  showRankingRegistration();
 }
 
-function showRankingRegistration(message) {
+function showRankingRegistration(debugMessage = "") {
+  const clearTimeMs = Math.round(elapsedRound * 1000);
+  const playScore = players[0].score;
+  const timeBonus = calculateClearTimeBonus(clearTimeMs);
+  const totalScore = playScore + timeBonus;
   lastClearResult = {
-    clearTimeMs: Math.round(elapsedRound * 1000),
-    score: players[0].score,
+    clearTimeMs,
+    playScore,
+    timeBonus,
+    score: totalScore,
     maxLevel: players[0].level,
   };
   rankingSubmittedForClear = false;
-  if (rankingResult) rankingResult.textContent = message;
+  rankingSubmitPanel?.classList.remove("is-submitted");
+  if (rankingSubmitHeading) rankingSubmitHeading.textContent = "ランキング登録";
+  if (rankingSubmitList) rankingSubmitList.innerHTML = "";
+  if (rankingResult) {
+    const prefix = debugMessage ? `${debugMessage} ` : "";
+    rankingResult.textContent =
+      `${prefix}SCORE ${formatScore(totalScore)} ` +
+      `（プレイ ${formatScore(playScore)} + タイムボーナス ${formatScore(timeBonus)}）`;
+  }
   rankingSubmitPanel?.classList.add("is-visible");
   updateRankingSubmitState();
+}
+
+function calculateClearTimeBonus(clearTimeMs) {
+  return Math.max(0, CLEAR_TIME_BONUS_BASE - clearTimeMs);
 }
 
 function isLocalDevelopment() {
@@ -1620,6 +2542,8 @@ async function submitRanking() {
     });
     rankingSubmittedForClear = true;
     setRankingMessage("登録しました。");
+    rankingSubmitPanel?.classList.add("is-submitted");
+    if (rankingSubmitHeading) rankingSubmitHeading.textContent = "スコアランキング";
     updateRankingSubmitState();
     await loadRanking();
   } catch (error) {
@@ -1631,29 +2555,38 @@ async function submitRanking() {
 
 async function loadRanking() {
   if (!rankingList) return;
-  rankingList.innerHTML = "";
-  const loadingItem = document.createElement("li");
-  loadingItem.textContent = "読み込み中...";
-  rankingList.append(loadingItem);
+  const targets = getRankingListTargets();
+  for (const target of targets) setRankingListMessage(target, "読み込み中...");
 
   try {
-    renderRanking(await fetchTimeRanking(20));
+    renderRanking(await fetchScoreRanking(20, CLIENT_VERSION));
   } catch (error) {
     console.warn(error);
-    rankingList.innerHTML = "";
-    const item = document.createElement("li");
-    item.textContent = "ランキングAPI未接続";
-    rankingList.append(item);
+    for (const target of targets) setRankingListMessage(target, "ランキングAPI未接続");
   }
 }
 
 function renderRanking(rankings) {
-  if (!rankingList) return;
-  rankingList.innerHTML = "";
+  for (const target of getRankingListTargets()) renderRankingInto(target, rankings);
+}
+
+function getRankingListTargets() {
+  const targets = rankingList ? [rankingList] : [];
+  if (rankingSubmittedForClear && rankingSubmitList) targets.push(rankingSubmitList);
+  return targets;
+}
+
+function setRankingListMessage(target, message) {
+  target.innerHTML = "";
+  const item = document.createElement("li");
+  item.textContent = message;
+  target.append(item);
+}
+
+function renderRankingInto(target, rankings) {
+  target.innerHTML = "";
   if (rankings.length === 0) {
-    const emptyItem = document.createElement("li");
-    emptyItem.textContent = "まだ登録がありません";
-    rankingList.append(emptyItem);
+    setRankingListMessage(target, "まだ登録がありません");
     return;
   }
 
@@ -1662,10 +2595,10 @@ function renderRanking(rankings) {
     const name = document.createElement("strong");
     name.textContent = ranking.player_name;
     const detail = document.createTextNode(
-      ` ${formatRankingTime(ranking.clear_time_ms)} / SCORE ${ranking.score} / LV ${ranking.max_level}`,
+      ` SCORE ${formatScore(ranking.score)} / TIME ${formatRankingTime(ranking.clear_time_ms)} / LV ${ranking.max_level}`,
     );
     item.append(name, detail);
-    rankingList.append(item);
+    target.append(item);
   }
 }
 
@@ -1676,6 +2609,10 @@ function setRankingMessage(message) {
 function formatRankingTime(milliseconds) {
   const totalSeconds = milliseconds / 1000;
   return `${totalSeconds.toFixed(2)}s`;
+}
+
+function formatScore(score) {
+  return Math.round(score).toLocaleString("ja-JP");
 }
 
 function getInvincibleRingRatio(player) {
@@ -1794,7 +2731,10 @@ function spawnBaseBullets(player, delta) {
   if (player.enemyTimer > 0) return;
 
   const intensity = 1 + elapsedRound / 45;
-  const densityScale = (bulletDensity / 2) * (1 + defeatedBossCount * BASE_BULLET_CLEAR_BONUS);
+  const densityScale =
+    (bulletDensity / 2)
+    * BASE_BULLET_DENSITY_SCALE
+    * (1 + defeatedBossCount * BASE_BULLET_CLEAR_BONUS);
   player.enemyTimer = Math.max(0.08, (0.46 - intensity * 0.045 - Math.random() * 0.08) / densityScale);
   const bulletBatch = Math.max(1, Math.floor(densityScale));
   const extraChance = densityScale - bulletBatch;
@@ -1933,6 +2873,7 @@ function randomBaseBulletSpeed(intensity) {
 }
 
 function addBullet(player, x, y, vx, vy, radius, color, type, options = {}) {
+  if (player.bullets.length >= MAX_ACTIVE_BULLETS_PER_FIELD) return;
   const bullet = {
     id: nextBulletId++,
     x,
@@ -1943,6 +2884,7 @@ function addBullet(player, x, y, vx, vy, radius, color, type, options = {}) {
     color,
     type,
     age: 0,
+    enteredField: isPointInsidePlayerField(player, x, y),
     ...options,
   };
   player.bullets.push(bullet);
@@ -1961,6 +2903,7 @@ function addBullet(player, x, y, vx, vy, radius, color, type, options = {}) {
       age: bullet.age,
       shape: bullet.shape,
       rotation: bullet.rotation,
+      enteredField: bullet.enteredField,
     },
   });
 }
@@ -1970,6 +2913,9 @@ function updateBullets(player, delta) {
     bullet.age += delta;
     bullet.x += bullet.vx * delta;
     bullet.y += bullet.vy * delta;
+    if (isPointInsidePlayerField(player, bullet.x, bullet.y)) {
+      bullet.enteredField = true;
+    }
     if (
       bullet.type !== "bossAttack" &&
       (bullet.x < player.fieldX + 20 || bullet.x > player.fieldX + FIELD_WIDTH - 20)
@@ -1977,11 +2923,21 @@ function updateBullets(player, delta) {
       bullet.vx *= -1;
     }
   }
-  player.bullets = player.bullets.filter(
-    (bullet) =>
-      bullet.y < FIELD_BOTTOM + 48 &&
-      bullet.x > player.fieldX - 48 &&
-      bullet.x < player.fieldX + FIELD_WIDTH + 48,
+  player.bullets = player.bullets.filter((bullet) => shouldKeepBullet(player, bullet));
+}
+
+function isPointInsidePlayerField(player, x, y) {
+  return x >= player.fieldX && x <= player.fieldX + FIELD_WIDTH && y >= FIELD_TOP && y <= FIELD_BOTTOM;
+}
+
+function shouldKeepBullet(player, bullet) {
+  if (bullet.enteredField) {
+    return isPointInsidePlayerField(player, bullet.x, bullet.y);
+  }
+  return (
+    bullet.y <= FIELD_BOTTOM &&
+    bullet.x > player.fieldX - 48 &&
+    bullet.x < player.fieldX + FIELD_WIDTH + 48
   );
 }
 
@@ -2069,17 +3025,34 @@ function tryAttack(attacker, defender) {
   const shouldSendBoss = attacker.level >= attacker.nextBossLevel;
   if (shouldSendBoss) {
     attacker.nextBossLevel += BOSS_ATTACK_INTERVAL;
+  }
+
+  if (isVersusParticipant() && versusPhase === "playing" && attacker === players[0]) {
+    cabinetClient.send({
+      type: "versusAttack",
+      matchId: versusMatchId,
+      attackId: crypto.randomUUID(),
+      level: attacker.level,
+      bossAttack: shouldSendBoss,
+    });
+    return;
+  }
+
+  if (shouldSendBoss) {
     addBossBullets(defender, attacker.level);
     playBossAttackSound();
   }
+  addStandardAttackBullets(defender, attacker.level, attacker.multiplier, defeatedBossCount);
+}
 
-  const levelBonus = Math.floor((attacker.level - 1) / 6);
+function addStandardAttackBullets(defender, level, multiplier = 1, clearedBosses = 0) {
+  const levelBonus = Math.floor((level - 1) / 6);
   const waves = 1;
   for (let wave = 0; wave < waves; wave += 1) {
     const center = defender.fieldX + FIELD_WIDTH / 2 + randomRange(-90, 90);
     const y = FIELD_TOP - 36 - wave * 22;
-    const attackScale = ATTACK_BULLET_COUNT_SCALE + defeatedBossCount * ATTACK_BULLET_CLEAR_BONUS;
-    const count = Math.max(2, Math.ceil((4 + Math.floor(attacker.multiplier) + levelBonus) * attackScale));
+    const attackScale = ATTACK_BULLET_COUNT_SCALE + clearedBosses * ATTACK_BULLET_CLEAR_BONUS;
+    const count = Math.max(2, Math.ceil((4 + Math.floor(multiplier) + levelBonus) * attackScale));
     for (let index = 0; index < count; index += 1) {
       const angle = -Math.PI / 2 + (index - (count - 1) / 2) * 0.16;
       const speed = 128 + wave * 12 + Math.random() * 24;
@@ -2233,6 +3206,7 @@ function draw() {
     drawField(players[1]);
     drawCenterInfo();
     drawBoss();
+    if (isVersusParticipant() || isVersusSpectator()) drawOpponentBoss();
     drawBossSpawnHint();
 
     for (const player of players) {
@@ -2253,27 +3227,31 @@ function isCompactView() {
 }
 
 function drawCompactGame() {
-  withCompactWorldTransform(() => {
-    drawField(players[0]);
-    drawBoss();
-    drawBullets(players[0]);
-    drawPlayer(players[0]);
+  const playerIndex = isVersusSpectator() ? spectatorPlayerIndex : 0;
+  const selectedPlayer = players[playerIndex];
+  const otherPlayer = players[playerIndex === 0 ? 1 : 0];
+  withCompactWorldTransform(selectedPlayer, () => {
+    drawField(selectedPlayer);
+    if (playerIndex === 0) drawBoss();
+    else drawOpponentBoss();
+    drawBullets(selectedPlayer);
+    drawPlayer(selectedPlayer);
     drawParticles();
   });
 
-  drawPlayerHud(players[0]);
-  drawOpponentInfoHud(players[1]);
-  drawBossSpawnHint();
+  drawPlayerHud(selectedPlayer);
+  drawOpponentInfoHud(otherPlayer);
+  if (playerIndex === 0) drawBossSpawnHint();
   drawCenterInfo();
 }
 
-function withCompactWorldTransform(drawCallback) {
+function withCompactWorldTransform(player, drawCallback) {
   context.save();
   const visibleSourceWidth = HEIGHT * (canvas.clientWidth / Math.max(1, canvas.clientHeight));
   const horizontalScale = visibleSourceWidth / FIELD_WIDTH;
   const verticalScale = (HEIGHT - 92) / FIELD_HEIGHT;
   const scale = clamp(Math.min(horizontalScale, verticalScale), 0.82, 1.05);
-  const focusX = players[0].fieldX + FIELD_WIDTH / 2;
+  const focusX = player.fieldX + FIELD_WIDTH / 2;
   const focusY = FIELD_TOP + FIELD_HEIGHT / 2;
   context.translate(WIDTH / 2, HEIGHT / 2 + 24);
   context.scale(scale, scale);
@@ -2359,6 +3337,61 @@ function drawBoss() {
   context.textAlign = "center";
   context.fillText(phase.name, labelX, FIELD_TOP + 10);
   context.textAlign = "left";
+  context.restore();
+}
+
+function drawOpponentBoss() {
+  if (!opponentBoss.active || opponentBoss.hp <= 0) return;
+  const phase = BOSS_PHASES[opponentBoss.phaseIndex] ?? BOSS_PHASES[0];
+  const entering = opponentBoss.encounterState === "entering";
+  const entranceProgress = entering ? opponentBoss.arrivalProgress : 1;
+  const visualRadius = opponentBoss.radius * (0.68 + entranceProgress * 0.32);
+  const pulse = 0.5 + Math.sin(elapsedRound * 3.2) * 0.16;
+  const flash = opponentBoss.flash > 0 ? 1 : 0;
+
+  context.save();
+  context.globalAlpha = entering ? 0.08 + entranceProgress * 0.92 : 1;
+  context.shadowBlur = 28 + flash * 22;
+  context.shadowColor = flash ? "#ffffff" : "#ff3355";
+  context.fillStyle = flash ? "#ffffff" : phase.color;
+  context.strokeStyle = "#8f1739";
+  context.lineWidth = 5;
+  drawBossShape(phase.shape, opponentBoss.x, opponentBoss.y, visualRadius + pulse * 5);
+
+  context.shadowBlur = 0;
+  const coreGradient = context.createRadialGradient(
+    opponentBoss.x,
+    opponentBoss.y,
+    1,
+    opponentBoss.x,
+    opponentBoss.y,
+    visualRadius * 0.52,
+  );
+  coreGradient.addColorStop(0, flash ? "#ffffff" : "#ffeff3");
+  coreGradient.addColorStop(0.18, "#ff3355");
+  coreGradient.addColorStop(0.56, "#5d071d");
+  coreGradient.addColorStop(1, "rgba(20, 0, 8, 0)");
+  context.fillStyle = coreGradient;
+  context.beginPath();
+  context.arc(opponentBoss.x, opponentBoss.y, visualRadius * 0.54, 0, Math.PI * 2);
+  context.fill();
+
+  if (opponentBoss.encounterState === "active") {
+    const barWidth = 260;
+    const labelX = RIGHT_X + FIELD_WIDTH / 2;
+    const barX = labelX - barWidth / 2;
+    const hpRatio = clamp(opponentBoss.hp / Math.max(1, opponentBoss.maxHp), 0, 1);
+    context.fillStyle = "rgba(0,0,0,0.46)";
+    roundRect(barX, FIELD_TOP + 16, barWidth, 12, 8);
+    context.fill();
+    context.fillStyle = hpRatio > 0.35 ? "#ffd166" : "#ff4e8a";
+    roundRect(barX, FIELD_TOP + 16, barWidth * hpRatio, 12, 8);
+    context.fill();
+    context.fillStyle = "#f4f7ff";
+    context.font = "800 12px system-ui";
+    context.textAlign = "center";
+    context.fillText(phase.name, labelX, FIELD_TOP + 10);
+  }
   context.restore();
 }
 
@@ -2478,10 +3511,14 @@ function drawField(player) {
 }
 
 function drawBullets(player) {
+  context.save();
+  roundRect(player.fieldX, FIELD_TOP, FIELD_WIDTH, FIELD_HEIGHT, 18);
+  context.clip();
+  const glowBlur = getBulletGlowBlur(player.bullets.length);
   for (const bullet of player.bullets) {
     context.save();
-    if (bullet.type !== "base") {
-      context.shadowBlur = 10;
+    if (bullet.type !== "base" && glowBlur > 0) {
+      context.shadowBlur = glowBlur;
       context.shadowColor = bullet.color;
     }
     context.fillStyle = bullet.color;
@@ -2489,6 +3526,13 @@ function drawBullets(player) {
     drawBulletShape(bullet);
     context.restore();
   }
+  context.restore();
+}
+
+function getBulletGlowBlur(bulletCount) {
+  if (bulletCount >= BULLET_GLOW_DISABLE_THRESHOLD) return 0;
+  if (bulletCount >= BULLET_GLOW_REDUCE_THRESHOLD) return 4;
+  return 10;
 }
 
 function drawBulletShape(bullet) {
@@ -2552,7 +3596,9 @@ function drawBulletShape(bullet) {
 function drawPlayer(player) {
   context.save();
   const isLevelInvincible = player.levelUpInvincible > 0;
-  context.globalAlpha = player.invincible > 0 && !isLevelInvincible && Math.floor(elapsedRound * 18) % 2 === 0 ? 0.45 : 1;
+  const isHitInvincible = player.invincible > 0 && !isLevelInvincible;
+  const invincibleBlink = Math.floor(elapsedRound * 18) % 2 === 0;
+  context.globalAlpha = isHitInvincible && invincibleBlink ? 0.45 : 1;
   if (isLevelInvincible) {
     context.save();
     const invincibleRatio = player.barrierRatio;
@@ -2596,9 +3642,20 @@ function drawPlayer(player) {
   context.translate(-player.x, -player.y);
 
   context.shadowBlur = 0;
-  context.fillStyle = "#ff3355";
+  const isWarning = isLevelInvincible && player.levelUpInvincible <= INVINCIBLE_WARNING_TIME;
+  const markerAlpha = isWarning && invincibleBlink ? 0.25 : 1;
+  context.globalAlpha *= markerAlpha;
+  context.fillStyle = isLevelInvincible
+    ? "#d9fdff"
+    : isHitInvincible
+      ? "#ffd166"
+      : "#ff3355";
   context.strokeStyle = "rgba(255,255,255,0.72)";
   context.lineWidth = 1;
+  if (isLevelInvincible || isHitInvincible) {
+    context.shadowBlur = isLevelInvincible ? 16 : 10;
+    context.shadowColor = isLevelInvincible ? "#69f7ff" : "#ffd166";
+  }
   context.beginPath();
   context.arc(player.x, player.y, HIT_MARKER_RADIUS, 0, Math.PI * 2);
   context.fill();
@@ -2871,6 +3928,10 @@ function roundRect(x, y, width, height, radius) {
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
+}
+
+function smoothstep(value) {
+  return value * value * (3 - 2 * value);
 }
 
 function randomRange(min, max) {

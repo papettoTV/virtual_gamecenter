@@ -32,9 +32,10 @@ export async function submitRankingEntry(
   }
 }
 
-export async function fetchTimeRanking(limit = 20): Promise<RankingEntry[]> {
+export async function fetchScoreRanking(limit = 20, clientVersion?: string): Promise<RankingEntry[]> {
+  const versionQuery = clientVersion ? `&version=${encodeURIComponent(clientVersion)}` : "";
   const response = await fetch(
-    `${getApiBase()}/api/ranking?type=time&limit=${encodeURIComponent(limit)}`,
+    `${getApiBase()}/api/ranking?type=score&limit=${encodeURIComponent(limit)}${versionQuery}`,
   );
   if (!response.ok) {
     throw new Error(`ranking get failed: ${response.status}`);

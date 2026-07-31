@@ -2,8 +2,17 @@ export function GameScreen() {
   return (
     <section className="game-screen is-hidden" id="game-screen">
       <div className="spectator-banner is-hidden" id="spectator-banner">
-        <strong>観戦中</strong>
-        <span>この画面は操作できません。プレイヤーのゲーム状態をリアルタイム表示しています。</span>
+        <div>
+          <strong id="spectator-view-label">観戦中</strong>
+          <span id="spectator-status-text">プレイヤーのゲーム状態をリアルタイム表示しています。</span>
+        </div>
+        <button className="spectator-switch-button is-hidden" id="spectator-switch-player" type="button">
+          プレイヤーBを見る
+        </button>
+        <button id="challenge-request" type="button">1クレジットで対戦申込</button>
+      </div>
+      <div className="versus-status is-hidden" id="versus-status" role="status">
+        対戦者が待っています。ゲーム停止時に確認できます。
       </div>
       <div className="game-nav">
         <button id="game-back-to-arcade" className="secondary-button" type="button">筐体画面に戻る</button>
@@ -35,13 +44,25 @@ export function GameScreen() {
 
       <div className="game-frame">
         <canvas id="game" width="960" height="640" aria-label="Graze Duel game canvas" />
+        <div className="versus-overlay is-hidden" id="versus-overlay" role="dialog" aria-modal="true">
+          <p className="eyebrow" id="versus-eyebrow">Versus</p>
+          <h2 id="versus-title">対戦</h2>
+          <p id="versus-message" />
+          <strong className="versus-countdown is-hidden" id="versus-countdown" />
+          <div className="versus-actions">
+            <button id="versus-secondary" type="button">いいえ</button>
+            <button id="versus-danger" className="is-hidden" type="button">拒否する</button>
+            <button id="versus-primary" className="platform-primary-button" type="button">はい</button>
+          </div>
+        </div>
         <div className="ranking-submit ranking-overlay" id="ranking-submit-panel">
-          <h2>ランキング登録</h2>
+          <h2 id="ranking-submit-heading">ランキング登録</h2>
           <p id="ranking-result">クリアするとタイムを登録できます。</p>
           <div className="ranking-form">
             <input id="ranking-name" maxLength={24} placeholder="名前" autoComplete="nickname" />
             <button id="ranking-submit" type="button" disabled>登録</button>
           </div>
+          <ol className="ranking-submit-list" id="ranking-submit-list" />
           <button id="clear-restart" className="clear-restart-button" type="button">リスタート</button>
         </div>
       </div>
@@ -59,7 +80,7 @@ export function GameScreen() {
 
       <section className="ranking-panel">
         <div className="ranking-list">
-          <h2>クリアタイムランキング</h2>
+          <h2>スコアランキング</h2>
           <ol id="ranking-list" />
           <button id="ranking-refresh" type="button">更新</button>
         </div>

@@ -51,10 +51,13 @@ export async function acceptPolicies(
   });
 }
 
-export async function reservePlayCredit(cabinetId: string): Promise<ReservationResponse> {
+export async function reservePlayCredit(
+  cabinetId: string,
+  purpose: "solo" | "challenge" | "rematch" = "solo",
+): Promise<ReservationResponse> {
   return requestJson("/api/platform/credit-reservations", {
     method: "POST",
-    body: JSON.stringify({ cabinetId }),
+    body: JSON.stringify({ cabinetId, purpose }),
   });
 }
 
