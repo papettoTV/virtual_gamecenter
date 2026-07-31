@@ -1,17 +1,23 @@
-import { CabinetSelector } from "../arcade/CabinetDirectory";
+import { CabinetSelector } from "../arcade/CabinetDirectory"
 
 export function CabinetScreen() {
   return (
     <section className="cabinet-screen is-hidden" id="cabinet-screen">
       <div className="arcade-card">
         <div className="cabinet-top-actions">
-          <button id="cabinet-top-back" className="secondary-button" type="button">
+          <button
+            id="cabinet-top-back"
+            className="secondary-button"
+            type="button"
+          >
             他のゲームを探す
           </button>
         </div>
         <div className="arcade-heading">
           <div>
-            <p className="eyebrow" id="cabinet-id-label">Cabinet</p>
+            <p className="eyebrow" id="cabinet-id-label">
+              Cabinet
+            </p>
             <h2>Graze Duel</h2>
           </div>
           <button
@@ -36,22 +42,40 @@ export function CabinetScreen() {
             <span id="cabinet-status-label">空き</span>
             <small id="cabinet-role-label">接続中</small>
           </div>
-          <button id="start-solo" className="cabinet-start-button" type="button">
+          <button
+            id="start-solo"
+            className="cabinet-start-button"
+            type="button"
+          >
             ゲームスタート
           </button>
-          <small id="cabinet-copy-status" className="cabinet-copy-status" aria-live="polite">
+          <small
+            id="cabinet-copy-status"
+            className="cabinet-copy-status"
+            aria-live="polite"
+          >
             共有アイコンで筐体URLをコピーできます
           </small>
         </div>
 
         <CabinetSelector />
 
-        <section className="cabinet-promo" aria-labelledby="cabinet-promo-title">
+        <section
+          className="cabinet-promo"
+          aria-labelledby="cabinet-promo-title"
+        >
           <div className="cabinet-promo-heading">
             <strong id="cabinet-promo-title">プレイイメージ</strong>
             <small>Graze Duel Gameplay</small>
           </div>
-          <video autoPlay muted loop playsInline preload="metadata" poster="/graze-duel-promo-poster.jpg">
+          <video
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            poster="/graze-duel-promo-poster.jpg"
+          >
             <source src="/graze-duel-promo.mp4" type="video/mp4" />
             お使いのブラウザでは動画を再生できません。
           </video>
@@ -67,14 +91,23 @@ export function CabinetScreen() {
           </div>
           <div>
             <strong>ゲームのコツ</strong>
-            <span>弾をかするとレベルが上がり、ゲージが溜まると自動攻撃します。</span>
-            <span>無敵の膜をボスに当てて、ラスボス撃破を目指します。</span>
+            <span>
+              弾をかするとゲームが増え、ゲージが溜まるとレベルが上がり一定時間無敵になります。
+            </span>
+            <span>無敵中も、弾をかすってゲージを溜めることができます。</span>
+            <span>無敵シールドをボスに当てて、ラスボス撃破を目指します。</span>
           </div>
         </section>
         <div className="screen-actions">
-          <button id="back-to-arcade" className="secondary-button" type="button">他のゲームを探す</button>
+          <button
+            id="back-to-arcade"
+            className="secondary-button"
+            type="button"
+          >
+            他のゲームを探す
+          </button>
         </div>
       </div>
     </section>
-  );
+  )
 }
