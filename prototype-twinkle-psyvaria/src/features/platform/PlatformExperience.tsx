@@ -52,6 +52,14 @@ export function PlatformExperience() {
   }, [loadPlatform]);
 
   useEffect(() => {
+    if (!platform?.playerName) return;
+    const rankingName = document.querySelector<HTMLInputElement>("#ranking-name");
+    if (!rankingName) return;
+    rankingName.value = platform.playerName;
+    rankingName.dispatchEvent(new Event("input", { bubbles: true }));
+  }, [platform?.playerName]);
+
+  useEffect(() => {
     const url = new URL(window.location.href);
     const purchaseResult = url.searchParams.get("purchase");
     const checkoutSessionId = url.searchParams.get("session_id");
@@ -316,8 +324,12 @@ export function PlatformExperience() {
                 <span />
               </span>
               <div>
-                <span className="platform-account-state">ゲスト</span>
-                <strong className="platform-profile-name">ゲストプレイヤー</strong>
+                <span className="platform-account-state">
+                  {platform?.accountRegistered ? "登録済み" : "ゲスト"}
+                </span>
+                <strong className="platform-profile-name">
+                  {platform?.playerName ?? "読み込み中"}
+                </strong>
                 <span className="platform-player-id">
                   {platform ? `ID ${platform.playerId.slice(0, 8)}` : "読み込み中"}
                 </span>
@@ -332,6 +344,15 @@ export function PlatformExperience() {
                 </small>
               )}
             </div>
+            {!platform?.accountRegistered && (
+              <button
+                className="platform-account-register-button"
+                type="button"
+                onClick={() => setNotice("アカウント登録は現在準備中です。")}
+              >
+                名前を変更するにはアカウント登録
+              </button>
+            )}
           </section>
         )}
       </div>

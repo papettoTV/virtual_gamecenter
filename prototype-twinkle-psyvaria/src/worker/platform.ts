@@ -19,6 +19,12 @@ interface PlayerSession {
   secureCookie: boolean;
 }
 
+export interface PlayerIdentity {
+  playerId: string;
+  playerName: string;
+  accountRegistered: boolean;
+}
+
 interface WalletSummary {
   freeBalance: number;
   purchasedBalance: number;
@@ -45,9 +51,12 @@ export async function handlePlatformRequest(
     const session = await getOrCreatePlayerSession(request, database);
     const consent = await getConsentState(database, session.playerId);
     const wallet = await getWalletSummary(database, session.playerId);
+    const identity = await getPlayerIdentityById(database, session.playerId);
     return platformJson(
       {
         playerId: session.playerId,
+        playerName: identity.playerName,
+        accountRegistered: identity.accountRegistered,
         consent,
         wallet,
         creditCost: PLAY_CREDIT_COST,
@@ -496,10 +505,11 @@ async function getOrCreatePlayerSession(
   const token = createSessionToken();
   const tokenHash = await hashToken(token);
   const playerId = crypto.randomUUID();
+  const guestName = createGuestName(playerId);
   const expiresAt = new Date(Date.now() + SESSION_MAX_AGE_SECONDS * 1000).toISOString();
 
   await database.batch([
-    database.prepare("INSERT INTO players (id) VALUES (?)").bind(playerId),
+    database.prepare("INSERT INTO players (id, guest_name) VALUES (?, ?)").bind(playerId, guestName),
     database.prepare(
       `INSERT INTO player_sessions (token_hash, player_id, expires_at)
        VALUES (?, ?, ?)`,
@@ -515,6 +525,33 @@ async function getOrCreatePlayerSession(
     setCookie: true,
     secureCookie: new URL(request.url).protocol === "https:",
   };
+}
+
+export async function getPlayerIdentity(
+  request: Request,
+  database: D1Database,
+): Promise<PlayerIdentity | null> {
+  const session = await getExistingPlayerSession(request, database);
+  if (!session) return null;
+  return getPlayerIdentityById(database, session.playerId);
+}
+
+async function getPlayerIdentityById(
+  database: D1Database,
+  playerId: string,
+): Promise<PlayerIdentity> {
+  const player = await database.prepare(
+    "SELECT guest_name FROM players WHERE id = ?",
+  ).bind(playerId).first<{ guest_name: string | null }>();
+  return {
+    playerId,
+    playerName: player?.guest_name || createGuestName(playerId),
+    accountRegistered: false,
+  };
+}
+
+function createGuestName(playerId: string): string {
+  return `PLAYER-${playerId.replaceAll("-", "").slice(0, 8).toUpperCase()}`;
 }
 
 async function getExistingPlayerSession(

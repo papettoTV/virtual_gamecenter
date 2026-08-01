@@ -16,6 +16,8 @@ export interface ConsentState {
 
 export interface PlatformBootstrap {
   playerId: string;
+  playerName: string;
+  accountRegistered: boolean;
   consent: ConsentState;
   wallet: WalletSummary;
   creditCost: number;

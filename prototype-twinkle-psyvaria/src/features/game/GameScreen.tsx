@@ -59,7 +59,13 @@ export function GameScreen() {
           <h2 id="ranking-submit-heading">ランキング登録</h2>
           <p id="ranking-result">クリアするとタイムを登録できます。</p>
           <div className="ranking-form">
-            <input id="ranking-name" maxLength={24} placeholder="名前" autoComplete="nickname" />
+            <input
+              id="ranking-name"
+              maxLength={24}
+              placeholder="プレイヤー名"
+              aria-label="ランキング登録名（変更不可）"
+              readOnly
+            />
             <button id="ranking-submit" type="button" disabled>登録</button>
           </div>
           <ol className="ranking-submit-list" id="ranking-submit-list" />

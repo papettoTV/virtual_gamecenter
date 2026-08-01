@@ -2559,7 +2559,6 @@ async function submitRanking() {
 
   try {
     await submitRankingEntry({
-      playerName,
       clearTimeMs: lastClearResult.clearTimeMs,
       score: lastClearResult.score,
       maxLevel: lastClearResult.maxLevel,

@@ -1,4 +1,5 @@
 import type { RankingEntry } from "../domain/results";
+import { getPlayerIdentity } from "./platform";
 
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
@@ -9,10 +10,7 @@ const JSON_HEADERS = {
 
 const MAX_LIMIT = 100;
 const DEFAULT_LIMIT = 50;
-const MAX_NAME_LENGTH = 24;
-
 interface RankingRequest {
-  playerName?: unknown;
   clearTimeMs?: unknown;
   score?: unknown;
   maxLevel?: unknown;
@@ -52,6 +50,9 @@ async function getRanking(url: URL, db: D1Database): Promise<Response> {
 }
 
 async function postRanking(request: Request, db: D1Database): Promise<Response> {
+  const identity = await getPlayerIdentity(request, db);
+  if (!identity) return json({ error: "player_session_required" }, 401);
+
   let body: RankingRequest;
   try {
     body = await request.json<RankingRequest>();
@@ -59,14 +60,13 @@ async function postRanking(request: Request, db: D1Database): Promise<Response> 
     return json({ error: "invalid_json" }, 400);
   }
 
-  const playerName = sanitizeName(body.playerName);
+  const playerName = identity.playerName;
   const clearTimeMs = Number(body.clearTimeMs);
   const score = Number(body.score);
   const maxLevel = Number(body.maxLevel);
   const defeatedBossCount = Number(body.defeatedBossCount ?? 3);
   const clientVersion = String(body.clientVersion || "dev").slice(0, 40);
 
-  if (!playerName) return json({ error: "invalid_player_name" }, 400);
   if (!Number.isFinite(clearTimeMs) || clearTimeMs <= 0) return json({ error: "invalid_clear_time_ms" }, 400);
   if (!Number.isFinite(score) || score < 0) return json({ error: "invalid_score" }, 400);
   if (!Number.isFinite(maxLevel) || maxLevel < 1) return json({ error: "invalid_max_level" }, 400);
@@ -82,13 +82,14 @@ async function postRanking(request: Request, db: D1Database): Promise<Response> 
     db
       .prepare(
         `INSERT INTO game_results (
-          id, game_id, game_version, mode, player_name, cleared, clear_time_ms,
+          id, game_id, game_version, mode, player_id, player_name, cleared, clear_time_ms,
           score, max_level, defeated_boss_count
-        ) VALUES (?, 'graze-duel', ?, 'solo', ?, 1, ?, ?, ?, ?)`,
+        ) VALUES (?, 'graze-duel', ?, 'solo', ?, ?, 1, ?, ?, ?, ?)`,
       )
       .bind(
         resultId,
         clientVersion,
+        identity.playerId,
         playerName,
         Math.round(clearTimeMs),
         Math.round(score),
@@ -98,13 +99,6 @@ async function postRanking(request: Request, db: D1Database): Promise<Response> 
   ]);
 
   return json({ ok: true, resultId });
-}
-
-function sanitizeName(value: unknown): string {
-  return String(value || "")
-    .trim()
-    .replace(/\s+/g, " ")
-    .slice(0, MAX_NAME_LENGTH);
 }
 
 function clamp(value: number, min: number, max: number): number {

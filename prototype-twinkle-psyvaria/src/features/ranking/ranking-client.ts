@@ -1,5 +1,4 @@
 export interface RankingSubmission {
-  playerName: string;
   clearTimeMs: number;
   score: number;
   maxLevel: number;
@@ -24,6 +23,7 @@ export async function submitRankingEntry(
 ): Promise<void> {
   const response = await fetch(`${getApiBase()}/api/ranking`, {
     method: "POST",
+    credentials: "same-origin",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(submission),
   });
