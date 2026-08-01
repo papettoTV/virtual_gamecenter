@@ -42,6 +42,10 @@ export async function updatePlayerName(playerName: string): Promise<{
   });
 }
 
+export async function logoutUser(): Promise<PlatformBootstrap> {
+  return requestJson("/api/platform/auth/logout", { method: "POST" });
+}
+
 interface ReservationResponse {
   reservationId: string;
   playSessionId: string;

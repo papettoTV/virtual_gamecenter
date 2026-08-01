@@ -87,6 +87,27 @@ export async function handlePlatformRequest(
   const session = await getExistingPlayerSession(request, database);
   if (!session) return Response.json({ error: "player_session_required" }, { status: 401 });
 
+  if (url.pathname === "/api/platform/auth/logout" && request.method === "POST") {
+    const identity = await getPlayerIdentityById(database, session.playerId);
+    if (!identity.accountRegistered) {
+      return Response.json({ error: "user_registration_required" }, { status: 403 });
+    }
+    await database.prepare("DELETE FROM player_sessions WHERE token_hash = ?")
+      .bind(await hashToken(session.token)).run();
+    const guestSession = await getOrCreatePlayerSession(request, database);
+    const guestIdentity = await getPlayerIdentityById(database, guestSession.playerId);
+    return platformJson({
+      playerId: guestSession.playerId,
+      playerName: guestIdentity.playerName,
+      accountRegistered: false,
+      avatarUrl: null,
+      developerLoginAvailable: isDeveloperAuthAvailable(url, paymentEnv),
+      consent: await getConsentState(database, guestSession.playerId),
+      wallet: await getWalletSummary(database, guestSession.playerId),
+      creditCost: PLAY_CREDIT_COST,
+    }, guestSession);
+  }
+
   if (url.pathname === "/api/platform/consents" && request.method === "POST") {
     const body = await readJson(request);
     if (

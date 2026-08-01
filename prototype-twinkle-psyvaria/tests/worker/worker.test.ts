@@ -13,7 +13,7 @@ beforeAll(async () => {
     env.DB.prepare("CREATE TABLE credit_ledger_entries (id TEXT PRIMARY KEY, player_id TEXT NOT NULL, balance_type TEXT NOT NULL, entry_type TEXT NOT NULL, amount INTEGER NOT NULL, reference_id TEXT)"),
     env.DB.prepare("CREATE TRIGGER credit_ledger_free AFTER INSERT ON credit_ledger_entries WHEN NEW.balance_type = 'free' BEGIN UPDATE credit_wallets SET free_balance = free_balance + NEW.amount WHERE player_id = NEW.player_id; END"),
     env.DB.prepare("CREATE TABLE credit_reservations (id TEXT PRIMARY KEY, player_id TEXT NOT NULL, amount INTEGER NOT NULL, balance_type TEXT NOT NULL, status TEXT NOT NULL, expires_at TEXT NOT NULL)"),
-    env.DB.prepare("CREATE TABLE rankings (id INTEGER PRIMARY KEY AUTOINCREMENT, player_name TEXT NOT NULL, clear_time_ms INTEGER NOT NULL, score INTEGER NOT NULL, max_level INTEGER NOT NULL, client_version TEXT NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP)"),
+    env.DB.prepare("CREATE TABLE rankings (id INTEGER PRIMARY KEY AUTOINCREMENT, player_name TEXT NOT NULL, clear_time_ms INTEGER NOT NULL, cleared INTEGER NOT NULL DEFAULT 1, score INTEGER NOT NULL, max_level INTEGER NOT NULL, defeated_boss_count INTEGER NOT NULL DEFAULT 3, client_version TEXT NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP)"),
     env.DB.prepare("CREATE TABLE game_results (id TEXT PRIMARY KEY, game_id TEXT NOT NULL, game_version TEXT NOT NULL, mode TEXT NOT NULL, player_id TEXT, player_name TEXT NOT NULL, cleared INTEGER NOT NULL, clear_time_ms INTEGER, score INTEGER NOT NULL, max_level INTEGER NOT NULL, defeated_boss_count INTEGER NOT NULL)"),
   ]);
 });
@@ -70,6 +70,45 @@ describe("Cloudflare Worker", () => {
     const ranking = await rankingResponse.json<{ rankings: Array<{ player_name: string }> }>();
     expect(ranking.rankings[0]?.player_name).toBe(bootstrap.playerName);
     expect(ranking.rankings[0]?.player_name).not.toBe("CHANGED-NAME");
+  });
+
+  it("registers a game-over score without marking the result as cleared", async () => {
+    const bootstrapResponse = await exports.default.fetch("http://localhost/api/platform/bootstrap");
+    const cookie = bootstrapResponse.headers.get("set-cookie")?.split(";", 1)[0];
+    const clientVersion = `game-over-test-${crypto.randomUUID()}`;
+
+    const response = await exports.default.fetch("http://localhost/api/ranking", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: cookie!,
+      },
+      body: JSON.stringify({
+        elapsedTimeMs: 45_000,
+        cleared: false,
+        score: 12_345,
+        maxLevel: 18,
+        defeatedBossCount: 1,
+        clientVersion,
+      }),
+    });
+    expect(response.status).toBe(200);
+
+    const rankingResponse = await exports.default.fetch(
+      `http://localhost/api/ranking?type=score&limit=1&version=${clientVersion}`,
+    );
+    const ranking = await rankingResponse.json<{
+      rankings: Array<{
+        cleared: number;
+        play_time_ms: number;
+        defeated_boss_count: number;
+      }>;
+    }>();
+    expect(ranking.rankings[0]).toMatchObject({
+      cleared: 0,
+      play_time_ms: 45_000,
+      defeated_boss_count: 1,
+    });
   });
 
   it("upgrades the current guest player and grants registration credits", async () => {
@@ -134,6 +173,7 @@ describe("Cloudflare Worker", () => {
       headers: { Cookie: cookie! },
     });
     const registered = await registeredResponse.json<{
+      playerId: string;
       playerName: string;
       accountRegistered: boolean;
       wallet: { availableTotal: number };
@@ -141,6 +181,23 @@ describe("Cloudflare Worker", () => {
     expect(registered.playerName).toBe("開発者ユーザー");
     expect(registered.accountRegistered).toBe(true);
     expect(registered.wallet.availableTotal).toBe(5);
+
+    const logoutResponse = await exports.default.fetch("http://localhost/api/platform/auth/logout", {
+      method: "POST",
+      headers: { Cookie: cookie! },
+    });
+    expect(logoutResponse.status).toBe(200);
+    const guest = await logoutResponse.json<{
+      playerId: string;
+      playerName: string;
+      accountRegistered: boolean;
+      wallet: { availableTotal: number };
+    }>();
+    expect(guest.playerId).not.toBe(registered.playerId);
+    expect(guest.playerName).toMatch(/^Player-[a-f0-9]{8}$/);
+    expect(guest.accountRegistered).toBe(false);
+    expect(guest.wallet.availableTotal).toBe(0);
+    expect(logoutResponse.headers.get("set-cookie")).toContain("vgc_session=");
   });
 
   it("rejects writes to the cabinet directory endpoint", async () => {

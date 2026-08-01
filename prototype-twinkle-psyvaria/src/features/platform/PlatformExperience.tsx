@@ -10,6 +10,7 @@ import {
   PlatformApiError,
   releasePlayCredit,
   reservePlayCredit,
+  logoutUser,
   updatePlayerName,
   type PlatformBootstrap,
   type WalletSummary,
@@ -337,6 +338,21 @@ export function PlatformExperience() {
     }
   };
 
+  const handleLogout = async () => {
+    setBusy(true);
+    try {
+      const guestPlatform = await logoutUser();
+      setPlatform(guestPlatform);
+      setProfileOpen(false);
+      setEditingName(false);
+      setNotice("ログアウトしました。");
+    } catch {
+      setNotice("ログアウトできませんでした。");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (promoCaptureMode) return null;
 
   return (
@@ -366,9 +382,9 @@ export function PlatformExperience() {
                   : <span />}
               </span>
               <div>
-                <span className="platform-account-state">
-                  {platform?.accountRegistered ? "ユーザー登録済み" : "ゲスト"}
-                </span>
+                {!platform?.accountRegistered && (
+                  <span className="platform-account-state">ゲスト</span>
+                )}
                 {platform?.accountRegistered ? (
                   editingName ? (
                     <div className="platform-name-editor">
@@ -429,6 +445,16 @@ export function PlatformExperience() {
                 </small>
               )}
             </div>
+            {platform?.accountRegistered && (
+              <button
+                className="platform-logout-button"
+                type="button"
+                disabled={busy}
+                onClick={() => void handleLogout()}
+              >
+                {busy ? "ログアウト中…" : "ログアウト"}
+              </button>
+            )}
           </section>
         )}
       </div>
