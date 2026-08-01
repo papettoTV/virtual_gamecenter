@@ -34,6 +34,7 @@ export async function handleCabinetDirectoryRequest(
   }
 
   const gameId = url.searchParams.get("gameId") || "graze-duel";
+  const activeSince = Date.now() - 15_000;
   const rows = await db
     .prepare(
       `SELECT cabinet_id, game_id, status, player_count, spectator_count, updated_at
@@ -43,13 +44,12 @@ export async function handleCabinetDirectoryRequest(
          AND status IN (
            'soloPlaying',
            'challengePending',
-           'versusReady',
-           'versusPlaying',
-           'result'
+           'versusPlaying'
          )
+         AND updated_at >= ?
        ORDER BY spectator_count DESC, updated_at DESC`,
     )
-    .bind(gameId)
+    .bind(gameId, activeSince)
     .all<CabinetDirectoryRow>();
 
   const cabinets: CabinetDirectoryEntry[] = (rows.results ?? []).map((row) => ({

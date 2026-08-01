@@ -3,6 +3,7 @@ import {
   getCreditAmount,
   verifyStripeSignature,
 } from "../../src/worker/platform";
+import { isDeveloperAuthAvailable, sanitizeReturnPath } from "../../src/worker/google-auth";
 
 describe("credit purchases", () => {
   it("adds the ten-unit bonus", () => {
@@ -42,5 +43,21 @@ describe("credit purchases", () => {
     await expect(
       verifyStripeSignature(payload, `t=${timestamp},v1=invalid`, secret),
     ).resolves.toBe(false);
+  });
+});
+
+describe("account registration redirects", () => {
+  it("allows only same-origin return paths", () => {
+    expect(sanitizeReturnPath("/cabinets/abc?mode=host#game")).toBe("/cabinets/abc?mode=host#game");
+    expect(sanitizeReturnPath("https://example.com/steal")).toBe("/");
+    expect(sanitizeReturnPath("//example.com/steal")).toBe("/");
+  });
+
+  it("enables developer login only on local network origins", () => {
+    const env = { DEVELOPER_AUTH_ENABLED: "true" };
+    expect(isDeveloperAuthAvailable(new URL("http://localhost:5174"), env)).toBe(true);
+    expect(isDeveloperAuthAvailable(new URL("http://192.168.0.14:5174"), env)).toBe(true);
+    expect(isDeveloperAuthAvailable(new URL("https://game.example.com"), env)).toBe(false);
+    expect(isDeveloperAuthAvailable(new URL("http://localhost:5174"), {})).toBe(false);
   });
 });

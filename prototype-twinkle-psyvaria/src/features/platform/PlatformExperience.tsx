@@ -2,12 +2,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   acceptPolicies,
   capturePlayCredit,
+  createGoogleRegistrationUrl,
+  createDeveloperLoginUrl,
   createCreditCheckout,
   fetchCreditPurchaseStatus,
   fetchPlatformBootstrap,
   PlatformApiError,
   releasePlayCredit,
   reservePlayCredit,
+  updatePlayerName,
   type PlatformBootstrap,
   type WalletSummary,
 } from "./platform-client";
@@ -35,6 +38,9 @@ export function PlatformExperience() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [profileOpen, setProfileOpen] = useState(false);
+  const [accountDialogOpen, setAccountDialogOpen] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
   const bypassGate = useRef(false);
   const profileRef = useRef<HTMLDivElement>(null);
 
@@ -49,6 +55,21 @@ export function PlatformExperience() {
 
   useEffect(() => {
     void loadPlatform();
+  }, [loadPlatform]);
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const result = url.searchParams.get("account");
+    if (!result) return;
+    if (result === "registered") {
+      setNotice("ユーザー登録が完了し、5クレジットを追加しました。");
+      void loadPlatform();
+    } else {
+      setNotice(accountErrorMessage(url.searchParams.get("reason")));
+    }
+    url.searchParams.delete("account");
+    url.searchParams.delete("reason");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
   }, [loadPlatform]);
 
   useEffect(() => {
@@ -297,6 +318,25 @@ export function PlatformExperience() {
   const consentRequired = Boolean(platform && !platform.consent.accepted);
   const wallet = platform?.wallet;
 
+  const savePlayerName = async () => {
+    const playerName = nameDraft.trim();
+    if (!playerName || playerName.length > 24) {
+      setNotice("名前は1〜24文字で入力してください。");
+      return;
+    }
+    setBusy(true);
+    try {
+      const { identity } = await updatePlayerName(playerName);
+      setPlatform((current) => current ? { ...current, ...identity } : current);
+      setEditingName(false);
+      setNotice("名前を変更しました。");
+    } catch {
+      setNotice("名前を変更できませんでした。");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (promoCaptureMode) return null;
 
   return (
@@ -320,19 +360,64 @@ export function PlatformExperience() {
           <section id="platform-profile-menu" className="platform-profile-menu" aria-label="プレイヤー情報">
             <p className="eyebrow">Player Profile</p>
             <div className="platform-profile-summary">
-              <span className="platform-profile-avatar" aria-label="ゲスト用プロフィールアイコン">
-                <span />
+              <span className="platform-profile-avatar" aria-label="プロフィールアイコン">
+                {platform?.avatarUrl
+                  ? <img src={platform.avatarUrl} alt="" referrerPolicy="no-referrer" />
+                  : <span />}
               </span>
               <div>
                 <span className="platform-account-state">
-                  {platform?.accountRegistered ? "登録済み" : "ゲスト"}
+                  {platform?.accountRegistered ? "ユーザー登録済み" : "ゲスト"}
                 </span>
-                <strong className="platform-profile-name">
-                  {platform?.playerName ?? "読み込み中"}
-                </strong>
+                {platform?.accountRegistered ? (
+                  editingName ? (
+                    <div className="platform-name-editor">
+                      <input
+                        aria-label="ユーザー名"
+                        maxLength={24}
+                        value={nameDraft}
+                        onChange={(event) => setNameDraft(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") void savePlayerName();
+                          if (event.key === "Escape") setEditingName(false);
+                        }}
+                        autoFocus
+                      />
+                      <button type="button" disabled={busy} onClick={() => void savePlayerName()}>保存</button>
+                    </div>
+                  ) : (
+                    <button
+                      className="platform-profile-name platform-profile-name-button"
+                      type="button"
+                      title="名前を変更"
+                      onClick={() => {
+                        setNameDraft(platform.playerName);
+                        setEditingName(true);
+                      }}
+                    >
+                      {platform.playerName}
+                    </button>
+                  )
+                ) : (
+                  <strong className="platform-profile-name">
+                    {platform?.playerName ?? "読み込み中"}
+                  </strong>
+                )}
                 <span className="platform-player-id">
                   {platform ? `ID ${platform.playerId.slice(0, 8)}` : "読み込み中"}
                 </span>
+                {!platform?.accountRegistered && (
+                  <button
+                    className="platform-account-register-button"
+                    type="button"
+                    onClick={() => {
+                      setProfileOpen(false);
+                      setAccountDialogOpen(true);
+                    }}
+                  >
+                    ユーザー登録で名前を変更
+                  </button>
+                )}
               </div>
             </div>
             <div className="platform-wallet">
@@ -344,15 +429,6 @@ export function PlatformExperience() {
                 </small>
               )}
             </div>
-            {!platform?.accountRegistered && (
-              <button
-                className="platform-account-register-button"
-                type="button"
-                onClick={() => setNotice("アカウント登録は現在準備中です。")}
-              >
-                名前を変更するにはアカウント登録
-              </button>
-            )}
           </section>
         )}
       </div>
@@ -368,6 +444,53 @@ export function PlatformExperience() {
         <div className="platform-notice" role="status">
           {notice}
           <button type="button" aria-label="閉じる" onClick={() => setNotice("")}>×</button>
+        </div>
+      )}
+
+      {accountDialogOpen && (
+        <div className="platform-overlay platform-overlay-front" role="dialog" aria-modal="true" aria-labelledby="account-register-title">
+          <div className="platform-dialog platform-account-dialog">
+            <button
+              className="platform-dialog-close"
+              type="button"
+              aria-label="ユーザー登録を閉じる"
+              onClick={() => setAccountDialogOpen(false)}
+            >
+              × 閉じる
+            </button>
+            <p className="eyebrow">User Registration</p>
+            <h2 id="account-register-title">ユーザー登録</h2>
+            <p>Googleアカウントで登録します。登録後はこの画面へ戻ります。</p>
+            <ul className="platform-account-benefits">
+              <li>現在のクレジットとプレイ情報を引き継ぐ</li>
+              <li>登録特典として5クレジットを追加</li>
+              <li>ほかの端末でも同じクレジットを利用</li>
+              <li>Googleの名前とアイコンをプロフィールに設定</li>
+            </ul>
+            <button
+              className="platform-google-button"
+              type="button"
+              onClick={() => {
+                const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+                window.location.assign(createGoogleRegistrationUrl(returnTo));
+              }}
+            >
+              <span aria-hidden="true">G</span>
+              Googleで登録
+            </button>
+            {platform?.developerLoginAvailable && (
+              <button
+                className="platform-developer-login-button"
+                type="button"
+                onClick={() => {
+                  const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+                  window.location.assign(createDeveloperLoginUrl(returnTo));
+                }}
+              >
+                開発者ユーザーでログイン
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -497,9 +620,9 @@ export function PlatformExperience() {
             <p><strong>{purchasedCredits}クレジット</strong>を付与しました。</p>
             <div className="account-link-panel">
               <strong>ほかの端末でもクレジットを利用できます</strong>
-              <p>アカウント登録すると、別のブラウザ・PC・スマートフォンでも購入クレジットを共有できます。</p>
-              <button type="button" onClick={() => setNotice("アカウント登録は現在準備中です。")}>
-                アカウント登録へ
+              <p>ユーザー登録すると、別のブラウザ・PC・スマートフォンでも購入クレジットを共有できます。</p>
+              <button type="button" onClick={() => setAccountDialogOpen(true)}>
+                ユーザー登録へ
               </button>
             </div>
             <button className="platform-primary-button" type="button" onClick={closePurchaseComplete}>
@@ -521,6 +644,14 @@ export function PlatformExperience() {
       </footer>
     </>
   );
+}
+
+function accountErrorMessage(reason: string | null): string {
+  if (reason === "cancelled") return "ユーザー登録をキャンセルしました。";
+  if (reason === "session_expired") return "セッションの有効期限が切れました。もう一度お試しください。";
+  if (reason === "not_configured") return "Googleユーザー登録の設定が完了していません。";
+  if (reason === "developer_auth_unavailable") return "開発者ログインはローカル開発環境でのみ利用できます。";
+  return "ユーザー登録を完了できませんでした。もう一度お試しください。";
 }
 
 function PolicyDialog({

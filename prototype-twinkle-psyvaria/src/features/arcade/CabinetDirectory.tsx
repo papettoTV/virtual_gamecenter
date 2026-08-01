@@ -14,7 +14,6 @@ const PLAYING_STATUSES = new Set([
   "soloPlaying",
   "challengePending",
   "versusPlaying",
-  "result",
 ]);
 
 function useCabinets() {
@@ -140,12 +139,13 @@ export function CabinetDirectory() {
     return () => window.clearInterval(watchTimer);
   }, []);
 
-  if (loading || cabinets.length === 0) return null;
+  const playingCabinets = cabinets.filter((cabinet) => PLAYING_STATUSES.has(cabinet.status));
+  if (loading || playingCabinets.length === 0) return null;
 
   return (
     <div className="cabinet-directory" aria-label="プレイ中の筐体一覧">
       <div className="cabinet-dots">
-        {cabinets.map((cabinet, index) => {
+        {playingCabinets.map((cabinet, index) => {
           const popular = cabinet.spectatorCount >= POPULAR_SPECTATOR_COUNT;
           const label = popular
             ? `筐体${index + 1}を観戦。盛り上がり中、観戦者${cabinet.spectatorCount}人`

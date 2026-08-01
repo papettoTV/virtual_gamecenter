@@ -18,9 +18,28 @@ export interface PlatformBootstrap {
   playerId: string;
   playerName: string;
   accountRegistered: boolean;
+  avatarUrl: string | null;
+  developerLoginAvailable: boolean;
   consent: ConsentState;
   wallet: WalletSummary;
   creditCost: number;
+}
+
+export function createGoogleRegistrationUrl(returnTo: string): string {
+  return `/api/platform/auth/google/start?returnTo=${encodeURIComponent(returnTo)}`;
+}
+
+export function createDeveloperLoginUrl(returnTo: string): string {
+  return `/api/platform/auth/developer?returnTo=${encodeURIComponent(returnTo)}`;
+}
+
+export async function updatePlayerName(playerName: string): Promise<{
+  identity: Pick<PlatformBootstrap, "playerId" | "playerName" | "accountRegistered" | "avatarUrl">;
+}> {
+  return requestJson("/api/platform/profile", {
+    method: "PATCH",
+    body: JSON.stringify({ playerName }),
+  });
 }
 
 interface ReservationResponse {

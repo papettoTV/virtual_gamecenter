@@ -1,2 +1,5 @@
 STRIPE_SECRET_KEY=sk_test_replace_me
 STRIPE_WEBHOOK_SECRET=whsec_replace_me
+GOOGLE_CLIENT_ID=replace_me.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=replace_me
+DEVELOPER_AUTH_ENABLED=true

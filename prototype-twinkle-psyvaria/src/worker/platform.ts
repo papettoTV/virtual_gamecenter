@@ -1,3 +1,9 @@
+import {
+  handleGoogleAuthRequest,
+  isDeveloperAuthAvailable,
+  type GoogleAuthEnv,
+} from "./google-auth";
+
 const SESSION_COOKIE = "vgc_session";
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
 const INITIAL_FREE_CREDITS = 5;
@@ -23,6 +29,7 @@ export interface PlayerIdentity {
   playerId: string;
   playerName: string;
   accountRegistered: boolean;
+  avatarUrl: string | null;
 }
 
 interface WalletSummary {
@@ -38,7 +45,7 @@ interface WalletSummary {
 export async function handlePlatformRequest(
   request: Request,
   database: D1Database,
-  paymentEnv: StripePaymentEnv = {},
+  paymentEnv: StripePaymentEnv & GoogleAuthEnv = {},
 ): Promise<Response | null> {
   const url = new URL(request.url);
   if (!url.pathname.startsWith("/api/platform/")) return null;
@@ -46,6 +53,16 @@ export async function handlePlatformRequest(
   if (url.pathname === "/api/platform/stripe/webhook" && request.method === "POST") {
     return handleStripeWebhook(request, database, paymentEnv);
   }
+
+  const authResponse = await handleGoogleAuthRequest(
+    request,
+    database,
+    paymentEnv,
+    getOrCreatePlayerSession,
+    getExistingPlayerSession,
+    createSessionCookie,
+  );
+  if (authResponse) return authResponse;
 
   if (url.pathname === "/api/platform/bootstrap" && request.method === "GET") {
     const session = await getOrCreatePlayerSession(request, database);
@@ -57,6 +74,8 @@ export async function handlePlatformRequest(
         playerId: session.playerId,
         playerName: identity.playerName,
         accountRegistered: identity.accountRegistered,
+        avatarUrl: identity.avatarUrl,
+        developerLoginAvailable: isDeveloperAuthAvailable(url, paymentEnv),
         consent,
         wallet,
         creditCost: PLAY_CREDIT_COST,
@@ -103,6 +122,24 @@ export async function handlePlatformRequest(
 
   if (url.pathname === "/api/platform/credits" && request.method === "GET") {
     return Response.json({ wallet: await getWalletSummary(database, session.playerId) });
+  }
+
+  if (url.pathname === "/api/platform/profile" && request.method === "PATCH") {
+    const identity = await getPlayerIdentityById(database, session.playerId);
+    if (!identity.accountRegistered) {
+      return Response.json({ error: "user_registration_required" }, { status: 403 });
+    }
+    const body = await readJson(request);
+    const playerName = typeof body?.playerName === "string" ? body.playerName.trim() : "";
+    if (playerName.length < 1 || playerName.length > 24) {
+      return Response.json({ error: "invalid_player_name" }, { status: 400 });
+    }
+    await database.prepare(
+      `UPDATE accounts
+       SET display_name = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = (SELECT account_id FROM players WHERE id = ?)`,
+    ).bind(playerName, session.playerId).run();
+    return Response.json({ identity: await getPlayerIdentityById(database, session.playerId) });
   }
 
   if (url.pathname === "/api/platform/credit-purchases/checkout" && request.method === "POST") {
@@ -541,17 +578,26 @@ async function getPlayerIdentityById(
   playerId: string,
 ): Promise<PlayerIdentity> {
   const player = await database.prepare(
-    "SELECT guest_name FROM players WHERE id = ?",
-  ).bind(playerId).first<{ guest_name: string | null }>();
+    `SELECT p.guest_name, p.account_id, a.display_name, a.avatar_url
+     FROM players p
+     LEFT JOIN accounts a ON a.id = p.account_id
+     WHERE p.id = ?`,
+  ).bind(playerId).first<{
+    guest_name: string | null;
+    account_id: string | null;
+    display_name: string | null;
+    avatar_url: string | null;
+  }>();
   return {
     playerId,
-    playerName: player?.guest_name || createGuestName(playerId),
-    accountRegistered: false,
+    playerName: player?.display_name || player?.guest_name || createGuestName(playerId),
+    accountRegistered: Boolean(player?.account_id),
+    avatarUrl: player?.avatar_url ?? null,
   };
 }
 
 function createGuestName(playerId: string): string {
-  return `PLAYER-${playerId.replaceAll("-", "").slice(0, 8).toUpperCase()}`;
+  return `Player-${playerId.replaceAll("-", "").slice(0, 8)}`;
 }
 
 async function getExistingPlayerSession(
@@ -655,10 +701,14 @@ function platformJson(
   if (session.setCookie) {
     headers.append(
       "Set-Cookie",
-      `${SESSION_COOKIE}=${session.token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_MAX_AGE_SECONDS}${session.secureCookie ? "; Secure" : ""}`,
+      createSessionCookie(session),
     );
   }
   return new Response(JSON.stringify(body), { headers });
+}
+
+function createSessionCookie(session: PlayerSession): string {
+  return `${SESSION_COOKIE}=${session.token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_MAX_AGE_SECONDS}${session.secureCookie ? "; Secure" : ""}`;
 }
 
 function createSessionToken(): string {

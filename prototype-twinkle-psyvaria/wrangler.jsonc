@@ -3,6 +3,9 @@
   "name": "virtual-gamecenter",
   "main": "src/worker/index.ts",
   "compatibility_date": "2026-07-26",
+  "vars": {
+    "DEVELOPER_AUTH_ENABLED": "true"
+  },
   "assets": {
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",

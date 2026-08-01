@@ -1,12 +1,12 @@
 import { authorizeRequest, type BasicAuthEnv } from "./auth";
 import { handleCabinetDirectoryRequest } from "./cabinet-directory";
 import { CabinetRoom } from "./cabinet-room";
-import { handlePlatformRequest, type StripePaymentEnv } from "./platform";
+import { handlePlatformRequest } from "./platform";
 import { handleRankingRequest } from "./ranking";
 
 export { CabinetRoom };
 
-interface WorkerEnv extends Env, BasicAuthEnv, StripePaymentEnv {
+interface WorkerEnv extends Env, BasicAuthEnv {
   ASSETS: Fetcher;
   DB: D1Database;
   CABINET_ROOMS: DurableObjectNamespace<CabinetRoom>;
