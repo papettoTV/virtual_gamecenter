@@ -57,7 +57,7 @@ export function GameScreen() {
         </div>
         <div className="ranking-submit ranking-overlay" id="ranking-submit-panel">
           <h2 id="ranking-submit-heading">ランキング登録</h2>
-          <p id="ranking-result">クリアするとタイムを登録できます。</p>
+          <p id="ranking-result">ゲーム終了時にスコアを登録できます。</p>
           <div className="ranking-form">
             <input
               id="ranking-name"

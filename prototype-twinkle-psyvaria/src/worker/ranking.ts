@@ -11,7 +11,9 @@ const JSON_HEADERS = {
 const MAX_LIMIT = 100;
 const DEFAULT_LIMIT = 50;
 interface RankingRequest {
+  elapsedTimeMs?: unknown;
   clearTimeMs?: unknown;
+  cleared?: unknown;
   score?: unknown;
   maxLevel?: unknown;
   defeatedBossCount?: unknown;
@@ -30,14 +32,18 @@ async function getRanking(url: URL, db: D1Database): Promise<Response> {
   const type = url.searchParams.get("type") === "score" ? "score" : "time";
   const limit = clamp(Number(url.searchParams.get("limit") || DEFAULT_LIMIT), 1, MAX_LIMIT);
   const clientVersion = url.searchParams.get("version")?.slice(0, 40);
-  const orderBy = type === "score" ? "score DESC, clear_time_ms ASC" : "clear_time_ms ASC, score DESC";
+  const orderBy = type === "score"
+    ? "score DESC, cleared DESC, clear_time_ms ASC"
+    : "cleared DESC, clear_time_ms ASC, score DESC";
   const query = clientVersion
-    ? `SELECT player_name, clear_time_ms, score, max_level, created_at
+    ? `SELECT player_name, clear_time_ms AS play_time_ms, cleared, score, max_level,
+              defeated_boss_count, created_at
        FROM rankings
        WHERE client_version = ?
        ORDER BY ${orderBy}
        LIMIT ?`
-    : `SELECT player_name, clear_time_ms, score, max_level, created_at
+    : `SELECT player_name, clear_time_ms AS play_time_ms, cleared, score, max_level,
+              defeated_boss_count, created_at
        FROM rankings
        ORDER BY ${orderBy}
        LIMIT ?`;
@@ -61,13 +67,14 @@ async function postRanking(request: Request, db: D1Database): Promise<Response> 
   }
 
   const playerName = identity.playerName;
-  const clearTimeMs = Number(body.clearTimeMs);
+  const elapsedTimeMs = Number(body.elapsedTimeMs ?? body.clearTimeMs);
+  const cleared = body.cleared !== false;
   const score = Number(body.score);
   const maxLevel = Number(body.maxLevel);
   const defeatedBossCount = Number(body.defeatedBossCount ?? 3);
   const clientVersion = String(body.clientVersion || "dev").slice(0, 40);
 
-  if (!Number.isFinite(clearTimeMs) || clearTimeMs <= 0) return json({ error: "invalid_clear_time_ms" }, 400);
+  if (!Number.isFinite(elapsedTimeMs) || elapsedTimeMs <= 0) return json({ error: "invalid_elapsed_time_ms" }, 400);
   if (!Number.isFinite(score) || score < 0) return json({ error: "invalid_score" }, 400);
   if (!Number.isFinite(maxLevel) || maxLevel < 1) return json({ error: "invalid_max_level" }, 400);
 
@@ -75,23 +82,33 @@ async function postRanking(request: Request, db: D1Database): Promise<Response> 
   await db.batch([
     db
       .prepare(
-        `INSERT INTO rankings (player_name, clear_time_ms, score, max_level, client_version)
-         VALUES (?, ?, ?, ?, ?)`,
+        `INSERT INTO rankings (
+          player_name, clear_time_ms, cleared, score, max_level, defeated_boss_count, client_version
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
-      .bind(playerName, Math.round(clearTimeMs), Math.round(score), Math.round(maxLevel), clientVersion),
+      .bind(
+        playerName,
+        Math.round(elapsedTimeMs),
+        cleared ? 1 : 0,
+        Math.round(score),
+        Math.round(maxLevel),
+        Math.max(0, Math.round(defeatedBossCount)),
+        clientVersion,
+      ),
     db
       .prepare(
         `INSERT INTO game_results (
           id, game_id, game_version, mode, player_id, player_name, cleared, clear_time_ms,
           score, max_level, defeated_boss_count
-        ) VALUES (?, 'graze-duel', ?, 'solo', ?, ?, 1, ?, ?, ?, ?)`,
+        ) VALUES (?, 'graze-duel', ?, 'solo', ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         resultId,
         clientVersion,
         identity.playerId,
         playerName,
-        Math.round(clearTimeMs),
+        cleared ? 1 : 0,
+        cleared ? Math.round(elapsedTimeMs) : null,
         Math.round(score),
         Math.round(maxLevel),
         Math.max(0, Math.round(defeatedBossCount)),

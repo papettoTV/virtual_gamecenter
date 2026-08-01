@@ -18,8 +18,10 @@ export interface GameResult {
 
 export interface RankingEntry {
   player_name: string;
-  clear_time_ms: number;
+  play_time_ms: number;
+  cleared: number;
   score: number;
   max_level: number;
+  defeated_boss_count: number;
   created_at: string;
 }

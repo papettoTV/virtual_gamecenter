@@ -163,8 +163,8 @@ let paused = false;
 let waitingForStart = false;
 let nextBulletId = 1;
 let clearGame = false;
-let lastClearResult = null;
-let rankingSubmittedForClear = false;
+let lastRankingResult = null;
+let rankingSubmittedForResult = false;
 let debugRankingPreviewEnabled = false;
 let debugRankingPreviewShown = false;
 let currentScreen = "arcade";
@@ -349,8 +349,8 @@ function resetGame() {
   waitingForStart = true;
   updatePauseButton();
   clearGame = false;
-  lastClearResult = null;
-  rankingSubmittedForClear = false;
+  lastRankingResult = null;
+  rankingSubmittedForResult = false;
   debugRankingPreviewShown = false;
   rankingSubmitPanel?.classList.remove("is-visible");
   rankingSubmitPanel?.classList.remove("is-submitted");
@@ -568,8 +568,8 @@ if (debugRankingPreviewToggle) {
     debugRankingPreviewEnabled = debugRankingPreviewToggle.checked;
     debugRankingPreviewShown = false;
     if (!debugRankingPreviewEnabled && !clearGame) {
-      lastClearResult = null;
-      rankingSubmittedForClear = false;
+      lastRankingResult = null;
+      rankingSubmittedForResult = false;
       rankingSubmitPanel?.classList.remove("is-visible");
       rankingSubmitPanel?.classList.remove("is-submitted");
       updateRankingSubmitState();
@@ -1936,6 +1936,7 @@ function update(delta) {
   const gameDelta = getGameDelta(delta);
   if (players[0].lives <= 0) {
     gameOver = true;
+    recordGameOverResult();
   }
 
   updateHuman(players[0], gameDelta);
@@ -2491,34 +2492,46 @@ function updateDebugRankingPreview() {
   clearGame = true;
   gameOver = true;
   clearAllBullets();
-  showRankingRegistration("デバッグ: ゲーム開始3秒後のランキング登録表示です。");
+  showRankingRegistration({
+    cleared: true,
+    debugMessage: "デバッグ: ゲーム開始3秒後のランキング登録表示です。",
+  });
 }
 
 function recordClearResult() {
-  showRankingRegistration();
+  showRankingRegistration({ cleared: true });
 }
 
-function showRankingRegistration(debugMessage = "") {
-  const clearTimeMs = Math.round(elapsedRound * 1000);
+function recordGameOverResult() {
+  if (lastRankingResult || clearGame) return;
+  showRankingRegistration({ cleared: false });
+}
+
+function showRankingRegistration({ cleared, debugMessage = "" }) {
+  const elapsedTimeMs = Math.round(elapsedRound * 1000);
   const playScore = players[0].score;
-  const timeBonus = calculateClearTimeBonus(clearTimeMs);
+  const timeBonus = cleared ? calculateClearTimeBonus(elapsedTimeMs) : 0;
   const totalScore = playScore + timeBonus;
-  lastClearResult = {
-    clearTimeMs,
+  lastRankingResult = {
+    elapsedTimeMs,
+    cleared,
     playScore,
     timeBonus,
     score: totalScore,
     maxLevel: players[0].level,
+    defeatedBossCount,
   };
-  rankingSubmittedForClear = false;
+  rankingSubmittedForResult = false;
   rankingSubmitPanel?.classList.remove("is-submitted");
   if (rankingSubmitHeading) rankingSubmitHeading.textContent = "ランキング登録";
   if (rankingSubmitList) rankingSubmitList.innerHTML = "";
   if (rankingResult) {
     const prefix = debugMessage ? `${debugMessage} ` : "";
-    rankingResult.textContent =
-      `${prefix}SCORE ${formatScore(totalScore)} ` +
-      `（プレイ ${formatScore(playScore)} + タイムボーナス ${formatScore(timeBonus)}）`;
+    rankingResult.textContent = cleared
+      ? `${prefix}SCORE ${formatScore(totalScore)} ` +
+        `（プレイ ${formatScore(playScore)} + タイムボーナス ${formatScore(timeBonus)}）`
+      : `${prefix}GAME OVER / SCORE ${formatScore(totalScore)} ` +
+        `（ボス撃破 ${defeatedBossCount} / LV ${players[0].level} / TIME ${formatRankingTime(elapsedTimeMs)}）`;
   }
   rankingSubmitPanel?.classList.add("is-visible");
   updateRankingSubmitState();
@@ -2543,11 +2556,11 @@ function isLocalDevelopment() {
 function updateRankingSubmitState() {
   if (!rankingSubmitButton) return;
   const hasName = Boolean(rankingNameInput?.value.trim());
-  rankingSubmitButton.disabled = !lastClearResult || rankingSubmittedForClear || !hasName;
+  rankingSubmitButton.disabled = !lastRankingResult || rankingSubmittedForResult || !hasName;
 }
 
 async function submitRanking() {
-  if (!lastClearResult || rankingSubmittedForClear || !rankingNameInput) return;
+  if (!lastRankingResult || rankingSubmittedForResult || !rankingNameInput) return;
   const playerName = rankingNameInput.value.trim();
   if (!playerName) {
     updateRankingSubmitState();
@@ -2559,13 +2572,14 @@ async function submitRanking() {
 
   try {
     await submitRankingEntry({
-      clearTimeMs: lastClearResult.clearTimeMs,
-      score: lastClearResult.score,
-      maxLevel: lastClearResult.maxLevel,
-      defeatedBossCount,
+      elapsedTimeMs: lastRankingResult.elapsedTimeMs,
+      cleared: lastRankingResult.cleared,
+      score: lastRankingResult.score,
+      maxLevel: lastRankingResult.maxLevel,
+      defeatedBossCount: lastRankingResult.defeatedBossCount,
       clientVersion: CLIENT_VERSION,
     });
-    rankingSubmittedForClear = true;
+    rankingSubmittedForResult = true;
     setRankingMessage("登録しました。");
     rankingSubmitPanel?.classList.add("is-submitted");
     if (rankingSubmitHeading) rankingSubmitHeading.textContent = "スコアランキング";
@@ -2597,7 +2611,7 @@ function renderRanking(rankings) {
 
 function getRankingListTargets() {
   const targets = rankingList ? [rankingList] : [];
-  if (rankingSubmittedForClear && rankingSubmitList) targets.push(rankingSubmitList);
+  if (rankingSubmittedForResult && rankingSubmitList) targets.push(rankingSubmitList);
   return targets;
 }
 
@@ -2619,8 +2633,11 @@ function renderRankingInto(target, rankings) {
     const item = document.createElement("li");
     const name = document.createElement("strong");
     name.textContent = ranking.player_name;
+    const resultLabel = ranking.cleared
+      ? "CLEAR"
+      : `GAME OVER / BOSS ${ranking.defeated_boss_count}`;
     const detail = document.createTextNode(
-      ` SCORE ${formatScore(ranking.score)} / TIME ${formatRankingTime(ranking.clear_time_ms)} / LV ${ranking.max_level}`,
+      ` SCORE ${formatScore(ranking.score)} / ${resultLabel} / TIME ${formatRankingTime(ranking.play_time_ms)} / LV ${ranking.max_level}`,
     );
     item.append(name, detail);
     target.append(item);
