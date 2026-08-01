@@ -95,6 +95,18 @@ export async function handlePlatformRequest(
     await database.prepare("DELETE FROM player_sessions WHERE token_hash = ?")
       .bind(await hashToken(session.token)).run();
     const guestSession = await getOrCreatePlayerSession(request, database);
+    await database.batch([
+      database.prepare(
+        `INSERT OR IGNORE INTO consent_records
+          (id, player_id, policy_type, policy_version)
+         VALUES (?, ?, 'terms', ?)`,
+      ).bind(`logout-consent:terms:${guestSession.playerId}`, guestSession.playerId, TERMS_VERSION),
+      database.prepare(
+        `INSERT OR IGNORE INTO consent_records
+          (id, player_id, policy_type, policy_version)
+         VALUES (?, ?, 'privacy', ?)`,
+      ).bind(`logout-consent:privacy:${guestSession.playerId}`, guestSession.playerId, PRIVACY_VERSION),
+    ]);
     const guestIdentity = await getPlayerIdentityById(database, guestSession.playerId);
     return platformJson({
       playerId: guestSession.playerId,

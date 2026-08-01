@@ -191,11 +191,13 @@ describe("Cloudflare Worker", () => {
       playerId: string;
       playerName: string;
       accountRegistered: boolean;
+      consent: { accepted: boolean };
       wallet: { availableTotal: number };
     }>();
     expect(guest.playerId).not.toBe(registered.playerId);
     expect(guest.playerName).toMatch(/^Player-[a-f0-9]{8}$/);
     expect(guest.accountRegistered).toBe(false);
+    expect(guest.consent.accepted).toBe(true);
     expect(guest.wallet.availableTotal).toBe(0);
     expect(logoutResponse.headers.get("set-cookie")).toContain("vgc_session=");
   });
