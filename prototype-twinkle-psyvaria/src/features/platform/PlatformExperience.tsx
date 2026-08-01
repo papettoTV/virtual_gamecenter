@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   acceptPolicies,
   capturePlayCredit,
+  createCreditCheckout,
+  fetchCreditPurchaseStatus,
   fetchPlatformBootstrap,
   PlatformApiError,
   releasePlayCredit,
@@ -14,6 +16,7 @@ type PolicyKind = "terms" | "privacy";
 type PendingPlayAction =
   | { type: "button"; button: HTMLButtonElement }
   | { type: "restartKey" };
+type PurchaseUnit = 1 | 3 | 5 | 10;
 
 const PLAY_BUTTON_IDS = new Set(["start-solo", "touch-restart", "clear-restart"]);
 
@@ -25,6 +28,10 @@ export function PlatformExperience() {
   const [policy, setPolicy] = useState<PolicyKind | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingPlayAction | null>(null);
   const [playDialog, setPlayDialog] = useState<"confirm" | "insufficient" | null>(null);
+  const [purchaseDialog, setPurchaseDialog] = useState<"select" | "processing" | "complete" | null>(null);
+  const [purchaseUnit, setPurchaseUnit] = useState<PurchaseUnit>(1);
+  const [purchasedCredits, setPurchasedCredits] = useState(0);
+  const [purchaseError, setPurchaseError] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [profileOpen, setProfileOpen] = useState(false);
@@ -43,6 +50,49 @@ export function PlatformExperience() {
   useEffect(() => {
     void loadPlatform();
   }, [loadPlatform]);
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const purchaseResult = url.searchParams.get("purchase");
+    const checkoutSessionId = url.searchParams.get("session_id");
+    if (purchaseResult === "cancelled") {
+      cleanPurchaseParams(url);
+      restoreStoredPlayAction(setPendingAction);
+      setPlayDialog("insufficient");
+      return;
+    }
+    if (purchaseResult !== "success" || !checkoutSessionId) return;
+
+    setPurchaseDialog("processing");
+    let cancelled = false;
+    let pollTimer = 0;
+    let attempts = 0;
+    const pollPurchase = async () => {
+      attempts += 1;
+      try {
+        const result = await fetchCreditPurchaseStatus(checkoutSessionId);
+        if (cancelled) return;
+        updateWallet(result.wallet);
+        if (result.status === "paid") {
+          setPurchasedCredits(result.creditAmount);
+          setPurchaseDialog("complete");
+          cleanPurchaseParams(url);
+          return;
+        }
+      } catch {
+      }
+      if (attempts < 15 && !cancelled) {
+        pollTimer = window.setTimeout(() => void pollPurchase(), 1000);
+      } else if (!cancelled) {
+        setPurchaseError("決済状況を確認できません。プロフィールの残高を再読み込みしてください。");
+      }
+    };
+    void pollPurchase();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(pollTimer);
+    };
+  }, []);
 
   useEffect(() => {
     const refreshWallet = () => void loadPlatform();
@@ -188,6 +238,36 @@ export function PlatformExperience() {
     }
   };
 
+  const handlePurchase = async () => {
+    setBusy(true);
+    setPurchaseError("");
+    try {
+      storePendingPlayAction(pendingAction);
+      const currency = getPurchaseCurrency();
+      const checkout = await createCreditCheckout(
+        purchaseUnit,
+        currency,
+        `${window.location.pathname}${window.location.search}`,
+      );
+      window.location.assign(checkout.checkoutUrl);
+    } catch (error) {
+      setPurchaseError(
+        error instanceof PlatformApiError && error.code === "stripe_not_configured"
+          ? "Stripeの設定が完了していません。"
+          : "購入画面を開けませんでした。もう一度お試しください。",
+      );
+      setBusy(false);
+    }
+  };
+
+  const closePurchaseComplete = () => {
+    setPurchaseDialog(null);
+    setPurchasedCredits(0);
+    const restored = restoreStoredPlayAction(setPendingAction);
+    window.sessionStorage.removeItem("vgc_pending_play_action");
+    setPlayDialog(restored ? "confirm" : null);
+  };
+
   const updateWallet = (wallet: WalletSummary) => {
     setPlatform((current) => current ? { ...current, wallet } : current);
   };
@@ -303,22 +383,107 @@ export function PlatformExperience() {
               </p>
             ) : (
               <p>
-                ゲーム開始には1クレジット必要です。追加購入は現在準備中です。
+                ゲーム開始には1クレジット必要です。クレジットを購入しますか？
               </p>
             )}
             <div className="platform-dialog-actions">
               <button type="button" onClick={() => {
+                if (playDialog === "insufficient") {
+                  window.sessionStorage.removeItem("vgc_pending_play_action");
+                }
                 setPlayDialog(null);
                 setPendingAction(null);
               }}>
-                キャンセル
+                {playDialog === "confirm" ? "キャンセル" : "いいえ"}
               </button>
               {playDialog === "confirm" && (
                 <button className="platform-primary-button" type="button" disabled={busy} onClick={() => void handlePlayConfirm()}>
                   {busy ? "準備中…" : "1クレジットで開始"}
                 </button>
               )}
+              {playDialog === "insufficient" && (
+                <button className="platform-primary-button" type="button" onClick={() => {
+                  setPlayDialog(null);
+                  setPurchaseDialog("select");
+                }}>
+                  はい
+                </button>
+              )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {purchaseDialog === "select" && (
+        <div className="platform-overlay platform-overlay-front" role="dialog" aria-modal="true" aria-labelledby="purchase-title">
+          <div className="platform-dialog">
+            <p className="eyebrow">Credit Shop</p>
+            <h2 id="purchase-title">クレジットを購入</h2>
+            <p>5クレジットを1単位として、購入する単位数を選んでください。</p>
+            <div className="credit-package-grid" role="radiogroup" aria-label="購入単位">
+              {([1, 3, 5, 10] as PurchaseUnit[]).map((unit) => {
+                const credits = unit === 10 ? 60 : unit * 5;
+                const selected = purchaseUnit === unit;
+                return (
+                  <button
+                    key={unit}
+                    className={selected ? "credit-package is-selected" : "credit-package"}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    onClick={() => setPurchaseUnit(unit)}
+                  >
+                    <span>{unit}単位</span>
+                    <strong>{credits}クレジット</strong>
+                    <small>{formatPurchasePrice(unit)}</small>
+                    {unit === 10 && <em>10クレジット ボーナス</em>}
+                  </button>
+                );
+              })}
+            </div>
+            {purchaseError && <p className="platform-inline-error" role="alert">{purchaseError}</p>}
+            <div className="platform-dialog-actions">
+              <button type="button" disabled={busy} onClick={() => {
+                setPurchaseDialog(null);
+                setPlayDialog("insufficient");
+              }}>
+                戻る
+              </button>
+              <button className="platform-primary-button" type="button" disabled={busy} onClick={() => void handlePurchase()}>
+                {busy ? "Stripeへ接続中…" : `${formatPurchasePrice(purchaseUnit)}で購入`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {purchaseDialog === "processing" && (
+        <div className="platform-overlay platform-overlay-front" role="dialog" aria-modal="true" aria-labelledby="purchase-processing-title">
+          <div className="platform-dialog platform-dialog-small">
+            <p className="eyebrow">Payment Confirmation</p>
+            <h2 id="purchase-processing-title">決済を確認しています</h2>
+            <p>Stripeからの決済完了通知を確認後、クレジットを付与します。</p>
+            {purchaseError && <p className="platform-inline-error" role="alert">{purchaseError}</p>}
+          </div>
+        </div>
+      )}
+
+      {purchaseDialog === "complete" && (
+        <div className="platform-overlay platform-overlay-front" role="dialog" aria-modal="true" aria-labelledby="purchase-complete-title">
+          <div className="platform-dialog">
+            <p className="eyebrow">Payment Complete</p>
+            <h2 id="purchase-complete-title">購入が完了しました</h2>
+            <p><strong>{purchasedCredits}クレジット</strong>を付与しました。</p>
+            <div className="account-link-panel">
+              <strong>ほかの端末でもクレジットを利用できます</strong>
+              <p>アカウント登録すると、別のブラウザ・PC・スマートフォンでも購入クレジットを共有できます。</p>
+              <button type="button" onClick={() => setNotice("アカウント登録は現在準備中です。")}>
+                アカウント登録へ
+              </button>
+            </div>
+            <button className="platform-primary-button" type="button" onClick={closePurchaseComplete}>
+              クレジット投入画面に戻る
+            </button>
           </div>
         </div>
       )}
@@ -379,4 +544,39 @@ function PolicyDialog({
 function getCabinetId(): string {
   const match = window.location.pathname.match(/^\/cabinets\/([a-zA-Z0-9-]+)/);
   return match?.[1] ?? "local-cabinet";
+}
+
+function getPurchaseCurrency(): "jpy" | "usd" {
+  return navigator.language.toLowerCase().startsWith("ja") ? "jpy" : "usd";
+}
+
+function formatPurchasePrice(unit: PurchaseUnit): string {
+  return getPurchaseCurrency() === "jpy" ? `${unit * 100}円` : `$${unit}`;
+}
+
+function storePendingPlayAction(action: PendingPlayAction | null) {
+  if (!action) return;
+  const value = action.type === "restartKey" ? "restartKey" : action.button.id;
+  window.sessionStorage.setItem("vgc_pending_play_action", value);
+}
+
+function restoreStoredPlayAction(
+  setAction: (action: PendingPlayAction | null) => void,
+): boolean {
+  const stored = window.sessionStorage.getItem("vgc_pending_play_action");
+  if (!stored) return false;
+  if (stored === "restartKey") {
+    setAction({ type: "restartKey" });
+    return true;
+  }
+  const button = document.getElementById(stored);
+  if (!(button instanceof HTMLButtonElement)) return false;
+  setAction({ type: "button", button });
+  return true;
+}
+
+function cleanPurchaseParams(url: URL) {
+  url.searchParams.delete("purchase");
+  url.searchParams.delete("session_id");
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}`);
 }

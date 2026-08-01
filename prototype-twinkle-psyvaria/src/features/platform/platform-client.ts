@@ -27,6 +27,13 @@ interface ReservationResponse {
   wallet: WalletSummary;
 }
 
+export interface CreditPurchaseStatus {
+  purchaseId: string;
+  status: "pending" | "paid" | "cancelled" | "failed";
+  creditAmount: number;
+  wallet: WalletSummary;
+}
+
 export class PlatformApiError extends Error {
   constructor(
     public readonly code: string,
@@ -75,6 +82,25 @@ export async function releasePlayCredit(
   return requestJson(`/api/platform/credit-reservations/${reservationId}/release`, {
     method: "POST",
   });
+}
+
+export async function createCreditCheckout(
+  unitCount: 1 | 3 | 5 | 10,
+  currency: "jpy" | "usd",
+  returnPath: string,
+): Promise<{ purchaseId: string; checkoutSessionId: string; checkoutUrl: string }> {
+  return requestJson("/api/platform/credit-purchases/checkout", {
+    method: "POST",
+    body: JSON.stringify({ unitCount, currency, returnPath }),
+  });
+}
+
+export async function fetchCreditPurchaseStatus(
+  checkoutSessionId: string,
+): Promise<CreditPurchaseStatus> {
+  return requestJson(
+    `/api/platform/credit-purchases/status?sessionId=${encodeURIComponent(checkoutSessionId)}`,
+  );
 }
 
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {

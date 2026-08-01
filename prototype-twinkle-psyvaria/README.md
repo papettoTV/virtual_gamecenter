@@ -12,6 +12,12 @@ npm run db:migrate:local
 npm run dev
 ```
 
+Stripe決済をローカルで確認する場合は、`.dev.vars.example`を`.dev.vars`へコピーし、Stripeのテスト用Secret KeyとStripe CLIが表示するWebhook Secretを設定します。Webhookは次のURLへ転送します。
+
+```bash
+stripe listen --forward-to http://localhost:5174/api/platform/stripe/webhook
+```
+
 PCでは `http://localhost:5174/`、スマホではPCと同じWi-Fiにつなぎ、起動時に表示される `Network` のURLを開きます。ローカルとプライベートネットワーク内ではBasic認証を要求しません。
 
 変更後の確認:
@@ -38,8 +44,12 @@ npm run preview
 npm run db:migrate:remote
 npx wrangler secret put BASIC_AUTH_USERNAME
 npx wrangler secret put BASIC_AUTH_PASSWORD
+npx wrangler secret put STRIPE_SECRET_KEY
+npx wrangler secret put STRIPE_WEBHOOK_SECRET
 npm run deploy
 ```
+
+StripeのWebhook送信先には `https://<公開ドメイン>/api/platform/stripe/webhook` を設定し、`checkout.session.completed` を購読します。購入クレジットは成功画面では付与せず、署名検証済みWebhookを受信した時点でD1台帳へ冪等付与します。
 
 `npm run deploy` は本番公開を行うため、明示的にデプロイするときだけ実行します。
 

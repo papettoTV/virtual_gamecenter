@@ -1079,6 +1079,88 @@ canvas {
   margin-top: 0;
 }
 
+.credit-package-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 22px 0;
+}
+
+.credit-package {
+  position: relative;
+  display: grid;
+  min-height: 132px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.credit-package:hover,
+.credit-package:focus-visible,
+.credit-package.is-selected {
+  border-color: rgba(105, 247, 255, 0.76);
+  background: rgba(105, 247, 255, 0.1);
+  outline: none;
+}
+
+.credit-package span,
+.credit-package small {
+  color: var(--muted);
+}
+
+.credit-package strong {
+  margin-top: 5px;
+  font-size: 20px;
+}
+
+.credit-package small {
+  margin-top: 4px;
+}
+
+.credit-package em {
+  margin-top: 8px;
+  color: #ffcc68;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.platform-inline-error {
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 92, 122, 0.36);
+  border-radius: 10px;
+  background: rgba(255, 92, 122, 0.08);
+  color: #ff9aae;
+}
+
+.account-link-panel {
+  margin-top: 22px;
+  padding: 18px;
+  border: 1px solid rgba(105, 247, 255, 0.22);
+  border-radius: 14px;
+  background: rgba(105, 247, 255, 0.06);
+}
+
+.account-link-panel p {
+  margin: 6px 0 14px;
+  color: var(--muted);
+}
+
+.account-link-panel button {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  padding: 10px 13px;
+}
+
 .policy-dialog p {
   margin-top: 8px;
 }
@@ -1182,6 +1264,10 @@ canvas {
 
   .platform-dialog-actions button {
     width: 100%;
+  }
+
+  .credit-package-grid {
+    grid-template-columns: 1fr;
   }
 
   .is-game-screen .shell {
