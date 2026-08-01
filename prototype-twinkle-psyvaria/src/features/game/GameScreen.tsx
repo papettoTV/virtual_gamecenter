@@ -69,7 +69,7 @@ export function GameScreen() {
             <button id="ranking-submit" type="button" disabled>登録</button>
           </div>
           <ol className="ranking-submit-list" id="ranking-submit-list" />
-          <button id="clear-restart" className="clear-restart-button" type="button">リスタート</button>
+          <button id="clear-restart" className="clear-restart-button" type="button">ゲームに戻る</button>
         </div>
       </div>
 

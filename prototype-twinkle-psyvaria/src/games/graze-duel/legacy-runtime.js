@@ -611,7 +611,7 @@ if (touchRestart) {
 
 if (clearRestart) {
   clearRestart.addEventListener("click", () => {
-    if (cabinetRole !== "spectator" && !isVersusParticipant()) resetGame();
+    rankingSubmitPanel?.classList.remove("is-visible");
   });
 }
 
