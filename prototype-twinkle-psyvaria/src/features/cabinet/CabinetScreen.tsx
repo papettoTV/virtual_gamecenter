@@ -74,9 +74,9 @@ export function CabinetScreen() {
             loop
             playsInline
             preload="metadata"
-            poster="/graze-duel-promo-poster.jpg"
+            poster="/graze-duel-promo-poster.jpg?v=20260801-actual"
           >
-            <source src="/graze-duel-promo.mp4" type="video/mp4" />
+            <source src="/graze-duel-promo.mp4?v=20260801-actual" type="video/mp4" />
             お使いのブラウザでは動画を再生できません。
           </video>
         </section>

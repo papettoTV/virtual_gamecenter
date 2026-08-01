@@ -137,6 +137,8 @@ const START_BULLET_DELAY = 2.0;
 const HIT_MARKER_RADIUS = 3;
 const CLEAR_TIME_BONUS_BASE = 600_000;
 const CLIENT_VERSION = "prototype-score-ranking-1";
+const PROMO_CAPTURE_MODE = import.meta.env.DEV
+  && new URLSearchParams(window.location.search).get("promoCapture") === "1";
 
 const BOSS_PHASES = [
   { level: 1, spawnLevel: 10, name: "BOSS LV1", shape: "circle", hp: 100, hitsToDefeat: 12, radius: 44, color: "#18051f" },
@@ -459,7 +461,31 @@ function isBossEncounterInProgress() {
 }
 
 resetGame();
-syncScreenWithUrl();
+if (PROMO_CAPTURE_MODE) startPromoCapture();
+else syncScreenWithUrl();
+
+function startPromoCapture() {
+  resetGame();
+  cabinetRole = "player";
+  gameSessionActive = true;
+  paused = false;
+  waitingForStart = false;
+  playerHitboxEnabled = false;
+  players[0].level = 17;
+  players[0].score = 18_420;
+  players[0].gauge = getAttackCost(players[0]) - 70;
+  players[0].invincible = 0;
+  players[1].level = 13;
+  players[1].score = 12_660;
+  scheduleBossPhase(0);
+  startBossEntrance();
+  boss.arrivalTimer = 0;
+  boss.arrivalProgress = 1;
+  completeBossEntrance();
+  boss.attackTimer = 0;
+  showScreen("game");
+  lastTime = performance.now();
+}
 
 if (selectGameButton) {
   selectGameButton.addEventListener("click", () => {
@@ -2633,6 +2659,10 @@ function tryAutoAttack(attacker, defender) {
 
 function updateHuman(player, delta) {
   if (gameOver) return;
+  if (PROMO_CAPTURE_MODE) {
+    updatePromoPlayer(player, delta);
+    return;
+  }
   let moveX = 0;
   let moveY = 0;
   if (keys.has("ArrowLeft") || keys.has("KeyA")) moveX -= 1;
@@ -2644,6 +2674,27 @@ function updateHuman(player, delta) {
     moveY += touchMove.y;
   }
   movePlayer(player, moveX, moveY, keys.has("ShiftLeft") || keys.has("ShiftRight"), delta);
+}
+
+function updatePromoPlayer(player, delta) {
+  let targetX = player.fieldX + FIELD_WIDTH / 2 + Math.sin(elapsedRound * 1.4) * 96;
+  let targetY = FIELD_BOTTOM - 92 + Math.sin(elapsedRound * 2.1) * 34;
+
+  if (player.levelUpInvincible > 0 && boss.encounterState === "active" && boss.shieldAttackCharges > 0) {
+    targetX = boss.x;
+    targetY = boss.y + boss.radius + Math.max(18, getInvincibleRingDamageRadius(player) * 0.72);
+  } else {
+    const closestBullet = findClosestBullet(player);
+    if (closestBullet) {
+      const grazeSide = closestBullet.x < player.x ? 1 : -1;
+      targetX = closestBullet.x + grazeSide * (closestBullet.radius + HIT_RADIUS + 9);
+      targetY = closestBullet.y + 22;
+    }
+  }
+
+  const moveX = Math.abs(targetX - player.x) < 3 ? 0 : Math.sign(targetX - player.x);
+  const moveY = Math.abs(targetY - player.y) < 3 ? 0 : Math.sign(targetY - player.y);
+  movePlayer(player, moveX, moveY, true, delta);
 }
 
 function updateTouchMove(event) {

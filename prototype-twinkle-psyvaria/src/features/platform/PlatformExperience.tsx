@@ -18,6 +18,8 @@ type PendingPlayAction =
 const PLAY_BUTTON_IDS = new Set(["start-solo", "touch-restart", "clear-restart"]);
 
 export function PlatformExperience() {
+  const promoCaptureMode = import.meta.env.DEV
+    && new URLSearchParams(window.location.search).get("promoCapture") === "1";
   const [platform, setPlatform] = useState<PlatformBootstrap | null>(null);
   const [loadingError, setLoadingError] = useState("");
   const [policy, setPolicy] = useState<PolicyKind | null>(null);
@@ -206,6 +208,8 @@ export function PlatformExperience() {
 
   const consentRequired = Boolean(platform && !platform.consent.accepted);
   const wallet = platform?.wallet;
+
+  if (promoCaptureMode) return null;
 
   return (
     <>
