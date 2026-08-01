@@ -1,4 +1,4 @@
-# Graze Duel 対戦フロー
+# BUZZ BARRIER 対戦フロー
 
 ## 基本方針
 

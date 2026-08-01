@@ -236,11 +236,11 @@ function CabinetMachineScreen({
 }) {
   return (
     <span className="cabinet-machine" aria-hidden="true">
-      <span className="cabinet-machine-marquee">GRAZE DUEL</span>
+      <span className="cabinet-machine-marquee">BUZZ BARRIER</span>
       <span className={`cabinet-machine-monitor is-${mode}`}>
         {mode !== "playing" ? (
           <>
-            <span className="cabinet-ready-logo">GD</span>
+            <span className="cabinet-ready-logo">BB</span>
             <span className="cabinet-ready-text">
               {mode === "ready" ? "PRESS START" : "NO PLAYER"}
             </span>

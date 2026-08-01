@@ -18,7 +18,7 @@ export function CabinetScreen() {
             <p className="eyebrow" id="cabinet-id-label">
               Cabinet
             </p>
-            <h2>Graze Duel</h2>
+            <h2>BUZZ BARRIER</h2>
           </div>
           <button
             id="copy-cabinet-url"
@@ -66,7 +66,7 @@ export function CabinetScreen() {
         >
           <div className="cabinet-promo-heading">
             <strong id="cabinet-promo-title">プレイイメージ</strong>
-            <small>Graze Duel Gameplay</small>
+            <small>バズバリア Gameplay</small>
           </div>
           <video
             autoPlay

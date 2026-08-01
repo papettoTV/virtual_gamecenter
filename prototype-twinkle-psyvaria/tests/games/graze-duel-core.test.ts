@@ -5,7 +5,7 @@ import {
   LEVEL_UP_INVINCIBLE_TIME,
 } from "../../src/games/graze-duel/core";
 
-describe("Graze Duel core rules", () => {
+describe("BUZZ BARRIER core rules", () => {
   it("raises the gauge requirement on every level", () => {
     expect(calculateAttackCost(1, 30)).toBe(420);
     expect(calculateAttackCost(10, 30)).toBe(690);

@@ -16,7 +16,7 @@ export function GameScreen() {
       </div>
       <div className="game-nav">
         <button id="game-back-to-arcade" className="secondary-button" type="button">筐体画面に戻る</button>
-        <span>ゲームセンター &gt; ゲーム一覧 &gt; Graze Duel &gt; 共有筐体</span>
+        <span>ゲームセンター &gt; ゲーム一覧 &gt; BUZZ BARRIER &gt; 共有筐体</span>
       </div>
       <details className="debug-panel" id="debug-panel">
         <summary>デバッグ設定</summary>
@@ -43,7 +43,7 @@ export function GameScreen() {
       </details>
 
       <div className="game-frame">
-        <canvas id="game" width="960" height="640" aria-label="Graze Duel game canvas" />
+        <canvas id="game" width="960" height="640" aria-label="BUZZ BARRIER game canvas" />
         <div className="versus-overlay is-hidden" id="versus-overlay" role="dialog" aria-modal="true">
           <p className="eyebrow" id="versus-eyebrow">Versus</p>
           <h2 id="versus-title">対戦</h2>

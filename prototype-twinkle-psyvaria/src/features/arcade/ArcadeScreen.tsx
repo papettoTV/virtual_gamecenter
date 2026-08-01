@@ -11,9 +11,10 @@ export function ArcadeScreen() {
             </div>
           </div>
           <div className="game-select-card">
-            <div className="game-card-thumb" aria-hidden="true">GD</div>
+            <div className="game-card-thumb" aria-hidden="true">BB</div>
             <div className="game-card-body">
-              <strong>Graze Duel</strong>
+              <strong>BUZZ BARRIER</strong>
+              <small>バズバリア</small>
               <span>弾幕かすり・無敵体当たり・ボス撃破型シューティング</span>
             </div>
             <div className="game-card-actions">

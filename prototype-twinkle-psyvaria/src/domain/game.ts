@@ -19,8 +19,8 @@ export interface PlaySession {
   endedAt: number | null;
 }
 
-export const GRAZE_DUEL: GameDefinition = {
+export const BUZZ_BARRIER: GameDefinition = {
   id: "graze-duel",
-  title: "Graze Duel",
+  title: "BUZZ BARRIER",
   currentVersion: "prototype-boss-rush-1",
 };

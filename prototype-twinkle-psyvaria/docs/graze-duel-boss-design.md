@@ -1,4 +1,4 @@
-# Graze Duel ボス戦設計
+# BUZZ BARRIER ボス戦設計
 
 ## 目的
 

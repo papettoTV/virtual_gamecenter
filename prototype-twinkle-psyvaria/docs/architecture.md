@@ -2,12 +2,12 @@
 
 ## 方針
 
-ゲームセンターと個別ゲームを別の境界として扱います。プラットフォーム側はゲーム選択、筐体、プレイヤー、観戦、クレジット、結果を管理し、Graze Duel側はゲームルールと描画だけを担当します。
+ゲームセンターと個別ゲームを別の境界として扱います。プラットフォーム側はゲーム選択、筐体、プレイヤー、観戦、クレジット、結果を管理し、BUZZ BARRIER側はゲームルールと描画だけを担当します。
 
 ```mermaid
 flowchart LR
   UI["React画面"] --> Domain["ドメインルール"]
-  UI --> Runtime["Graze Duelランタイム"]
+  UI --> Runtime["BUZZ BARRIERランタイム"]
   UI --> Realtime["WebSocketクライアント"]
   Realtime --> Room["Durable Object 筐体ルーム"]
   UI --> API["Worker API"]
@@ -43,9 +43,9 @@ erDiagram
 - `GameScreen`: プレイ・観戦共通のゲーム表示領域
 - `src/domain`: UIや通信に依存しない状態遷移
 - `src/realtime`: 通信形式と再接続
-- `src/games/graze-duel`: Graze Duel固有実装
+- `src/games/graze-duel`: BUZZ BARRIER固有実装
 
-Graze Duelの既存Canvas処理は挙動を壊さないため `legacy-runtime.js` に隔離しています。新しい画面、ドメイン、通信、APIはTypeScriptで実装し、ゲーム固有処理を変更する際は `core.ts`、`audio.ts` などへ段階的に移します。この互換層からプラットフォーム機能を増やさないことをルールとします。
+BUZZ BARRIERの既存Canvas処理は挙動を壊さないため `legacy-runtime.js` に隔離しています。新しい画面、ドメイン、通信、APIはTypeScriptで実装し、ゲーム固有処理を変更する際は `core.ts`、`audio.ts` などへ段階的に移します。この互換層からプラットフォーム機能を増やさないことをルールとします。
 
 ## リアルタイム通信
 
