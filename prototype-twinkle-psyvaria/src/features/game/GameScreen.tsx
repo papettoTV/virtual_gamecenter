@@ -77,7 +77,12 @@ export function GameScreen() {
             </button>
           </div>
           <ol className="ranking-submit-list" id="ranking-submit-list" />
-          <button id="clear-restart" className="clear-restart-button" type="button">ゲームに戻る</button>
+          <div className="ranking-next-actions">
+            <button id="ranking-another-game" className="clear-restart-button" type="button">別のゲームをする</button>
+            <button id="ranking-retry" className="clear-restart-button ranking-retry-button" type="button">
+              1クレジットでリトライ
+            </button>
+          </div>
         </div>
       </div>
 

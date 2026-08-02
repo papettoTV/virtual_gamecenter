@@ -50,7 +50,8 @@ const gaugeGrowthValue = document.querySelector("#gauge-growth-value");
 const gaugeGrowthLabel = document.querySelector("#gauge-growth-label");
 const touchRestart = document.querySelector("#touch-restart");
 const touchPause = document.querySelector("#touch-pause");
-const clearRestart = document.querySelector("#clear-restart");
+const rankingAnotherGame = document.querySelector("#ranking-another-game");
+const rankingRetry = document.querySelector("#ranking-retry");
 const rankingNameInput = document.querySelector("#ranking-name");
 const rankingSubmitButton = document.querySelector("#ranking-submit");
 const rankingSubmitPanel = document.querySelector("#ranking-submit-panel");
@@ -610,9 +611,17 @@ if (touchRestart) {
   });
 }
 
-if (clearRestart) {
-  clearRestart.addEventListener("click", () => {
+if (rankingAnotherGame) {
+  rankingAnotherGame.addEventListener("click", () => {
     rankingSubmitPanel?.classList.remove("is-visible");
+    leaveCabinet();
+  });
+}
+
+if (rankingRetry) {
+  rankingRetry.addEventListener("click", () => {
+    rankingSubmitPanel?.classList.remove("is-visible");
+    resetGame();
   });
 }
 
@@ -2562,6 +2571,8 @@ function restoreRankingRegistration() {
     }
     rankingSubmitPanel?.classList.remove("is-submitted");
     rankingSubmitPanel?.classList.add("is-visible");
+    gameSessionActive = false;
+    showScreen("game");
     updateRankingSubmitState();
   } finally {
     window.sessionStorage.removeItem(RANKING_REGISTRATION_RETURN_KEY);

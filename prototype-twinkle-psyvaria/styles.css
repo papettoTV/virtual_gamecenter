@@ -801,6 +801,17 @@ canvas {
   -webkit-tap-highlight-color: transparent;
 }
 
+.ranking-next-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.ranking-retry-button {
+  border-color: rgba(105, 247, 255, 0.42);
+  background: rgba(105, 247, 255, 0.18);
+}
+
 .ranking-form button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
@@ -1482,6 +1493,10 @@ canvas {
 
   .platform-dialog-actions button {
     width: 100%;
+  }
+
+  .ranking-next-actions {
+    grid-template-columns: 1fr;
   }
 
   .credit-package-grid {
