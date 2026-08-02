@@ -59,7 +59,6 @@ const rankingSubmitHeading = document.querySelector("#ranking-submit-heading");
 const rankingSubmitList = document.querySelector("#ranking-submit-list");
 const rankingResult = document.querySelector("#ranking-result");
 const rankingList = document.querySelector("#ranking-list");
-const rankingRefresh = document.querySelector("#ranking-refresh");
 const challengeRequestButton = document.querySelector("#challenge-request");
 const spectatorStatusText = document.querySelector("#spectator-status-text");
 const spectatorViewLabel = document.querySelector("#spectator-view-label");
@@ -635,12 +634,6 @@ if (touchPause) {
 if (rankingSubmitButton) {
   rankingSubmitButton.addEventListener("click", () => {
     submitRanking();
-  });
-}
-
-if (rankingRefresh) {
-  rankingRefresh.addEventListener("click", () => {
-    loadRanking();
   });
 }
 
@@ -2659,9 +2652,13 @@ function getRankingListTargets() {
 
 function setRankingListMessage(target, message) {
   target.innerHTML = "";
-  const item = document.createElement("li");
-  item.textContent = message;
-  target.append(item);
+  const row = document.createElement("tr");
+  const cell = document.createElement("td");
+  cell.colSpan = 4;
+  cell.className = "ranking-table-message";
+  cell.textContent = message;
+  row.append(cell);
+  target.append(row);
 }
 
 function renderRankingInto(target, rankings) {
@@ -2671,19 +2668,34 @@ function renderRankingInto(target, rankings) {
     return;
   }
 
-  for (const ranking of rankings) {
-    const item = document.createElement("li");
-    const name = document.createElement("strong");
+  rankings.forEach((ranking, index) => {
+    const row = document.createElement("tr");
+    const rank = document.createElement("td");
+    const name = document.createElement("td");
+    const score = document.createElement("td");
+    const createdAt = document.createElement("td");
+    rank.textContent = String(index + 1);
     name.textContent = ranking.player_name;
-    const resultLabel = ranking.cleared
-      ? "CLEAR"
-      : `GAME OVER / BOSS ${ranking.defeated_boss_count}`;
-    const detail = document.createTextNode(
-      ` SCORE ${formatScore(ranking.score)} / ${resultLabel} / TIME ${formatRankingTime(ranking.play_time_ms)} / LV ${ranking.max_level}`,
-    );
-    item.append(name, detail);
-    target.append(item);
-  }
+    score.textContent = formatScore(ranking.score);
+    createdAt.textContent = formatRankingDate(ranking.created_at);
+    row.append(rank, name, score, createdAt);
+    target.append(row);
+  });
+}
+
+function formatRankingDate(value) {
+  const normalizedValue = /^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$/.test(value)
+    ? `${value.replace(" ", "T")}Z`
+    : value;
+  const date = new Date(normalizedValue);
+  if (Number.isNaN(date.getTime())) return "—";
+  return new Intl.DateTimeFormat("ja-JP", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
 }
 
 function setRankingMessage(message) {

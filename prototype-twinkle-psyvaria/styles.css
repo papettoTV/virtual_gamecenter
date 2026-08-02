@@ -761,14 +761,12 @@ canvas {
   display: none;
   max-height: 220px;
   margin: 10px 0 0;
-  padding-left: 2em;
   overflow-y: auto;
-  color: var(--muted);
-  line-height: 1.8;
   text-align: left;
 }
 
-.ranking-submit.is-submitted .ranking-form {
+.ranking-submit.is-submitted .ranking-form,
+.ranking-submit.is-submitted .ranking-user-registration {
   display: none;
 }
 
@@ -776,12 +774,7 @@ canvas {
   display: block;
 }
 
-.ranking-submit-list li strong {
-  color: var(--text);
-}
-
 .ranking-form button,
-.ranking-list button,
 .clear-restart-button {
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 10px;
@@ -817,15 +810,61 @@ canvas {
   opacity: 0.45;
 }
 
-.ranking-list ol {
-  margin: 0 0 10px;
-  padding-left: 1.4em;
-  color: var(--muted);
-  line-height: 1.8;
+.ranking-table-scroll {
+  width: 100%;
+  overflow-x: auto;
 }
 
-.ranking-list li strong {
+.ranking-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: left;
+  table-layout: fixed;
+}
+
+.ranking-table th,
+.ranking-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ranking-table th {
   color: var(--text);
+  font-size: 11px;
+}
+
+.ranking-table th:nth-child(1),
+.ranking-table td:nth-child(1) {
+  width: 52px;
+  text-align: center;
+}
+
+.ranking-table th:nth-child(2),
+.ranking-table td:nth-child(2) {
+  width: 34%;
+}
+
+.ranking-table th:nth-child(3),
+.ranking-table td:nth-child(3) {
+  width: 24%;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.ranking-table th:nth-child(4),
+.ranking-table td:nth-child(4) {
+  width: 32%;
+  font-variant-numeric: tabular-nums;
+}
+
+.ranking-table-message {
+  color: var(--muted);
+  text-align: center !important;
 }
 
 .platform-profile {

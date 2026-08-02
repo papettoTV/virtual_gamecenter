@@ -76,7 +76,9 @@ export function GameScreen() {
               ユーザー登録
             </button>
           </div>
-          <ol className="ranking-submit-list" id="ranking-submit-list" />
+          <div className="ranking-submit-list">
+            <RankingTable bodyId="ranking-submit-list" label="登録後のスコアランキング" />
+          </div>
           <div className="ranking-next-actions">
             <button id="ranking-another-game" className="clear-restart-button" type="button">別のゲームをする</button>
             <button id="ranking-retry" className="clear-restart-button ranking-retry-button" type="button">
@@ -100,10 +102,27 @@ export function GameScreen() {
       <section className="ranking-panel">
         <div className="ranking-list">
           <h2>スコアランキング</h2>
-          <ol id="ranking-list" />
-          <button id="ranking-refresh" type="button">更新</button>
+          <RankingTable bodyId="ranking-list" label="スコアランキング" />
         </div>
       </section>
     </section>
+  );
+}
+
+function RankingTable({ bodyId, label }: { bodyId: string; label: string }) {
+  return (
+    <div className="ranking-table-scroll">
+      <table className="ranking-table" aria-label={label}>
+        <thead>
+          <tr>
+            <th scope="col">順位</th>
+            <th scope="col">ユーザー名</th>
+            <th scope="col">スコア</th>
+            <th scope="col">日時</th>
+          </tr>
+        </thead>
+        <tbody id={bodyId} />
+      </table>
+    </div>
   );
 }
