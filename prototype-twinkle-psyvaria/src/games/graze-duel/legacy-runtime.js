@@ -2615,7 +2615,7 @@ async function submitRanking() {
       clientVersion: CLIENT_VERSION,
     });
     rankingSubmittedForResult = true;
-    setRankingMessage("登録しました。");
+    setRankingMessage("");
     rankingSubmitPanel?.classList.add("is-submitted");
     if (rankingSubmitHeading) rankingSubmitHeading.textContent = "スコアランキング";
     updateRankingSubmitState();
@@ -2669,6 +2669,7 @@ function renderRankingInto(target, rankings) {
   }
 
   let submittedRecordHighlighted = false;
+  let submittedRow = null;
   rankings.forEach((ranking, index) => {
     const row = document.createElement("tr");
     const rank = document.createElement("td");
@@ -2689,10 +2690,22 @@ function renderRankingInto(target, rankings) {
       row.classList.add("is-current-ranking");
       row.setAttribute("aria-label", "今回登録したスコア");
       submittedRecordHighlighted = true;
+      submittedRow = row;
     }
     row.append(rank, name, score, createdAt);
     target.append(row);
   });
+  if (submittedRow) {
+    const scrollContainer = target.closest(".ranking-submit-list");
+    if (scrollContainer) {
+      requestAnimationFrame(() => {
+        scrollContainer.scrollTop = Math.max(
+          0,
+          submittedRow.offsetTop - (scrollContainer.clientHeight - submittedRow.offsetHeight) / 2,
+        );
+      });
+    }
+  }
 }
 
 function formatRankingDate(value) {

@@ -185,7 +185,6 @@ export function CabinetSelector() {
       <div className="cabinet-selector-heading">
         <div>
           <p className="eyebrow">SELECT CABINET</p>
-          <h3 id="cabinet-selector-title">遊ぶ筐体を選ぶ</h3>
         </div>
         <p>新しい筐体でソロプレイを始めるか、プレイ中の筐体を観戦できます。</p>
       </div>

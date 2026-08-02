@@ -58,6 +58,7 @@ export function CabinetScreen() {
           </small>
         </div>
 
+        <div id="cabinet-selector-title" className="sr-only">筐体選択</div>
         <CabinetSelector />
 
         <section
