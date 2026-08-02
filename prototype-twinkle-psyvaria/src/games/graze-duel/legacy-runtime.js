@@ -2668,6 +2668,7 @@ function renderRankingInto(target, rankings) {
     return;
   }
 
+  let submittedRecordHighlighted = false;
   rankings.forEach((ranking, index) => {
     const row = document.createElement("tr");
     const rank = document.createElement("td");
@@ -2678,6 +2679,17 @@ function renderRankingInto(target, rankings) {
     name.textContent = ranking.player_name;
     score.textContent = formatScore(ranking.score);
     createdAt.textContent = formatRankingDate(ranking.created_at);
+    if (
+      !submittedRecordHighlighted
+      && rankingSubmittedForResult
+      && lastRankingResult
+      && ranking.player_name === rankingNameInput?.value.trim()
+      && ranking.score === lastRankingResult.score
+    ) {
+      row.classList.add("is-current-ranking");
+      row.setAttribute("aria-label", "今回登録したスコア");
+      submittedRecordHighlighted = true;
+    }
     row.append(rank, name, score, createdAt);
     target.append(row);
   });

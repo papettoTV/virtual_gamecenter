@@ -409,6 +409,8 @@ export function PlatformExperience() {
       setProfileOpen(false);
       setEditingName(false);
       setNotice("ログアウトしました。");
+      window.history.pushState({}, "", "/");
+      window.dispatchEvent(new PopStateEvent("popstate"));
     } catch {
       setNotice("ログアウトできませんでした。");
     } finally {

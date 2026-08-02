@@ -867,6 +867,21 @@ canvas {
   text-align: center !important;
 }
 
+.ranking-table tr.is-current-ranking td {
+  border-bottom-color: var(--accent);
+  background: var(--accent);
+  color: #071017;
+  font-weight: 900;
+}
+
+.ranking-table tr.is-current-ranking td:first-child {
+  border-radius: 8px 0 0 8px;
+}
+
+.ranking-table tr.is-current-ranking td:last-child {
+  border-radius: 0 8px 8px 0;
+}
+
 .platform-profile {
   position: fixed;
   top: max(16px, env(safe-area-inset-top));
