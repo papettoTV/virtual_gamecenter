@@ -333,7 +333,7 @@ export function PlatformExperience() {
   };
 
   const shareCabinetUrl = async () => {
-    const shareUrl = `${window.location.origin}${window.location.pathname}`;
+    const shareUrl = await resolveCabinetShareUrl();
     try {
       if (navigator.share) {
         try {
@@ -353,6 +353,12 @@ export function PlatformExperience() {
       setNotice("筐体URLを共有できませんでした。");
     }
   };
+
+  useEffect(() => {
+    const shareCabinet = () => void shareCabinetUrl();
+    window.addEventListener("request-cabinet-share", shareCabinet);
+    return () => window.removeEventListener("request-cabinet-share", shareCabinet);
+  });
 
   const handlePurchase = async () => {
     setBusy(true);
@@ -677,7 +683,7 @@ export function PlatformExperience() {
             <div className="platform-dialog-actions">
               {playDialog === "confirm" && (
                 <button className="platform-share-button" type="button" onClick={() => void shareCabinetUrl()}>
-                  URLをシェア
+                  観戦用画面を共有
                 </button>
               )}
               <button type="button" onClick={() => {
@@ -857,6 +863,22 @@ async function copyText(value: string): Promise<void> {
   const copied = document.execCommand("copy");
   textarea.remove();
   if (!copied) throw new Error("copy_failed");
+}
+
+async function resolveCabinetShareUrl(): Promise<string> {
+  let shareOrigin = window.location.origin;
+  if (["localhost", "127.0.0.1"].includes(window.location.hostname)) {
+    try {
+      const response = await fetch("/api/local-address");
+      if (response.ok) {
+        const localAddress = await response.json() as { address: string; port: number };
+        shareOrigin = `http://${localAddress.address}:${localAddress.port}`;
+      }
+    } catch {
+      shareOrigin = window.location.origin;
+    }
+  }
+  return `${shareOrigin}${window.location.pathname}`;
 }
 
 function storePendingPlayAction(action: PendingPlayAction | null) {

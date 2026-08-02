@@ -20,20 +20,6 @@ export function CabinetScreen() {
             </p>
             <h2>BUZZ BARRIER</h2>
           </div>
-          <button
-            id="copy-cabinet-url"
-            className="cabinet-share-button"
-            type="button"
-            aria-label="筐体共有URLをコピー"
-            title="筐体共有URLをコピー"
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="18" cy="5" r="3" />
-              <circle cx="6" cy="12" r="3" />
-              <circle cx="18" cy="19" r="3" />
-              <path d="m8.7 10.7 6.6-4.2M8.7 13.3l6.6 4.2" />
-            </svg>
-          </button>
         </div>
 
         <div className="cabinet-legacy-controls" hidden>

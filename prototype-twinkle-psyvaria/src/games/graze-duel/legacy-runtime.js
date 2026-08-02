@@ -37,7 +37,6 @@ const cabinetSummary = document.querySelector("#cabinet-summary");
 const cabinetDescription = document.querySelector("#cabinet-description");
 const cabinetRoleLabel = document.querySelector("#cabinet-role-label");
 const cabinetIdLabel = document.querySelector("#cabinet-id-label");
-const copyCabinetUrlButton = document.querySelector("#copy-cabinet-url");
 const cabinetCopyStatus = document.querySelector("#cabinet-copy-status");
 const spectatorBanner = document.querySelector("#spectator-banner");
 const bulletDensityInput = document.querySelector("#bullet-density");
@@ -184,7 +183,6 @@ let eventFlushTimer = 0;
 let pendingSyncEvents = [];
 let cabinetConnected = false;
 let currentCabinetId = null;
-let cabinetShareUrl = "";
 let pendingCreatedSoloStart = false;
 let spectatorPlayerIndex = 0;
 let challengeQueueState = {
@@ -545,10 +543,6 @@ versusPrimary?.addEventListener("click", () => handleVersusUiAction("primary"));
 versusSecondary?.addEventListener("click", () => handleVersusUiAction("secondary"));
 versusDanger?.addEventListener("click", () => handleVersusUiAction("danger"));
 
-if (copyCabinetUrlButton) {
-  copyCabinetUrlButton.addEventListener("click", copyCabinetUrl);
-}
-
 window.addEventListener("popstate", syncScreenWithUrl);
 
 if (bulletDensityInput && bulletDensityValue) {
@@ -886,7 +880,6 @@ function enterCabinet(cabinetId, updateUrl = true) {
   resetViewerSyncState();
   if (updateUrl) history.pushState({ cabinetId }, "", `/cabinets/${cabinetId}`);
   if (cabinetIdLabel) cabinetIdLabel.textContent = `Cabinet ${cabinetId.slice(0, 8)}`;
-  updateCabinetShareUrl();
   updateCabinetUi();
   showScreen("cabinet");
   cabinetClient.join(cabinetId);
@@ -990,41 +983,6 @@ function syncScreenWithUrl() {
 function getCabinetIdFromPath() {
   const match = window.location.pathname.match(/^\/cabinets\/([a-zA-Z0-9-]+)\/?$/);
   return match?.[1] ?? null;
-}
-
-async function updateCabinetShareUrl() {
-  if (!currentCabinetId) return;
-  let shareOrigin = window.location.origin;
-  if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
-    try {
-      const response = await fetch("/api/local-address");
-      if (response.ok) {
-        const localAddress = await response.json();
-        shareOrigin = `http://${localAddress.address}:${localAddress.port}`;
-      }
-    } catch {
-      shareOrigin = window.location.origin;
-    }
-  }
-  cabinetShareUrl = `${shareOrigin}/cabinets/${currentCabinetId}`;
-}
-
-async function copyCabinetUrl() {
-  if (!cabinetShareUrl) return;
-  try {
-    await navigator.clipboard.writeText(cabinetShareUrl);
-  } catch {
-    const copyTarget = document.createElement("textarea");
-    copyTarget.value = cabinetShareUrl;
-    copyTarget.setAttribute("readonly", "");
-    copyTarget.style.position = "fixed";
-    copyTarget.style.opacity = "0";
-    document.body.append(copyTarget);
-    copyTarget.select();
-    document.execCommand("copy");
-    copyTarget.remove();
-  }
-  if (cabinetCopyStatus) cabinetCopyStatus.textContent = "コピーしました。同じWi-Fiの端末で開けます。";
 }
 
 function handleCabinetMessage(message) {

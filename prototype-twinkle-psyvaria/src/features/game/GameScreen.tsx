@@ -39,6 +39,20 @@ export function GameScreen() {
       </details>
 
       <div className="game-frame">
+        <button
+          className="cabinet-share-button game-share-button"
+          type="button"
+          aria-label="観戦用画面を共有"
+          title="観戦用画面を共有"
+          onClick={() => window.dispatchEvent(new Event("request-cabinet-share"))}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="18" cy="5" r="3" />
+            <circle cx="6" cy="12" r="3" />
+            <circle cx="18" cy="19" r="3" />
+            <path d="m8.7 10.7 6.6-4.2M8.7 13.3l6.6 4.2" />
+          </svg>
+        </button>
         <canvas id="game" width="960" height="640" aria-label="BUZZ BARRIER game canvas" />
         <div className="versus-overlay is-hidden" id="versus-overlay" role="dialog" aria-modal="true">
           <p className="eyebrow" id="versus-eyebrow">Versus</p>

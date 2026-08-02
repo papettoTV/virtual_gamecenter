@@ -314,6 +314,19 @@ p {
   stroke-width: 1.8;
 }
 
+.game-share-button {
+  position: absolute;
+  z-index: 7;
+  top: 12px;
+  right: 12px;
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  border-color: rgba(105, 247, 255, 0.36);
+  background: rgba(8, 10, 24, 0.76);
+  backdrop-filter: blur(8px);
+}
+
 .cabinet-copy-status {
   grid-column: 1 / -1;
   min-height: 1.4em;
