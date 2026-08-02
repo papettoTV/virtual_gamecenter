@@ -109,6 +109,7 @@ const BOSS_ATTACK_PATTERNS = [
   { id: "aimedBurst", duration: 4, shotInterval: 0.55 },
   { id: "centerPressure", duration: 5, shotInterval: 0.38 },
 ];
+const RANKING_REGISTRATION_RETURN_KEY = "vgc_ranking_registration_return";
 const HIT_INVINCIBLE_TIME = 2.2;
 const INVINCIBLE_RING_INNER_RADIUS = 18;
 const INVINCIBLE_RING_INNER_SCALE = 28;
@@ -637,6 +638,17 @@ if (rankingRefresh) {
 if (rankingNameInput) {
   rankingNameInput.addEventListener("input", updateRankingSubmitState);
 }
+
+window.addEventListener("prepare-user-registration", () => {
+  if (!lastRankingResult || !rankingSubmitPanel?.classList.contains("is-visible")) return;
+  window.sessionStorage.setItem(RANKING_REGISTRATION_RETURN_KEY, JSON.stringify({
+    result: lastRankingResult,
+    message: rankingResult?.textContent ?? "",
+  }));
+});
+
+window.addEventListener("restore-ranking-registration", restoreRankingRegistration);
+restoreRankingRegistration();
 
 function updateGaugeGrowth(delta) {
   gaugeGrowthPerLevel = clamp(gaugeGrowthPerLevel + delta, 0, 200);
@@ -2535,6 +2547,25 @@ function showRankingRegistration({ cleared, debugMessage = "" }) {
   }
   rankingSubmitPanel?.classList.add("is-visible");
   updateRankingSubmitState();
+}
+
+function restoreRankingRegistration() {
+  const stored = window.sessionStorage.getItem(RANKING_REGISTRATION_RETURN_KEY);
+  if (!stored) return;
+  try {
+    const restored = JSON.parse(stored);
+    if (!restored?.result) return;
+    lastRankingResult = restored.result;
+    rankingSubmittedForResult = false;
+    if (rankingResult && typeof restored.message === "string") {
+      rankingResult.textContent = restored.message;
+    }
+    rankingSubmitPanel?.classList.remove("is-submitted");
+    rankingSubmitPanel?.classList.add("is-visible");
+    updateRankingSubmitState();
+  } finally {
+    window.sessionStorage.removeItem(RANKING_REGISTRATION_RETURN_KEY);
+  }
 }
 
 function calculateClearTimeBonus(clearTimeMs) {

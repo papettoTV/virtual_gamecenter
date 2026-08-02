@@ -1083,6 +1083,12 @@ canvas {
   padding-top: 52px;
 }
 
+.platform-consent-dialog,
+.policy-dialog {
+  position: relative;
+  padding-top: 52px;
+}
+
 .platform-dialog-close {
   position: absolute;
   top: 14px;
@@ -1351,6 +1357,30 @@ canvas {
 
 .policy-dialog p {
   margin-top: 8px;
+}
+
+.policy-frame-list {
+  display: grid;
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.policy-frame-list h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.policy-frame-list iframe,
+.policy-document-frame {
+  width: 100%;
+  height: 220px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  background: #f7f8fc;
+}
+
+.policy-document-frame {
+  height: min(560px, calc(100vh - 190px));
 }
 
 .platform-footer {

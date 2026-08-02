@@ -69,6 +69,7 @@ export function PlatformExperience() {
     if (result === "registered") {
       setNotice("ユーザー登録が完了し、5クレジットを追加しました。");
       void loadPlatform();
+      window.dispatchEvent(new Event("restore-ranking-registration"));
     } else {
       setNotice(accountErrorMessage(url.searchParams.get("reason")));
     }
@@ -556,6 +557,7 @@ export function PlatformExperience() {
               className="platform-google-button"
               type="button"
               onClick={() => {
+                window.dispatchEvent(new Event("prepare-user-registration"));
                 const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
                 window.location.assign(createGoogleRegistrationUrl(returnTo));
               }}
@@ -568,6 +570,7 @@ export function PlatformExperience() {
                 className="platform-developer-login-button"
                 type="button"
                 onClick={() => {
+                  window.dispatchEvent(new Event("prepare-user-registration"));
                   const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
                   window.location.assign(createDeveloperLoginUrl(returnTo));
                 }}
@@ -581,22 +584,34 @@ export function PlatformExperience() {
 
       {consentPurpose && (
         <div className="platform-overlay" role="dialog" aria-modal="true" aria-labelledby="consent-title">
-          <div className="platform-dialog">
+          <div className="platform-dialog platform-consent-dialog">
+            <button
+              className="platform-dialog-close"
+              type="button"
+              aria-label="規約確認を閉じる"
+              disabled={busy}
+              onClick={() => setConsentPurpose(null)}
+            >
+              × 閉じる
+            </button>
             <p className="eyebrow">Terms & Privacy</p>
             <h2 id="consent-title">サービスを利用する前に</h2>
             <p>
               利用規約への同意と、プライバシーポリシーの確認が必要です。
             </p>
-            <div className="policy-links">
-              <button type="button" onClick={() => setPolicy("terms")}>利用規約を確認</button>
-              <button type="button" onClick={() => setPolicy("privacy")}>プライバシーポリシーを確認</button>
+            <div className="policy-frame-list">
+              <section>
+                <h3>利用規約</h3>
+                <iframe title="利用規約全文" src="/legal/terms.html" />
+              </section>
+              <section>
+                <h3>プライバシーポリシー</h3>
+                <iframe title="プライバシーポリシー全文" src="/legal/privacy.html" />
+              </section>
             </div>
             <button className="platform-primary-button" type="button" disabled={busy} onClick={() => void handleConsent()}>
               {busy ? "保存中…" : "同意して続ける"}
             </button>
-            <button type="button" disabled={busy} onClick={() => {
-              setConsentPurpose(null);
-            }}>キャンセル</button>
           </div>
         </div>
       )}
@@ -771,29 +786,15 @@ function PolicyDialog({
   return (
     <div className="platform-overlay platform-overlay-front" role="dialog" aria-modal="true">
       <article className="platform-dialog policy-dialog">
+        <button className="platform-dialog-close" type="button" aria-label="閉じる" onClick={onClose}>
+          × 閉じる
+        </button>
         <h2>{isTerms ? "利用規約（プロトタイプ版）" : "プライバシーポリシー（プロトタイプ版）"}</h2>
-        {isTerms ? (
-          <>
-            <p>本サービスはオンラインゲームセンターの試作サービスです。</p>
-            <h3>利用条件</h3>
-            <p>不正アクセス、迷惑行為、ゲームや通信の改変、他の利用者への嫌がらせを禁止します。</p>
-            <h3>無料クレジット</h3>
-            <p>無料クレジットは換金・譲渡できず、試作期間中に内容を変更または終了する場合があります。</p>
-            <h3>サービス変更</h3>
-            <p>メンテナンスや開発上の都合により、予告なく機能を変更または停止する場合があります。</p>
-          </>
-        ) : (
-          <>
-            <p>サービス提供のため、匿名プレイヤーID、Cookie、アクセスログ、プレイ履歴を取得します。</p>
-            <h3>利用目的</h3>
-            <p>セッション維持、無料クレジット管理、ゲーム提供、不正利用防止、障害調査に使用します。</p>
-            <h3>保存と委託</h3>
-            <p>データはCloudflareのサービス上で処理・保存される場合があります。</p>
-            <h3>問い合わせ</h3>
-            <p>データの確認・削除に関する問い合わせ窓口は、有料化前に正式な運営者情報とともに公開します。</p>
-          </>
-        )}
-        <button className="platform-primary-button" type="button" onClick={onClose}>閉じる</button>
+        <iframe
+          className="policy-document-frame"
+          title={isTerms ? "利用規約全文" : "プライバシーポリシー全文"}
+          src={isTerms ? "/legal/terms.html" : "/legal/privacy.html"}
+        />
       </article>
     </div>
   );
