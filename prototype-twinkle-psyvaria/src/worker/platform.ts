@@ -303,11 +303,6 @@ export async function handlePlatformRequest(
   }
 
   if (url.pathname === "/api/platform/credit-reservations" && request.method === "POST") {
-    const consent = await getConsentState(database, session.playerId);
-    if (!consent.accepted) {
-      return Response.json({ error: "consent_required" }, { status: 403 });
-    }
-
     const body = await readJson(request);
     const cabinetId = sanitizeId(body?.cabinetId, "cabinet");
     const purpose = body?.purpose === "challenge" || body?.purpose === "rematch"
