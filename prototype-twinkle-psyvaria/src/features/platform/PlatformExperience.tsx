@@ -22,7 +22,7 @@ type PendingPlayAction =
   | { type: "button"; button: HTMLButtonElement }
   | { type: "restartKey" };
 type PurchaseUnit = 1 | 3 | 5 | 10;
-type ConsentPurpose = "play" | "registration" | "purchase";
+type ConsentPurpose = "registration" | "purchase";
 
 const PLAY_BUTTON_IDS = new Set(["start-solo", "touch-restart", "clear-restart"]);
 
@@ -163,10 +163,6 @@ export function PlatformExperience() {
   const requestPlay = useCallback((action: PendingPlayAction) => {
     if (!platform) return;
     setPendingAction(action);
-    if (!platform.consent.accepted) {
-      setConsentPurpose("play");
-      return;
-    }
     if (!platform.welcomeCreditGranted) {
       setWelcomeDialogOpen(true);
       return;
@@ -229,13 +225,7 @@ export function PlatformExperience() {
       });
       const completedPurpose = consentPurpose;
       setConsentPurpose(null);
-      if (completedPurpose === "play") {
-        if (platform.welcomeCreditGranted) {
-          setPlayDialog(platform.wallet.availableTotal >= platform.creditCost ? "confirm" : "insufficient");
-        } else {
-          setWelcomeDialogOpen(true);
-        }
-      } else if (completedPurpose === "registration") {
+      if (completedPurpose === "registration") {
         setAccountDialogOpen(true);
       } else if (completedPurpose === "purchase") {
         setPurchaseDialog("select");
@@ -589,7 +579,6 @@ export function PlatformExperience() {
             </button>
             <button type="button" disabled={busy} onClick={() => {
               setConsentPurpose(null);
-              if (consentPurpose === "play") setPendingAction(null);
             }}>キャンセル</button>
           </div>
         </div>

@@ -153,10 +153,6 @@ export async function handlePlatformRequest(
   }
 
   if (url.pathname === "/api/platform/welcome-credit" && request.method === "POST") {
-    const consent = await getConsentState(database, session.playerId);
-    if (!consent.accepted) {
-      return Response.json({ error: "policy_consent_required" }, { status: 403 });
-    }
     await database.prepare(
       `INSERT OR IGNORE INTO credit_ledger_entries
         (id, player_id, balance_type, entry_type, amount, reference_id)

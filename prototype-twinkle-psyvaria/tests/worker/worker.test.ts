@@ -97,11 +97,17 @@ describe("Cloudflare Worker", () => {
     expect(initial.welcomeCreditGranted).toBe(false);
     expect(initial.wallet.availableTotal).toBe(0);
 
-    const earlyClaim = await exports.default.fetch("http://localhost/api/platform/welcome-credit", {
+    const earlyClaimResponse = await exports.default.fetch("http://localhost/api/platform/welcome-credit", {
       method: "POST",
       headers: { Cookie: cookie! },
     });
-    expect(earlyClaim.status).toBe(403);
+    expect(earlyClaimResponse.status).toBe(200);
+    const earlyClaim = await earlyClaimResponse.json<{
+      welcomeCreditGranted: boolean;
+      wallet: { availableTotal: number };
+    }>();
+    expect(earlyClaim.welcomeCreditGranted).toBe(true);
+    expect(earlyClaim.wallet.availableTotal).toBe(5);
 
     const consentResponse = await exports.default.fetch("http://localhost/api/platform/consents", {
       method: "POST",
@@ -116,7 +122,7 @@ describe("Cloudflare Worker", () => {
       wallet: { availableTotal: number };
     }>();
     expect(consentResult.consent.accepted).toBe(true);
-    expect(consentResult.wallet.availableTotal).toBe(0);
+    expect(consentResult.wallet.availableTotal).toBe(5);
 
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const claimResponse = await exports.default.fetch("http://localhost/api/platform/welcome-credit", {
