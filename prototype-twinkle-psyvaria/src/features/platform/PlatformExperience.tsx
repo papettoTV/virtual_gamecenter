@@ -332,6 +332,28 @@ export function PlatformExperience() {
     }
   };
 
+  const shareCabinetUrl = async () => {
+    const shareUrl = `${window.location.origin}${window.location.pathname}`;
+    try {
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: "BUZZ BARRIER",
+            text: "この筐体を観戦・共有できます。",
+            url: shareUrl,
+          });
+          return;
+        } catch (error) {
+          if (error instanceof DOMException && error.name === "AbortError") return;
+        }
+      }
+      await copyText(shareUrl);
+      setNotice("筐体URLをコピーしました。");
+    } catch {
+      setNotice("筐体URLを共有できませんでした。");
+    }
+  };
+
   const handlePurchase = async () => {
     setBusy(true);
     setPurchaseError("");
@@ -653,6 +675,11 @@ export function PlatformExperience() {
               </p>
             )}
             <div className="platform-dialog-actions">
+              {playDialog === "confirm" && (
+                <button className="platform-share-button" type="button" onClick={() => void shareCabinetUrl()}>
+                  URLをシェア
+                </button>
+              )}
               <button type="button" onClick={() => {
                 if (playDialog === "insufficient") {
                   window.sessionStorage.removeItem("vgc_pending_play_action");
@@ -813,6 +840,23 @@ function getPurchaseCurrency(): "jpy" | "usd" {
 
 function formatPurchasePrice(unit: PurchaseUnit): string {
   return getPurchaseCurrency() === "jpy" ? `${unit * 100}円` : `$${unit}`;
+}
+
+async function copyText(value: string): Promise<void> {
+  if (navigator.clipboard) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+  const copied = document.execCommand("copy");
+  textarea.remove();
+  if (!copied) throw new Error("copy_failed");
 }
 
 function storePendingPlayAction(action: PendingPlayAction | null) {

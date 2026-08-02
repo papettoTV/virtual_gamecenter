@@ -525,6 +525,23 @@ p {
   margin-top: 12px;
 }
 
+.game-footer-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.game-footer-actions button {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  padding: 10px 16px;
+}
+
 .is-spectator #game-back-to-arcade {
   display: none;
 }
@@ -1358,6 +1375,12 @@ canvas {
 
 .platform-dialog-actions .platform-primary-button {
   margin-top: 0;
+}
+
+.platform-dialog-actions .platform-share-button {
+  margin-right: auto;
+  border-color: rgba(105, 247, 255, 0.32);
+  color: var(--accent);
 }
 
 .credit-package-grid {

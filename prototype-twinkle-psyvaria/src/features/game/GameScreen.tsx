@@ -14,10 +14,6 @@ export function GameScreen() {
       <div className="versus-status is-hidden" id="versus-status" role="status">
         対戦者が待っています。ゲーム停止時に確認できます。
       </div>
-      <div className="game-nav">
-        <button id="game-back-to-arcade" className="secondary-button" type="button">筐体画面に戻る</button>
-        <span>ゲームセンター &gt; ゲーム一覧 &gt; BUZZ BARRIER &gt; 共有筐体</span>
-      </div>
       <details className="debug-panel" id="debug-panel">
         <summary>デバッグ設定</summary>
         <div className="debug-panel-body">
@@ -105,6 +101,10 @@ export function GameScreen() {
           <RankingTable bodyId="ranking-list" label="スコアランキング" />
         </div>
       </section>
+
+      <div className="game-footer-actions">
+        <button id="game-back-to-arcade" className="secondary-button" type="button">別のゲームをする</button>
+      </div>
     </section>
   );
 }
