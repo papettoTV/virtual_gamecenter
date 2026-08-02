@@ -5,7 +5,9 @@ import {
 } from "./google-auth";
 
 const SESSION_COOKIE = "vgc_session";
+const DEVICE_COOKIE = "vgc_device";
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
+const DEVICE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365 * 5;
 const INITIAL_FREE_CREDITS = 5;
 const PLAY_CREDIT_COST = 1;
 const TERMS_VERSION = "2026-07-26";
@@ -20,6 +22,12 @@ export interface StripePaymentEnv {
 
 interface PlayerSession {
   playerId: string;
+  token: string;
+  setCookie: boolean;
+  secureCookie: boolean;
+}
+
+interface DeviceIdentity {
   token: string;
   setCookie: boolean;
   secureCookie: boolean;
@@ -67,8 +75,9 @@ export async function handlePlatformRequest(
 
   if (url.pathname === "/api/platform/bootstrap" && request.method === "GET") {
     const session = await getOrCreatePlayerSession(request, database);
+    const device = getOrCreateDeviceIdentity(request, session.token);
     const consent = await getConsentState(database, session.playerId);
-    const welcomeCreditGranted = await hasWelcomeCredit(database, session.playerId);
+    const welcomeCreditGranted = await ensureDeviceWelcomeCreditState(database, device.token, session.playerId);
     const wallet = await getWalletSummary(database, session.playerId);
     const identity = await getPlayerIdentityById(database, session.playerId);
     return platformJson(
@@ -84,6 +93,7 @@ export async function handlePlatformRequest(
         creditCost: PLAY_CREDIT_COST,
       },
       session,
+      device.setCookie ? [createDeviceCookie(device)] : [],
     );
   }
 
@@ -91,6 +101,7 @@ export async function handlePlatformRequest(
   if (!session) return Response.json({ error: "player_session_required" }, { status: 401 });
 
   if (url.pathname === "/api/platform/auth/logout" && request.method === "POST") {
+    const device = getOrCreateDeviceIdentity(request, session.token);
     const identity = await getPlayerIdentityById(database, session.playerId);
     if (!identity.accountRegistered) {
       return Response.json({ error: "user_registration_required" }, { status: 403 });
@@ -118,10 +129,10 @@ export async function handlePlatformRequest(
       avatarUrl: null,
       developerLoginAvailable: isDeveloperAuthAvailable(url, paymentEnv),
       consent: await getConsentState(database, guestSession.playerId),
-      welcomeCreditGranted: await hasWelcomeCredit(database, guestSession.playerId),
+      welcomeCreditGranted: await hasDeviceWelcomeCredit(database, device.token),
       wallet: await getWalletSummary(database, guestSession.playerId),
       creditCost: PLAY_CREDIT_COST,
-    }, guestSession);
+    }, guestSession, device.setCookie ? [createDeviceCookie(device)] : []);
   }
 
   if (url.pathname === "/api/platform/consents" && request.method === "POST") {
@@ -153,15 +164,28 @@ export async function handlePlatformRequest(
   }
 
   if (url.pathname === "/api/platform/welcome-credit" && request.method === "POST") {
-    await database.prepare(
-      `INSERT OR IGNORE INTO credit_ledger_entries
-        (id, player_id, balance_type, entry_type, amount, reference_id)
-       VALUES (?, ?, 'free', 'free_granted', ?, 'welcome-credit')`,
-    ).bind(`initial-grant:${session.playerId}`, session.playerId, INITIAL_FREE_CREDITS).run();
-    return Response.json({
+    const device = getOrCreateDeviceIdentity(request, session.token);
+    const deviceHash = await hashToken(device.token);
+    if (!await hasDeviceWelcomeCreditByHash(database, deviceHash)) {
+      await database.batch([
+        database.prepare(
+          `INSERT OR IGNORE INTO device_benefits
+            (device_hash, benefit_type, player_id)
+           VALUES (?, 'welcome-credit', ?)`,
+        ).bind(deviceHash, session.playerId),
+        database.prepare(
+          `INSERT OR IGNORE INTO credit_ledger_entries
+            (id, player_id, balance_type, entry_type, amount, reference_id)
+           VALUES (?, ?, 'free', 'free_granted', ?, 'welcome-credit')`,
+        ).bind(`device-welcome:${deviceHash}`, session.playerId, INITIAL_FREE_CREDITS),
+      ]);
+    }
+    const response = Response.json({
       welcomeCreditGranted: true,
       wallet: await getWalletSummary(database, session.playerId),
     });
+    if (device.setCookie) response.headers.append("Set-Cookie", createDeviceCookie(device));
+    return response;
   }
 
   if (url.pathname === "/api/platform/credits" && request.method === "GET") {
@@ -435,11 +459,37 @@ export async function handlePlatformRequest(
   return Response.json({ error: "not_found" }, { status: 404 });
 }
 
-async function hasWelcomeCredit(database: D1Database, playerId: string): Promise<boolean> {
+async function hasLegacyWelcomeCredit(database: D1Database, playerId: string): Promise<boolean> {
   const entry = await database.prepare(
     "SELECT 1 AS granted FROM credit_ledger_entries WHERE id = ?",
   ).bind(`initial-grant:${playerId}`).first<{ granted: number }>();
   return Boolean(entry);
+}
+
+async function hasDeviceWelcomeCredit(database: D1Database, deviceToken: string): Promise<boolean> {
+  return hasDeviceWelcomeCreditByHash(database, await hashToken(deviceToken));
+}
+
+async function hasDeviceWelcomeCreditByHash(database: D1Database, deviceHash: string): Promise<boolean> {
+  const benefit = await database.prepare(
+    "SELECT 1 AS granted FROM device_benefits WHERE device_hash = ? AND benefit_type = 'welcome-credit'",
+  ).bind(deviceHash).first<{ granted: number }>();
+  return Boolean(benefit);
+}
+
+async function ensureDeviceWelcomeCreditState(
+  database: D1Database,
+  deviceToken: string,
+  playerId: string,
+): Promise<boolean> {
+  const deviceHash = await hashToken(deviceToken);
+  if (await hasDeviceWelcomeCreditByHash(database, deviceHash)) return true;
+  if (!await hasLegacyWelcomeCredit(database, playerId)) return false;
+  await database.prepare(
+    `INSERT OR IGNORE INTO device_benefits (device_hash, benefit_type, player_id)
+     VALUES (?, 'welcome-credit', ?)`,
+  ).bind(deviceHash, playerId).run();
+  return true;
 }
 
 async function handleStripeWebhook(
@@ -746,6 +796,7 @@ async function getWalletSummary(
 function platformJson(
   body: unknown,
   session: PlayerSession,
+  cookies: string[] = [],
 ): Response {
   const headers = new Headers({ "Content-Type": "application/json" });
   if (session.setCookie) {
@@ -754,11 +805,32 @@ function platformJson(
       createSessionCookie(session),
     );
   }
+  for (const cookie of cookies) headers.append("Set-Cookie", cookie);
   return new Response(JSON.stringify(body), { headers });
 }
 
 function createSessionCookie(session: PlayerSession): string {
   return `${SESSION_COOKIE}=${session.token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_MAX_AGE_SECONDS}${session.secureCookie ? "; Secure" : ""}`;
+}
+
+function getOrCreateDeviceIdentity(request: Request, fallbackToken: string): DeviceIdentity {
+  const existingToken = getCookie(request.headers.get("Cookie"), DEVICE_COOKIE);
+  if (existingToken) {
+    return {
+      token: existingToken,
+      setCookie: false,
+      secureCookie: new URL(request.url).protocol === "https:",
+    };
+  }
+  return {
+    token: fallbackToken,
+    setCookie: true,
+    secureCookie: new URL(request.url).protocol === "https:",
+  };
+}
+
+function createDeviceCookie(device: DeviceIdentity): string {
+  return `${DEVICE_COOKIE}=${device.token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${DEVICE_MAX_AGE_SECONDS}${device.secureCookie ? "; Secure" : ""}`;
 }
 
 function createSessionToken(): string {

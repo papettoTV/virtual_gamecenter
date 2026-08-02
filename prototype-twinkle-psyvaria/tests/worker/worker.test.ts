@@ -11,6 +11,7 @@ beforeAll(async () => {
     env.DB.prepare("CREATE TABLE consent_records (id TEXT PRIMARY KEY, player_id TEXT NOT NULL, policy_type TEXT NOT NULL, policy_version TEXT NOT NULL)"),
     env.DB.prepare("CREATE TABLE credit_wallets (player_id TEXT PRIMARY KEY, free_balance INTEGER NOT NULL DEFAULT 0, purchased_balance INTEGER NOT NULL DEFAULT 0, updated_at TEXT DEFAULT CURRENT_TIMESTAMP)"),
     env.DB.prepare("CREATE TABLE credit_ledger_entries (id TEXT PRIMARY KEY, player_id TEXT NOT NULL, balance_type TEXT NOT NULL, entry_type TEXT NOT NULL, amount INTEGER NOT NULL, reference_id TEXT)"),
+    env.DB.prepare("CREATE TABLE device_benefits (device_hash TEXT NOT NULL, benefit_type TEXT NOT NULL, player_id TEXT NOT NULL, granted_at TEXT DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (device_hash, benefit_type))"),
     env.DB.prepare("CREATE TRIGGER credit_ledger_free AFTER INSERT ON credit_ledger_entries WHEN NEW.balance_type = 'free' BEGIN UPDATE credit_wallets SET free_balance = free_balance + NEW.amount WHERE player_id = NEW.player_id; END"),
     env.DB.prepare("CREATE TABLE play_sessions (id TEXT PRIMARY KEY, cabinet_id TEXT NOT NULL, game_id TEXT NOT NULL, mode TEXT NOT NULL, status TEXT NOT NULL, host_player_id TEXT)"),
     env.DB.prepare("CREATE TABLE credit_reservations (id TEXT PRIMARY KEY, player_id TEXT NOT NULL, play_session_id TEXT NOT NULL, amount INTEGER NOT NULL, balance_type TEXT NOT NULL, status TEXT NOT NULL, expires_at TEXT NOT NULL)"),
@@ -260,6 +261,11 @@ describe("Cloudflare Worker", () => {
         privacyVersion: bootstrap.consent.privacyVersion,
       }),
     });
+    const welcomeResponse = await exports.default.fetch("http://localhost/api/platform/welcome-credit", {
+      method: "POST",
+      headers: { Cookie: cookie! },
+    });
+    expect(welcomeResponse.status).toBe(200);
 
     const loginResponse = await exports.default.fetch(
       "http://localhost/api/platform/auth/developer?returnTo=%2Fcabinets%2Fdev%3Fmode%3Dhost",
@@ -281,7 +287,7 @@ describe("Cloudflare Worker", () => {
     }>();
     expect(registered.playerName).toBe("開発者ユーザー");
     expect(registered.accountRegistered).toBe(true);
-    expect(registered.wallet.availableTotal).toBe(5);
+    expect(registered.wallet.availableTotal).toBe(10);
 
     const logoutResponse = await exports.default.fetch("http://localhost/api/platform/auth/logout", {
       method: "POST",
@@ -293,12 +299,14 @@ describe("Cloudflare Worker", () => {
       playerName: string;
       accountRegistered: boolean;
       consent: { accepted: boolean };
+      welcomeCreditGranted: boolean;
       wallet: { availableTotal: number };
     }>();
     expect(guest.playerId).not.toBe(registered.playerId);
     expect(guest.playerName).toMatch(/^Player-[a-f0-9]{8}$/);
     expect(guest.accountRegistered).toBe(false);
     expect(guest.consent.accepted).toBe(true);
+    expect(guest.welcomeCreditGranted).toBe(true);
     expect(guest.wallet.availableTotal).toBe(0);
     expect(logoutResponse.headers.get("set-cookie")).toContain("vgc_session=");
   });
