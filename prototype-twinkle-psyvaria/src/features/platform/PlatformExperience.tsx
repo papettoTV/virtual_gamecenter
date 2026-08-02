@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   acceptPolicies,
   capturePlayCredit,
+  claimWelcomeCredit,
   createGoogleRegistrationUrl,
   createDeveloperLoginUrl,
   createCreditCheckout,
@@ -21,6 +22,7 @@ type PendingPlayAction =
   | { type: "button"; button: HTMLButtonElement }
   | { type: "restartKey" };
 type PurchaseUnit = 1 | 3 | 5 | 10;
+type ConsentPurpose = "play" | "registration" | "purchase";
 
 const PLAY_BUTTON_IDS = new Set(["start-solo", "touch-restart", "clear-restart"]);
 
@@ -40,6 +42,8 @@ export function PlatformExperience() {
   const [notice, setNotice] = useState("");
   const [profileOpen, setProfileOpen] = useState(false);
   const [accountDialogOpen, setAccountDialogOpen] = useState(false);
+  const [consentPurpose, setConsentPurpose] = useState<ConsentPurpose | null>(null);
+  const [welcomeDialogOpen, setWelcomeDialogOpen] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const bypassGate = useRef(false);
@@ -157,8 +161,16 @@ export function PlatformExperience() {
   }, [profileOpen]);
 
   const requestPlay = useCallback((action: PendingPlayAction) => {
-    if (!platform?.consent.accepted) return;
+    if (!platform) return;
     setPendingAction(action);
+    if (!platform.consent.accepted) {
+      setConsentPurpose("play");
+      return;
+    }
+    if (!platform.welcomeCreditGranted) {
+      setWelcomeDialogOpen(true);
+      return;
+    }
     setPlayDialog(
       platform.wallet.availableTotal >= platform.creditCost
         ? "confirm"
@@ -215,12 +227,56 @@ export function PlatformExperience() {
         consent: result.consent,
         wallet: result.wallet,
       });
-      setNotice(`無料クレジット${result.wallet.freeBalance}枚を受け取りました。`);
+      const completedPurpose = consentPurpose;
+      setConsentPurpose(null);
+      if (completedPurpose === "play") {
+        if (platform.welcomeCreditGranted) {
+          setPlayDialog(platform.wallet.availableTotal >= platform.creditCost ? "confirm" : "insufficient");
+        } else {
+          setWelcomeDialogOpen(true);
+        }
+      } else if (completedPurpose === "registration") {
+        setAccountDialogOpen(true);
+      } else if (completedPurpose === "purchase") {
+        setPurchaseDialog("select");
+      }
     } catch {
       setLoadingError("同意情報を保存できませんでした。");
     } finally {
       setBusy(false);
     }
+  };
+
+  const handleWelcomeCredit = async () => {
+    if (!platform) return;
+    setBusy(true);
+    try {
+      const result = await claimWelcomeCredit();
+      setPlatform({ ...platform, welcomeCreditGranted: true, wallet: result.wallet });
+      setWelcomeDialogOpen(false);
+      setNotice("無料5クレジットを受け取りました。");
+      setPlayDialog("confirm");
+    } catch {
+      setNotice("無料クレジットを受け取れませんでした。");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const skipWelcomeCredit = () => {
+    setWelcomeDialogOpen(false);
+    setPlayDialog((platform?.wallet.availableTotal ?? 0) >= (platform?.creditCost ?? 1)
+      ? "confirm"
+      : "insufficient");
+  };
+
+  const requestUserRegistration = () => {
+    setProfileOpen(false);
+    if (!platform?.consent.accepted) {
+      setConsentPurpose("registration");
+      return;
+    }
+    setAccountDialogOpen(true);
   };
 
   const handlePlayConfirm = async () => {
@@ -316,7 +372,6 @@ export function PlatformExperience() {
     bypassGate.current = false;
   };
 
-  const consentRequired = Boolean(platform && !platform.consent.accepted);
   const wallet = platform?.wallet;
 
   const savePlayerName = async () => {
@@ -426,10 +481,7 @@ export function PlatformExperience() {
                   <button
                     className="platform-account-register-button"
                     type="button"
-                    onClick={() => {
-                      setProfileOpen(false);
-                      setAccountDialogOpen(true);
-                    }}
+                    onClick={requestUserRegistration}
                   >
                     ユーザー登録で名前を変更
                   </button>
@@ -520,21 +572,42 @@ export function PlatformExperience() {
         </div>
       )}
 
-      {consentRequired && (
+      {consentPurpose && (
         <div className="platform-overlay" role="dialog" aria-modal="true" aria-labelledby="consent-title">
           <div className="platform-dialog">
-            <p className="eyebrow">Welcome Credit</p>
-            <h2 id="consent-title">ゲームセンターを利用する</h2>
+            <p className="eyebrow">Terms & Privacy</p>
+            <h2 id="consent-title">サービスを利用する前に</h2>
             <p>
-              利用規約とプライバシーポリシーを確認して同意すると、無料クレジット5枚を受け取れます。
+              利用規約への同意と、プライバシーポリシーの確認が必要です。
             </p>
             <div className="policy-links">
               <button type="button" onClick={() => setPolicy("terms")}>利用規約を確認</button>
               <button type="button" onClick={() => setPolicy("privacy")}>プライバシーポリシーを確認</button>
             </div>
             <button className="platform-primary-button" type="button" disabled={busy} onClick={() => void handleConsent()}>
-              {busy ? "保存中…" : "同意して無料クレジットを受け取る"}
+              {busy ? "保存中…" : "同意して続ける"}
             </button>
+            <button type="button" disabled={busy} onClick={() => {
+              setConsentPurpose(null);
+              if (consentPurpose === "play") setPendingAction(null);
+            }}>キャンセル</button>
+          </div>
+        </div>
+      )}
+
+      {welcomeDialogOpen && (
+        <div className="platform-overlay" role="dialog" aria-modal="true" aria-labelledby="welcome-credit-title">
+          <div className="platform-dialog platform-dialog-small">
+            <p className="eyebrow">Welcome Credit</p>
+            <h2 id="welcome-credit-title">無料5クレジット</h2>
+            <p>初回プレイ特典として、無料5クレジットを受け取れます。</p>
+            <small className="platform-dialog-note">この端末では初回のみ受け取れます。</small>
+            <div className="platform-dialog-actions">
+              <button type="button" disabled={busy} onClick={skipWelcomeCredit}>今は受け取らない</button>
+              <button className="platform-primary-button" type="button" disabled={busy} onClick={() => void handleWelcomeCredit()}>
+                {busy ? "受取中…" : "無料5クレジットを受け取る"}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -647,7 +720,7 @@ export function PlatformExperience() {
             <div className="account-link-panel">
               <strong>ほかの端末でもクレジットを利用できます</strong>
               <p>ユーザー登録すると、別のブラウザ・PC・スマートフォンでも購入クレジットを共有できます。</p>
-              <button type="button" onClick={() => setAccountDialogOpen(true)}>
+              <button type="button" onClick={requestUserRegistration}>
                 ユーザー登録へ
               </button>
             </div>
@@ -677,6 +750,7 @@ function accountErrorMessage(reason: string | null): string {
   if (reason === "session_expired") return "セッションの有効期限が切れました。もう一度お試しください。";
   if (reason === "not_configured") return "Googleユーザー登録の設定が完了していません。";
   if (reason === "developer_auth_unavailable") return "開発者ログインはローカル開発環境でのみ利用できます。";
+  if (reason === "policy_consent_required") return "ユーザー登録の前に利用規約への同意が必要です。";
   return "ユーザー登録を完了できませんでした。もう一度お試しください。";
 }
 

@@ -29,9 +29,22 @@ describe("Cloudflare Worker", () => {
   });
 
   it("starts Google registration with the configured callback", async () => {
+    const bootstrapResponse = await exports.default.fetch("http://localhost/api/platform/bootstrap");
+    const bootstrap = await bootstrapResponse.json<{
+      consent: { termsVersion: string; privacyVersion: string };
+    }>();
+    const cookie = bootstrapResponse.headers.get("set-cookie")?.split(";", 1)[0];
+    await exports.default.fetch("http://localhost/api/platform/consents", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie! },
+      body: JSON.stringify({
+        termsVersion: bootstrap.consent.termsVersion,
+        privacyVersion: bootstrap.consent.privacyVersion,
+      }),
+    });
     const response = await exports.default.fetch(
       "http://localhost/api/platform/auth/google/start?returnTo=%2Fcabinets%2Fabc%3Fmode%3Dhost",
-      { redirect: "manual" },
+      { headers: { Cookie: cookie! }, redirect: "manual" },
     );
     expect(response.status).toBe(302);
     const location = new URL(response.headers.get("location")!);
@@ -70,6 +83,53 @@ describe("Cloudflare Worker", () => {
     const ranking = await rankingResponse.json<{ rankings: Array<{ player_name: string }> }>();
     expect(ranking.rankings[0]?.player_name).toBe(bootstrap.playerName);
     expect(ranking.rankings[0]?.player_name).not.toBe("CHANGED-NAME");
+  });
+
+  it("separates policy consent from the one-time welcome credit", async () => {
+    const bootstrapResponse = await exports.default.fetch("http://localhost/api/platform/bootstrap");
+    const initial = await bootstrapResponse.json<{
+      consent: { accepted: boolean; termsVersion: string; privacyVersion: string };
+      welcomeCreditGranted: boolean;
+      wallet: { availableTotal: number };
+    }>();
+    const cookie = bootstrapResponse.headers.get("set-cookie")?.split(";", 1)[0];
+    expect(initial.consent.accepted).toBe(false);
+    expect(initial.welcomeCreditGranted).toBe(false);
+    expect(initial.wallet.availableTotal).toBe(0);
+
+    const earlyClaim = await exports.default.fetch("http://localhost/api/platform/welcome-credit", {
+      method: "POST",
+      headers: { Cookie: cookie! },
+    });
+    expect(earlyClaim.status).toBe(403);
+
+    const consentResponse = await exports.default.fetch("http://localhost/api/platform/consents", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie! },
+      body: JSON.stringify({
+        termsVersion: initial.consent.termsVersion,
+        privacyVersion: initial.consent.privacyVersion,
+      }),
+    });
+    const consentResult = await consentResponse.json<{
+      consent: { accepted: boolean };
+      wallet: { availableTotal: number };
+    }>();
+    expect(consentResult.consent.accepted).toBe(true);
+    expect(consentResult.wallet.availableTotal).toBe(0);
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const claimResponse = await exports.default.fetch("http://localhost/api/platform/welcome-credit", {
+        method: "POST",
+        headers: { Cookie: cookie! },
+      });
+      const claim = await claimResponse.json<{
+        welcomeCreditGranted: boolean;
+        wallet: { availableTotal: number };
+      }>();
+      expect(claim.welcomeCreditGranted).toBe(true);
+      expect(claim.wallet.availableTotal).toBe(5);
+    }
   });
 
   it("registers a game-over score without marking the result as cleared", async () => {
@@ -157,8 +217,19 @@ describe("Cloudflare Worker", () => {
 
   it("logs into the shared developer account locally and returns to the source screen", async () => {
     const bootstrapResponse = await exports.default.fetch("http://localhost/api/platform/bootstrap");
+    const bootstrap = await bootstrapResponse.json<{
+      consent: { termsVersion: string; privacyVersion: string };
+    }>();
     const cookie = bootstrapResponse.headers.get("set-cookie")?.split(";", 1)[0];
     expect(cookie).toBeTruthy();
+    await exports.default.fetch("http://localhost/api/platform/consents", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie! },
+      body: JSON.stringify({
+        termsVersion: bootstrap.consent.termsVersion,
+        privacyVersion: bootstrap.consent.privacyVersion,
+      }),
+    });
 
     const loginResponse = await exports.default.fetch(
       "http://localhost/api/platform/auth/developer?returnTo=%2Fcabinets%2Fdev%3Fmode%3Dhost",

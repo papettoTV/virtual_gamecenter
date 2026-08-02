@@ -61,12 +61,14 @@ export async function handlePlatformRequest(
     getOrCreatePlayerSession,
     getExistingPlayerSession,
     createSessionCookie,
+    async (authDatabase, playerId) => (await getConsentState(authDatabase, playerId)).accepted,
   );
   if (authResponse) return authResponse;
 
   if (url.pathname === "/api/platform/bootstrap" && request.method === "GET") {
     const session = await getOrCreatePlayerSession(request, database);
     const consent = await getConsentState(database, session.playerId);
+    const welcomeCreditGranted = await hasWelcomeCredit(database, session.playerId);
     const wallet = await getWalletSummary(database, session.playerId);
     const identity = await getPlayerIdentityById(database, session.playerId);
     return platformJson(
@@ -77,6 +79,7 @@ export async function handlePlatformRequest(
         avatarUrl: identity.avatarUrl,
         developerLoginAvailable: isDeveloperAuthAvailable(url, paymentEnv),
         consent,
+        welcomeCreditGranted,
         wallet,
         creditCost: PLAY_CREDIT_COST,
       },
@@ -115,6 +118,7 @@ export async function handlePlatformRequest(
       avatarUrl: null,
       developerLoginAvailable: isDeveloperAuthAvailable(url, paymentEnv),
       consent: await getConsentState(database, guestSession.playerId),
+      welcomeCreditGranted: await hasWelcomeCredit(database, guestSession.playerId),
       wallet: await getWalletSummary(database, guestSession.playerId),
       creditCost: PLAY_CREDIT_COST,
     }, guestSession);
@@ -140,15 +144,26 @@ export async function handlePlatformRequest(
           (id, player_id, policy_type, policy_version)
          VALUES (?, ?, 'privacy', ?)`,
       ).bind(crypto.randomUUID(), session.playerId, PRIVACY_VERSION),
-      database.prepare(
-        `INSERT OR IGNORE INTO credit_ledger_entries
-          (id, player_id, balance_type, entry_type, amount, reference_id)
-         VALUES (?, ?, 'free', 'free_granted', ?, 'initial-consent-grant')`,
-      ).bind(`initial-grant:${session.playerId}`, session.playerId, INITIAL_FREE_CREDITS),
     ]);
 
     return Response.json({
       consent: await getConsentState(database, session.playerId),
+      wallet: await getWalletSummary(database, session.playerId),
+    });
+  }
+
+  if (url.pathname === "/api/platform/welcome-credit" && request.method === "POST") {
+    const consent = await getConsentState(database, session.playerId);
+    if (!consent.accepted) {
+      return Response.json({ error: "policy_consent_required" }, { status: 403 });
+    }
+    await database.prepare(
+      `INSERT OR IGNORE INTO credit_ledger_entries
+        (id, player_id, balance_type, entry_type, amount, reference_id)
+       VALUES (?, ?, 'free', 'free_granted', ?, 'welcome-credit')`,
+    ).bind(`initial-grant:${session.playerId}`, session.playerId, INITIAL_FREE_CREDITS).run();
+    return Response.json({
+      welcomeCreditGranted: true,
       wallet: await getWalletSummary(database, session.playerId),
     });
   }
@@ -176,6 +191,10 @@ export async function handlePlatformRequest(
   }
 
   if (url.pathname === "/api/platform/credit-purchases/checkout" && request.method === "POST") {
+    const consent = await getConsentState(database, session.playerId);
+    if (!consent.accepted) {
+      return Response.json({ error: "policy_consent_required" }, { status: 403 });
+    }
     if (!paymentEnv.STRIPE_SECRET_KEY) {
       return Response.json({ error: "stripe_not_configured" }, { status: 503 });
     }
@@ -423,6 +442,13 @@ export async function handlePlatformRequest(
   }
 
   return Response.json({ error: "not_found" }, { status: 404 });
+}
+
+async function hasWelcomeCredit(database: D1Database, playerId: string): Promise<boolean> {
+  const entry = await database.prepare(
+    "SELECT 1 AS granted FROM credit_ledger_entries WHERE id = ?",
+  ).bind(`initial-grant:${playerId}`).first<{ granted: number }>();
+  return Boolean(entry);
 }
 
 async function handleStripeWebhook(

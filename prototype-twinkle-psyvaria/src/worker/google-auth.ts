@@ -28,6 +28,7 @@ export async function handleGoogleAuthRequest(
   getOrCreateSession: (request: Request, database: D1Database) => Promise<PlayerSession & { setCookie: boolean }>,
   getExistingSession: (request: Request, database: D1Database) => Promise<PlayerSession | null>,
   sessionCookie: (session: PlayerSession & { setCookie: boolean }) => string,
+  hasPolicyConsent: (database: D1Database, playerId: string) => Promise<boolean>,
 ): Promise<Response | null> {
   const url = new URL(request.url);
   if (url.pathname === "/api/platform/auth/developer" && request.method === "GET") {
@@ -40,6 +41,13 @@ export async function handleGoogleAuthRequest(
     }
 
     const session = await getOrCreateSession(request, database);
+    if (!await hasPolicyConsent(database, session.playerId)) {
+      redirect.searchParams.set("account", "error");
+      redirect.searchParams.set("reason", "policy_consent_required");
+      const headers = new Headers({ Location: redirect.toString() });
+      if (session.setCookie) headers.append("Set-Cookie", sessionCookie(session));
+      return new Response(null, { status: 302, headers });
+    }
     await registerAccount(database, session, {
       sub: "local-developer",
       name: "開発者ユーザー",
@@ -51,15 +59,23 @@ export async function handleGoogleAuthRequest(
   }
 
   if (url.pathname === "/api/platform/auth/google/start" && request.method === "GET") {
+    const returnTo = sanitizeReturnPath(url.searchParams.get("returnTo"));
     if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
-      const redirect = new URL(sanitizeReturnPath(url.searchParams.get("returnTo")), url.origin);
+      const redirect = new URL(returnTo, url.origin);
       redirect.searchParams.set("account", "error");
       redirect.searchParams.set("reason", "not_configured");
       return Response.redirect(redirect.toString(), 302);
     }
     const session = await getOrCreateSession(request, database);
+    if (!await hasPolicyConsent(database, session.playerId)) {
+      const redirect = new URL(returnTo, url.origin);
+      redirect.searchParams.set("account", "error");
+      redirect.searchParams.set("reason", "policy_consent_required");
+      const headers = new Headers({ Location: redirect.toString() });
+      if (session.setCookie) headers.append("Set-Cookie", sessionCookie(session));
+      return new Response(null, { status: 302, headers });
+    }
     const state = createRandomToken();
-    const returnTo = sanitizeReturnPath(url.searchParams.get("returnTo"));
     const stateValue = encodeURIComponent(JSON.stringify({ state, returnTo }));
     const authorizationUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
     authorizationUrl.search = new URLSearchParams({
@@ -90,6 +106,7 @@ export async function handleGoogleAuthRequest(
   };
 
   if (!session) return fail("session_expired");
+  if (!await hasPolicyConsent(database, session.playerId)) return fail("policy_consent_required");
   if (!stateRecord || !url.searchParams.get("state") || stateRecord.state !== url.searchParams.get("state")) {
     return fail("invalid_state");
   }

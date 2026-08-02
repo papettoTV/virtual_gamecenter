@@ -1052,6 +1052,12 @@ canvas {
   font-weight: 700;
 }
 
+.platform-dialog-note {
+  display: block;
+  margin-top: 10px;
+  color: var(--muted);
+}
+
 .platform-account-benefits {
   display: grid;
   gap: 0.65rem;

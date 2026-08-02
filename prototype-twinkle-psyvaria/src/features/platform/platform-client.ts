@@ -21,6 +21,7 @@ export interface PlatformBootstrap {
   avatarUrl: string | null;
   developerLoginAvailable: boolean;
   consent: ConsentState;
+  welcomeCreditGranted: boolean;
   wallet: WalletSummary;
   creditCost: number;
 }
@@ -81,6 +82,13 @@ export async function acceptPolicies(
     method: "POST",
     body: JSON.stringify({ termsVersion, privacyVersion }),
   });
+}
+
+export async function claimWelcomeCredit(): Promise<{
+  welcomeCreditGranted: boolean;
+  wallet: WalletSummary;
+}> {
+  return requestJson("/api/platform/welcome-credit", { method: "POST" });
 }
 
 export async function reservePlayCredit(
