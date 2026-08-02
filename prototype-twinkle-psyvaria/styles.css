@@ -698,8 +698,63 @@ canvas {
 
 .ranking-form {
   display: flex;
+  align-items: stretch;
   gap: 8px;
   margin-top: 10px;
+}
+
+.ranking-name-summary {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  text-align: left;
+}
+
+.ranking-name-summary span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.ranking-name-summary strong {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ranking-user-registration {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(105, 247, 255, 0.2);
+  border-radius: 10px;
+  background: rgba(105, 247, 255, 0.06);
+}
+
+.ranking-user-registration[hidden] {
+  display: none;
+}
+
+.ranking-user-registration p {
+  min-height: 0;
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ranking-user-registration button {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
 }
 
 .ranking-submit-list {
@@ -723,17 +778,6 @@ canvas {
 
 .ranking-submit-list li strong {
   color: var(--text);
-}
-
-.ranking-form input {
-  min-width: 0;
-  flex: 1;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text);
-  font: inherit;
-  padding: 10px 12px;
 }
 
 .ranking-form button,
@@ -1106,12 +1150,6 @@ canvas {
   height: 100%;
   border-radius: inherit;
   object-fit: cover;
-}
-
-#ranking-name[readonly] {
-  cursor: default;
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.05);
 }
 
 .platform-error,

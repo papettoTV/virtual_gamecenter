@@ -80,10 +80,27 @@ export function PlatformExperience() {
   useEffect(() => {
     if (!platform?.playerName) return;
     const rankingName = document.querySelector<HTMLInputElement>("#ranking-name");
-    if (!rankingName) return;
-    rankingName.value = platform.playerName;
-    rankingName.dispatchEvent(new Event("input", { bubbles: true }));
-  }, [platform?.playerName]);
+    const rankingNameDisplay = document.querySelector<HTMLElement>("#ranking-name-display");
+    const registrationHint = document.querySelector<HTMLElement>("#ranking-user-registration");
+    if (rankingName) {
+      rankingName.value = platform.playerName;
+      rankingName.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    if (rankingNameDisplay) rankingNameDisplay.textContent = platform.playerName;
+    if (registrationHint) registrationHint.hidden = platform.accountRegistered;
+  }, [platform?.accountRegistered, platform?.playerName]);
+
+  useEffect(() => {
+    const openRegistration = () => {
+      if (!platform?.consent.accepted) {
+        setConsentPurpose("registration");
+      } else {
+        setAccountDialogOpen(true);
+      }
+    };
+    window.addEventListener("request-user-registration", openRegistration);
+    return () => window.removeEventListener("request-user-registration", openRegistration);
+  }, [platform?.consent.accepted]);
 
   useEffect(() => {
     const url = new URL(window.location.href);

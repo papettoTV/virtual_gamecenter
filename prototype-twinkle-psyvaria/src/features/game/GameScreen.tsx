@@ -59,14 +59,22 @@ export function GameScreen() {
           <h2 id="ranking-submit-heading">ランキング登録</h2>
           <p id="ranking-result">ゲーム終了時にスコアを登録できます。</p>
           <div className="ranking-form">
-            <input
-              id="ranking-name"
-              maxLength={24}
-              placeholder="プレイヤー名"
-              aria-label="ランキング登録名（変更不可）"
-              readOnly
-            />
+            <input id="ranking-name" type="hidden" />
+            <div className="ranking-name-summary">
+              <span>登録名</span>
+              <strong id="ranking-name-display">読み込み中</strong>
+            </div>
             <button id="ranking-submit" type="button" disabled>登録</button>
+          </div>
+          <div className="ranking-user-registration" id="ranking-user-registration" hidden>
+            <p>ユーザー登録すると、ランキング名を自由に設定できます。</p>
+            <button
+              id="ranking-user-register"
+              type="button"
+              onClick={() => window.dispatchEvent(new Event("request-user-registration"))}
+            >
+              ユーザー登録
+            </button>
           </div>
           <ol className="ranking-submit-list" id="ranking-submit-list" />
           <button id="clear-restart" className="clear-restart-button" type="button">ゲームに戻る</button>
