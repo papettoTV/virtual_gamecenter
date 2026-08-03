@@ -47,7 +47,6 @@ const gaugeGrowthDown = document.querySelector("#gauge-growth-down");
 const gaugeGrowthUp = document.querySelector("#gauge-growth-up");
 const gaugeGrowthValue = document.querySelector("#gauge-growth-value");
 const gaugeGrowthLabel = document.querySelector("#gauge-growth-label");
-const touchRestart = document.querySelector("#touch-restart");
 const touchPause = document.querySelector("#touch-pause");
 const rankingAnotherGame = document.querySelector("#ranking-another-game");
 const rankingRetry = document.querySelector("#ranking-retry");
@@ -602,12 +601,6 @@ canvas.addEventListener("pointermove", (event) => {
 
 canvas.addEventListener("pointerup", resetTouchMove);
 canvas.addEventListener("pointercancel", resetTouchMove);
-
-if (touchRestart) {
-  touchRestart.addEventListener("click", () => {
-    if (cabinetRole !== "spectator" && !isVersusParticipant()) resetGame();
-  });
-}
 
 if (rankingAnotherGame) {
   rankingAnotherGame.addEventListener("click", () => {
@@ -4077,13 +4070,20 @@ function drawHitDebug() {
 function drawPaused() {
   const compact = isCompactView();
   const title = waitingForStart ? "READY" : "PAUSED";
-  const action = waitingForStart ? "Spaceでゲーム開始" : "Spaceで再開";
+  const action = compact
+    ? waitingForStart ? "下の「ゲーム開始」をタップ" : "下の「再開」をタップ"
+    : waitingForStart ? "Spaceでゲーム開始" : "Spaceで再開";
   const instructionX = WIDTH / 2 - (compact ? 165 : 195);
-  const instructions = [
-    "移動: 矢印キー / WASD",
-    "低速移動: Shift",
-    "ボス攻撃: 無敵シールドを当てる",
-  ];
+  const instructions = compact
+    ? [
+      "移動: ゲーム画面をスライド",
+      "ボス攻撃: 無敵シールドを当てる",
+    ]
+    : [
+      "移動: 矢印キー / WASD",
+      "低速移動: Shift",
+      "ボス攻撃: 無敵シールドを当てる",
+    ];
 
   context.fillStyle = "rgba(0,0,0,0.7)";
   context.fillRect(0, 0, WIDTH, HEIGHT);

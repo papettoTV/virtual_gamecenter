@@ -24,7 +24,7 @@ type PendingPlayAction =
 type PurchaseUnit = 1 | 3 | 5 | 10;
 type ConsentPurpose = "registration" | "purchase";
 
-const PLAY_BUTTON_IDS = new Set(["start-solo", "touch-restart", "ranking-retry"]);
+const PLAY_BUTTON_IDS = new Set(["start-solo", "ranking-retry"]);
 
 export function PlatformExperience() {
   const promoCaptureMode = import.meta.env.DEV

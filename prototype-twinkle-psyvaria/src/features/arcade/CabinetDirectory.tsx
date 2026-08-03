@@ -235,7 +235,10 @@ function CabinetMachineScreen({
 }) {
   return (
     <span className="cabinet-machine" aria-hidden="true">
-      <span className="cabinet-machine-marquee">BUZZ BARRIER</span>
+      <span className="cabinet-machine-marquee">
+        <span className="cabinet-game-icon">BB</span>
+        <span>BUZZ BARRIER</span>
+      </span>
       <span className={`cabinet-machine-monitor is-${mode}`}>
         {mode !== "playing" ? (
           <>

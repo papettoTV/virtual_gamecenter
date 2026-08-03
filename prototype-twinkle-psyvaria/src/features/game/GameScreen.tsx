@@ -104,7 +104,6 @@ export function GameScreen() {
 
       <div className="touch-controls" aria-label="スマホ操作">
         <div className="touch-actions">
-          <button id="touch-restart" className="touch-button" type="button">リスタート</button>
           <button id="touch-pause" className="touch-button" type="button">一時停止</button>
         </div>
       </div>
