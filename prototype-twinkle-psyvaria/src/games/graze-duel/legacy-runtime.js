@@ -4071,7 +4071,7 @@ function drawPaused() {
   const compact = isCompactView();
   const title = waitingForStart ? "READY" : "PAUSED";
   const action = compact
-    ? waitingForStart ? "下の「ゲーム開始」をタップ" : "下の「再開」をタップ"
+    ? waitingForStart ? "画面下の「ゲーム開始」でスタート" : "画面下の「再開」ボタンでゲーム再開"
     : waitingForStart ? "Spaceでゲーム開始" : "Spaceで再開";
   const instructionX = WIDTH / 2 - (compact ? 165 : 195);
   const instructions = compact
