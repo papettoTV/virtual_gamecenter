@@ -738,6 +738,10 @@ canvas {
   display: block;
 }
 
+.ranking-submit.is-input-locked {
+  pointer-events: none;
+}
+
 .ranking-overlay {
   position: absolute;
   left: 50%;

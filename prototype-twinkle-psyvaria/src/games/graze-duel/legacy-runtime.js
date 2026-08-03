@@ -108,6 +108,8 @@ const BOSS_ATTACK_PATTERNS = [
   { id: "centerPressure", duration: 5, shotInterval: 0.38 },
 ];
 const RANKING_REGISTRATION_RETURN_KEY = "vgc_ranking_registration_return";
+const GAME_OVER_RANKING_DELAY = 2;
+const RANKING_INPUT_GUARD_TIME = 300;
 const HIT_INVINCIBLE_TIME = 2.2;
 const INVINCIBLE_RING_INNER_RADIUS = 18;
 const INVINCIBLE_RING_INNER_SCALE = 28;
@@ -164,6 +166,8 @@ let nextBulletId = 1;
 let clearGame = false;
 let lastRankingResult = null;
 let rankingSubmittedForResult = false;
+let gameOverRankingTimer = 0;
+let rankingInputUnlockTimeout = 0;
 let debugRankingPreviewEnabled = false;
 let debugRankingPreviewShown = false;
 let currentScreen = "arcade";
@@ -349,9 +353,13 @@ function resetGame() {
   clearGame = false;
   lastRankingResult = null;
   rankingSubmittedForResult = false;
+  gameOverRankingTimer = 0;
+  window.clearTimeout(rankingInputUnlockTimeout);
+  rankingInputUnlockTimeout = 0;
   debugRankingPreviewShown = false;
   rankingSubmitPanel?.classList.remove("is-visible");
   rankingSubmitPanel?.classList.remove("is-submitted");
+  rankingSubmitPanel?.classList.remove("is-input-locked");
   updateRankingSubmitState();
   resetBossProgress();
   resetOpponentBossProgress();
@@ -1915,10 +1923,11 @@ function update(delta) {
 
   if (!gameOver) elapsedRound += delta;
   const gameDelta = getGameDelta(delta);
-  if (players[0].lives <= 0) {
+  if (players[0].lives <= 0 && !gameOver) {
     gameOver = true;
-    recordGameOverResult();
+    gameOverRankingTimer = GAME_OVER_RANKING_DELAY;
   }
+  updateGameOverRanking(delta);
 
   updateHuman(players[0], gameDelta);
   updateCpu(players[1], players[0], gameDelta);
@@ -2488,6 +2497,13 @@ function recordGameOverResult() {
   showRankingRegistration({ cleared: false });
 }
 
+function updateGameOverRanking(delta) {
+  if (!gameOver || clearGame || lastRankingResult || players[0].lives > 0) return;
+  gameOverRankingTimer = Math.max(0, gameOverRankingTimer - delta);
+  if (gameOverRankingTimer > 0 || (isCompactView() && touchMove.active)) return;
+  recordGameOverResult();
+}
+
 function showRankingRegistration({ cleared, debugMessage = "" }) {
   const elapsedTimeMs = Math.round(elapsedRound * 1000);
   const playScore = players[0].score;
@@ -2515,7 +2531,18 @@ function showRankingRegistration({ cleared, debugMessage = "" }) {
         `（ボス撃破 ${defeatedBossCount} / LV ${players[0].level} / TIME ${formatRankingTime(elapsedTimeMs)}）`;
   }
   rankingSubmitPanel?.classList.add("is-visible");
+  guardRankingInput();
   updateRankingSubmitState();
+}
+
+function guardRankingInput() {
+  window.clearTimeout(rankingInputUnlockTimeout);
+  rankingSubmitPanel?.classList.toggle("is-input-locked", isCompactView());
+  if (!isCompactView()) return;
+  rankingInputUnlockTimeout = window.setTimeout(() => {
+    rankingSubmitPanel?.classList.remove("is-input-locked");
+    rankingInputUnlockTimeout = 0;
+  }, RANKING_INPUT_GUARD_TIME);
 }
 
 function restoreRankingRegistration() {
@@ -4033,17 +4060,23 @@ function drawParticles() {
 }
 
 function drawGameOver() {
-  const winner = getWinner();
+  const showingGameOverEffect = !clearGame && !lastRankingResult;
+  const winner = showingGameOverEffect ? "GAME OVER" : getWinner();
   context.fillStyle = "rgba(0,0,0,0.68)";
   context.fillRect(0, 0, WIDTH, HEIGHT);
   context.fillStyle = "#f4f7ff";
   context.textAlign = "center";
   context.font = "800 58px system-ui";
   context.fillText(winner, WIDTH / 2, HEIGHT / 2 + (clearGame ? -118 : -28));
+  if (showingGameOverEffect) {
+    context.font = "700 22px system-ui";
+    context.fillStyle = "#69f7ff";
+    context.fillText(`SCORE ${players[0].score}`, WIDTH / 2, HEIGHT / 2 + 18);
+  }
   if (cabinetRole === "spectator") {
     context.font = "600 20px system-ui";
     context.fillText("プレイヤーが続けるか辞めるか選ぶのを待っています", WIDTH / 2, HEIGHT / 2 + (clearGame ? -72 : 18));
-  } else if (!clearGame) {
+  } else if (!clearGame && !showingGameOverEffect) {
     context.font = "500 20px system-ui";
     context.fillText("Rキーでリスタート", WIDTH / 2, HEIGHT / 2 + 18);
   }
