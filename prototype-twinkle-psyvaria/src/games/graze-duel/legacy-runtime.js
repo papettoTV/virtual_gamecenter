@@ -487,7 +487,12 @@ function startPromoCapture() {
 }
 
 if (selectGameButton) {
-  selectGameButton.addEventListener("click", () => {
+  selectGameButton.addEventListener("click", (event) => {
+    if (
+      event.target instanceof Element
+      && event.target !== selectGameButton
+      && event.target.closest("button, a")
+    ) return;
     enterCabinet(createCabinetId());
   });
 }

@@ -10,7 +10,19 @@ export function ArcadeScreen() {
               <p>プレイ中の筐体を観戦するか、新しい筐体に入ってゲームを始められます。</p>
             </div>
           </div>
-          <div className="game-select-card">
+          <div
+            className="game-select-card is-selectable"
+            id="select-game"
+            role="button"
+            tabIndex={0}
+            aria-label="BUZZ BARRIERを選択"
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                event.currentTarget.click();
+              }
+            }}
+          >
             <div className="game-card-thumb" aria-hidden="true">BB</div>
             <div className="game-card-body">
               <strong>BUZZ BARRIER</strong>
@@ -18,7 +30,6 @@ export function ArcadeScreen() {
               <span>弾幕かすり・無敵体当たり・ボス撃破型シューティング</span>
             </div>
             <div className="game-card-actions">
-              <button id="select-game" type="button">ゲームを選択</button>
               <CabinetDirectory />
             </div>
           </div>

@@ -153,7 +153,7 @@ export function PlatformExperience() {
   }, [loadPlatform]);
 
   useEffect(() => {
-    if (notice !== "1クレジットを使用しました。") return;
+    if (!["1クレジットを使用しました。", "筐体URLをコピーしました。"].includes(notice)) return;
     const closeTimer = window.setTimeout(() => setNotice(""), 5000);
     return () => window.clearTimeout(closeTimer);
   }, [notice]);
@@ -680,13 +680,13 @@ export function PlatformExperience() {
                 ゲーム開始には1クレジット必要です。クレジットを購入しますか？
               </p>
             )}
-            <div className="platform-dialog-actions">
+            <div className="platform-dialog-actions play-credit-actions">
               {playDialog === "confirm" && (
                 <button className="platform-share-button" type="button" onClick={() => void shareCabinetUrl()}>
                   観戦用画面を共有
                 </button>
               )}
-              <button type="button" onClick={() => {
+              <button className="platform-cancel-button" type="button" onClick={() => {
                 if (playDialog === "insufficient") {
                   window.sessionStorage.removeItem("vgc_pending_play_action");
                 }

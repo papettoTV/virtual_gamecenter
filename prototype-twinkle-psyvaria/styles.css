@@ -191,6 +191,19 @@ p {
   opacity: 0.5;
 }
 
+.game-select-card.is-selectable {
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.game-select-card.is-selectable:hover,
+.game-select-card.is-selectable:focus-visible {
+  border-color: rgba(105, 247, 255, 0.42);
+  background: rgba(27, 38, 61, 0.82);
+  outline: none;
+  transform: translateY(-2px);
+}
+
 .game-card-thumb {
   display: grid;
   width: 64px;
@@ -1553,6 +1566,35 @@ canvas {
     grid-template-columns: 1fr;
   }
 
+  .game-select-card.is-selectable {
+    grid-template-columns: 48px minmax(0, 1fr);
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .game-select-card.is-selectable .game-card-thumb {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+  }
+
+  .game-select-card.is-selectable .game-card-body strong {
+    margin-bottom: 1px;
+    font-size: 16px;
+  }
+
+  .game-select-card.is-selectable .game-card-body span {
+    display: none;
+  }
+
+  .game-select-card.is-selectable .game-card-body small {
+    line-height: 1.35;
+  }
+
+  .game-select-card.is-selectable .game-card-actions {
+    grid-column: 2;
+  }
+
   .cabinet-status {
     grid-template-columns: 1fr;
   }
@@ -1605,6 +1647,21 @@ canvas {
 
   .platform-dialog-actions button {
     width: 100%;
+  }
+
+  .play-credit-actions .platform-share-button {
+    order: 0;
+    margin-right: 0;
+  }
+
+  .play-credit-actions .platform-primary-button {
+    order: 1;
+    min-height: 58px;
+    font-size: 18px;
+  }
+
+  .play-credit-actions .platform-cancel-button {
+    order: 2;
   }
 
   .ranking-next-actions {
