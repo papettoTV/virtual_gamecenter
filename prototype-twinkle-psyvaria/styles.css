@@ -1592,7 +1592,10 @@ canvas {
   }
 
   .game-select-card.is-selectable .game-card-body span {
-    display: none;
+    display: block;
+    margin-top: 3px;
+    font-size: 11px;
+    line-height: 1.4;
   }
 
   .game-select-card.is-selectable .game-card-body small {
