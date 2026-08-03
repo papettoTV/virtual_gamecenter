@@ -994,16 +994,14 @@ function handleCabinetMessage(message) {
   if (message.type === "cabinetState") {
     cabinetState = message.state;
     updateCabinetUi();
+    attemptPendingCreatedSoloStart();
     return;
   }
 
   if (message.type === "joinedCabinet") {
     cabinetRole = message.role;
     updateCabinetUi();
-    if (pendingCreatedSoloStart && message.role === "player") {
-      pendingCreatedSoloStart = false;
-      window.setTimeout(() => startSoloButton?.click(), 0);
-    }
+    attemptPendingCreatedSoloStart();
     return;
   }
 
@@ -1320,6 +1318,19 @@ function finishVersusLocally(nextRole, reason) {
     if (spectatorStatusText) spectatorStatusText.textContent = `${reason} 観戦モードに戻りました。`;
     startSpectating();
   }
+}
+
+function attemptPendingCreatedSoloStart() {
+  if (
+    !pendingCreatedSoloStart
+    || cabinetRole !== "player"
+    || !cabinetConnected
+    || !["occupied", "soloPlaying"].includes(cabinetState?.status)
+    || !startSoloButton
+    || startSoloButton.disabled
+  ) return;
+  pendingCreatedSoloStart = false;
+  window.setTimeout(() => startSoloButton.click(), 0);
 }
 
 function updateCabinetUi() {
