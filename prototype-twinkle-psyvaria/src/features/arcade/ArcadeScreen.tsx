@@ -23,7 +23,9 @@ export function ArcadeScreen() {
               }
             }}
           >
-            <div className="game-card-thumb" aria-hidden="true">BB</div>
+            <div className="game-card-thumb" aria-hidden="true">
+              <img src="/assets/buzz-barrier-icon.png" alt="" />
+            </div>
             <div className="game-card-body">
               <strong>BUZZ BARRIER</strong>
               <small>バズバリア</small>

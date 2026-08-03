@@ -3730,25 +3730,7 @@ function drawPlayer(player) {
   if (player.levelUpFlash > 0) {
     drawLevelUpLightning(player);
   }
-  context.strokeStyle = player.color;
-  context.fillStyle = "#ffffff";
-  context.shadowBlur = 20;
-  context.shadowColor = player.color;
-  const bankAmount = Math.abs(player.tilt);
-  const bankScale = 1 - bankAmount * 0.48;
-  const bankOffset = player.tilt * 4;
-  context.translate(player.x, player.y);
-  context.scale(bankScale, 1);
-  context.beginPath();
-  context.moveTo(bankOffset, -14);
-  context.lineTo(-10, 12);
-  context.lineTo(bankOffset * 0.35, 6);
-  context.lineTo(10, 12);
-  context.closePath();
-  context.stroke();
-  context.fill();
-  context.scale(1 / bankScale, 1);
-  context.translate(-player.x, -player.y);
+  drawPixelPlayerShip(player);
 
   context.shadowBlur = 0;
   const isWarning = isLevelInvincible && player.levelUpInvincible <= INVINCIBLE_WARNING_TIME;
@@ -3769,6 +3751,97 @@ function drawPlayer(player) {
   context.arc(player.x, player.y, HIT_MARKER_RADIUS, 0, Math.PI * 2);
   context.fill();
   context.stroke();
+  context.restore();
+}
+
+function drawPixelPlayerShip(player) {
+  const bankAmount = Math.abs(player.tilt);
+  const bankScale = 1 - bankAmount * 0.48;
+  const bankOffset = player.tilt * 4;
+
+  context.save();
+  context.translate(player.x + bankOffset, player.y);
+  context.scale(bankScale, 1);
+  context.lineJoin = "miter";
+  context.lineCap = "square";
+  context.shadowBlur = 16;
+  context.shadowColor = player.color;
+
+  context.fillStyle = "#d9fdff";
+  context.beginPath();
+  context.moveTo(-8, 9);
+  context.lineTo(-3, 9);
+  context.lineTo(-4, 19);
+  context.lineTo(-7, 14);
+  context.closePath();
+  context.moveTo(3, 9);
+  context.lineTo(8, 9);
+  context.lineTo(7, 14);
+  context.lineTo(4, 19);
+  context.closePath();
+  context.fill();
+
+  context.fillStyle = "#061a35";
+  context.strokeStyle = player.color;
+  context.lineWidth = 2;
+  context.beginPath();
+  context.moveTo(0, -18);
+  context.lineTo(-5, -8);
+  context.lineTo(-8, -5);
+  context.lineTo(-14, 1);
+  context.lineTo(-17, 11);
+  context.lineTo(-8, 7);
+  context.lineTo(-7, 14);
+  context.lineTo(0, 10);
+  context.lineTo(7, 14);
+  context.lineTo(8, 7);
+  context.lineTo(17, 11);
+  context.lineTo(14, 1);
+  context.lineTo(8, -5);
+  context.lineTo(5, -8);
+  context.closePath();
+  context.fill();
+  context.stroke();
+
+  context.fillStyle = player.color;
+  context.beginPath();
+  context.moveTo(-4, -7);
+  context.lineTo(-14, 3);
+  context.lineTo(-15, 8);
+  context.lineTo(-7, 5);
+  context.lineTo(-5, 11);
+  context.closePath();
+  context.moveTo(4, -7);
+  context.lineTo(14, 3);
+  context.lineTo(15, 8);
+  context.lineTo(7, 5);
+  context.lineTo(5, 11);
+  context.closePath();
+  context.fill();
+
+  context.fillStyle = "#bdfcff";
+  context.beginPath();
+  context.moveTo(0, -15);
+  context.lineTo(-4, -3);
+  context.lineTo(-3, 9);
+  context.lineTo(0, 7);
+  context.lineTo(3, 9);
+  context.lineTo(4, -3);
+  context.closePath();
+  context.fill();
+
+  context.fillStyle = "#0879b8";
+  context.beginPath();
+  context.moveTo(0, -8);
+  context.lineTo(-3, -2);
+  context.lineTo(-2, 4);
+  context.lineTo(2, 4);
+  context.lineTo(3, -2);
+  context.closePath();
+  context.fill();
+
+  context.fillStyle = "rgba(255, 255, 255, 0.92)";
+  context.fillRect(-1, -6, 2, 6);
   context.restore();
 }
 
