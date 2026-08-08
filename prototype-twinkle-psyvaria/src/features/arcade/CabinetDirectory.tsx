@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import "./cabinet-directory.css";
+import type { GameDefinition } from "../../domain/game";
 
 interface CabinetEntry {
   cabinetId: string;
+  gameId: string;
   status: string;
   spectatorCount: number;
 }
@@ -16,13 +18,13 @@ const PLAYING_STATUSES = new Set([
   "versusPlaying",
 ]);
 
-function useCabinets() {
+function useCabinets(gameId: string) {
   const [cabinets, setCabinets] = useState<CabinetEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadCabinets = useCallback(async () => {
     try {
-      const response = await fetch("/api/cabinets?gameId=graze-duel", {
+      const response = await fetch(`/api/cabinets?gameId=${encodeURIComponent(gameId)}`, {
         headers: { Accept: "application/json" },
       });
       if (!response.ok) return;
@@ -31,7 +33,7 @@ function useCabinets() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [gameId]);
 
   useEffect(() => {
     void loadCabinets();
@@ -46,13 +48,13 @@ function useCabinets() {
   return { cabinets, loading };
 }
 
-function openCabinet(cabinetId: string) {
-  history.pushState({ cabinetId }, "", `/cabinets/${cabinetId}?watch=1`);
+function openCabinet(cabinetId: string, gameId: string) {
+  history.pushState({ cabinetId, gameId }, "", `/cabinets/${cabinetId}?game=${encodeURIComponent(gameId)}&watch=1`);
   window.dispatchEvent(new PopStateEvent("popstate"));
 }
 
-export function CabinetDirectory() {
-  const { cabinets, loading } = useCabinets();
+export function CabinetDirectory({ gameId }: { gameId: string }) {
+  const { cabinets, loading } = useCabinets(gameId);
 
   useEffect(() => {
     const leaveForAnotherGame = (event: MouseEvent) => {
@@ -143,7 +145,11 @@ export function CabinetDirectory() {
   if (loading || playingCabinets.length === 0) return null;
 
   return (
-    <div className="cabinet-directory" aria-label="プレイ中の筐体一覧">
+    <div
+      className="cabinet-directory"
+      aria-label="プレイ中の筐体一覧"
+      onClick={(event) => event.stopPropagation()}
+    >
       <div className="cabinet-dots">
         {playingCabinets.map((cabinet, index) => {
           const popular = cabinet.spectatorCount >= POPULAR_SPECTATOR_COUNT;
@@ -157,7 +163,7 @@ export function CabinetDirectory() {
               type="button"
               aria-label={label}
               title={label}
-              onClick={() => openCabinet(cabinet.cabinetId)}
+              onClick={() => openCabinet(cabinet.cabinetId, cabinet.gameId)}
             />
           );
         })}
@@ -166,8 +172,8 @@ export function CabinetDirectory() {
   );
 }
 
-export function CabinetSelector() {
-  const { cabinets, loading } = useCabinets();
+export function CabinetSelector({ game }: { game: GameDefinition }) {
+  const { cabinets, loading } = useCabinets(game.id);
   const currentCabinetId = window.location.pathname.match(/^\/cabinets\/([^/]+)/)?.[1];
   const playingCabinets = cabinets
     .filter((cabinet) => (
@@ -177,7 +183,9 @@ export function CabinetSelector() {
     .slice(0, CABINET_PREVIEW_LIMIT);
 
   const startSolo = () => {
-    window.dispatchEvent(new CustomEvent("create-solo-cabinet"));
+    window.dispatchEvent(new CustomEvent("create-solo-cabinet", {
+      detail: { gameId: game.id },
+    }));
   };
 
   return (
@@ -191,7 +199,7 @@ export function CabinetSelector() {
 
       <div className="cabinet-machine-grid">
         <button className="cabinet-machine-card is-solo" type="button" onClick={startSolo}>
-          <CabinetMachineScreen mode="ready" />
+          <CabinetMachineScreen game={game} mode="ready" />
           <strong>ソロでプレイ</strong>
           <small>新しい筐体を作成してプレイ開始</small>
         </button>
@@ -201,9 +209,9 @@ export function CabinetSelector() {
             key={cabinet.cabinetId}
             className="cabinet-machine-card is-playing"
             type="button"
-            onClick={() => openCabinet(cabinet.cabinetId)}
+            onClick={() => openCabinet(cabinet.cabinetId, cabinet.gameId)}
           >
-            <CabinetMachineScreen mode="playing" index={index} />
+            <CabinetMachineScreen game={game} mode="playing" index={index} />
             <span className="cabinet-machine-name">プレイ中筐体 {index + 1}</span>
             <strong>観戦する</strong>
             <small>
@@ -216,7 +224,7 @@ export function CabinetSelector() {
 
         {!loading && playingCabinets.length === 0 && (
           <div className="cabinet-machine-empty">
-            <CabinetMachineScreen mode="empty" />
+            <CabinetMachineScreen game={game} mode="empty" />
             <strong>観戦</strong>
             <small>他のプレイヤーのゲーム開始待機中</small>
           </div>
@@ -227,22 +235,24 @@ export function CabinetSelector() {
 }
 
 function CabinetMachineScreen({
+  game,
   mode,
   index = 0,
 }: {
+  game: GameDefinition;
   mode: "ready" | "playing" | "empty";
   index?: number;
 }) {
   return (
     <span className="cabinet-machine" aria-hidden="true">
       <span className="cabinet-machine-marquee">
-        <span className="cabinet-game-icon">BB</span>
-        <span>BUZZ BARRIER</span>
+        <span className="cabinet-game-icon">{game.shortTitle}</span>
+        <span>{game.title}</span>
       </span>
       <span className={`cabinet-machine-monitor is-${mode}`}>
         {mode !== "playing" ? (
           <>
-            <span className="cabinet-ready-logo">BB</span>
+            <span className="cabinet-ready-logo">{game.shortTitle}</span>
             <span className="cabinet-ready-text">
               {mode === "ready" ? "PRESS START" : "NO PLAYER"}
             </span>

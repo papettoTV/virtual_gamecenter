@@ -20,13 +20,13 @@ import {
   playExplosionSound,
   playGrazeSound,
 } from "./audio";
+import { BUZZ_BARRIER } from "../../domain/game";
 
 const canvas = document.querySelector("#game");
 const context = canvas.getContext("2d");
 const arcadeScreen = document.querySelector("#arcade-screen");
 const cabinetScreen = document.querySelector("#cabinet-screen");
 const gameScreen = document.querySelector("#game-screen");
-const selectGameButton = document.querySelector("#select-game");
 const startSoloButton = document.querySelector("#start-solo");
 const backToArcadeButton = document.querySelector("#back-to-arcade");
 const cabinetBreadcrumbArcade = document.querySelector("#cabinet-breadcrumb-arcade");
@@ -137,7 +137,8 @@ const BOSS_DEFEAT_SLOW_SCALE = 0.28;
 const START_BULLET_DELAY = 2.0;
 const HIT_MARKER_RADIUS = 3;
 const CLEAR_TIME_BONUS_BASE = 600_000;
-const CLIENT_VERSION = "prototype-score-ranking-1";
+const GAME_ID = BUZZ_BARRIER.id;
+const CLIENT_VERSION = BUZZ_BARRIER.currentVersion;
 const PROMO_CAPTURE_MODE = import.meta.env.DEV
   && new URLSearchParams(window.location.search).get("promoCapture") === "1";
 
@@ -493,18 +494,8 @@ function startPromoCapture() {
   lastTime = performance.now();
 }
 
-if (selectGameButton) {
-  selectGameButton.addEventListener("click", (event) => {
-    if (
-      event.target instanceof Element
-      && event.target !== selectGameButton
-      && event.target.closest("button, a")
-    ) return;
-    enterCabinet(createCabinetId());
-  });
-}
-
-window.addEventListener("create-solo-cabinet", () => {
+window.addEventListener("create-solo-cabinet", (event) => {
+  if (event.detail?.gameId !== GAME_ID) return;
   pendingCreatedSoloStart = true;
   enterCabinet(createCabinetId());
 });
@@ -665,7 +656,7 @@ async function requestVersusChallenge() {
     challengeRequestButton.textContent = "クレジット予約中…";
   }
   try {
-    const reservation = await reservePlayCredit(currentCabinetId, "challenge");
+    const reservation = await reservePlayCredit(currentCabinetId, GAME_ID, "challenge");
     challengeReservationId = reservation.reservationId;
     window.dispatchEvent(new Event("platform-wallet-changed"));
     cabinetClient.send({
@@ -780,7 +771,7 @@ function handleVersusUiAction(action) {
 async function requestVersusRematch() {
   if (!currentCabinetId || !versusMatchId || challengeReservationId) return;
   try {
-    const reservation = await reservePlayCredit(currentCabinetId, "rematch");
+    const reservation = await reservePlayCredit(currentCabinetId, GAME_ID, "rematch");
     challengeReservationId = reservation.reservationId;
     window.dispatchEvent(new Event("platform-wallet-changed"));
     cabinetClient.send({
@@ -884,18 +875,24 @@ function enterCabinet(cabinetId, updateUrl = true) {
   cabinetConnected = false;
   cabinetState = null;
   resetViewerSyncState();
-  if (updateUrl) history.pushState({ cabinetId }, "", `/cabinets/${cabinetId}`);
+  if (updateUrl) {
+    history.pushState(
+      { cabinetId, gameId: GAME_ID },
+      "",
+      `/cabinets/${cabinetId}?game=${encodeURIComponent(GAME_ID)}`,
+    );
+  }
   if (cabinetIdLabel) cabinetIdLabel.textContent = `Cabinet ${cabinetId.slice(0, 8)}`;
   updateCabinetUi();
   showScreen("cabinet");
-  cabinetClient.join(cabinetId);
+  cabinetClient.join(cabinetId, GAME_ID);
 }
 
 function startSoloPlay() {
   if (!cabinetConnected) {
     cabinetRole = "joining";
     updateCabinetUi();
-    cabinetClient.join(currentCabinetId);
+    cabinetClient.join(currentCabinetId, GAME_ID);
     return;
   }
   if (cabinetRole === "spectator") {
@@ -2601,6 +2598,7 @@ async function submitRanking() {
 
   try {
     await submitRankingEntry({
+      gameId: GAME_ID,
       elapsedTimeMs: lastRankingResult.elapsedTimeMs,
       cleared: lastRankingResult.cleared,
       score: lastRankingResult.score,
@@ -2627,7 +2625,7 @@ async function loadRanking() {
   for (const target of targets) setRankingListMessage(target, "読み込み中...");
 
   try {
-    renderRanking(await fetchScoreRanking(20, CLIENT_VERSION));
+    renderRanking(await fetchScoreRanking(GAME_ID, 20, CLIENT_VERSION));
   } catch (error) {
     console.warn(error);
     for (const target of targets) setRankingListMessage(target, "ランキングAPI未接続");

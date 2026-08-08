@@ -17,7 +17,7 @@ export interface VersusTerminalReport {
 export type ChallengeQueueClientStatus = "none" | "pending" | "queued" | "matched";
 
 export type ClientMessage =
-  | { type: "joinCabinet" }
+  | { type: "joinCabinet"; gameId: string }
   | { type: "startSolo" }
   | { type: "stopSolo" }
   | { type: "leaveCabinet" }

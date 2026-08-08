@@ -3,6 +3,7 @@ import {
   isDeveloperAuthAvailable,
   type GoogleAuthEnv,
 } from "./google-auth";
+import { DEFAULT_GAME_ID, getGameDefinition } from "../domain/game";
 
 const SESSION_COOKIE = "vgc_session";
 const DEVICE_COOKIE = "vgc_device";
@@ -329,13 +330,17 @@ export async function handlePlatformRequest(
   if (url.pathname === "/api/platform/credit-reservations" && request.method === "POST") {
     const body = await readJson(request);
     const cabinetId = sanitizeId(body?.cabinetId, "cabinet");
+    const game = getGameDefinition(String(body?.gameId || DEFAULT_GAME_ID));
+    if (!game || game.status !== "active") {
+      return Response.json({ error: "unknown_game" }, { status: 404 });
+    }
     const purpose = body?.purpose === "challenge" || body?.purpose === "rematch"
       ? body.purpose
       : "solo";
     const reservationId = crypto.randomUUID();
     const playSessionId = crypto.randomUUID();
     const wallet = await getWalletSummary(database, session.playerId);
-    const balanceType = wallet.availableFree >= PLAY_CREDIT_COST ? "free" : "purchased";
+    const balanceType = wallet.availableFree >= game.creditCost ? "free" : "purchased";
     const expiresAt = new Date(
       Date.now() + (purpose === "solo" ? 2 : purpose === "challenge" ? 120 : 15) * 60 * 1000,
     ).toISOString();
@@ -345,8 +350,14 @@ export async function handlePlatformRequest(
         database.prepare(
           `INSERT INTO play_sessions
             (id, cabinet_id, game_id, mode, status, host_player_id)
-           VALUES (?, ?, 'graze-duel', ?, 'credit_reserved', ?)`,
-        ).bind(playSessionId, cabinetId, purpose === "solo" ? "solo" : "versus", session.playerId),
+           VALUES (?, ?, ?, ?, 'credit_reserved', ?)`,
+        ).bind(
+          playSessionId,
+          cabinetId,
+          game.id,
+          purpose === "solo" ? "solo" : "versus",
+          session.playerId,
+        ),
         database.prepare(
           `INSERT INTO credit_reservations
             (id, player_id, play_session_id, amount, balance_type, status, expires_at)
@@ -355,7 +366,7 @@ export async function handlePlatformRequest(
           reservationId,
           session.playerId,
           playSessionId,
-          PLAY_CREDIT_COST,
+          game.creditCost,
           balanceType,
           expiresAt,
         ),

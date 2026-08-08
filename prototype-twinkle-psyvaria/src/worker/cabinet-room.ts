@@ -22,6 +22,7 @@ import type {
   VersusSeat,
   VersusTerminalReport,
 } from "../shared/protocol";
+import { getGameDefinition } from "../domain/game";
 
 interface ConnectionAttachment {
   clientId: string;
@@ -99,7 +100,15 @@ export class CabinetRoom extends DurableObject<Env> {
 
     const url = new URL(request.url);
     this.cabinetId = url.pathname.split("/").at(-2) ?? this.cabinetId;
-    if (!this.state.cabinetId) this.state = createCabinetState(this.cabinetId);
+    const requestedGame = getGameDefinition(url.searchParams.get("gameId"));
+    if (!requestedGame) return Response.json({ error: "unknown_game" }, { status: 404 });
+    if (this.state.cabinetId && this.state.gameId !== requestedGame.id) {
+      return Response.json({ error: "cabinet_game_mismatch" }, { status: 409 });
+    }
+    if (!this.state.cabinetId) {
+      this.state = createCabinetState(this.cabinetId, requestedGame.id);
+      await this.persistState();
+    }
 
     const pair = new WebSocketPair();
     const client = pair[0];
@@ -131,6 +140,10 @@ export class CabinetRoom extends DurableObject<Env> {
     }
 
     if (message.type === "joinCabinet") {
+      if (message.gameId !== this.state.gameId) {
+        this.send(socket, { type: "error", message: "筐体のゲームが一致しません。" });
+        return;
+      }
       await this.join(socket);
       return;
     }

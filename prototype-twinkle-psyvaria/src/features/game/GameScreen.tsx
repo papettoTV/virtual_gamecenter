@@ -1,4 +1,6 @@
-export function GameScreen() {
+import type { GameDefinition } from "../../domain/game";
+
+export function GameScreen({ game }: { game: GameDefinition }) {
   return (
     <section className="game-screen is-hidden" id="game-screen">
       <div className="spectator-banner is-hidden" id="spectator-banner">
@@ -53,7 +55,7 @@ export function GameScreen() {
             <path d="m8.7 10.7 6.6-4.2M8.7 13.3l6.6 4.2" />
           </svg>
         </button>
-        <canvas id="game" width="960" height="640" aria-label="BUZZ BARRIER game canvas" />
+        <canvas id="game" width="960" height="640" aria-label={`${game.title} game canvas`} />
         <div className="versus-overlay is-hidden" id="versus-overlay" role="dialog" aria-modal="true">
           <p className="eyebrow" id="versus-eyebrow">Versus</p>
           <h2 id="versus-title">対戦</h2>

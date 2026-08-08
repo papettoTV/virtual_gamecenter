@@ -1,6 +1,8 @@
 import { CabinetDirectory } from "./CabinetDirectory";
+import { getActiveGames } from "../../domain/game";
 
-export function ArcadeScreen() {
+export function ArcadeScreen({ onSelectGame }: { onSelectGame: (gameId: string) => void }) {
+  const games = getActiveGames();
   return (
     <section className="arcade-screen" id="arcade-screen">
       <div className="arcade-card">
@@ -10,31 +12,30 @@ export function ArcadeScreen() {
               <p>プレイ中の筐体を観戦するか、新しい筐体に入ってゲームを始められます。</p>
             </div>
           </div>
-          <div
-            className="game-select-card is-selectable"
-            id="select-game"
-            role="button"
-            tabIndex={0}
-            aria-label="BUZZ BARRIERを選択"
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                event.currentTarget.click();
-              }
-            }}
-          >
-            <div className="game-card-thumb" aria-hidden="true">
-              <img src="/assets/buzz-barrier-icon.png" alt="" />
+          {games.map((game) => (
+            <div
+              className="game-select-card is-selectable"
+              key={game.id}
+            >
+              <button
+                className="game-card-select-overlay"
+                type="button"
+                aria-label={`${game.title}を選択`}
+                onClick={() => void onSelectGame(game.id)}
+              />
+              <div className="game-card-thumb" aria-hidden="true">
+                <img src={game.iconUrl} alt="" />
+              </div>
+              <div className="game-card-body">
+                <strong>{game.title}</strong>
+                <small>{game.localizedTitle}</small>
+                <span>{game.description}</span>
+              </div>
+              <div className="game-card-actions">
+                <CabinetDirectory gameId={game.id} />
+              </div>
             </div>
-            <div className="game-card-body">
-              <strong>BUZZ BARRIER</strong>
-              <small>バズバリア</small>
-              <span>弾幕かすり・無敵体当たり・ボス撃破型シューティング</span>
-            </div>
-            <div className="game-card-actions">
-              <CabinetDirectory />
-            </div>
-          </div>
+          ))}
           <div className="game-select-card is-disabled">
             <div className="game-card-thumb" aria-hidden="true">?</div>
             <div className="game-card-body">

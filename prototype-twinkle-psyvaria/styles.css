@@ -180,6 +180,7 @@ p {
 }
 
 .game-select-card {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -197,11 +198,26 @@ p {
 }
 
 .game-select-card.is-selectable:hover,
-.game-select-card.is-selectable:focus-visible {
+.game-select-card.is-selectable:has(.game-card-select-overlay:focus-visible) {
   border-color: rgba(105, 247, 255, 0.42);
   background: rgba(27, 38, 61, 0.82);
   outline: none;
   transform: translateY(-2px);
+}
+
+.game-select-card .game-card-select-overlay {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  padding: 0;
+}
+
+.game-select-card .game-card-actions {
+  position: relative;
+  z-index: 2;
 }
 
 .game-card-thumb {

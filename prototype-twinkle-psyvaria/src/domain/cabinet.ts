@@ -36,17 +36,23 @@ export type CabinetAction =
   | { type: "VERSUS_ENDED" }
   | { type: "PLAYER_LEFT" };
 
-export function createCabinetState(cabinetId: string, now = Date.now()): CabinetState {
+export function createCabinetState(
+  cabinetId: string,
+  gameIdOrNow: string | number = DEFAULT_GAME_ID,
+  now = Date.now(),
+): CabinetState {
+  const gameId = typeof gameIdOrNow === "string" ? gameIdOrNow : DEFAULT_GAME_ID;
+  const updatedAt = typeof gameIdOrNow === "number" ? gameIdOrNow : now;
   return {
     cabinetId,
-    gameId: "graze-duel",
+    gameId,
     status: "empty",
     freePlay: true,
     playerCount: 0,
     spectatorCount: 0,
     readyCount: 0,
     challengeQueueCount: 0,
-    updatedAt: now,
+    updatedAt,
   };
 }
 
@@ -108,3 +114,4 @@ export function reduceCabinetState(
 export function assignCabinetRole(state: CabinetState): CabinetRole {
   return state.playerCount === 0 ? "player" : "spectator";
 }
+import { DEFAULT_GAME_ID } from "./game";

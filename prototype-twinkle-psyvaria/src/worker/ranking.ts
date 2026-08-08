@@ -1,5 +1,6 @@
 import type { RankingEntry } from "../domain/results";
 import { getPlayerIdentity } from "./platform";
+import { DEFAULT_GAME_ID, getGameDefinition } from "../domain/game";
 
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
@@ -11,6 +12,7 @@ const JSON_HEADERS = {
 const MAX_LIMIT = 100;
 const DEFAULT_LIMIT = 50;
 interface RankingRequest {
+  gameId?: unknown;
   elapsedTimeMs?: unknown;
   clearTimeMs?: unknown;
   cleared?: unknown;
@@ -30,6 +32,8 @@ export async function handleRankingRequest(request: Request, db: D1Database): Pr
 
 async function getRanking(url: URL, db: D1Database): Promise<Response> {
   const type = url.searchParams.get("type") === "score" ? "score" : "time";
+  const game = getGameDefinition(url.searchParams.get("gameId") ?? DEFAULT_GAME_ID);
+  if (!game) return json({ error: "unknown_game" }, 404);
   const limit = clamp(Number(url.searchParams.get("limit") || DEFAULT_LIMIT), 1, MAX_LIMIT);
   const clientVersion = url.searchParams.get("version")?.slice(0, 40);
   const orderBy = type === "score"
@@ -39,18 +43,19 @@ async function getRanking(url: URL, db: D1Database): Promise<Response> {
     ? `SELECT player_name, clear_time_ms AS play_time_ms, cleared, score, max_level,
               defeated_boss_count, created_at
        FROM rankings
-       WHERE client_version = ?
+       WHERE game_id = ? AND client_version = ?
        ORDER BY ${orderBy}
        LIMIT ?`
     : `SELECT player_name, clear_time_ms AS play_time_ms, cleared, score, max_level,
               defeated_boss_count, created_at
        FROM rankings
+       WHERE game_id = ?
        ORDER BY ${orderBy}
        LIMIT ?`;
   const statement = db.prepare(query);
   const rows = clientVersion
-    ? await statement.bind(clientVersion, limit).all<RankingEntry>()
-    : await statement.bind(limit).all<RankingEntry>();
+    ? await statement.bind(game.id, clientVersion, limit).all<RankingEntry>()
+    : await statement.bind(game.id, limit).all<RankingEntry>();
 
   return json({ type, rankings: rows.results ?? [] });
 }
@@ -67,6 +72,8 @@ async function postRanking(request: Request, db: D1Database): Promise<Response> 
   }
 
   const playerName = identity.playerName;
+  const game = getGameDefinition(String(body.gameId || DEFAULT_GAME_ID));
+  if (!game) return json({ error: "unknown_game" }, 404);
   const elapsedTimeMs = Number(body.elapsedTimeMs ?? body.clearTimeMs);
   const cleared = body.cleared !== false;
   const score = Number(body.score);
@@ -83,10 +90,11 @@ async function postRanking(request: Request, db: D1Database): Promise<Response> 
     db
       .prepare(
         `INSERT INTO rankings (
-          player_name, clear_time_ms, cleared, score, max_level, defeated_boss_count, client_version
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          game_id, player_name, clear_time_ms, cleared, score, max_level, defeated_boss_count, client_version
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
+        game.id,
         playerName,
         Math.round(elapsedTimeMs),
         cleared ? 1 : 0,
@@ -100,10 +108,11 @@ async function postRanking(request: Request, db: D1Database): Promise<Response> 
         `INSERT INTO game_results (
           id, game_id, game_version, mode, player_id, player_name, cleared, clear_time_ms,
           score, max_level, defeated_boss_count
-        ) VALUES (?, 'graze-duel', ?, 'solo', ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, 'solo', ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         resultId,
+        game.id,
         clientVersion,
         identity.playerId,
         playerName,

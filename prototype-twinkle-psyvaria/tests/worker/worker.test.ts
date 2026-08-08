@@ -15,7 +15,7 @@ beforeAll(async () => {
     env.DB.prepare("CREATE TRIGGER credit_ledger_free AFTER INSERT ON credit_ledger_entries WHEN NEW.balance_type = 'free' BEGIN UPDATE credit_wallets SET free_balance = free_balance + NEW.amount WHERE player_id = NEW.player_id; END"),
     env.DB.prepare("CREATE TABLE play_sessions (id TEXT PRIMARY KEY, cabinet_id TEXT NOT NULL, game_id TEXT NOT NULL, mode TEXT NOT NULL, status TEXT NOT NULL, host_player_id TEXT)"),
     env.DB.prepare("CREATE TABLE credit_reservations (id TEXT PRIMARY KEY, player_id TEXT NOT NULL, play_session_id TEXT NOT NULL, amount INTEGER NOT NULL, balance_type TEXT NOT NULL, status TEXT NOT NULL, expires_at TEXT NOT NULL)"),
-    env.DB.prepare("CREATE TABLE rankings (id INTEGER PRIMARY KEY AUTOINCREMENT, player_name TEXT NOT NULL, clear_time_ms INTEGER NOT NULL, cleared INTEGER NOT NULL DEFAULT 1, score INTEGER NOT NULL, max_level INTEGER NOT NULL, defeated_boss_count INTEGER NOT NULL DEFAULT 3, client_version TEXT NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP)"),
+    env.DB.prepare("CREATE TABLE rankings (id INTEGER PRIMARY KEY AUTOINCREMENT, game_id TEXT NOT NULL DEFAULT 'graze-duel', player_name TEXT NOT NULL, clear_time_ms INTEGER NOT NULL, cleared INTEGER NOT NULL DEFAULT 1, score INTEGER NOT NULL, max_level INTEGER NOT NULL, defeated_boss_count INTEGER NOT NULL DEFAULT 3, client_version TEXT NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP)"),
     env.DB.prepare("CREATE TABLE game_results (id TEXT PRIMARY KEY, game_id TEXT NOT NULL, game_version TEXT NOT NULL, mode TEXT NOT NULL, player_id TEXT, player_name TEXT NOT NULL, cleared INTEGER NOT NULL, clear_time_ms INTEGER, score INTEGER NOT NULL, max_level INTEGER NOT NULL, defeated_boss_count INTEGER NOT NULL)"),
   ]);
 });
@@ -161,6 +161,20 @@ describe("Cloudflare Worker", () => {
     expect(reservation.reservationId).toBeTruthy();
     expect(reservation.wallet.availableTotal).toBe(4);
     expect(reservation.wallet.reservedFree).toBe(1);
+  });
+
+  it("rejects credit reservations for unknown games", async () => {
+    const bootstrapResponse = await exports.default.fetch("http://localhost/api/platform/bootstrap");
+    const cookie = bootstrapResponse.headers.get("set-cookie")?.split(";", 1)[0];
+
+    const response = await exports.default.fetch("http://localhost/api/platform/credit-reservations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie! },
+      body: JSON.stringify({ cabinetId: "unknown-game-cabinet", gameId: "unknown", purpose: "solo" }),
+    });
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({ error: "unknown_game" });
   });
 
   it("registers a game-over score without marking the result as cleared", async () => {

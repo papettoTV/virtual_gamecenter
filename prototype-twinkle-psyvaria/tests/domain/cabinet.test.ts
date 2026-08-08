@@ -6,6 +6,10 @@ import {
 } from "../../src/domain/cabinet";
 
 describe("cabinet state", () => {
+  it("keeps the selected game on the cabinet state", () => {
+    expect(createCabinetState("cabinet-1", "another-game", 1).gameId).toBe("another-game");
+  });
+
   it("assigns the first visitor as player and later visitors as spectators", () => {
     const empty = createCabinetState("cabinet-1", 1);
     expect(assignCabinetRole(empty)).toBe("player");

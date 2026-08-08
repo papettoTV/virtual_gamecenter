@@ -7,7 +7,7 @@ interface CabinetClientHandlers {
 }
 
 export interface CabinetClient {
-  join(cabinetId: string): void;
+  join(cabinetId: string, gameId: string): void;
   leave(): void;
   send(message: ClientMessage | Record<string, unknown>): boolean;
   getBufferedAmount(): number;
@@ -21,6 +21,7 @@ export function createCabinetClient(handlers: CabinetClientHandlers = {}): Cabin
 
   let socket: WebSocket | null = null;
   let cabinetId: string | null = null;
+  let gameId: string | null = null;
   let wantsCabinet = false;
   let reconnectTimer: number | null = null;
 
@@ -29,7 +30,9 @@ export function createCabinetClient(handlers: CabinetClientHandlers = {}): Cabin
     if (reconnectTimer) clearTimeout(reconnectTimer);
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     try {
-      socket = new WebSocket(`${protocol}//${window.location.host}/api/cabinets/${cabinetId}/ws`);
+      socket = new WebSocket(
+        `${protocol}//${window.location.host}/api/cabinets/${cabinetId}/ws?gameId=${encodeURIComponent(gameId ?? "")}`,
+      );
     } catch {
       socket = null;
       handlers.onConnectionChange?.(false);
@@ -39,7 +42,7 @@ export function createCabinetClient(handlers: CabinetClientHandlers = {}): Cabin
 
     socket.addEventListener("open", () => {
       handlers.onConnectionChange?.(true);
-      if (wantsCabinet) send({ type: "joinCabinet" });
+      if (wantsCabinet && gameId) send({ type: "joinCabinet", gameId });
     });
     socket.addEventListener("close", () => {
       socket = null;
@@ -65,15 +68,16 @@ export function createCabinetClient(handlers: CabinetClientHandlers = {}): Cabin
     return false;
   }
 
-  function join(nextCabinetId: string) {
-    if (cabinetId !== nextCabinetId) {
+  function join(nextCabinetId: string, nextGameId: string) {
+    if (cabinetId !== nextCabinetId || gameId !== nextGameId) {
       wantsCabinet = false;
       socket?.close();
       socket = null;
       cabinetId = nextCabinetId;
+      gameId = nextGameId;
     }
     wantsCabinet = true;
-    send({ type: "joinCabinet" });
+    send({ type: "joinCabinet", gameId: nextGameId });
   }
 
   function leave() {
@@ -83,6 +87,7 @@ export function createCabinetClient(handlers: CabinetClientHandlers = {}): Cabin
     socket?.close();
     socket = null;
     cabinetId = null;
+    gameId = null;
     handlers.onConnectionChange?.(false);
   }
 

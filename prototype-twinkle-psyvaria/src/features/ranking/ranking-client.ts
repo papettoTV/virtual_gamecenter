@@ -1,4 +1,5 @@
 export interface RankingSubmission {
+  gameId: string;
   elapsedTimeMs: number;
   cleared: boolean;
   score: number;
@@ -35,10 +36,14 @@ export async function submitRankingEntry(
   }
 }
 
-export async function fetchScoreRanking(limit = 20, clientVersion?: string): Promise<RankingEntry[]> {
+export async function fetchScoreRanking(
+  gameId: string,
+  limit = 20,
+  clientVersion?: string,
+): Promise<RankingEntry[]> {
   const versionQuery = clientVersion ? `&version=${encodeURIComponent(clientVersion)}` : "";
   const response = await fetch(
-    `${getApiBase()}/api/ranking?type=score&limit=${encodeURIComponent(limit)}${versionQuery}`,
+    `${getApiBase()}/api/ranking?gameId=${encodeURIComponent(gameId)}&type=score&limit=${encodeURIComponent(limit)}${versionQuery}`,
   );
   if (!response.ok) {
     throw new Error(`ranking get failed: ${response.status}`);

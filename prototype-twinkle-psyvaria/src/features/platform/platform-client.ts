@@ -93,11 +93,12 @@ export async function claimWelcomeCredit(): Promise<{
 
 export async function reservePlayCredit(
   cabinetId: string,
+  gameId: string,
   purpose: "solo" | "challenge" | "rematch" = "solo",
 ): Promise<ReservationResponse> {
   return requestJson("/api/platform/credit-reservations", {
     method: "POST",
-    body: JSON.stringify({ cabinetId, purpose }),
+    body: JSON.stringify({ cabinetId, gameId, purpose }),
   });
 }
 

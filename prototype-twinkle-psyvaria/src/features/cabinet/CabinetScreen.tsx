@@ -1,6 +1,7 @@
 import { CabinetSelector } from "../arcade/CabinetDirectory"
+import type { GameDefinition } from "../../domain/game"
 
-export function CabinetScreen() {
+export function CabinetScreen({ game }: { game: GameDefinition }) {
   return (
     <section className="cabinet-screen is-hidden" id="cabinet-screen">
       <div className="arcade-card">
@@ -9,7 +10,7 @@ export function CabinetScreen() {
             <p className="eyebrow" id="cabinet-id-label">
               Cabinet
             </p>
-            <h2>BUZZ BARRIER</h2>
+            <h2>{game.title}</h2>
           </div>
         </div>
 
@@ -36,7 +37,7 @@ export function CabinetScreen() {
         </div>
 
         <div id="cabinet-selector-title" className="sr-only">筐体選択</div>
-        <CabinetSelector />
+        <CabinetSelector game={game} />
 
         <section
           className="cabinet-promo"
@@ -44,7 +45,7 @@ export function CabinetScreen() {
         >
           <div className="cabinet-promo-heading">
             <strong id="cabinet-promo-title">プレイイメージ</strong>
-            <small>バズバリア Gameplay</small>
+            <small>{game.localizedTitle} Gameplay</small>
           </div>
           <video
             autoPlay
@@ -52,9 +53,9 @@ export function CabinetScreen() {
             loop
             playsInline
             preload="metadata"
-            poster="/graze-duel-promo-poster.jpg?v=20260801-actual"
+            poster={game.promoPosterUrl}
           >
-            <source src="/graze-duel-promo.mp4?v=20260801-actual" type="video/mp4" />
+            <source src={game.promoVideoUrl} type="video/mp4" />
             お使いのブラウザでは動画を再生できません。
           </video>
         </section>

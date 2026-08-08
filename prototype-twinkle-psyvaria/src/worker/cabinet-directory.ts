@@ -1,4 +1,5 @@
 import type { CabinetState } from "../domain/cabinet";
+import { DEFAULT_GAME_ID, getGameDefinition } from "../domain/game";
 
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
@@ -33,7 +34,10 @@ export async function handleCabinetDirectoryRequest(
     return Response.json({ error: "method_not_allowed" }, { status: 405, headers: JSON_HEADERS });
   }
 
-  const gameId = url.searchParams.get("gameId") || "graze-duel";
+  const game = getGameDefinition(url.searchParams.get("gameId") ?? DEFAULT_GAME_ID);
+  if (!game) {
+    return Response.json({ error: "unknown_game" }, { status: 404, headers: JSON_HEADERS });
+  }
   const activeSince = Date.now() - 15_000;
   const rows = await db
     .prepare(
@@ -49,7 +53,7 @@ export async function handleCabinetDirectoryRequest(
          AND updated_at >= ?
        ORDER BY spectator_count DESC, updated_at DESC`,
     )
-    .bind(gameId, activeSince)
+    .bind(game.id, activeSince)
     .all<CabinetDirectoryRow>();
 
   const cabinets: CabinetDirectoryEntry[] = (rows.results ?? []).map((row) => ({

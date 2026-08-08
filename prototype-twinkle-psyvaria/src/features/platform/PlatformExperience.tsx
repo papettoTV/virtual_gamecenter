@@ -16,6 +16,7 @@ import {
   type PlatformBootstrap,
   type WalletSummary,
 } from "./platform-client";
+import { resolveGameDefinition } from "../../domain/game";
 
 type PolicyKind = "terms" | "privacy";
 type PendingPlayAction =
@@ -186,7 +187,7 @@ export function PlatformExperience() {
       return;
     }
     setPlayDialog(
-      platform.wallet.availableTotal >= platform.creditCost
+      platform.wallet.availableTotal >= getCurrentGame().creditCost
         ? "confirm"
         : "insufficient",
     );
@@ -273,7 +274,7 @@ export function PlatformExperience() {
 
   const skipWelcomeCredit = () => {
     setWelcomeDialogOpen(false);
-    setPlayDialog((platform?.wallet.availableTotal ?? 0) >= (platform?.creditCost ?? 1)
+    setPlayDialog((platform?.wallet.availableTotal ?? 0) >= getCurrentGame().creditCost
       ? "confirm"
       : "insufficient");
   };
@@ -293,7 +294,7 @@ export function PlatformExperience() {
     setNotice("");
     let reservationId: string | null = null;
     try {
-      const reservation = await reservePlayCredit(getCabinetId());
+      const reservation = await reservePlayCredit(getCabinetId(), getCurrentGame().id);
       reservationId = reservation.reservationId;
       updateWallet(reservation.wallet);
       replayPlayAction(pendingAction);
@@ -338,7 +339,7 @@ export function PlatformExperience() {
       if (navigator.share) {
         try {
           await navigator.share({
-            title: "BUZZ BARRIER",
+            title: getCurrentGame().title,
             text: "この筐体を観戦・共有できます。",
             url: shareUrl,
           });
@@ -844,6 +845,10 @@ function getPurchaseCurrency(): "jpy" | "usd" {
   return navigator.language.toLowerCase().startsWith("ja") ? "jpy" : "usd";
 }
 
+function getCurrentGame() {
+  return resolveGameDefinition(new URL(window.location.href).searchParams.get("game"));
+}
+
 function formatPurchasePrice(unit: PurchaseUnit): string {
   return getPurchaseCurrency() === "jpy" ? `${unit * 100}円` : `$${unit}`;
 }
@@ -878,7 +883,10 @@ async function resolveCabinetShareUrl(): Promise<string> {
       shareOrigin = window.location.origin;
     }
   }
-  return `${shareOrigin}${window.location.pathname}`;
+  const shareUrl = new URL(`${shareOrigin}${window.location.pathname}`);
+  shareUrl.searchParams.set("game", getCurrentGame().id);
+  shareUrl.searchParams.set("watch", "1");
+  return shareUrl.toString();
 }
 
 function storePendingPlayAction(action: PendingPlayAction | null) {
