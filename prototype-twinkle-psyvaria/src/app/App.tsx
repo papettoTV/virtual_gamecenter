@@ -5,6 +5,7 @@ import { GameScreen } from "../features/game/GameScreen";
 import { PlatformExperience } from "../features/platform/PlatformExperience";
 import { DEFAULT_GAME_ID, resolveGameDefinition } from "../domain/game";
 import { loadGameRuntime } from "../games/registry";
+import { BRAND } from "../domain/brand";
 
 export function App() {
   const [activeGameId, setActiveGameId] = useState(() => getGameIdFromLocation());
@@ -36,11 +37,9 @@ export function App() {
   return (
     <main className="shell">
       <section className="intro">
-        <p className="eyebrow">Virtual Arcade Prototype</p>
-        <h1>ゲームセンター</h1>
-        <p>
-          オンライン上にゲームセンター体験を再現する試作です。ゲーム一覧から遊びたいゲームを選び、筐体に入ってプレイします。
-        </p>
+        <p className="eyebrow brand-category">{BRAND.category}</p>
+        <h1>{BRAND.name}</h1>
+        <p className="brand-tagline">{BRAND.tagline}</p>
       </section>
       <ArcadeScreen onSelectGame={selectGame} />
       <CabinetScreen game={activeGame} />

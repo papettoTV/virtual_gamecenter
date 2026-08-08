@@ -17,6 +17,7 @@ import {
   type WalletSummary,
 } from "./platform-client";
 import { resolveGameDefinition } from "../../domain/game";
+import { BRAND } from "../../domain/brand";
 import {
   createTrackedWatchUrl,
   recordPlayStartedFromWatch,
@@ -802,6 +803,7 @@ export function PlatformExperience() {
       )}
 
       <footer className="platform-footer">
+        <strong>{BRAND.name} · {BRAND.category}</strong>
         <button type="button" onClick={() => setPolicy("terms")}>利用規約</button>
         <button type="button" onClick={() => setPolicy("privacy")}>プライバシーポリシー</button>
         <span>お問い合わせ（準備中）</span>
