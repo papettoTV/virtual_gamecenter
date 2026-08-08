@@ -98,6 +98,40 @@ export async function handlePlatformRequest(
     );
   }
 
+  if (url.pathname === "/api/platform/engagement/events" && request.method === "POST") {
+    const session = await getOrCreatePlayerSession(request, database);
+    const body = await readJson(request);
+    const eventTypes = new Set(["watch_started", "share_created", "play_started_from_watch"]);
+    const eventId = sanitizeId(body?.eventId, "");
+    const eventType = typeof body?.eventType === "string" ? body.eventType : "";
+    const gameId = typeof body?.gameId === "string" ? body.gameId : "";
+    const cabinetId = sanitizeId(body?.cabinetId, "");
+    const sourceCabinetId = sanitizeOptionalId(body?.sourceCabinetId);
+    const shareId = sanitizeOptionalId(body?.shareId);
+    if (
+      !eventId
+      || !eventTypes.has(eventType)
+      || !getGameDefinition(gameId)
+      || !cabinetId
+    ) {
+      return Response.json({ error: "invalid_engagement_event" }, { status: 400 });
+    }
+    await database.prepare(
+      `INSERT OR IGNORE INTO live_engagement_events
+        (id, event_type, game_id, cabinet_id, source_cabinet_id, player_id, share_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      eventId,
+      eventType,
+      gameId,
+      cabinetId,
+      sourceCabinetId,
+      session.playerId,
+      shareId,
+    ).run();
+    return platformJson({ recorded: true }, session);
+  }
+
   const session = await getExistingPlayerSession(request, database);
   if (!session) return Response.json({ error: "player_session_required" }, { status: 401 });
 
@@ -869,6 +903,11 @@ function sanitizeId(value: unknown, fallback: string): string {
   if (typeof value !== "string") return fallback;
   const sanitized = value.replace(/[^a-zA-Z0-9-]/g, "").slice(0, 80);
   return sanitized || fallback;
+}
+
+function sanitizeOptionalId(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  return sanitizeId(value, "") || null;
 }
 
 function sanitizeReturnPath(value: unknown): string {

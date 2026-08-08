@@ -21,6 +21,7 @@ import {
   playGrazeSound,
 } from "./audio";
 import { BUZZ_BARRIER } from "../../domain/game";
+import { recordWatchStarted } from "../../features/engagement/engagement-client";
 
 const canvas = document.querySelector("#game");
 const context = canvas.getContext("2d");
@@ -61,6 +62,8 @@ const challengeRequestButton = document.querySelector("#challenge-request");
 const spectatorStatusText = document.querySelector("#spectator-status-text");
 const spectatorViewLabel = document.querySelector("#spectator-view-label");
 const spectatorSwitchPlayer = document.querySelector("#spectator-switch-player");
+const spectatorCount = document.querySelector("#spectator-count");
+const playerCrowdPulse = document.querySelector("#player-crowd-pulse");
 const versusStatus = document.querySelector("#versus-status");
 const versusOverlay = document.querySelector("#versus-overlay");
 const versusEyebrow = document.querySelector("#versus-eyebrow");
@@ -188,6 +191,7 @@ let pendingSyncEvents = [];
 let cabinetConnected = false;
 let currentCabinetId = null;
 let pendingCreatedSoloStart = false;
+let immediateWatchStarted = false;
 let spectatorPlayerIndex = 0;
 let challengeQueueState = {
   waitingCount: 0,
@@ -266,6 +270,7 @@ const cabinetClient = createCabinetClient({
   onConnectionChange: (connected) => {
     cabinetConnected = connected;
     updateCabinetUi();
+    attemptImmediateSpectating();
   },
   onMessage: handleCabinetMessage,
   onError: (message) => {
@@ -874,6 +879,7 @@ function enterCabinet(cabinetId, updateUrl = true) {
   cabinetRole = "joining";
   cabinetConnected = false;
   cabinetState = null;
+  immediateWatchStarted = false;
   resetViewerSyncState();
   if (updateUrl) {
     history.pushState(
@@ -926,6 +932,8 @@ function startSpectating() {
   lastTime = performance.now();
   showScreen("game");
   updateSpectatorViewSwitch();
+  updateCrowdUi();
+  if (currentCabinetId) recordWatchStarted(GAME_ID, currentCabinetId);
 }
 
 function returnToCabinet() {
@@ -993,6 +1001,7 @@ function handleCabinetMessage(message) {
     cabinetState = message.state;
     updateCabinetUi();
     attemptPendingCreatedSoloStart();
+    attemptImmediateSpectating();
     return;
   }
 
@@ -1000,6 +1009,7 @@ function handleCabinetMessage(message) {
     cabinetRole = message.role;
     updateCabinetUi();
     attemptPendingCreatedSoloStart();
+    attemptImmediateSpectating();
     return;
   }
 
@@ -1331,6 +1341,26 @@ function attemptPendingCreatedSoloStart() {
   window.setTimeout(() => startSoloButton.click(), 0);
 }
 
+function attemptImmediateSpectating() {
+  if (
+    immediateWatchStarted
+    || new URL(window.location.href).searchParams.get("watch") !== "1"
+    || cabinetRole !== "spectator"
+    || !cabinetConnected
+    || !["soloPlaying", "challengePending", "versusPlaying"].includes(cabinetState?.status)
+  ) return;
+  immediateWatchStarted = true;
+  startSpectating();
+}
+
+function updateCrowdUi() {
+  const count = Math.max(0, Number(cabinetState?.spectatorCount ?? 0));
+  if (spectatorCount) spectatorCount.textContent = `観戦者 ${Math.max(1, count)}人`;
+  const intensity = Math.min(1, Math.log2(count + 1) / 4);
+  playerCrowdPulse?.style.setProperty("--crowd-intensity", String(intensity));
+  playerCrowdPulse?.classList.toggle("is-hidden", cabinetRole !== "player" || count === 0);
+}
+
 function updateCabinetUi() {
   const statusLabels = {
     empty: "空き",
@@ -1343,6 +1373,7 @@ function updateCabinetUi() {
   };
   const statusLabel = statusLabels[cabinetState?.status] ?? "接続中";
   document.body.classList.toggle("is-cabinet-spectator", cabinetRole === "spectator");
+  updateCrowdUi();
   if (cabinetStatusLabel) cabinetStatusLabel.textContent = statusLabel;
   updateChallengeButton();
   updateSpectatorViewSwitch();

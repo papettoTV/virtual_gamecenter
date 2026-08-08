@@ -120,27 +120,6 @@ export function CabinetDirectory({ gameId }: { gameId: string }) {
     };
   }, []);
 
-  useEffect(() => {
-    const startWatchingWhenReady = () => {
-      const url = new URL(window.location.href);
-      if (url.searchParams.get("watch") !== "1") return;
-      const watchButton = document.querySelector<HTMLButtonElement>("#start-solo");
-      if (
-        !watchButton
-        || watchButton.disabled
-        || !watchButton.textContent?.includes("観戦する")
-      ) {
-        return;
-      }
-      url.searchParams.delete("watch");
-      history.replaceState(history.state, "", `${url.pathname}${url.search}`);
-      watchButton.click();
-    };
-
-    const watchTimer = window.setInterval(startWatchingWhenReady, 250);
-    return () => window.clearInterval(watchTimer);
-  }, []);
-
   const playingCabinets = cabinets.filter((cabinet) => PLAYING_STATUSES.has(cabinet.status));
   if (loading || playingCabinets.length === 0) return null;
 
@@ -153,18 +132,27 @@ export function CabinetDirectory({ gameId }: { gameId: string }) {
       <div className="cabinet-dots">
         {playingCabinets.map((cabinet, index) => {
           const popular = cabinet.spectatorCount >= POPULAR_SPECTATOR_COUNT;
+          const crowdLevel = cabinet.spectatorCount >= 10
+            ? "is-crowded"
+            : popular
+              ? "is-popular"
+              : cabinet.spectatorCount > 0
+                ? "is-watched"
+                : "";
           const label = popular
             ? `筐体${index + 1}を観戦。盛り上がり中、観戦者${cabinet.spectatorCount}人`
             : `筐体${index + 1}を観戦。観戦者${cabinet.spectatorCount}人`;
           return (
             <button
               key={cabinet.cabinetId}
-              className={popular ? "cabinet-dot is-popular" : "cabinet-dot"}
+              className={`cabinet-dot ${crowdLevel}`.trim()}
               type="button"
               aria-label={label}
               title={label}
               onClick={() => openCabinet(cabinet.cabinetId, cabinet.gameId)}
-            />
+            >
+              <span aria-hidden="true">{cabinet.spectatorCount || ""}</span>
+            </button>
           );
         })}
       </div>

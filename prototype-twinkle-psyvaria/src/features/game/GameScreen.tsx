@@ -8,6 +8,17 @@ export function GameScreen({ game }: { game: GameDefinition }) {
           <strong id="spectator-view-label">観戦中</strong>
           <span id="spectator-status-text">プレイヤーのゲーム状態をリアルタイム表示しています。</span>
         </div>
+        <div className="spectator-crowd" id="spectator-crowd" aria-live="polite">
+          <span className="spectator-crowd-pulse" aria-hidden="true" />
+          <strong id="spectator-count">観戦者 1人</strong>
+        </div>
+        <button
+          className="spectator-share-button"
+          type="button"
+          onClick={() => window.dispatchEvent(new Event("request-cabinet-share"))}
+        >
+          このライブを共有
+        </button>
         <button className="spectator-switch-button is-hidden" id="spectator-switch-player" type="button">
           プレイヤーBを見る
         </button>
@@ -41,6 +52,7 @@ export function GameScreen({ game }: { game: GameDefinition }) {
       </details>
 
       <div className="game-frame">
+        <div className="player-crowd-pulse is-hidden" id="player-crowd-pulse" aria-hidden="true" />
         <button
           className="cabinet-share-button game-share-button"
           type="button"

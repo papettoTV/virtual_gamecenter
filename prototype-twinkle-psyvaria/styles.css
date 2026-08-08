@@ -420,6 +420,42 @@ p {
   gap: 3px;
 }
 
+.spectator-banner .spectator-crowd {
+  display: flex;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.spectator-crowd-pulse {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent);
+  animation: live-crowd-pulse 1.8s ease-in-out infinite;
+}
+
+.player-crowd-pulse {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  pointer-events: none;
+  border: 1px solid rgba(105, 247, 255, 0.36);
+  border-radius: inherit;
+  box-shadow: inset 0 0 calc(12px + var(--crowd-intensity, 0) * 18px) rgba(105, 247, 255, calc(0.08 + var(--crowd-intensity, 0) * 0.14));
+  animation: player-crowd-pulse 2.8s ease-in-out infinite;
+}
+
+@keyframes live-crowd-pulse {
+  50% { opacity: 0.4; transform: scale(0.72); }
+}
+
+@keyframes player-crowd-pulse {
+  50% { opacity: 0.42; }
+}
+
 .spectator-banner button,
 .versus-status {
   border: 1px solid rgba(105, 247, 255, 0.28);

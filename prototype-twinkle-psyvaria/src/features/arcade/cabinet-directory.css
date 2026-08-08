@@ -310,6 +310,7 @@
 }
 
 .game-select-card .cabinet-dot {
+  position: relative;
   width: 16px;
   height: 16px;
   padding: 0;
@@ -320,6 +321,29 @@
   cursor: pointer;
 }
 
+.game-select-card .cabinet-dot span {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 4px);
+  transform: translateX(-50%);
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.game-select-card .cabinet-dot.is-watched::after,
+.game-select-card .cabinet-dot.is-popular::after,
+.game-select-card .cabinet-dot.is-crowded::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  opacity: 0;
+  animation: cabinet-crowd-pulse 2.2s ease-out infinite;
+}
+
 .game-select-card .cabinet-dot:hover,
 .game-select-card .cabinet-dot:focus-visible {
   outline: 2px solid var(--text);
@@ -327,9 +351,19 @@
   transform: scale(1.12);
 }
 
-.game-select-card .cabinet-dot.is-popular {
+.game-select-card .cabinet-dot.is-popular,
+.game-select-card .cabinet-dot.is-crowded {
   background: #ff4e68;
   box-shadow: 0 0 16px rgba(255, 78, 104, 0.58);
+}
+
+.game-select-card .cabinet-dot.is-crowded {
+  box-shadow: 0 0 22px rgba(255, 78, 104, 0.86);
+}
+
+@keyframes cabinet-crowd-pulse {
+  35% { opacity: 0.62; }
+  100% { inset: -10px; opacity: 0; }
 }
 
 .game-nav span {

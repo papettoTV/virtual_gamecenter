@@ -17,6 +17,7 @@ beforeAll(async () => {
     env.DB.prepare("CREATE TABLE credit_reservations (id TEXT PRIMARY KEY, player_id TEXT NOT NULL, play_session_id TEXT NOT NULL, amount INTEGER NOT NULL, balance_type TEXT NOT NULL, status TEXT NOT NULL, expires_at TEXT NOT NULL)"),
     env.DB.prepare("CREATE TABLE rankings (id INTEGER PRIMARY KEY AUTOINCREMENT, game_id TEXT NOT NULL DEFAULT 'graze-duel', player_name TEXT NOT NULL, clear_time_ms INTEGER NOT NULL, cleared INTEGER NOT NULL DEFAULT 1, score INTEGER NOT NULL, max_level INTEGER NOT NULL, defeated_boss_count INTEGER NOT NULL DEFAULT 3, client_version TEXT NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP)"),
     env.DB.prepare("CREATE TABLE game_results (id TEXT PRIMARY KEY, game_id TEXT NOT NULL, game_version TEXT NOT NULL, mode TEXT NOT NULL, player_id TEXT, player_name TEXT NOT NULL, cleared INTEGER NOT NULL, clear_time_ms INTEGER, score INTEGER NOT NULL, max_level INTEGER NOT NULL, defeated_boss_count INTEGER NOT NULL)"),
+    env.DB.prepare("CREATE TABLE live_engagement_events (id TEXT PRIMARY KEY, event_type TEXT NOT NULL, game_id TEXT NOT NULL, cabinet_id TEXT NOT NULL, source_cabinet_id TEXT, player_id TEXT, share_id TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)"),
   ]);
 });
 
@@ -28,6 +29,31 @@ describe("Cloudflare Worker", () => {
       ok: true,
       runtime: "cloudflare-workers",
     });
+  });
+
+  it("records live audience acquisition events idempotently", async () => {
+    const eventId = crypto.randomUUID();
+    const bootstrapResponse = await exports.default.fetch("http://localhost/api/platform/bootstrap");
+    const cookie = bootstrapResponse.headers.get("set-cookie")?.split(";", 1)[0];
+    const event = {
+      eventId,
+      eventType: "watch_started",
+      gameId: "graze-duel",
+      cabinetId: "live-cabinet",
+      shareId: "shared-link",
+    };
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const response = await exports.default.fetch("http://localhost/api/platform/engagement/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: cookie! },
+        body: JSON.stringify(event),
+      });
+      expect(response.status).toBe(200);
+    }
+    const row = await env.DB.prepare(
+      "SELECT COUNT(*) AS count FROM live_engagement_events WHERE id = ?",
+    ).bind(eventId).first<{ count: number }>();
+    expect(row?.count).toBe(1);
   });
 
   it("starts Google registration with the configured callback", async () => {

@@ -17,6 +17,11 @@ import {
   type WalletSummary,
 } from "./platform-client";
 import { resolveGameDefinition } from "../../domain/game";
+import {
+  createTrackedWatchUrl,
+  recordPlayStartedFromWatch,
+  recordShareCreated,
+} from "../engagement/engagement-client";
 
 type PolicyKind = "terms" | "privacy";
 type PendingPlayAction =
@@ -310,6 +315,7 @@ export function PlatformExperience() {
 
       const captured = await capturePlayCredit(reservation.reservationId);
       updateWallet(captured.wallet);
+      recordPlayStartedFromWatch(getCurrentGame().id, getCabinetId());
       setNotice("1クレジットを使用しました。");
       setPlayDialog(null);
       setPendingAction(null);
@@ -334,22 +340,25 @@ export function PlatformExperience() {
   };
 
   const shareCabinetUrl = async () => {
-    const shareUrl = await resolveCabinetShareUrl();
+    const baseShareUrl = await resolveCabinetShareUrl();
+    const trackedShare = createTrackedWatchUrl(baseShareUrl);
     try {
       if (navigator.share) {
         try {
           await navigator.share({
             title: getCurrentGame().title,
-            text: "この筐体を観戦・共有できます。",
-            url: shareUrl,
+            text: "いま行われているライブプレイを一緒に観戦できます。",
+            url: trackedShare.url,
           });
+          recordShareCreated(getCurrentGame().id, getCabinetId(), trackedShare.shareId);
           return;
         } catch (error) {
           if (error instanceof DOMException && error.name === "AbortError") return;
         }
       }
-      await copyText(shareUrl);
-      setNotice("筐体URLをコピーしました。");
+      await copyText(trackedShare.url);
+      recordShareCreated(getCurrentGame().id, getCabinetId(), trackedShare.shareId);
+      setNotice("観戦用URLをコピーしました。");
     } catch {
       setNotice("筐体URLを共有できませんでした。");
     }
