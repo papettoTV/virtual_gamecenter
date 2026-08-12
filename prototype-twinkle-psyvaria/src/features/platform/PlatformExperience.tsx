@@ -696,10 +696,21 @@ export function PlatformExperience() {
                 ゲーム開始には1クレジット必要です。クレジットを購入しますか？
               </p>
             )}
-            <div className="platform-dialog-actions play-credit-actions">
+            <div className={`platform-dialog-actions play-credit-actions${playDialog === "confirm" ? " is-confirm" : ""}`}>
               {playDialog === "confirm" && (
-                <button className="platform-share-button" type="button" onClick={() => void shareCabinetUrl()}>
-                  観戦用画面を共有
+                <button
+                  className="cabinet-share-button platform-share-icon-button"
+                  type="button"
+                  aria-label="観戦用画面を共有"
+                  title="観戦用画面を共有"
+                  onClick={() => void shareCabinetUrl()}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="18" cy="5" r="3" />
+                    <circle cx="6" cy="12" r="3" />
+                    <circle cx="18" cy="19" r="3" />
+                    <path d="m8.7 10.7 6.6-4.2M8.7 13.3l6.6 4.2" />
+                  </svg>
                 </button>
               )}
               <button className="platform-cancel-button" type="button" onClick={() => {
@@ -712,7 +723,7 @@ export function PlatformExperience() {
                 {playDialog === "confirm" ? "キャンセル" : "いいえ"}
               </button>
               {playDialog === "confirm" && (
-                <button className="platform-primary-button" type="button" disabled={busy} onClick={() => void handlePlayConfirm()}>
+                <button className="platform-primary-button play-credit-start-button" type="button" disabled={busy} onClick={() => void handlePlayConfirm()}>
                   {busy ? "準備中…" : "1クレジットで開始"}
                 </button>
               )}

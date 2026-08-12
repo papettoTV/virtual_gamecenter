@@ -1492,6 +1492,38 @@ canvas {
   color: var(--accent);
 }
 
+.play-credit-actions.is-confirm {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  align-items: stretch;
+}
+
+.play-credit-actions.is-confirm .platform-share-icon-button {
+  width: 48px;
+  min-width: 48px;
+  height: 48px;
+  align-self: end;
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  opacity: 0.78;
+}
+
+.play-credit-actions.is-confirm .play-credit-start-button {
+  grid-column: 2 / -1;
+  grid-row: 1;
+  min-height: 62px;
+  border-color: rgba(105, 247, 255, 0.72);
+  background: linear-gradient(135deg, rgba(105, 247, 255, 0.38), rgba(105, 247, 255, 0.17));
+  box-shadow: 0 12px 34px rgba(105, 247, 255, 0.16);
+  font-size: 18px;
+}
+
+.play-credit-actions.is-confirm .platform-cancel-button {
+  grid-column: 3;
+  grid-row: 2;
+}
+
 .credit-package-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1740,19 +1772,26 @@ canvas {
     width: 100%;
   }
 
-  .play-credit-actions .platform-share-button {
-    order: 0;
-    margin-right: 0;
+  .play-credit-actions.is-confirm {
+    grid-template-columns: 48px minmax(0, 1fr);
   }
 
-  .play-credit-actions .platform-primary-button {
-    order: 1;
-    min-height: 58px;
-    font-size: 18px;
+  .play-credit-actions.is-confirm .platform-share-icon-button {
+    grid-column: 1;
+    grid-row: 2;
+    width: 48px;
   }
 
-  .play-credit-actions .platform-cancel-button {
-    order: 2;
+  .play-credit-actions.is-confirm .play-credit-start-button {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    width: 100%;
+  }
+
+  .play-credit-actions.is-confirm .platform-cancel-button {
+    grid-column: 2;
+    grid-row: 2;
+    width: 100%;
   }
 
   .ranking-next-actions {
