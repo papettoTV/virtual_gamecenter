@@ -43,7 +43,22 @@ export const BUZZ_BARRIER: GameDefinition = {
   status: "active",
 };
 
-export const GAME_CATALOG: readonly GameDefinition[] = [BUZZ_BARRIER];
+export const DEEP_SEA_SALVAGE: GameDefinition = {
+  id: "deep-sea-salvage",
+  slug: "deep-sea-salvage",
+  title: "DEEP SEA SALVAGE",
+  localizedTitle: "深海サルベージ",
+  shortTitle: "DSS",
+  description: "危険生物を観測し、海底遺跡の財宝を回収して帰還する深海探索ゲーム",
+  currentVersion: "prototype-expedition-1",
+  creditCost: 1,
+  iconUrl: "/assets/deep-sea-salvage-icon.svg",
+  promoVideoUrl: "",
+  promoPosterUrl: "/assets/deep-sea-salvage-icon.svg",
+  status: "active",
+};
+
+export const GAME_CATALOG: readonly GameDefinition[] = [BUZZ_BARRIER, DEEP_SEA_SALVAGE];
 export const DEFAULT_GAME_ID: GameId = BUZZ_BARRIER.id;
 
 export function getGameDefinition(gameId: string | null | undefined): GameDefinition | null {

@@ -203,6 +203,31 @@ describe("Cloudflare Worker", () => {
     await expect(response.json()).resolves.toMatchObject({ error: "unknown_game" });
   });
 
+  it("starts a credit reservation for deep sea salvage", async () => {
+    const bootstrapResponse = await exports.default.fetch("http://localhost/api/platform/bootstrap");
+    const cookie = bootstrapResponse.headers.get("set-cookie")?.split(";", 1)[0];
+    await exports.default.fetch("http://localhost/api/platform/welcome-credit", {
+      method: "POST",
+      headers: { Cookie: cookie! },
+    });
+
+    const response = await exports.default.fetch("http://localhost/api/platform/credit-reservations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie! },
+      body: JSON.stringify({
+        cabinetId: "deep-sea-cabinet",
+        gameId: "deep-sea-salvage",
+        purpose: "solo",
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      reservationId: expect.any(String),
+      wallet: { availableTotal: 4, reservedFree: 1 },
+    });
+  });
+
   it("registers a game-over score without marking the result as cleared", async () => {
     const bootstrapResponse = await exports.default.fetch("http://localhost/api/platform/bootstrap");
     const cookie = bootstrapResponse.headers.get("set-cookie")?.split(";", 1)[0];

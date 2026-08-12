@@ -408,6 +408,11 @@ export function PlatformExperience() {
   const replayPlayAction = (action: PendingPlayAction) => {
     bypassGate.current = true;
     if (action.type === "button") {
+      if (action.button.id === "start-solo") {
+        window.dispatchEvent(new CustomEvent("platform-play-approved", {
+          detail: { gameId: getCurrentGame().id },
+        }));
+      }
       action.button.click();
     } else {
       window.dispatchEvent(new KeyboardEvent("keydown", {

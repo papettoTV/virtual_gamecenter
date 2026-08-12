@@ -1,6 +1,7 @@
 import type { GameDefinition } from "../../domain/game";
 
 export function GameScreen({ game }: { game: GameDefinition }) {
+  const isSalvage = game.id === "deep-sea-salvage";
   return (
     <section className="game-screen is-hidden" id="game-screen">
       <div className="spectator-banner is-hidden" id="spectator-banner">
@@ -27,7 +28,7 @@ export function GameScreen({ game }: { game: GameDefinition }) {
       <div className="versus-status is-hidden" id="versus-status" role="status">
         対戦者が待っています。ゲーム停止時に確認できます。
       </div>
-      <details className="debug-panel" id="debug-panel">
+      <details className={`debug-panel${isSalvage ? " is-hidden" : ""}`} id="debug-panel">
         <summary>デバッグ設定</summary>
         <div className="debug-panel-body">
           <label htmlFor="bullet-density"><strong>デバッグ: 敵弾量</strong></label>
@@ -118,6 +119,8 @@ export function GameScreen({ game }: { game: GameDefinition }) {
 
       <div className="touch-controls" aria-label="スマホ操作">
         <div className="touch-actions">
+          {isSalvage && <button id="touch-scan" className="touch-button" type="button">スキャン</button>}
+          {isSalvage && <button id="touch-light" className="touch-button" type="button">ライト</button>}
           <button id="touch-pause" className="touch-button" type="button">一時停止</button>
         </div>
       </div>

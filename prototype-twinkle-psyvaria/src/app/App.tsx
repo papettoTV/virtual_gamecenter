@@ -23,15 +23,9 @@ export function App() {
 
   const selectGame = (gameId: string) => {
     const game = resolveGameDefinition(gameId);
-    setActiveGameId(game.id);
     const cabinetId = crypto.randomUUID();
-    history.pushState(
-      { cabinetId, gameId: game.id },
-      "",
-      `/cabinets/${cabinetId}?game=${encodeURIComponent(game.id)}`,
-    );
-    window.dispatchEvent(new PopStateEvent("popstate"));
-    void loadGameRuntime(game.id);
+    const destination = `/cabinets/${cabinetId}?game=${encodeURIComponent(game.id)}`;
+    window.location.assign(destination);
   };
 
   return (

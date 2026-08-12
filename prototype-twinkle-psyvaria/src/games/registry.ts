@@ -1,9 +1,10 @@
-import { BUZZ_BARRIER, type GameId } from "../domain/game";
+import { BUZZ_BARRIER, DEEP_SEA_SALVAGE, type GameId } from "../domain/game";
 
 type GameRuntimeLoader = () => Promise<unknown>;
 
 const runtimeLoaders: Record<GameId, GameRuntimeLoader> = {
   [BUZZ_BARRIER.id]: () => import("./graze-duel/runtime"),
+  [DEEP_SEA_SALVAGE.id]: () => import("./deep-sea-salvage/runtime"),
 };
 
 const loadedRuntimes = new Map<GameId, Promise<unknown>>();

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360">
+  <defs><radialGradient id="g"><stop stop-color="#0b6070"/><stop offset="1" stop-color="#020914"/></radialGradient></defs>
+  <rect width="640" height="360" fill="url(#g)"/><circle cx="480" cy="90" r="72" fill="#18d5c2" opacity=".08"/>
+  <g fill="none" stroke="#5ff9de" stroke-width="8"><path d="M194 202h164l54 30-54 30H194l-42-30z"/><circle cx="250" cy="232" r="34"/><path d="M172 206l-28-44m238 56 28-62"/></g>
+  <path d="M412 232l136-50-108 88z" fill="#f6c85f" opacity=".35"/><g fill="#8fffea"><circle cx="112" cy="90" r="5"/><circle cx="88" cy="132" r="3"/><circle cx="530" cy="290" r="4"/></g>
+  <text x="320" y="330" text-anchor="middle" fill="#e6fffb" font-family="system-ui,sans-serif" font-size="34" font-weight="800" letter-spacing="6">DEEP SEA SALVAGE</text>
+</svg>

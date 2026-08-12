@@ -47,20 +47,31 @@ export function CabinetScreen({ game }: { game: GameDefinition }) {
             <strong id="cabinet-promo-title">プレイイメージ</strong>
             <small>{game.localizedTitle} Gameplay</small>
           </div>
-          <video
-            autoPlay
-            muted
-            loop
-            playsInline
-            preload="metadata"
-            poster={game.promoPosterUrl}
-          >
-            <source src={game.promoVideoUrl} type="video/mp4" />
-            お使いのブラウザでは動画を再生できません。
-          </video>
+          {game.promoVideoUrl ? (
+            <video autoPlay muted loop playsInline preload="metadata" poster={game.promoPosterUrl}>
+              <source src={game.promoVideoUrl} type="video/mp4" />
+              お使いのブラウザでは動画を再生できません。
+            </video>
+          ) : (
+            <img className="cabinet-promo-still" src={game.promoPosterUrl} alt={`${game.localizedTitle} プレイイメージ`} />
+          )}
         </section>
 
         <section className="cabinet-help-grid" aria-label="遊び方">
+          {game.id === "deep-sea-salvage" ? <>
+            <div>
+              <strong>操作</strong>
+              <span>移動: 矢印キー / WASD</span>
+              <span>スキャン: Shift / E　ライト: L</span>
+              <span>ポーズ: P　選択: 1 / 2 / 3</span>
+            </div>
+            <div>
+              <strong>ゲームのコツ</strong>
+              <span>危険生物に近いほどスキャンとスコア倍率が上がります。</span>
+              <span>財宝は重いほど操縦性が下がります。酸素が尽きる前に基地へ。</span>
+              <span>解析ゲージを残し、海域の主の弱点へ発信器を打ち込みましょう。</span>
+            </div>
+          </> : <>
           <div>
             <strong>操作</strong>
             <span>移動: 矢印キー / WASD</span>
@@ -76,6 +87,7 @@ export function CabinetScreen({ game }: { game: GameDefinition }) {
             <span>無敵中も、弾をかすってゲージを溜めることができます。</span>
             <span>無敵シールドをボスに当てて、ラスボス撃破を目指します。</span>
           </div>
+          </>}
         </section>
         <div className="screen-actions">
           <button
