@@ -371,6 +371,68 @@ function resetGame() {
   resetOpponentBossProgress();
 }
 
+function resetGameForRetry() {
+  for (const player of players) {
+    player.x = player.fieldX + FIELD_WIDTH / 2;
+    player.y = FIELD_BOTTOM - 58;
+    player.lives = MAX_LIVES;
+    player.score = 0;
+    player.combo = 0;
+    player.multiplier = 1;
+    player.comboTimer = 0;
+    player.invincible = 1.5;
+    player.levelUpInvincible = 0;
+    player.barrierRatio = 0;
+    player.hitInvincible = true;
+    player.bullets = [];
+    player.enemyTimer = 0;
+    player.basePattern = null;
+    player.basePatternShotsLeft = 0;
+    player.basePatternBreakTimer = 0;
+    player.attackFlash = 0;
+    player.attackCooldown = 0;
+    player.levelUpFlash = 0;
+    player.tilt = 0;
+    player.targetTilt = 0;
+    player.grazeIds.clear();
+  }
+  particles.length = 0;
+  elapsedRound = 0;
+  slowMotionTimer = 0;
+  bossHitStopTimer = 0;
+  gameOver = false;
+  paused = true;
+  waitingForStart = true;
+  clearGame = false;
+  lastRankingResult = null;
+  rankingSubmittedForResult = false;
+  gameOverRankingTimer = 0;
+  window.clearTimeout(rankingInputUnlockTimeout);
+  rankingInputUnlockTimeout = 0;
+  debugRankingPreviewShown = false;
+  rankingSubmitPanel?.classList.remove("is-visible");
+  rankingSubmitPanel?.classList.remove("is-submitted");
+  rankingSubmitPanel?.classList.remove("is-input-locked");
+
+  boss.damageCooldown = 0;
+  boss.flash = 0;
+  boss.shieldAttackCharges = 0;
+  boss.bonusPending = false;
+  boss.bonusActive = false;
+  if (boss.encounterState === "active") {
+    boss.attackState = "telegraph";
+    boss.attackTimer = BOSS_ATTACK_TELEGRAPH_TIME;
+    boss.attackShotTimer = 0;
+    boss.attackStep = 0;
+    boss.attackTargetX = players[0].x;
+    boss.attackTargetY = players[0].y;
+  }
+
+  clearAllBullets();
+  updatePauseButton();
+  updateRankingSubmitState();
+}
+
 function resetBossProgress() {
   boss.active = false;
   boss.phaseIndex = 0;
@@ -616,7 +678,7 @@ if (rankingAnotherGame) {
 if (rankingRetry) {
   rankingRetry.addEventListener("click", () => {
     rankingSubmitPanel?.classList.remove("is-visible");
-    resetGame();
+    startSoloPlay();
   });
 }
 
@@ -906,7 +968,9 @@ function startSoloPlay() {
     return;
   }
   if (cabinetRole !== "player") return;
-  resetGame();
+  const isGameOverRetry = gameOver && !clearGame && players[0].lives <= 0;
+  if (isGameOverRetry) resetGameForRetry();
+  else resetGame();
   gameSessionActive = true;
   document.body.classList.remove("is-cabinet-spectator");
   document.body.classList.remove("is-spectator");
@@ -4107,7 +4171,7 @@ function drawGameOver() {
     context.fillText("プレイヤーが続けるか辞めるか選ぶのを待っています", WIDTH / 2, HEIGHT / 2 + (clearGame ? -72 : 18));
   } else if (!clearGame && !showingGameOverEffect) {
     context.font = "500 20px system-ui";
-    context.fillText("Rキーでリスタート", WIDTH / 2, HEIGHT / 2 + 18);
+    context.fillText("Rキーで1クレジットリトライ", WIDTH / 2, HEIGHT / 2 + 18);
   }
   context.textAlign = "left";
 }
