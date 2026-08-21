@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildStripeCheckoutReturnUrls,
   getCreditAmount,
   getStripeKeyMode,
   verifyStripeSignature,
@@ -23,6 +24,15 @@ describe("credit purchases", () => {
     expect(getStripeKeyMode("sk_live_example")).toBe("live");
     expect(getStripeKeyMode("sk_test_replace_me")).toBe("invalid");
     expect(getStripeKeyMode()).toBe("invalid");
+  });
+
+  it("keeps the Stripe Checkout session placeholder unescaped", () => {
+    const urls = buildStripeCheckoutReturnUrls(
+      "http://localhost:5174",
+      "/cabinets/test?game=graze-duel",
+    );
+    expect(urls.successUrl).toContain("session_id={CHECKOUT_SESSION_ID}");
+    expect(urls.cancelUrl).toContain("purchase=cancelled");
   });
 
   it("verifies Stripe webhook signatures", async () => {

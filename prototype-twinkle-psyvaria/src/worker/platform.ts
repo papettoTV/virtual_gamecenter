@@ -29,6 +29,21 @@ export function getStripeKeyMode(secretKey?: string): StripeKeyMode {
   return "invalid";
 }
 
+export function buildStripeCheckoutReturnUrls(origin: string, returnPath: string) {
+  const successUrl = new URL(returnPath, origin);
+  successUrl.searchParams.set("purchase", "success");
+  successUrl.searchParams.set("session_id", "{CHECKOUT_SESSION_ID}");
+  const cancelUrl = new URL(returnPath, origin);
+  cancelUrl.searchParams.set("purchase", "cancelled");
+  return {
+    successUrl: successUrl.toString().replace(
+      "%7BCHECKOUT_SESSION_ID%7D",
+      "{CHECKOUT_SESSION_ID}",
+    ),
+    cancelUrl: cancelUrl.toString(),
+  };
+}
+
 function isLocalDevelopmentOrigin(url: URL): boolean {
   return url.hostname === "localhost"
     || url.hostname === "127.0.0.1"
@@ -286,11 +301,7 @@ export async function handlePlatformRequest(
     const amountTotal = unitCount * 100;
     const purchaseId = crypto.randomUUID();
     const returnPath = sanitizeReturnPath(body?.returnPath);
-    const successUrl = new URL(returnPath, url.origin);
-    successUrl.searchParams.set("purchase", "success");
-    successUrl.searchParams.set("session_id", "{CHECKOUT_SESSION_ID}");
-    const cancelUrl = new URL(returnPath, url.origin);
-    cancelUrl.searchParams.set("purchase", "cancelled");
+    const checkoutReturnUrls = buildStripeCheckoutReturnUrls(url.origin, returnPath);
 
     await database.prepare(
       `INSERT INTO credit_purchases
@@ -307,8 +318,8 @@ export async function handlePlatformRequest(
 
     const form = new URLSearchParams({
       mode: "payment",
-      success_url: successUrl.toString(),
-      cancel_url: cancelUrl.toString(),
+      success_url: checkoutReturnUrls.successUrl,
+      cancel_url: checkoutReturnUrls.cancelUrl,
       client_reference_id: purchaseId,
       "metadata[purchase_id]": purchaseId,
       "metadata[player_id]": session.playerId,
