@@ -13,6 +13,8 @@
     "preview": "vite preview --host 0.0.0.0",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "stripe:check": "./scripts/check-stripe-test-config.sh",
+    "stripe:listen": "./scripts/stripe-listen.sh",
     "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {

@@ -12,11 +12,16 @@ npm run db:migrate:local
 npm run dev
 ```
 
-Stripe決済をローカルで確認する場合は、`.dev.vars.example`を`.dev.vars`へコピーし、Stripeのテスト用Secret KeyとStripe CLIが表示するWebhook Secretを設定します。Webhookは次のURLへ転送します。
+Stripe決済をローカルで確認する場合は、`.dev.vars.example`を`.dev.vars`へコピーし、Stripeのテスト用Secret Key（`sk_test_...`）を設定します。ローカル環境では誤課金防止のため本番用Secret Keyを拒否します。
 
 ```bash
-stripe listen --forward-to http://localhost:5174/api/platform/stripe/webhook
+stripe login
+npm run stripe:listen
 ```
+
+Stripe CLIに表示されたWebhook Secret（`whsec_...`）を `.dev.vars` の `STRIPE_WEBHOOK_SECRET` に設定し、開発サーバーを再起動します。設定値を表示せずに確認するには `npm run stripe:check` を使います。
+
+テスト購入ではカード番号 `4242 4242 4242 4242`、将来の日付、有効な形式の任意のCVCを入力します。Checkout完了後、署名検証済みWebhookを受信してからクレジットが付与されます。
 
 PCでは `http://localhost:5174/`、スマホではPCと同じWi-Fiにつなぎ、起動時に表示される `Network` のURLを開きます。ローカルとプライベートネットワーク内ではBasic認証を要求しません。
 

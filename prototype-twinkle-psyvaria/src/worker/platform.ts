@@ -21,6 +21,23 @@ export interface StripePaymentEnv {
   STRIPE_WEBHOOK_SECRET?: string;
 }
 
+export type StripeKeyMode = "test" | "live" | "invalid";
+
+export function getStripeKeyMode(secretKey?: string): StripeKeyMode {
+  if (secretKey?.startsWith("sk_test_") && !secretKey.includes("replace_me")) return "test";
+  if (secretKey?.startsWith("sk_live_") && !secretKey.includes("replace_me")) return "live";
+  return "invalid";
+}
+
+function isLocalDevelopmentOrigin(url: URL): boolean {
+  return url.hostname === "localhost"
+    || url.hostname === "127.0.0.1"
+    || url.hostname === "::1"
+    || url.hostname.startsWith("192.168.")
+    || url.hostname.startsWith("10.")
+    || /^172\.(1[6-9]|2\d|3[01])\./.test(url.hostname);
+}
+
 interface PlayerSession {
   playerId: string;
   token: string;
@@ -250,8 +267,12 @@ export async function handlePlatformRequest(
     if (!consent.accepted) {
       return Response.json({ error: "policy_consent_required" }, { status: 403 });
     }
-    if (!paymentEnv.STRIPE_SECRET_KEY) {
+    const stripeKeyMode = getStripeKeyMode(paymentEnv.STRIPE_SECRET_KEY);
+    if (stripeKeyMode === "invalid") {
       return Response.json({ error: "stripe_not_configured" }, { status: 503 });
+    }
+    if (isLocalDevelopmentOrigin(url) && stripeKeyMode !== "test") {
+      return Response.json({ error: "stripe_test_key_required" }, { status: 503 });
     }
 
     const body = await readJson(request);

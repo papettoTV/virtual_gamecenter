@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   getCreditAmount,
+  getStripeKeyMode,
   verifyStripeSignature,
 } from "../../src/worker/platform";
 import { isDeveloperAuthAvailable, sanitizeReturnPath } from "../../src/worker/google-auth";
@@ -15,6 +16,13 @@ describe("credit purchases", () => {
 
   it("rejects unsupported unit counts", () => {
     expect(() => getCreditAmount(2)).toThrow("invalid_credit_unit");
+  });
+
+  it("distinguishes Stripe test and live secret keys", () => {
+    expect(getStripeKeyMode("sk_test_example")).toBe("test");
+    expect(getStripeKeyMode("sk_live_example")).toBe("live");
+    expect(getStripeKeyMode("sk_test_replace_me")).toBe("invalid");
+    expect(getStripeKeyMode()).toBe("invalid");
   });
 
   it("verifies Stripe webhook signatures", async () => {

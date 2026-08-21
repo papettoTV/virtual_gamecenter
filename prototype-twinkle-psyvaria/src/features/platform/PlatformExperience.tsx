@@ -384,11 +384,12 @@ export function PlatformExperience() {
       );
       window.location.assign(checkout.checkoutUrl);
     } catch (error) {
-      setPurchaseError(
-        error instanceof PlatformApiError && error.code === "stripe_not_configured"
-          ? "Stripeの設定が完了していません。"
-          : "購入画面を開けませんでした。もう一度お試しください。",
-      );
+      const errorCode = error instanceof PlatformApiError ? error.code : "";
+      setPurchaseError(errorCode === "stripe_not_configured"
+        ? "Stripeのテスト用設定が完了していません。"
+        : errorCode === "stripe_test_key_required"
+          ? "ローカル開発ではStripeのテスト用Secret Keyを使用してください。"
+          : "購入画面を開けませんでした。もう一度お試しください。");
       setBusy(false);
     }
   };
