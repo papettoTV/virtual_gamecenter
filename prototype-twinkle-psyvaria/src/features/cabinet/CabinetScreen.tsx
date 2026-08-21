@@ -62,7 +62,7 @@ export function CabinetScreen({ game }: { game: GameDefinition }) {
             <div>
               <strong>操作</strong>
               <span>移動: 矢印キー / WASD</span>
-              <span>スキャン: Shift / E　ライト: L</span>
+              <span>スキャン: 危険生物に近づくと自動　ライト: L</span>
               <span>ポーズ: P　選択: 1 / 2 / 3</span>
             </div>
             <div>

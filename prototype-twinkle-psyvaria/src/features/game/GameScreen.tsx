@@ -119,7 +119,6 @@ export function GameScreen({ game }: { game: GameDefinition }) {
 
       <div className="touch-controls" aria-label="スマホ操作">
         <div className="touch-actions">
-          {isSalvage && <button id="touch-scan" className="touch-button" type="button">スキャン</button>}
           {isSalvage && <button id="touch-light" className="touch-button" type="button">ライト</button>}
           <button id="touch-pause" className="touch-button" type="button">一時停止</button>
         </div>

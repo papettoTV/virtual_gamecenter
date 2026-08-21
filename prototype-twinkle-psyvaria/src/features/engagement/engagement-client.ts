@@ -1,3 +1,5 @@
+import { createUuid } from "../../shared/id";
+
 const WATCH_ATTRIBUTION_KEY = "vgc_watch_attribution";
 const WATCH_EVENT_PREFIX = "vgc_watch_recorded:";
 const ATTRIBUTION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -13,7 +15,7 @@ type EngagementEventType = "watch_started" | "share_created" | "play_started_fro
 
 export function createTrackedWatchUrl(url: string): { shareId: string; url: string } {
   const trackedUrl = new URL(url, window.location.origin);
-  const shareId = crypto.randomUUID();
+  const shareId = createUuid();
   trackedUrl.searchParams.set("watch", "1");
   trackedUrl.searchParams.set("ref", "share");
   trackedUrl.searchParams.set("shareId", shareId);
@@ -72,7 +74,7 @@ async function postEngagementEvent(
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        eventId: crypto.randomUUID(),
+        eventId: createUuid(),
         eventType,
         gameId,
         cabinetId,

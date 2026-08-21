@@ -6,6 +6,7 @@ import { PlatformExperience } from "../features/platform/PlatformExperience";
 import { DEFAULT_GAME_ID, resolveGameDefinition } from "../domain/game";
 import { loadGameRuntime } from "../games/registry";
 import { BRAND } from "../domain/brand";
+import { createUuid } from "../shared/id";
 
 export function App() {
   const [activeGameId, setActiveGameId] = useState(() => getGameIdFromLocation());
@@ -23,7 +24,7 @@ export function App() {
 
   const selectGame = (gameId: string) => {
     const game = resolveGameDefinition(gameId);
-    const cabinetId = crypto.randomUUID();
+    const cabinetId = createUuid();
     const destination = `/cabinets/${cabinetId}?game=${encodeURIComponent(game.id)}`;
     window.location.assign(destination);
   };
