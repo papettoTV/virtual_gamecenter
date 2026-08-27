@@ -1486,6 +1486,13 @@ canvas {
   margin-top: 0;
 }
 
+.platform-dialog-actions .welcome-credit-accept-button {
+  border-color: rgba(105, 247, 255, 0.78);
+  background: linear-gradient(135deg, #45dce8, #70f7c8);
+  box-shadow: 0 0 18px rgba(105, 247, 255, 0.24);
+  color: #06101a;
+}
+
 .platform-dialog-actions .platform-share-button {
   margin-right: auto;
   border-color: rgba(105, 247, 255, 0.32);
