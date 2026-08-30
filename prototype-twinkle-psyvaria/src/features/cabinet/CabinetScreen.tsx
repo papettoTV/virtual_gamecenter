@@ -62,14 +62,14 @@ export function CabinetScreen({ game }: { game: GameDefinition }) {
             <div>
               <strong>操作</strong>
               <span>移動: 矢印キー / WASD</span>
-              <span>スキャン: 危険生物に近づくと自動　ライト: L</span>
-              <span>ポーズ: P　選択: 1 / 2 / 3</span>
+              <span>調査: 魚に近づくと自動</span>
+              <span>ポーズ: P　図鑑: F</span>
             </div>
             <div>
               <strong>ゲームのコツ</strong>
-              <span>危険生物に近いほどスキャンとスコア倍率が上がります。</span>
-              <span>財宝は重いほど操縦性が下がります。酸素が尽きる前に基地へ。</span>
-              <span>解析ゲージを残し、海域の主の弱点へ発信器を打ち込みましょう。</span>
+              <span>魚を調査して電力を補充しながら、より深い海を目指します。</span>
+              <span>深海では発光や水流の変化を見て、高速魚を避けましょう。</span>
+              <span>何度も現れる巨大魚を追跡し、調査を完了するとクリアです。</span>
             </div>
           </> : <>
           <div>

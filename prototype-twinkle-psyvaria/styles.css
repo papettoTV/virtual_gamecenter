@@ -833,6 +833,100 @@ canvas {
   color: var(--text);
 }
 
+.ranking-overlay:has(.ranking-result-share-button) h2 {
+  padding: 0 94px;
+}
+
+.ranking-result-share-button {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  border: 1px solid rgba(255, 215, 92, 0.5);
+  border-radius: 9px;
+  background: linear-gradient(135deg, rgba(255, 213, 91, 0.2), rgba(105, 247, 255, 0.16));
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 7px 10px;
+}
+
+.ranking-result-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ranking-result-summary #ranking-result {
+  min-width: 0;
+  flex: 1;
+  margin: 10px 0;
+}
+
+.ranking-result-collection-button {
+  flex: 0 0 auto;
+  border: 1px solid rgba(105, 247, 255, 0.35);
+  border-radius: 8px;
+  background: rgba(105, 247, 255, 0.1);
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 7px 10px;
+}
+
+.salvage-share-menu {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 8px 0 10px;
+  padding: 10px;
+  border: 1px solid rgba(255, 215, 92, 0.28);
+  border-radius: 10px;
+  background: rgba(2, 8, 20, 0.82);
+}
+
+.salvage-share-menu[hidden] {
+  display: none;
+}
+
+.salvage-share-menu button {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 8px;
+}
+
+.salvage-share-menu p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+@media (max-width: 560px) {
+  .ranking-overlay:has(.ranking-result-share-button) h2 {
+    padding: 0 78px 0 0;
+    text-align: left;
+  }
+
+  .ranking-result-share-button {
+    right: 10px;
+  }
+
+  .ranking-result-summary {
+    align-items: flex-start;
+  }
+}
+
 .ranking-panel h2 {
   margin: 0 0 8px;
   font-size: 18px;

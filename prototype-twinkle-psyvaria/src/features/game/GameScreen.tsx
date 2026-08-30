@@ -82,7 +82,22 @@ export function GameScreen({ game }: { game: GameDefinition }) {
         </div>
         <div className="ranking-submit ranking-overlay" id="ranking-submit-panel">
           <h2 id="ranking-submit-heading">ランキング登録</h2>
-          <p id="ranking-result">ゲーム終了時にスコアを登録できます。</p>
+          {isSalvage && <button id="salvage-share-result" className="ranking-result-share-button" type="button">
+            結果をシェア
+          </button>}
+          <div className="ranking-result-summary">
+            <p id="ranking-result">ゲーム終了時にスコアを登録できます。</p>
+            {isSalvage && <button id="salvage-result-collection" className="ranking-result-collection-button" type="button">
+              図鑑
+            </button>}
+          </div>
+          {isSalvage && <div id="salvage-share-menu" className="salvage-share-menu" hidden>
+            <p>結果カードを画像で保存し、SNS投稿へ添付できます。</p>
+            <button id="salvage-share-x" type="button">Xで共有</button>
+            <button id="salvage-share-line" type="button">LINEで共有</button>
+            <button id="salvage-share-save" type="button">シェア用画像を保存</button>
+            <button id="salvage-share-copy" type="button">文章をコピー</button>
+          </div>}
           <div className="ranking-form">
             <input id="ranking-name" type="hidden" />
             <div className="ranking-name-summary">
@@ -119,7 +134,7 @@ export function GameScreen({ game }: { game: GameDefinition }) {
 
       <div className="touch-controls" aria-label="スマホ操作">
         <div className="touch-actions">
-          {isSalvage && <button id="touch-light" className="touch-button" type="button">ライト</button>}
+          {isSalvage && <button id="touch-collection" className="touch-button" type="button">図鑑</button>}
           <button id="touch-pause" className="touch-button" type="button">一時停止</button>
         </div>
       </div>
