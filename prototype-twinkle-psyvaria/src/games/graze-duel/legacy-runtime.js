@@ -145,6 +145,8 @@ const CLIENT_VERSION = BUZZ_BARRIER.currentVersion;
 const PROMO_CAPTURE_MODE = import.meta.env.DEV
   && new URLSearchParams(window.location.search).get("promoCapture") === "1";
 const THREE_BULLET_RENDERER_ENABLED = new URLSearchParams(window.location.search).get("bulletRenderer") === "three";
+const GPU_REPLAY_DEMO = import.meta.env.DEV
+  && new URLSearchParams(window.location.search).get("gpuReplayDemo") === "1";
 
 let threeBulletLayer = null;
 if (THREE_BULLET_RENDERER_ENABLED) {
@@ -193,6 +195,7 @@ let latestViewerMotion = null;
 let previousViewerMotion = null;
 let pendingViewerEvents = [];
 let lastViewerSequence = 0;
+let spectatorBulletRevision = 0;
 let syncSequence = 0;
 let motionFrameTimer = 0;
 let keyframeTimer = 0;
@@ -1567,6 +1570,7 @@ function resetViewerSyncState() {
   previousViewerMotion = null;
   pendingViewerEvents = [];
   lastViewerSequence = 0;
+  spectatorBulletRevision += 1;
 }
 
 function nextSyncSequence() {
@@ -1885,7 +1889,11 @@ function applyViewerEvent(event) {
       ...event.bullet,
       spectatorTargetX: event.bullet.x,
       spectatorTargetY: event.bullet.y,
+      spectatorRenderBaseX: event.bullet.x,
+      spectatorRenderBaseY: event.bullet.y,
+      spectatorRenderBaseElapsed: elapsedRound,
     });
+    spectatorBulletRevision += 1;
     return;
   }
   if (event.type === "bulletsCleared") {
@@ -1893,6 +1901,7 @@ function applyViewerEvent(event) {
       player.bullets = [];
       player.grazeIds.clear();
     }
+    spectatorBulletRevision += 1;
     return;
   }
   if (event.type === "bossState") {
@@ -1933,8 +1942,12 @@ function syncSpectatorBullets(player, snapshotBullets, immediate) {
     }
     bullet.spectatorTargetX = snapshotBullet.x;
     bullet.spectatorTargetY = snapshotBullet.y;
+    bullet.spectatorRenderBaseX = snapshotBullet.x;
+    bullet.spectatorRenderBaseY = snapshotBullet.y;
+    bullet.spectatorRenderBaseElapsed = elapsedRound;
     return bullet;
   });
+  spectatorBulletRevision += 1;
 }
 
 function updateSpectatorView(delta) {
@@ -1951,24 +1964,26 @@ function updateSpectatorView(delta) {
     player.invincible = Math.max(0, player.invincible - delta);
     player.levelUpInvincible = Math.max(0, player.levelUpInvincible - delta);
 
-    for (const bullet of player.bullets) {
-      bullet.spectatorTargetX = (bullet.spectatorTargetX ?? bullet.x) + bullet.vx * delta;
-      bullet.spectatorTargetY = (bullet.spectatorTargetY ?? bullet.y) + bullet.vy * delta;
-      bullet.x += (bullet.spectatorTargetX - bullet.x) * bulletCorrectionRatio;
-      bullet.y += (bullet.spectatorTargetY - bullet.y) * bulletCorrectionRatio;
-      bullet.age += delta;
-      if (isPointInsidePlayerField(player, bullet.x, bullet.y)) {
-        bullet.enteredField = true;
+    if (!THREE_BULLET_RENDERER_ENABLED) {
+      for (const bullet of player.bullets) {
+        bullet.spectatorTargetX = (bullet.spectatorTargetX ?? bullet.x) + bullet.vx * delta;
+        bullet.spectatorTargetY = (bullet.spectatorTargetY ?? bullet.y) + bullet.vy * delta;
+        bullet.x += (bullet.spectatorTargetX - bullet.x) * bulletCorrectionRatio;
+        bullet.y += (bullet.spectatorTargetY - bullet.y) * bulletCorrectionRatio;
+        bullet.age += delta;
+        if (isPointInsidePlayerField(player, bullet.x, bullet.y)) {
+          bullet.enteredField = true;
+        }
+        if (
+          bullet.type !== "bossAttack" &&
+          (bullet.x < player.fieldX + 20 || bullet.x > player.fieldX + FIELD_WIDTH - 20)
+        ) {
+          bullet.vx *= -1;
+          bullet.spectatorTargetX = bullet.x;
+        }
       }
-      if (
-        bullet.type !== "bossAttack" &&
-        (bullet.x < player.fieldX + 20 || bullet.x > player.fieldX + FIELD_WIDTH - 20)
-      ) {
-        bullet.vx *= -1;
-        bullet.spectatorTargetX = bullet.x;
-      }
+      player.bullets = player.bullets.filter((bullet) => shouldKeepBullet(player, bullet));
     }
-    player.bullets = player.bullets.filter((bullet) => shouldKeepBullet(player, bullet));
   }
 
   boss.spectatorTargetX = (boss.spectatorTargetX ?? boss.x) + (boss.spectatorVx ?? 0) * delta;
@@ -3779,12 +3794,18 @@ function renderThreeBulletLayer() {
   if (!threeBulletLayer) return;
   const compact = isCompactView();
   const selectedPlayerIndex = compact && isVersusSpectator() ? spectatorPlayerIndex : 0;
+  const gpuReplay = (cabinetRole === "spectator" && !isVersusParticipant()) || GPU_REPLAY_DEMO;
+  const demoRevision = GPU_REPLAY_DEMO
+    ? players.reduce((total, player) => total + player.bullets.length, 0)
+    : 0;
   threeBulletLayer.render(players, elapsedRound, {
     compact,
     selectedPlayerIndex,
     fieldTop: FIELD_TOP,
     fieldBottom: FIELD_BOTTOM,
     fieldWidth: FIELD_WIDTH,
+    gpuReplay,
+    revision: spectatorBulletRevision + demoRevision,
   });
 }
 

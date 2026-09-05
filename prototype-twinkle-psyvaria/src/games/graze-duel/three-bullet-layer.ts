@@ -5,13 +5,20 @@ const MAX_BULLETS = 12_000;
 type BulletShape = "circle" | "diamond" | "triangle" | "square" | "star" | "pill" | "line" | "spinner" | "smallCircle";
 
 type BulletState = {
+  id: number;
   x: number;
   y: number;
+  vx: number;
+  vy: number;
   radius: number;
   color: string;
   shape?: BulletShape;
   rotation?: number;
   age: number;
+  type: string;
+  spectatorRenderBaseX?: number;
+  spectatorRenderBaseY?: number;
+  spectatorRenderBaseElapsed?: number;
 };
 
 type PlayerBulletState = {
@@ -25,6 +32,8 @@ type RenderOptions = {
   fieldTop: number;
   fieldBottom: number;
   fieldWidth: number;
+  gpuReplay: boolean;
+  revision: number;
 };
 
 type BulletAttributes = {
@@ -34,6 +43,10 @@ type BulletAttributes = {
   rotation: THREE.InstancedBufferAttribute;
   color: THREE.InstancedBufferAttribute;
   fieldBounds: THREE.InstancedBufferAttribute;
+  velocity: THREE.InstancedBufferAttribute;
+  baseElapsed: THREE.InstancedBufferAttribute;
+  bounce: THREE.InstancedBufferAttribute;
+  bounceBounds: THREE.InstancedBufferAttribute;
 };
 
 export type ThreeBulletLayer = {
@@ -58,13 +71,14 @@ export function createThreeBulletLayer(width: number, height: number): ThreeBull
   camera.position.z = 2;
 
   const { geometry, attributes } = createGeometry();
-  const material = createMaterial(width, height);
+  const { material, elapsedUniform } = createMaterial(width, height);
   const mesh = new THREE.Mesh(geometry, material);
   mesh.frustumCulled = false;
   scene.add(mesh);
 
   const colorCache = new Map<string, THREE.Color>();
   let referenceCanvas: HTMLCanvasElement | null = null;
+  let lastGpuReplayKey = "";
 
   return {
     mount(host, reference) {
@@ -93,31 +107,46 @@ export function createThreeBulletLayer(width: number, height: number): ThreeBull
         ? players.slice(options.selectedPlayerIndex, options.selectedPlayerIndex + 1)
         : players;
       const transform = createViewTransform(width, height, visiblePlayers[0], referenceCanvas, options);
-      let instanceIndex = 0;
-      for (const player of visiblePlayers) {
-        const field = transformField(player.fieldX, options, transform);
-        for (const bullet of player.bullets) {
-          if (instanceIndex >= MAX_BULLETS) break;
-        const dimensions = bulletDimensions(bullet);
-        const color = cachedColor(colorCache, bullet.color);
-          const center = transformPoint(bullet.x, bullet.y, transform);
-          attributes.center.setXY(instanceIndex, center.x - width / 2, height / 2 - center.y);
-          attributes.size.setXY(instanceIndex, dimensions.width * transform.scale, dimensions.height * transform.scale);
-          attributes.shape.setX(instanceIndex, shapeCode(bullet.shape));
-          attributes.rotation.setX(instanceIndex, bulletRotation(bullet, elapsed));
-          attributes.color.setXYZ(instanceIndex, color.r, color.g, color.b);
-          attributes.fieldBounds.setXYZW(instanceIndex, field.left, field.top, field.right, field.bottom);
-          instanceIndex += 1;
+      const replayKey = `${options.revision}:${options.selectedPlayerIndex}:${referenceCanvas?.clientWidth ?? 0}:${referenceCanvas?.clientHeight ?? 0}`;
+      if (!options.gpuReplay || replayKey !== lastGpuReplayKey) {
+        let instanceIndex = 0;
+        for (const player of visiblePlayers) {
+          const field = transformField(player.fieldX, options, transform);
+          for (const bullet of player.bullets) {
+            if (instanceIndex >= MAX_BULLETS) break;
+            const dimensions = bulletDimensions(bullet);
+            const color = cachedColor(colorCache, bullet.color);
+            const baseX = options.gpuReplay ? bullet.spectatorRenderBaseX ?? bullet.x : bullet.x;
+            const baseY = options.gpuReplay ? bullet.spectatorRenderBaseY ?? bullet.y : bullet.y;
+            const center = transformPoint(baseX, baseY, transform);
+            attributes.center.setXY(instanceIndex, center.x - width / 2, height / 2 - center.y);
+            attributes.size.setXY(instanceIndex, dimensions.width * transform.scale, dimensions.height * transform.scale);
+            attributes.shape.setX(instanceIndex, shapeCode(bullet.shape));
+            attributes.rotation.setX(instanceIndex, bulletRotation(bullet, elapsed));
+            attributes.color.setXYZ(instanceIndex, color.r, color.g, color.b);
+            attributes.fieldBounds.setXYZW(instanceIndex, field.left, field.top, field.right, field.bottom);
+            attributes.velocity.setXY(instanceIndex, bullet.vx * transform.scale, -bullet.vy * transform.scale);
+            attributes.baseElapsed.setX(instanceIndex, options.gpuReplay ? bullet.spectatorRenderBaseElapsed ?? elapsed : elapsed);
+            attributes.bounce.setX(instanceIndex, options.gpuReplay && bullet.type !== "bossAttack" ? 1 : 0);
+            attributes.bounceBounds.setXY(instanceIndex, field.left + 20 * transform.scale - width / 2, field.right - 20 * transform.scale - width / 2);
+            instanceIndex += 1;
+          }
         }
-      }
 
-      geometry.instanceCount = instanceIndex;
-      attributes.center.needsUpdate = true;
-      attributes.size.needsUpdate = true;
-      attributes.shape.needsUpdate = true;
-      attributes.rotation.needsUpdate = true;
-      attributes.color.needsUpdate = true;
-      attributes.fieldBounds.needsUpdate = true;
+        geometry.instanceCount = instanceIndex;
+        attributes.center.needsUpdate = true;
+        attributes.size.needsUpdate = true;
+        attributes.shape.needsUpdate = true;
+        attributes.rotation.needsUpdate = true;
+        attributes.color.needsUpdate = true;
+        attributes.fieldBounds.needsUpdate = true;
+        attributes.velocity.needsUpdate = true;
+        attributes.baseElapsed.needsUpdate = true;
+        attributes.bounce.needsUpdate = true;
+        attributes.bounceBounds.needsUpdate = true;
+        lastGpuReplayKey = options.gpuReplay ? replayKey : "";
+      }
+      elapsedUniform.value = elapsed;
       renderer.clear();
       renderer.render(scene, camera);
     },
@@ -148,6 +177,10 @@ function createGeometry(): { geometry: THREE.InstancedBufferGeometry; attributes
     rotation: new THREE.InstancedBufferAttribute(new Float32Array(MAX_BULLETS), 1).setUsage(THREE.DynamicDrawUsage),
     color: new THREE.InstancedBufferAttribute(new Float32Array(MAX_BULLETS * 3), 3).setUsage(THREE.DynamicDrawUsage),
     fieldBounds: new THREE.InstancedBufferAttribute(new Float32Array(MAX_BULLETS * 4), 4).setUsage(THREE.DynamicDrawUsage),
+    velocity: new THREE.InstancedBufferAttribute(new Float32Array(MAX_BULLETS * 2), 2).setUsage(THREE.DynamicDrawUsage),
+    baseElapsed: new THREE.InstancedBufferAttribute(new Float32Array(MAX_BULLETS), 1).setUsage(THREE.DynamicDrawUsage),
+    bounce: new THREE.InstancedBufferAttribute(new Float32Array(MAX_BULLETS), 1).setUsage(THREE.DynamicDrawUsage),
+    bounceBounds: new THREE.InstancedBufferAttribute(new Float32Array(MAX_BULLETS * 2), 2).setUsage(THREE.DynamicDrawUsage),
   };
   geometry.setAttribute("aCenter", attributes.center);
   geometry.setAttribute("aSize", attributes.size);
@@ -155,22 +188,33 @@ function createGeometry(): { geometry: THREE.InstancedBufferGeometry; attributes
   geometry.setAttribute("aRotation", attributes.rotation);
   geometry.setAttribute("aColor", attributes.color);
   geometry.setAttribute("aFieldBounds", attributes.fieldBounds);
+  geometry.setAttribute("aVelocity", attributes.velocity);
+  geometry.setAttribute("aBaseElapsed", attributes.baseElapsed);
+  geometry.setAttribute("aBounce", attributes.bounce);
+  geometry.setAttribute("aBounceBounds", attributes.bounceBounds);
   return { geometry, attributes };
 }
 
 function createMaterial(width: number, height: number) {
-  return new THREE.ShaderMaterial({
+  const elapsedUniform = { value: 0 };
+  const material = new THREE.ShaderMaterial({
     transparent: true,
     depthTest: false,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
+    uniforms: { uElapsed: elapsedUniform },
     vertexShader: `
+      uniform float uElapsed;
       attribute vec2 aCenter;
       attribute vec2 aSize;
       attribute float aShape;
       attribute float aRotation;
       attribute vec3 aColor;
       attribute vec4 aFieldBounds;
+      attribute vec2 aVelocity;
+      attribute float aBaseElapsed;
+      attribute float aBounce;
+      attribute vec2 aBounceBounds;
       varying vec2 vUv;
       varying float vShape;
       varying vec3 vColor;
@@ -185,9 +229,17 @@ function createMaterial(width: number, height: number) {
         vUv = uv;
         vShape = aShape;
         vColor = aColor;
-        vScreenPosition = aCenter + local;
+        float travel = max(0.0, uElapsed - aBaseElapsed);
+        vec2 center = aCenter + aVelocity * travel;
+        if (aBounce > 0.5) {
+          float span = max(1.0, aBounceBounds.y - aBounceBounds.x);
+          float cycle = mod(center.x - aBounceBounds.x, span * 2.0);
+          if (cycle < 0.0) cycle += span * 2.0;
+          center.x = aBounceBounds.x + (cycle <= span ? cycle : span * 2.0 - cycle);
+        }
+        vScreenPosition = center + local;
         vFieldBounds = aFieldBounds;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(aCenter + local, 0.0, 1.0);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(center + local, 0.0, 1.0);
       }
     `,
     fragmentShader: `
@@ -225,6 +277,7 @@ function createMaterial(width: number, height: number) {
       }
     `,
   });
+  return { material, elapsedUniform };
 }
 
 type ViewTransform = {
