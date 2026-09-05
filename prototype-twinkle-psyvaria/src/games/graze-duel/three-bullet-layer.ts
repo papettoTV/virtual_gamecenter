@@ -15,7 +15,16 @@ type BulletState = {
 };
 
 type PlayerBulletState = {
+  fieldX: number;
   bullets: BulletState[];
+};
+
+type RenderOptions = {
+  compact: boolean;
+  selectedPlayerIndex: number;
+  fieldTop: number;
+  fieldBottom: number;
+  fieldWidth: number;
 };
 
 type BulletAttributes = {
@@ -24,10 +33,12 @@ type BulletAttributes = {
   shape: THREE.InstancedBufferAttribute;
   rotation: THREE.InstancedBufferAttribute;
   color: THREE.InstancedBufferAttribute;
+  fieldBounds: THREE.InstancedBufferAttribute;
 };
 
 export type ThreeBulletLayer = {
-  render(player: PlayerBulletState, elapsed: number): HTMLCanvasElement;
+  mount(host: Element | null, referenceCanvas: HTMLCanvasElement): void;
+  render(players: PlayerBulletState[], elapsed: number, options: RenderOptions): void;
   dispose(): void;
 };
 
@@ -47,41 +58,74 @@ export function createThreeBulletLayer(width: number, height: number): ThreeBull
   camera.position.z = 2;
 
   const { geometry, attributes } = createGeometry();
-  const material = createMaterial();
+  const material = createMaterial(width, height);
   const mesh = new THREE.Mesh(geometry, material);
   mesh.frustumCulled = false;
   scene.add(mesh);
 
   const colorCache = new Map<string, THREE.Color>();
+  let referenceCanvas: HTMLCanvasElement | null = null;
 
   return {
-    render(player, elapsed) {
-      const count = Math.min(player.bullets.length, MAX_BULLETS);
-      for (let index = 0; index < count; index += 1) {
-        const bullet = player.bullets[index]!;
+    mount(host, reference) {
+      if (!host) return;
+      referenceCanvas = reference;
+      canvas.dataset.threeBulletLayer = "true";
+      canvas.setAttribute("aria-hidden", "true");
+      canvas.style.cssText = [
+        "position:absolute",
+        "inset:0",
+        "z-index:1",
+        "width:100%",
+        "height:100%",
+        "border:0",
+        "border-radius:20px",
+        "background:transparent",
+        "box-shadow:none",
+        "object-fit:cover",
+        "object-position:center",
+        "pointer-events:none",
+      ].join(";");
+      host.appendChild(canvas);
+    },
+    render(players, elapsed, options) {
+      const visiblePlayers = options.compact
+        ? players.slice(options.selectedPlayerIndex, options.selectedPlayerIndex + 1)
+        : players;
+      const transform = createViewTransform(width, height, visiblePlayers[0], referenceCanvas, options);
+      let instanceIndex = 0;
+      for (const player of visiblePlayers) {
+        const field = transformField(player.fieldX, options, transform);
+        for (const bullet of player.bullets) {
+          if (instanceIndex >= MAX_BULLETS) break;
         const dimensions = bulletDimensions(bullet);
         const color = cachedColor(colorCache, bullet.color);
-        attributes.center.setXY(index, bullet.x - width / 2, height / 2 - bullet.y);
-        attributes.size.setXY(index, dimensions.width, dimensions.height);
-        attributes.shape.setX(index, shapeCode(bullet.shape));
-        attributes.rotation.setX(index, bulletRotation(bullet, elapsed));
-        attributes.color.setXYZ(index, color.r, color.g, color.b);
+          const center = transformPoint(bullet.x, bullet.y, transform);
+          attributes.center.setXY(instanceIndex, center.x - width / 2, height / 2 - center.y);
+          attributes.size.setXY(instanceIndex, dimensions.width * transform.scale, dimensions.height * transform.scale);
+          attributes.shape.setX(instanceIndex, shapeCode(bullet.shape));
+          attributes.rotation.setX(instanceIndex, bulletRotation(bullet, elapsed));
+          attributes.color.setXYZ(instanceIndex, color.r, color.g, color.b);
+          attributes.fieldBounds.setXYZW(instanceIndex, field.left, field.top, field.right, field.bottom);
+          instanceIndex += 1;
+        }
       }
 
-      geometry.instanceCount = count;
+      geometry.instanceCount = instanceIndex;
       attributes.center.needsUpdate = true;
       attributes.size.needsUpdate = true;
       attributes.shape.needsUpdate = true;
       attributes.rotation.needsUpdate = true;
       attributes.color.needsUpdate = true;
+      attributes.fieldBounds.needsUpdate = true;
       renderer.clear();
       renderer.render(scene, camera);
-      return canvas;
     },
     dispose() {
       geometry.dispose();
       material.dispose();
       renderer.dispose();
+      canvas.remove();
     },
   };
 }
@@ -103,16 +147,18 @@ function createGeometry(): { geometry: THREE.InstancedBufferGeometry; attributes
     shape: new THREE.InstancedBufferAttribute(new Float32Array(MAX_BULLETS), 1).setUsage(THREE.DynamicDrawUsage),
     rotation: new THREE.InstancedBufferAttribute(new Float32Array(MAX_BULLETS), 1).setUsage(THREE.DynamicDrawUsage),
     color: new THREE.InstancedBufferAttribute(new Float32Array(MAX_BULLETS * 3), 3).setUsage(THREE.DynamicDrawUsage),
+    fieldBounds: new THREE.InstancedBufferAttribute(new Float32Array(MAX_BULLETS * 4), 4).setUsage(THREE.DynamicDrawUsage),
   };
   geometry.setAttribute("aCenter", attributes.center);
   geometry.setAttribute("aSize", attributes.size);
   geometry.setAttribute("aShape", attributes.shape);
   geometry.setAttribute("aRotation", attributes.rotation);
   geometry.setAttribute("aColor", attributes.color);
+  geometry.setAttribute("aFieldBounds", attributes.fieldBounds);
   return { geometry, attributes };
 }
 
-function createMaterial() {
+function createMaterial(width: number, height: number) {
   return new THREE.ShaderMaterial({
     transparent: true,
     depthTest: false,
@@ -124,9 +170,12 @@ function createMaterial() {
       attribute float aShape;
       attribute float aRotation;
       attribute vec3 aColor;
+      attribute vec4 aFieldBounds;
       varying vec2 vUv;
       varying float vShape;
       varying vec3 vColor;
+      varying vec2 vScreenPosition;
+      varying vec4 vFieldBounds;
 
       void main() {
         vec2 local = position.xy * aSize;
@@ -136,6 +185,8 @@ function createMaterial() {
         vUv = uv;
         vShape = aShape;
         vColor = aColor;
+        vScreenPosition = aCenter + local;
+        vFieldBounds = aFieldBounds;
         gl_Position = projectionMatrix * modelViewMatrix * vec4(aCenter + local, 0.0, 1.0);
       }
     `,
@@ -143,6 +194,8 @@ function createMaterial() {
       varying vec2 vUv;
       varying float vShape;
       varying vec3 vColor;
+      varying vec2 vScreenPosition;
+      varying vec4 vFieldBounds;
 
       float starDistance(vec2 point) {
         float angle = atan(point.y, point.x);
@@ -152,6 +205,8 @@ function createMaterial() {
       }
 
       void main() {
+        vec2 screenPosition = vec2(vScreenPosition.x + ${width.toFixed(1)} * 0.5, ${height.toFixed(1)} * 0.5 - vScreenPosition.y);
+        if (screenPosition.x < vFieldBounds.x || screenPosition.x > vFieldBounds.z || screenPosition.y < vFieldBounds.y || screenPosition.y > vFieldBounds.w) discard;
         vec2 point = vUv * 2.0 - 1.0;
         float distanceToEdge = length(point);
         if (vShape > 0.5 && vShape < 1.5) distanceToEdge = abs(point.x) + abs(point.y);
@@ -170,6 +225,46 @@ function createMaterial() {
       }
     `,
   });
+}
+
+type ViewTransform = {
+  scale: number;
+  offsetX: number;
+  offsetY: number;
+};
+
+function createViewTransform(
+  width: number,
+  height: number,
+  player: PlayerBulletState | undefined,
+  referenceCanvas: HTMLCanvasElement | null,
+  options: RenderOptions,
+): ViewTransform {
+  if (!options.compact || !player || !referenceCanvas) return { scale: 1, offsetX: 0, offsetY: 0 };
+  const visibleSourceWidth = height * (referenceCanvas.clientWidth / Math.max(1, referenceCanvas.clientHeight));
+  const horizontalScale = visibleSourceWidth / options.fieldWidth;
+  const verticalScale = (height - 92) / (options.fieldBottom - options.fieldTop);
+  const scale = Math.max(0.82, Math.min(1.05, horizontalScale, verticalScale));
+  const focusX = player.fieldX + options.fieldWidth / 2;
+  const focusY = options.fieldTop + (options.fieldBottom - options.fieldTop) / 2;
+  return {
+    scale,
+    offsetX: width / 2 - focusX * scale,
+    offsetY: height / 2 + 24 - focusY * scale,
+  };
+}
+
+function transformPoint(x: number, y: number, transform: ViewTransform) {
+  return {
+    x: x * transform.scale + transform.offsetX,
+    y: y * transform.scale + transform.offsetY,
+  };
+}
+
+function transformField(fieldX: number, options: RenderOptions, transform: ViewTransform) {
+  const topLeft = transformPoint(fieldX, options.fieldTop, transform);
+  const bottomRight = transformPoint(fieldX + options.fieldWidth, options.fieldBottom, transform);
+  return { left: topLeft.x, top: topLeft.y, right: bottomRight.x, bottom: bottomRight.y };
 }
 
 function bulletDimensions(bullet: BulletState) {

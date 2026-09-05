@@ -150,6 +150,7 @@ let threeBulletLayer = null;
 if (THREE_BULLET_RENDERER_ENABLED) {
   void import("./three-bullet-layer").then(({ createThreeBulletLayer }) => {
     threeBulletLayer = createThreeBulletLayer(WIDTH, HEIGHT);
+    threeBulletLayer.mount(canvas.closest(".game-frame"), canvas);
     installThreeRendererBadge();
   });
 }
@@ -3440,6 +3441,7 @@ function createHitExplosion(x, y, color) {
 
 function draw() {
   if (currentScreen !== "game") return;
+  renderThreeBulletLayer();
   context.clearRect(0, 0, WIDTH, HEIGHT);
   drawBackground();
   if (isCompactView()) {
@@ -3754,14 +3756,10 @@ function drawField(player) {
 }
 
 function drawBullets(player) {
+  if (threeBulletLayer) return;
   context.save();
   roundRect(player.fieldX, FIELD_TOP, FIELD_WIDTH, FIELD_HEIGHT, 18);
   context.clip();
-  if (threeBulletLayer) {
-    context.drawImage(threeBulletLayer.render(player, elapsedRound), 0, 0, WIDTH, HEIGHT);
-    context.restore();
-    return;
-  }
   const glowBlur = getBulletGlowBlur(player.bullets.length);
   for (const bullet of player.bullets) {
     context.save();
@@ -3775,6 +3773,19 @@ function drawBullets(player) {
     context.restore();
   }
   context.restore();
+}
+
+function renderThreeBulletLayer() {
+  if (!threeBulletLayer) return;
+  const compact = isCompactView();
+  const selectedPlayerIndex = compact && isVersusSpectator() ? spectatorPlayerIndex : 0;
+  threeBulletLayer.render(players, elapsedRound, {
+    compact,
+    selectedPlayerIndex,
+    fieldTop: FIELD_TOP,
+    fieldBottom: FIELD_BOTTOM,
+    fieldWidth: FIELD_WIDTH,
+  });
 }
 
 function installThreeRendererBadge() {
