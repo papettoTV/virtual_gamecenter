@@ -148,11 +148,11 @@ const THREE_BULLET_RENDERER_ENABLED = new URLSearchParams(window.location.search
 const GPU_REPLAY_DEMO = import.meta.env.DEV
   && new URLSearchParams(window.location.search).get("gpuReplayDemo") === "1";
 
-let threeBulletLayer = null;
+let sceneRenderer = null;
 if (THREE_BULLET_RENDERER_ENABLED) {
-  void import("./three-bullet-layer").then(({ createThreeBulletLayer }) => {
-    threeBulletLayer = createThreeBulletLayer(WIDTH, HEIGHT);
-    threeBulletLayer.mount(canvas.closest(".game-frame"), canvas);
+  void import("./rendering/three-game-renderer").then(({ createThreeGameRenderer }) => {
+    sceneRenderer = createThreeGameRenderer(WIDTH, HEIGHT);
+    sceneRenderer.mount(canvas.closest(".game-frame"), canvas);
     installThreeRendererBadge();
   });
 }
@@ -3471,12 +3471,12 @@ function draw() {
 
     for (const player of players) {
       drawBullets(player);
-      if (!threeBulletLayer) drawPlayer(player);
+      if (!sceneRenderer) drawPlayer(player);
       drawPlayerHud(player);
     }
   }
 
-  if (!isCompactView() && !threeBulletLayer) drawParticles();
+  if (!isCompactView() && !sceneRenderer) drawParticles();
   drawHitDebug();
   if (paused) drawPaused();
   if (gameOver) drawGameOver();
@@ -3495,7 +3495,7 @@ function drawCompactGame() {
     if (playerIndex === 0) drawBoss();
     else drawOpponentBoss();
     drawBullets(selectedPlayer);
-    if (!threeBulletLayer) {
+    if (!sceneRenderer) {
       drawPlayer(selectedPlayer);
       drawParticles();
     }
@@ -3524,7 +3524,7 @@ function withCompactWorldTransform(player, drawCallback) {
 
 function drawBoss() {
   if (!boss.active || boss.hp <= 0) return;
-  if (threeBulletLayer) {
+  if (sceneRenderer) {
     drawBossGauge(boss, LEFT_X + FIELD_WIDTH / 2);
     return;
   }
@@ -3594,7 +3594,7 @@ function drawBoss() {
 
 function drawOpponentBoss() {
   if (!opponentBoss.active || opponentBoss.hp <= 0) return;
-  if (threeBulletLayer) {
+  if (sceneRenderer) {
     drawBossGauge(opponentBoss, RIGHT_X + FIELD_WIDTH / 2);
     return;
   }
@@ -3771,7 +3771,7 @@ function drawField(player) {
 }
 
 function drawBullets(player) {
-  if (threeBulletLayer) return;
+  if (sceneRenderer) return;
   context.save();
   roundRect(player.fieldX, FIELD_TOP, FIELD_WIDTH, FIELD_HEIGHT, 18);
   context.clip();
@@ -3791,14 +3791,14 @@ function drawBullets(player) {
 }
 
 function renderThreeBulletLayer() {
-  if (!threeBulletLayer) return;
+  if (!sceneRenderer) return;
   const compact = isCompactView();
   const selectedPlayerIndex = compact && isVersusSpectator() ? spectatorPlayerIndex : 0;
   const gpuReplay = (cabinetRole === "spectator" && !isVersusParticipant()) || GPU_REPLAY_DEMO;
   const demoRevision = GPU_REPLAY_DEMO
     ? players.reduce((total, player) => total + player.bullets.length, 0)
     : 0;
-  threeBulletLayer.render({ players, boss, opponentBoss, particles }, elapsedRound, {
+  sceneRenderer.render({ players, boss, opponentBoss, particles }, elapsedRound, {
     compact,
     selectedPlayerIndex,
     fieldTop: FIELD_TOP,

@@ -1,76 +1,16 @@
 import * as THREE from "three";
+import type {
+  BossRenderState,
+  BulletRenderState,
+  GameSceneRenderer,
+  ParticleRenderState,
+  PlayerRenderState,
+  RenderOptions,
+  SceneRenderFrame,
+} from "./scene-renderer";
 
 const MAX_BULLETS = 12_000;
 const MAX_PARTICLES = 512;
-
-type BulletShape = "circle" | "diamond" | "triangle" | "square" | "star" | "pill" | "line" | "spinner" | "smallCircle";
-
-type BulletState = {
-  id: number;
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  radius: number;
-  color: string;
-  shape?: BulletShape;
-  rotation?: number;
-  age: number;
-  type: string;
-  spectatorRenderBaseX?: number;
-  spectatorRenderBaseY?: number;
-  spectatorRenderBaseElapsed?: number;
-};
-
-type PlayerBulletState = {
-  fieldX: number;
-  x: number;
-  y: number;
-  color: string;
-  tilt: number;
-  invincible: number;
-  levelUpInvincible: number;
-  barrierRatio: number;
-  levelUpFlash: number;
-  bullets: BulletState[];
-};
-
-type BossState = {
-  active: boolean;
-  phaseIndex: number;
-  x: number;
-  y: number;
-  radius: number;
-  hp: number;
-  flash: number;
-  encounterState: string;
-  arrivalProgress: number;
-};
-
-type ParticleState = {
-  x: number;
-  y: number;
-  color: string;
-  life: number;
-  size?: number;
-};
-
-type RenderFrame = {
-  players: PlayerBulletState[];
-  boss: BossState;
-  opponentBoss: BossState;
-  particles: ParticleState[];
-};
-
-type RenderOptions = {
-  compact: boolean;
-  selectedPlayerIndex: number;
-  fieldTop: number;
-  fieldBottom: number;
-  fieldWidth: number;
-  gpuReplay: boolean;
-  revision: number;
-};
 
 type BulletAttributes = {
   center: THREE.InstancedBufferAttribute;
@@ -85,13 +25,7 @@ type BulletAttributes = {
   bounceBounds: THREE.InstancedBufferAttribute;
 };
 
-export type ThreeBulletLayer = {
-  mount(host: Element | null, referenceCanvas: HTMLCanvasElement): void;
-  render(frame: RenderFrame, elapsed: number, options: RenderOptions): void;
-  dispose(): void;
-};
-
-export function createThreeBulletLayer(width: number, height: number): ThreeBulletLayer {
+export function createThreeGameRenderer(width: number, height: number): GameSceneRenderer {
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
@@ -119,12 +53,15 @@ export function createThreeBulletLayer(width: number, height: number): ThreeBull
   const colorCache = new Map<string, THREE.Color>();
   let referenceCanvas: HTMLCanvasElement | null = null;
   let lastGpuReplayKey = "";
+  let frameCount = 0;
+  let sampleStartedAt = performance.now();
+  let metrics = { fps: 0, drawCalls: 0, bulletCount: 0, gpuReplay: false };
 
   return {
     mount(host, reference) {
       if (!host) return;
       referenceCanvas = reference;
-      canvas.dataset.threeBulletLayer = "true";
+      canvas.dataset.threeGameRenderer = "true";
       canvas.setAttribute("aria-hidden", "true");
       canvas.style.cssText = [
         "position:absolute",
@@ -194,6 +131,21 @@ export function createThreeBulletLayer(width: number, height: number): ThreeBull
       updateParticleVisual(particleVisual, frame.particles, transform, width, height, colorCache);
       renderer.clear();
       renderer.render(scene, camera);
+      frameCount += 1;
+      const now = performance.now();
+      if (now - sampleStartedAt >= 500) {
+        metrics = {
+          fps: Math.round(frameCount * 1000 / (now - sampleStartedAt)),
+          drawCalls: renderer.info.render.calls,
+          bulletCount: geometry.instanceCount,
+          gpuReplay: options.gpuReplay,
+        };
+        frameCount = 0;
+        sampleStartedAt = now;
+      }
+    },
+    getMetrics() {
+      return metrics;
     },
     dispose() {
       geometry.dispose();
@@ -298,7 +250,7 @@ function createParticleVisual(): ParticleVisual {
 
 function updatePlayerVisuals(
   visuals: PlayerVisual[],
-  players: PlayerBulletState[],
+  players: PlayerRenderState[],
   elapsed: number,
   transform: ViewTransform,
   options: RenderOptions,
@@ -330,7 +282,7 @@ function updatePlayerVisuals(
 
 function updateBossVisual(
   visual: BossVisual,
-  boss: BossState,
+  boss: BossRenderState,
   playerIndex: number,
   elapsed: number,
   transform: ViewTransform,
@@ -362,7 +314,7 @@ function updateBossVisual(
 
 function updateParticleVisual(
   visual: ParticleVisual,
-  particles: ParticleState[],
+  particles: ParticleRenderState[],
   transform: ViewTransform,
   width: number,
   height: number,
@@ -554,7 +506,7 @@ type ViewTransform = {
 function createViewTransform(
   width: number,
   height: number,
-  player: PlayerBulletState | undefined,
+  player: PlayerRenderState | undefined,
   referenceCanvas: HTMLCanvasElement | null,
   options: RenderOptions,
 ): ViewTransform {
@@ -585,7 +537,7 @@ function transformField(fieldX: number, options: RenderOptions, transform: ViewT
   return { left: topLeft.x, top: topLeft.y, right: bottomRight.x, bottom: bottomRight.y };
 }
 
-function bulletDimensions(bullet: BulletState) {
+function bulletDimensions(bullet: BulletRenderState) {
   const radius = bullet.radius;
   if (bullet.shape === "pill") return { width: radius * 0.75, height: radius * 1.45 };
   if (bullet.shape === "line") return { width: radius * 0.45, height: radius * 1.8 };
@@ -596,7 +548,7 @@ function bulletDimensions(bullet: BulletState) {
   return { width: radius, height: radius };
 }
 
-function shapeCode(shape: BulletShape | undefined) {
+function shapeCode(shape: BulletRenderState["shape"]) {
   if (shape === "diamond") return 1;
   if (shape === "triangle") return 2;
   if (shape === "square") return 3;
@@ -604,7 +556,7 @@ function shapeCode(shape: BulletShape | undefined) {
   return 0;
 }
 
-function bulletRotation(bullet: BulletState, elapsed: number) {
+function bulletRotation(bullet: BulletRenderState, elapsed: number) {
   if (bullet.shape === "spinner") return Math.floor((bullet.age || elapsed) * 24) * 0.35;
   return bullet.rotation ?? 0;
 }
