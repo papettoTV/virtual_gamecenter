@@ -1,6 +1,7 @@
 import * as THREE from "three";
 
 const MAX_BULLETS = 12_000;
+const MAX_PARTICLES = 512;
 
 type BulletShape = "circle" | "diamond" | "triangle" | "square" | "star" | "pill" | "line" | "spinner" | "smallCircle";
 
@@ -23,7 +24,42 @@ type BulletState = {
 
 type PlayerBulletState = {
   fieldX: number;
+  x: number;
+  y: number;
+  color: string;
+  tilt: number;
+  invincible: number;
+  levelUpInvincible: number;
+  barrierRatio: number;
+  levelUpFlash: number;
   bullets: BulletState[];
+};
+
+type BossState = {
+  active: boolean;
+  phaseIndex: number;
+  x: number;
+  y: number;
+  radius: number;
+  hp: number;
+  flash: number;
+  encounterState: string;
+  arrivalProgress: number;
+};
+
+type ParticleState = {
+  x: number;
+  y: number;
+  color: string;
+  life: number;
+  size?: number;
+};
+
+type RenderFrame = {
+  players: PlayerBulletState[];
+  boss: BossState;
+  opponentBoss: BossState;
+  particles: ParticleState[];
 };
 
 type RenderOptions = {
@@ -51,7 +87,7 @@ type BulletAttributes = {
 
 export type ThreeBulletLayer = {
   mount(host: Element | null, referenceCanvas: HTMLCanvasElement): void;
-  render(players: PlayerBulletState[], elapsed: number, options: RenderOptions): void;
+  render(frame: RenderFrame, elapsed: number, options: RenderOptions): void;
   dispose(): void;
 };
 
@@ -74,7 +110,11 @@ export function createThreeBulletLayer(width: number, height: number): ThreeBull
   const { material, elapsedUniform } = createMaterial(width, height);
   const mesh = new THREE.Mesh(geometry, material);
   mesh.frustumCulled = false;
-  scene.add(mesh);
+  mesh.renderOrder = 2;
+  const playerVisuals = [createPlayerVisual(), createPlayerVisual()];
+  const bossVisuals = [createBossVisual(), createBossVisual()];
+  const particleVisual = createParticleVisual();
+  scene.add(mesh, particleVisual.points, ...playerVisuals.map((visual) => visual.root), ...bossVisuals.map((visual) => visual.root));
 
   const colorCache = new Map<string, THREE.Color>();
   let referenceCanvas: HTMLCanvasElement | null = null;
@@ -102,7 +142,8 @@ export function createThreeBulletLayer(width: number, height: number): ThreeBull
       ].join(";");
       host.appendChild(canvas);
     },
-    render(players, elapsed, options) {
+    render(frame, elapsed, options) {
+      const players = frame.players;
       const visiblePlayers = options.compact
         ? players.slice(options.selectedPlayerIndex, options.selectedPlayerIndex + 1)
         : players;
@@ -147,16 +188,240 @@ export function createThreeBulletLayer(width: number, height: number): ThreeBull
         lastGpuReplayKey = options.gpuReplay ? replayKey : "";
       }
       elapsedUniform.value = elapsed;
+      updatePlayerVisuals(playerVisuals, players, elapsed, transform, options);
+      updateBossVisual(bossVisuals[0]!, frame.boss, 0, elapsed, transform, options, width, height);
+      updateBossVisual(bossVisuals[1]!, frame.opponentBoss, 1, elapsed, transform, options, width, height);
+      updateParticleVisual(particleVisual, frame.particles, transform, width, height, colorCache);
       renderer.clear();
       renderer.render(scene, camera);
     },
     dispose() {
       geometry.dispose();
       material.dispose();
+      disposeVisuals(playerVisuals, bossVisuals, particleVisual);
       renderer.dispose();
       canvas.remove();
     },
   };
+}
+
+type PlayerVisual = {
+  root: THREE.Group;
+  ship: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
+  shield: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
+  hitMarker: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
+};
+
+type BossVisual = {
+  root: THREE.Group;
+  shapes: Array<THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>>;
+  aura: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
+  eye: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
+  pupil: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
+};
+
+type ParticleVisual = {
+  points: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>;
+  positions: THREE.BufferAttribute;
+  colors: THREE.BufferAttribute;
+};
+
+function createPlayerVisual(): PlayerVisual {
+  const root = new THREE.Group();
+  root.renderOrder = 4;
+  const ship = new THREE.Mesh(
+    new THREE.BufferGeometry().setAttribute("position", new THREE.Float32BufferAttribute([
+      0, 18, 0, -5, 8, 0, -17, -10, 0,
+      0, 18, 0, -17, -10, 0, -7, -6, 0,
+      0, 18, 0, -7, -6, 0, 0, -10, 0,
+      0, 18, 0, 0, -10, 0, 7, -6, 0,
+      0, 18, 0, 7, -6, 0, 17, -10, 0,
+    ], 3)),
+    new THREE.MeshBasicMaterial({ color: 0x69f7ff, transparent: true }),
+  );
+  const shield = new THREE.Mesh(
+    new THREE.CircleGeometry(1, 48),
+    new THREE.MeshBasicMaterial({ color: 0x69f7ff, transparent: true, opacity: 0.36, blending: THREE.AdditiveBlending, depthTest: false }),
+  );
+  const hitMarker = new THREE.Mesh(
+    new THREE.CircleGeometry(3, 20),
+    new THREE.MeshBasicMaterial({ color: 0xff3355, transparent: true, depthTest: false }),
+  );
+  shield.renderOrder = 3;
+  ship.renderOrder = 4;
+  hitMarker.renderOrder = 5;
+  root.add(shield, ship, hitMarker);
+  return { root, ship, shield, hitMarker };
+}
+
+function createBossVisual(): BossVisual {
+  const root = new THREE.Group();
+  const material = () => new THREE.MeshBasicMaterial({ color: 0x18051f, transparent: true, depthTest: false });
+  const shapes = [
+    new THREE.Mesh(new THREE.CircleGeometry(1, 64), material()),
+    new THREE.Mesh(createPolygonGeometry(3, Math.PI / 2), material()),
+    new THREE.Mesh(createStarGeometry(5, 0.46), material()),
+  ];
+  const aura = new THREE.Mesh(
+    new THREE.CircleGeometry(1, 64),
+    new THREE.MeshBasicMaterial({ color: 0xff3355, transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending, depthTest: false }),
+  );
+  const eye = new THREE.Mesh(
+    new THREE.CircleGeometry(1, 32),
+    new THREE.MeshBasicMaterial({ color: 0xfff4f6, transparent: true, depthTest: false }),
+  );
+  const pupil = new THREE.Mesh(
+    new THREE.CircleGeometry(1, 24),
+    new THREE.MeshBasicMaterial({ color: 0x180008, transparent: true, depthTest: false }),
+  );
+  aura.renderOrder = 0;
+  shapes.forEach((shape) => { shape.renderOrder = 1; root.add(shape); });
+  eye.renderOrder = 3;
+  pupil.renderOrder = 4;
+  root.add(aura, eye, pupil);
+  return { root, shapes, aura, eye, pupil };
+}
+
+function createParticleVisual(): ParticleVisual {
+  const positions = new THREE.BufferAttribute(new Float32Array(MAX_PARTICLES * 3), 3).setUsage(THREE.DynamicDrawUsage);
+  const colors = new THREE.BufferAttribute(new Float32Array(MAX_PARTICLES * 3), 3).setUsage(THREE.DynamicDrawUsage);
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", positions);
+  geometry.setAttribute("color", colors);
+  geometry.setDrawRange(0, 0);
+  const material = new THREE.PointsMaterial({ size: 6, vertexColors: true, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthTest: false });
+  const points = new THREE.Points(geometry, material);
+  points.frustumCulled = false;
+  points.renderOrder = 5;
+  return { points, positions, colors };
+}
+
+function updatePlayerVisuals(
+  visuals: PlayerVisual[],
+  players: PlayerBulletState[],
+  elapsed: number,
+  transform: ViewTransform,
+  options: RenderOptions,
+) {
+  for (let index = 0; index < visuals.length; index += 1) {
+    const visual = visuals[index]!;
+    const player = players[index];
+    const visible = Boolean(player) && (!options.compact || index === options.selectedPlayerIndex);
+    visual.root.visible = visible;
+    if (!visible || !player) continue;
+    const point = transformPoint(player.x, player.y, transform);
+    visual.root.position.set(point.x - 480, 320 - point.y, 0);
+    visual.root.scale.setScalar(transform.scale);
+    visual.ship.scale.x = 1 - Math.min(0.48, Math.abs(player.tilt) * 0.48);
+    visual.ship.position.x = player.tilt * 4;
+    visual.ship.material.color.set(player.color);
+    const levelInvincible = player.levelUpInvincible > 0;
+    const hitInvincible = player.invincible > 0 && !levelInvincible;
+    const warning = levelInvincible && player.levelUpInvincible <= 0.5;
+    visual.ship.material.opacity = hitInvincible && Math.floor(elapsed * 18) % 2 === 0 ? 0.45 : 1;
+    visual.shield.visible = levelInvincible;
+    const shieldRadius = 18 + player.barrierRatio * 28 + (0.55 + Math.sin(elapsed * 18) * 0.22) * 5;
+    visual.shield.scale.setScalar(shieldRadius);
+    visual.shield.material.opacity = warning && Math.floor(elapsed * 18) % 2 === 0 ? 0.1 : 0.42;
+    visual.hitMarker.material.color.set(levelInvincible ? 0xd9fdff : hitInvincible ? 0xffd166 : 0xff3355);
+    visual.hitMarker.material.opacity = warning && Math.floor(elapsed * 18) % 2 === 0 ? 0.25 : 1;
+  }
+}
+
+function updateBossVisual(
+  visual: BossVisual,
+  boss: BossState,
+  playerIndex: number,
+  elapsed: number,
+  transform: ViewTransform,
+  options: RenderOptions,
+  width: number,
+  height: number,
+) {
+  const visible = boss.active && boss.hp > 0 && (!options.compact || playerIndex === options.selectedPlayerIndex);
+  visual.root.visible = visible;
+  if (!visible) return;
+  const point = transformPoint(boss.x, boss.y, transform);
+  visual.root.position.set(point.x - width / 2, height / 2 - point.y, 0);
+  const entering = boss.encounterState === "entering";
+  const progress = entering ? boss.arrivalProgress : 1;
+  const radius = boss.radius * (0.68 + progress * 0.32) + (0.5 + Math.sin(elapsed * 3.2) * 0.16) * 5;
+  visual.root.scale.setScalar(transform.scale);
+  visual.root.rotation.z = boss.phaseIndex === 2 ? elapsed * 0.08 : 0;
+  visual.root.children.forEach((child) => { child.visible = true; });
+  visual.shapes.forEach((shape, index) => { shape.visible = index === Math.min(2, boss.phaseIndex); });
+  const body = visual.shapes[Math.min(2, boss.phaseIndex)]!;
+  body.scale.setScalar(radius);
+  body.material.color.set(boss.flash > 0 ? 0xffffff : [0x18051f, 0x071722, 0x1c0628][boss.phaseIndex] ?? 0x18051f);
+  body.material.opacity = entering ? 0.08 + progress * 0.92 : 1;
+  visual.aura.scale.setScalar(radius * (1.35 + Math.sin(elapsed * 4) * 0.08));
+  visual.aura.material.opacity = entering ? progress * 0.12 : 0.2;
+  visual.eye.scale.set(radius * 0.34, radius * 0.09, 1);
+  visual.pupil.scale.set(radius * 0.07, radius * 0.1, 1);
+}
+
+function updateParticleVisual(
+  visual: ParticleVisual,
+  particles: ParticleState[],
+  transform: ViewTransform,
+  width: number,
+  height: number,
+  colorCache: Map<string, THREE.Color>,
+) {
+  const count = Math.min(MAX_PARTICLES, particles.length);
+  for (let index = 0; index < count; index += 1) {
+    const particle = particles[index]!;
+    const point = transformPoint(particle.x, particle.y, transform);
+    const color = cachedColor(colorCache, particle.color);
+    visual.positions.setXYZ(index, point.x - width / 2, height / 2 - point.y, 0);
+    visual.colors.setXYZ(index, color.r, color.g, color.b);
+  }
+  visual.points.geometry.setDrawRange(0, count);
+  visual.points.material.size = 6 * transform.scale;
+  visual.positions.needsUpdate = true;
+  visual.colors.needsUpdate = true;
+}
+
+function createPolygonGeometry(sides: number, rotation: number) {
+  const shape = new THREE.Shape();
+  for (let index = 0; index < sides; index += 1) {
+    const angle = rotation + Math.PI * 2 * index / sides;
+    const x = Math.cos(angle);
+    const y = Math.sin(angle);
+    if (index === 0) shape.moveTo(x, y);
+    else shape.lineTo(x, y);
+  }
+  shape.closePath();
+  return new THREE.ShapeGeometry(shape);
+}
+
+function createStarGeometry(points: number, innerRadius: number) {
+  const shape = new THREE.Shape();
+  for (let index = 0; index < points * 2; index += 1) {
+    const angle = Math.PI / 2 + Math.PI * index / points;
+    const radius = index % 2 === 0 ? 1 : innerRadius;
+    const x = Math.cos(angle) * radius;
+    const y = Math.sin(angle) * radius;
+    if (index === 0) shape.moveTo(x, y);
+    else shape.lineTo(x, y);
+  }
+  shape.closePath();
+  return new THREE.ShapeGeometry(shape);
+}
+
+function disposeVisuals(playerVisuals: PlayerVisual[], bossVisuals: BossVisual[], particleVisual: ParticleVisual) {
+  for (const visual of playerVisuals) disposeObject(visual.root);
+  for (const visual of bossVisuals) disposeObject(visual.root);
+  particleVisual.points.geometry.dispose();
+  particleVisual.points.material.dispose();
+}
+
+function disposeObject(object: THREE.Object3D) {
+  object.traverse((child) => {
+    if (!(child instanceof THREE.Mesh)) return;
+    child.geometry.dispose();
+    child.material.dispose();
+  });
 }
 
 function createGeometry(): { geometry: THREE.InstancedBufferGeometry; attributes: BulletAttributes } {

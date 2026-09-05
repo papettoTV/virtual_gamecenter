@@ -3471,12 +3471,12 @@ function draw() {
 
     for (const player of players) {
       drawBullets(player);
-      drawPlayer(player);
+      if (!threeBulletLayer) drawPlayer(player);
       drawPlayerHud(player);
     }
   }
 
-  if (!isCompactView()) drawParticles();
+  if (!isCompactView() && !threeBulletLayer) drawParticles();
   drawHitDebug();
   if (paused) drawPaused();
   if (gameOver) drawGameOver();
@@ -3495,8 +3495,10 @@ function drawCompactGame() {
     if (playerIndex === 0) drawBoss();
     else drawOpponentBoss();
     drawBullets(selectedPlayer);
-    drawPlayer(selectedPlayer);
-    drawParticles();
+    if (!threeBulletLayer) {
+      drawPlayer(selectedPlayer);
+      drawParticles();
+    }
   });
 
   drawPlayerHud(selectedPlayer);
@@ -3522,6 +3524,10 @@ function withCompactWorldTransform(player, drawCallback) {
 
 function drawBoss() {
   if (!boss.active || boss.hp <= 0) return;
+  if (threeBulletLayer) {
+    drawBossGauge(boss, LEFT_X + FIELD_WIDTH / 2);
+    return;
+  }
   context.save();
   const phase = BOSS_PHASES[boss.phaseIndex];
   const entering = boss.encounterState === "entering";
@@ -3582,26 +3588,16 @@ function drawBoss() {
     return;
   }
 
-  const barWidth = 260;
-  const barX = LEFT_X + FIELD_WIDTH / 2 - barWidth / 2;
-  const labelX = LEFT_X + FIELD_WIDTH / 2;
-  const hpRatio = boss.hp / boss.maxHp;
-  context.fillStyle = "rgba(0,0,0,0.46)";
-  roundRect(barX, FIELD_TOP + 16, barWidth, 12, 8);
-  context.fill();
-  context.fillStyle = hpRatio > 0.35 ? "#ffd166" : "#ff4e8a";
-  roundRect(barX, FIELD_TOP + 16, barWidth * hpRatio, 12, 8);
-  context.fill();
-  context.fillStyle = "#f4f7ff";
-  context.font = "800 12px system-ui";
-  context.textAlign = "center";
-  context.fillText(phase.name, labelX, FIELD_TOP + 10);
-  context.textAlign = "left";
+  drawBossGauge(boss, LEFT_X + FIELD_WIDTH / 2);
   context.restore();
 }
 
 function drawOpponentBoss() {
   if (!opponentBoss.active || opponentBoss.hp <= 0) return;
+  if (threeBulletLayer) {
+    drawBossGauge(opponentBoss, RIGHT_X + FIELD_WIDTH / 2);
+    return;
+  }
   const phase = BOSS_PHASES[opponentBoss.phaseIndex] ?? BOSS_PHASES[0];
   const entering = opponentBoss.encounterState === "entering";
   const entranceProgress = entering ? opponentBoss.arrivalProgress : 1;
@@ -3636,23 +3632,27 @@ function drawOpponentBoss() {
   context.arc(opponentBoss.x, opponentBoss.y, visualRadius * 0.54, 0, Math.PI * 2);
   context.fill();
 
-  if (opponentBoss.encounterState === "active") {
-    const barWidth = 260;
-    const labelX = RIGHT_X + FIELD_WIDTH / 2;
-    const barX = labelX - barWidth / 2;
-    const hpRatio = clamp(opponentBoss.hp / Math.max(1, opponentBoss.maxHp), 0, 1);
-    context.fillStyle = "rgba(0,0,0,0.46)";
-    roundRect(barX, FIELD_TOP + 16, barWidth, 12, 8);
-    context.fill();
-    context.fillStyle = hpRatio > 0.35 ? "#ffd166" : "#ff4e8a";
-    roundRect(barX, FIELD_TOP + 16, barWidth * hpRatio, 12, 8);
-    context.fill();
-    context.fillStyle = "#f4f7ff";
-    context.font = "800 12px system-ui";
-    context.textAlign = "center";
-    context.fillText(phase.name, labelX, FIELD_TOP + 10);
-  }
+  drawBossGauge(opponentBoss, RIGHT_X + FIELD_WIDTH / 2);
   context.restore();
+}
+
+function drawBossGauge(targetBoss, labelX) {
+  if (targetBoss.encounterState !== "active") return;
+  const phase = BOSS_PHASES[targetBoss.phaseIndex] ?? BOSS_PHASES[0];
+  const barWidth = 260;
+  const barX = labelX - barWidth / 2;
+  const hpRatio = clamp(targetBoss.hp / Math.max(1, targetBoss.maxHp), 0, 1);
+  context.fillStyle = "rgba(0,0,0,0.46)";
+  roundRect(barX, FIELD_TOP + 16, barWidth, 12, 8);
+  context.fill();
+  context.fillStyle = hpRatio > 0.35 ? "#ffd166" : "#ff4e8a";
+  roundRect(barX, FIELD_TOP + 16, barWidth * hpRatio, 12, 8);
+  context.fill();
+  context.fillStyle = "#f4f7ff";
+  context.font = "800 12px system-ui";
+  context.textAlign = "center";
+  context.fillText(phase.name, labelX, FIELD_TOP + 10);
+  context.textAlign = "left";
 }
 
 function drawBossArrivalShadow(progress) {
@@ -3798,7 +3798,7 @@ function renderThreeBulletLayer() {
   const demoRevision = GPU_REPLAY_DEMO
     ? players.reduce((total, player) => total + player.bullets.length, 0)
     : 0;
-  threeBulletLayer.render(players, elapsedRound, {
+  threeBulletLayer.render({ players, boss, opponentBoss, particles }, elapsedRound, {
     compact,
     selectedPlayerIndex,
     fieldTop: FIELD_TOP,
