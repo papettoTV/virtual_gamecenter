@@ -89,25 +89,29 @@ export function createThreeGameRenderer(width: number, height: number): GameScen
       if (!options.gpuReplay || replayKey !== lastGpuReplayKey) {
         let instanceIndex = 0;
         for (const player of visiblePlayers) {
+          const playerIndex = players.indexOf(player);
           const field = transformField(player.fieldX, options, transform);
-          for (const bullet of player.bullets) {
-            if (instanceIndex >= MAX_BULLETS) break;
-            const dimensions = bulletDimensions(bullet);
-            const color = cachedColor(colorCache, bullet.color);
-            const baseX = options.gpuReplay ? bullet.spectatorRenderBaseX ?? bullet.x : bullet.x;
-            const baseY = options.gpuReplay ? bullet.spectatorRenderBaseY ?? bullet.y : bullet.y;
-            const center = transformPoint(baseX, baseY, transform);
-            attributes.center.setXY(instanceIndex, center.x - width / 2, height / 2 - center.y);
-            attributes.size.setXY(instanceIndex, dimensions.width * transform.scale, dimensions.height * transform.scale);
-            attributes.shape.setX(instanceIndex, shapeCode(bullet.shape));
-            attributes.rotation.setX(instanceIndex, bulletRotation(bullet, elapsed));
-            attributes.color.setXYZ(instanceIndex, color.r, color.g, color.b);
-            attributes.fieldBounds.setXYZW(instanceIndex, field.left, field.top, field.right, field.bottom);
-            attributes.velocity.setXY(instanceIndex, bullet.vx * transform.scale, -bullet.vy * transform.scale);
-            attributes.baseElapsed.setX(instanceIndex, options.gpuReplay ? bullet.spectatorRenderBaseElapsed ?? elapsed : elapsed);
-            attributes.bounce.setX(instanceIndex, options.gpuReplay && bullet.type !== "bossAttack" ? 1 : 0);
-            attributes.bounceBounds.setXY(instanceIndex, field.left + 20 * transform.scale - width / 2, field.right - 20 * transform.scale - width / 2);
-            instanceIndex += 1;
+          const benchmarkBullets = frame.benchmarkBulletsByPlayer?.[playerIndex] ?? [];
+          for (const bullets of [player.bullets, benchmarkBullets]) {
+            for (const bullet of bullets) {
+              if (instanceIndex >= MAX_BULLETS) break;
+              const dimensions = bulletDimensions(bullet);
+              const color = cachedColor(colorCache, bullet.color);
+              const baseX = options.gpuReplay ? bullet.spectatorRenderBaseX ?? bullet.x : bullet.x;
+              const baseY = options.gpuReplay ? bullet.spectatorRenderBaseY ?? bullet.y : bullet.y;
+              const center = transformPoint(baseX, baseY, transform);
+              attributes.center.setXY(instanceIndex, center.x - width / 2, height / 2 - center.y);
+              attributes.size.setXY(instanceIndex, dimensions.width * transform.scale, dimensions.height * transform.scale);
+              attributes.shape.setX(instanceIndex, shapeCode(bullet.shape));
+              attributes.rotation.setX(instanceIndex, bulletRotation(bullet, elapsed));
+              attributes.color.setXYZ(instanceIndex, color.r, color.g, color.b);
+              attributes.fieldBounds.setXYZW(instanceIndex, field.left, field.top, field.right, field.bottom);
+              attributes.velocity.setXY(instanceIndex, bullet.vx * transform.scale, -bullet.vy * transform.scale);
+              attributes.baseElapsed.setX(instanceIndex, options.gpuReplay ? bullet.spectatorRenderBaseElapsed ?? elapsed : elapsed);
+              attributes.bounce.setX(instanceIndex, options.gpuReplay && bullet.type !== "bossAttack" ? 1 : 0);
+              attributes.bounceBounds.setXY(instanceIndex, field.left + 20 * transform.scale - width / 2, field.right - 20 * transform.scale - width / 2);
+              instanceIndex += 1;
+            }
           }
         }
 

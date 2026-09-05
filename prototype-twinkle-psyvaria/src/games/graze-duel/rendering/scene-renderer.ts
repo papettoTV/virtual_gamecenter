@@ -50,6 +50,7 @@ export type ParticleRenderState = {
 
 export type SceneRenderFrame = {
   players: PlayerRenderState[];
+  benchmarkBulletsByPlayer?: BulletRenderState[][];
   boss: BossRenderState;
   opponentBoss: BossRenderState;
   particles: ParticleRenderState[];

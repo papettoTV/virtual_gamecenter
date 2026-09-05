@@ -44,6 +44,17 @@ export function ThreeBulletLab() {
     window.location.assign(`/cabinets/${cabinetId}?game=${BUZZ_BARRIER.id}&bulletRenderer=three`);
   };
 
+  const openComparisonDemo = (renderer: "canvas" | "three") => {
+    const params = new URLSearchParams({
+      game: BUZZ_BARRIER.id,
+      promoCapture: "1",
+      renderStats: "1",
+      renderStress: "2000",
+    });
+    if (renderer === "three") params.set("bulletRenderer", "three");
+    window.location.assign(`/?${params.toString()}`);
+  };
+
   useEffect(() => {
     modeRef.current = mode;
   }, [mode]);
@@ -176,6 +187,8 @@ export function ThreeBulletLab() {
         </div>
         <div className="three-lab-header-actions">
           <button type="button" onClick={openGameWithThreeBullets}>Three.jsで実ゲームを開く</button>
+          <button type="button" onClick={() => openComparisonDemo("canvas")}>Canvas比較デモ</button>
+          <button type="button" onClick={() => openComparisonDemo("three")}>Three.js比較デモ</button>
           <button type="button" onClick={() => window.location.assign("/")}>ゲームセンターに戻る</button>
         </div>
       </header>

@@ -147,13 +147,23 @@ const PROMO_CAPTURE_MODE = import.meta.env.DEV
 const THREE_BULLET_RENDERER_ENABLED = new URLSearchParams(window.location.search).get("bulletRenderer") === "three";
 const GPU_REPLAY_DEMO = import.meta.env.DEV
   && new URLSearchParams(window.location.search).get("gpuReplayDemo") === "1";
+const RENDER_STATS_ENABLED = import.meta.env.DEV
+  && new URLSearchParams(window.location.search).get("renderStats") === "1";
+const RENDER_STRESS_COUNT = import.meta.env.DEV
+  ? clamp(Number(new URLSearchParams(window.location.search).get("renderStress")) || 0, 0, 10000)
+  : 0;
 
 let sceneRenderer = null;
+const renderStressBulletsByPlayer = [[], []];
+let renderStatsFrameCount = 0;
+let renderStatsWorkTotal = 0;
+let renderStatsWorkMax = 0;
+let renderStatsStartedAt = performance.now();
 if (THREE_BULLET_RENDERER_ENABLED) {
   void import("./rendering/three-game-renderer").then(({ createThreeGameRenderer }) => {
     sceneRenderer = createThreeGameRenderer(WIDTH, HEIGHT);
     sceneRenderer.mount(canvas.closest(".game-frame"), canvas);
-    installThreeRendererBadge();
+    installRendererBadge();
   });
 }
 
@@ -294,6 +304,7 @@ const cabinetClient = createCabinetClient({
 if (isLocalDevelopment()) {
   document.body.classList.add("is-local-dev");
 }
+if (RENDER_STATS_ENABLED && !THREE_BULLET_RENDERER_ENABLED) installRendererBadge();
 
 function createPlayer(label, x, color, cpu) {
   return {
@@ -2017,10 +2028,12 @@ window.addEventListener("keyup", (event) => {
 });
 
 function loop(now) {
+  const workStartedAt = performance.now();
   const delta = Math.min((now - lastTime) / 1000, 0.033);
   lastTime = now;
   update(delta);
   draw();
+  recordRenderStats(performance.now() - workStartedAt);
   requestAnimationFrame(loop);
 }
 
@@ -3456,6 +3469,7 @@ function createHitExplosion(x, y, color) {
 
 function draw() {
   if (currentScreen !== "game") return;
+  updateRenderStressBullets();
   renderThreeBulletLayer();
   context.clearRect(0, 0, WIDTH, HEIGHT);
   drawBackground();
@@ -3775,17 +3789,21 @@ function drawBullets(player) {
   context.save();
   roundRect(player.fieldX, FIELD_TOP, FIELD_WIDTH, FIELD_HEIGHT, 18);
   context.clip();
-  const glowBlur = getBulletGlowBlur(player.bullets.length);
-  for (const bullet of player.bullets) {
-    context.save();
-    if (bullet.type !== "base" && glowBlur > 0) {
-      context.shadowBlur = glowBlur;
-      context.shadowColor = bullet.color;
+  const playerIndex = players.indexOf(player);
+  const benchmarkBullets = renderStressBulletsByPlayer[playerIndex] ?? [];
+  const glowBlur = getBulletGlowBlur(player.bullets.length + benchmarkBullets.length);
+  for (const bullets of [player.bullets, benchmarkBullets]) {
+    for (const bullet of bullets) {
+      context.save();
+      if (bullet.type !== "base" && glowBlur > 0) {
+        context.shadowBlur = glowBlur;
+        context.shadowColor = bullet.color;
+      }
+      context.fillStyle = bullet.color;
+      context.beginPath();
+      drawBulletShape(bullet);
+      context.restore();
     }
-    context.fillStyle = bullet.color;
-    context.beginPath();
-    drawBulletShape(bullet);
-    context.restore();
   }
   context.restore();
 }
@@ -3798,7 +3816,7 @@ function renderThreeBulletLayer() {
   const demoRevision = GPU_REPLAY_DEMO
     ? players.reduce((total, player) => total + player.bullets.length, 0)
     : 0;
-  sceneRenderer.render({ players, boss, opponentBoss, particles }, elapsedRound, {
+  sceneRenderer.render({ players, benchmarkBulletsByPlayer: renderStressBulletsByPlayer, boss, opponentBoss, particles }, elapsedRound, {
     compact,
     selectedPlayerIndex,
     fieldTop: FIELD_TOP,
@@ -3809,12 +3827,12 @@ function renderThreeBulletLayer() {
   });
 }
 
-function installThreeRendererBadge() {
+function installRendererBadge() {
   const gameFrame = canvas.closest(".game-frame");
   if (!gameFrame || gameFrame.querySelector("[data-three-renderer-badge]")) return;
   const badge = document.createElement("div");
   badge.dataset.threeRendererBadge = "true";
-  badge.textContent = "THREE.JS BULLETS";
+  badge.textContent = THREE_BULLET_RENDERER_ENABLED ? "THREE.JS" : "CANVAS 2D";
   badge.style.cssText = [
     "position:absolute",
     "right:14px",
@@ -3825,11 +3843,80 @@ function installThreeRendererBadge() {
     "border-radius:999px",
     "background:rgba(3,7,20,.78)",
     "color:#69f7ff",
-    "font:800 10px system-ui",
+    "font:800 10px/1.5 ui-monospace,monospace",
     "letter-spacing:.12em",
+    "white-space:pre",
     "pointer-events:none",
   ].join(";");
   gameFrame.appendChild(badge);
+}
+
+function recordRenderStats(workTime) {
+  if (!RENDER_STATS_ENABLED) return;
+  renderStatsFrameCount += 1;
+  renderStatsWorkTotal += workTime;
+  renderStatsWorkMax = Math.max(renderStatsWorkMax, workTime);
+  const now = performance.now();
+  const sampleDuration = now - renderStatsStartedAt;
+  if (sampleDuration < 500) return;
+  const rendererMetrics = sceneRenderer?.getMetrics();
+  const bulletCount = players.reduce(
+    (total, player, index) => total + player.bullets.length + renderStressBulletsByPlayer[index].length,
+    0,
+  );
+  const badge = document.querySelector("[data-three-renderer-badge]");
+  if (badge) {
+    const lines = [
+      THREE_BULLET_RENDERER_ENABLED ? "THREE.JS" : "CANVAS 2D",
+      `${Math.round(renderStatsFrameCount * 1000 / sampleDuration)} FPS  ${bulletCount} BULLETS`,
+      `CPU ${Math.round(renderStatsWorkTotal / renderStatsFrameCount * 100) / 100}ms  MAX ${Math.round(renderStatsWorkMax * 100) / 100}ms`,
+    ];
+    if (rendererMetrics) {
+      lines.push(`${rendererMetrics.drawCalls} DRAWS  GPU REPLAY ${rendererMetrics.gpuReplay ? "ON" : "OFF"}`);
+    }
+    badge.textContent = lines.join("\n");
+  }
+  renderStatsFrameCount = 0;
+  renderStatsWorkTotal = 0;
+  renderStatsWorkMax = 0;
+  renderStatsStartedAt = now;
+}
+
+function updateRenderStressBullets() {
+  if (!RENDER_STRESS_COUNT) return;
+  const perPlayerCount = Math.ceil(RENDER_STRESS_COUNT / players.length);
+  for (let playerIndex = 0; playerIndex < players.length; playerIndex += 1) {
+    const player = players[playerIndex];
+    const targetCount = Math.min(perPlayerCount, RENDER_STRESS_COUNT - playerIndex * perPlayerCount);
+    const bullets = renderStressBulletsByPlayer[playerIndex];
+    while (bullets.length < targetCount) {
+      const index = bullets.length;
+      bullets.push({
+        id: 1_000_000 + playerIndex * perPlayerCount + index,
+        x: 0,
+        y: 0,
+        vx: 0,
+        vy: 0,
+        radius: 4 + index % 4,
+        color: ["#9ca7ff", "#ffdf7e", "#b8ff7a", "#d7b8ff", "#9cf7ff"][index % 5],
+        type: "benchmark",
+        shape: ["circle", "spinner", "line", "diamond", "smallCircle"][index % 5],
+        rotation: (index % 24) * Math.PI / 12,
+        age: 0,
+      });
+    }
+    for (let index = 0; index < bullets.length; index += 1) {
+      const bullet = bullets[index];
+      const columnCount = 25;
+      const column = index % columnCount;
+      const row = Math.floor(index / columnCount);
+      const horizontalRange = FIELD_WIDTH - 40;
+      const verticalRange = FIELD_HEIGHT - 40;
+      bullet.x = player.fieldX + 20 + (column / Math.max(1, columnCount - 1)) * horizontalRange;
+      bullet.y = FIELD_TOP + 20 + ((row * 17 + elapsedRound * (32 + index % 13)) % verticalRange);
+      bullet.age = elapsedRound + index * 0.01;
+    }
+  }
 }
 
 function getBulletGlowBlur(bulletCount) {
