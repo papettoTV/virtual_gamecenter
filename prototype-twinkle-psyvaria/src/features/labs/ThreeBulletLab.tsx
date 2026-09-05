@@ -41,7 +41,7 @@ export function ThreeBulletLab() {
 
   const openGameWithThreeBullets = () => {
     const cabinetId = crypto.randomUUID();
-    window.location.assign(`/cabinets/${cabinetId}?game=${BUZZ_BARRIER.id}&bulletRenderer=three`);
+    window.location.assign(`/cabinets/${cabinetId}?game=${BUZZ_BARRIER.id}`);
   };
 
   const openComparisonDemo = (renderer: "canvas" | "three") => {
@@ -51,7 +51,7 @@ export function ThreeBulletLab() {
       renderStats: "1",
       renderStress: "2000",
     });
-    if (renderer === "three") params.set("bulletRenderer", "three");
+    params.set("renderer", renderer);
     window.location.assign(`/?${params.toString()}`);
   };
 
