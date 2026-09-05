@@ -144,6 +144,15 @@ const GAME_ID = BUZZ_BARRIER.id;
 const CLIENT_VERSION = BUZZ_BARRIER.currentVersion;
 const PROMO_CAPTURE_MODE = import.meta.env.DEV
   && new URLSearchParams(window.location.search).get("promoCapture") === "1";
+const THREE_BULLET_RENDERER_ENABLED = new URLSearchParams(window.location.search).get("bulletRenderer") === "three";
+
+let threeBulletLayer = null;
+if (THREE_BULLET_RENDERER_ENABLED) {
+  void import("./three-bullet-layer").then(({ createThreeBulletLayer }) => {
+    threeBulletLayer = createThreeBulletLayer(WIDTH, HEIGHT);
+    installThreeRendererBadge();
+  });
+}
 
 const BOSS_PHASES = [
   { level: 1, spawnLevel: 10, name: "BOSS LV1", shape: "circle", hp: 100, hitsToDefeat: 12, radius: 44, color: "#18051f" },
@@ -944,10 +953,11 @@ function enterCabinet(cabinetId, updateUrl = true) {
   immediateWatchStarted = false;
   resetViewerSyncState();
   if (updateUrl) {
+    const rendererQuery = THREE_BULLET_RENDERER_ENABLED ? "&bulletRenderer=three" : "";
     history.pushState(
       { cabinetId, gameId: GAME_ID },
       "",
-      `/cabinets/${cabinetId}?game=${encodeURIComponent(GAME_ID)}`,
+      `/cabinets/${cabinetId}?game=${encodeURIComponent(GAME_ID)}${rendererQuery}`,
     );
   }
   if (cabinetIdLabel) cabinetIdLabel.textContent = `Cabinet ${cabinetId.slice(0, 8)}`;
@@ -3747,6 +3757,11 @@ function drawBullets(player) {
   context.save();
   roundRect(player.fieldX, FIELD_TOP, FIELD_WIDTH, FIELD_HEIGHT, 18);
   context.clip();
+  if (threeBulletLayer) {
+    context.drawImage(threeBulletLayer.render(player, elapsedRound), 0, 0, WIDTH, HEIGHT);
+    context.restore();
+    return;
+  }
   const glowBlur = getBulletGlowBlur(player.bullets.length);
   for (const bullet of player.bullets) {
     context.save();
@@ -3760,6 +3775,29 @@ function drawBullets(player) {
     context.restore();
   }
   context.restore();
+}
+
+function installThreeRendererBadge() {
+  const gameFrame = canvas.closest(".game-frame");
+  if (!gameFrame || gameFrame.querySelector("[data-three-renderer-badge]")) return;
+  const badge = document.createElement("div");
+  badge.dataset.threeRendererBadge = "true";
+  badge.textContent = "THREE.JS BULLETS";
+  badge.style.cssText = [
+    "position:absolute",
+    "right:14px",
+    "bottom:14px",
+    "z-index:4",
+    "padding:6px 9px",
+    "border:1px solid rgba(105,247,255,.5)",
+    "border-radius:999px",
+    "background:rgba(3,7,20,.78)",
+    "color:#69f7ff",
+    "font:800 10px system-ui",
+    "letter-spacing:.12em",
+    "pointer-events:none",
+  ].join(";");
+  gameFrame.appendChild(badge);
 }
 
 function getBulletGlowBlur(bulletCount) {

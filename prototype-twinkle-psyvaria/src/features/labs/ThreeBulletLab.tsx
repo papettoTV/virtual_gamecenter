@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
+import { BUZZ_BARRIER } from "../../domain/game";
 import "./three-bullet-lab.css";
 
 const WORLD_WIDTH = 960;
@@ -37,6 +38,11 @@ export function ThreeBulletLab() {
   const [metrics, setMetrics] = useState<LabMetrics>({ fps: 0, drawCalls: 0, checks: 0, grazes: 0 });
   const modeRef = useRef(mode);
   const pausedRef = useRef(paused);
+
+  const openGameWithThreeBullets = () => {
+    const cabinetId = crypto.randomUUID();
+    window.location.assign(`/cabinets/${cabinetId}?game=${BUZZ_BARRIER.id}&bulletRenderer=three`);
+  };
 
   useEffect(() => {
     modeRef.current = mode;
@@ -168,7 +174,10 @@ export function ThreeBulletLab() {
           <h1>Three.js 大量弾・観戦描画検証</h1>
           <p>既存ゲームを変更せず、GPUインスタンシングと観戦専用描画を比較する画面です。</p>
         </div>
-        <button type="button" onClick={() => window.location.assign("/")}>ゲームセンターに戻る</button>
+        <div className="three-lab-header-actions">
+          <button type="button" onClick={openGameWithThreeBullets}>Three.jsで実ゲームを開く</button>
+          <button type="button" onClick={() => window.location.assign("/")}>ゲームセンターに戻る</button>
+        </div>
       </header>
 
       <section className="three-lab-controls" aria-label="検証設定">

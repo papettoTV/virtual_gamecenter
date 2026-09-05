@@ -32,6 +32,13 @@
   color: #b9c5df;
 }
 
+.three-lab-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .three-lab-eyebrow {
   color: #69f7ff !important;
   font-size: 12px;
@@ -171,6 +178,14 @@
   .three-lab-controls {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .three-lab-header-actions {
+    justify-content: stretch;
+  }
+
+  .three-lab-header-actions button {
+    flex: 1 1 180px;
   }
 
   .three-lab-stage-card {
