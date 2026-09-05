@@ -1,0 +1,191 @@
+.three-lab-shell {
+  width: min(1180px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 32px 0 56px;
+  color: #f4f7ff;
+}
+
+.three-lab-header,
+.three-lab-controls,
+.three-lab-stage-card,
+.three-lab-notes {
+  border: 1px solid rgba(105, 247, 255, 0.18);
+  border-radius: 20px;
+  background: rgba(8, 12, 28, 0.9);
+}
+
+.three-lab-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 24px;
+}
+
+.three-lab-header h1 {
+  margin: 4px 0 8px;
+  font-size: clamp(25px, 4vw, 42px);
+}
+
+.three-lab-header p {
+  margin: 0;
+  color: #b9c5df;
+}
+
+.three-lab-eyebrow {
+  color: #69f7ff !important;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+}
+
+.three-lab-shell button,
+.three-lab-shell select {
+  min-height: 42px;
+  border: 1px solid rgba(105, 247, 255, 0.28);
+  border-radius: 12px;
+  background: #111a31;
+  color: #f4f7ff;
+  font: inherit;
+  font-weight: 800;
+}
+
+.three-lab-shell button {
+  padding: 9px 16px;
+  cursor: pointer;
+}
+
+.three-lab-shell button:hover,
+.three-lab-shell button.is-active {
+  border-color: #69f7ff;
+  background: #17324a;
+}
+
+.three-lab-controls {
+  display: flex;
+  align-items: end;
+  gap: 16px;
+  margin-top: 16px;
+  padding: 16px;
+}
+
+.three-lab-controls label {
+  display: grid;
+  gap: 6px;
+  color: #9faecc;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.three-lab-controls select {
+  min-width: 120px;
+  padding: 0 12px;
+}
+
+.three-lab-mode {
+  display: flex;
+  gap: 8px;
+}
+
+.three-lab-stage-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 190px;
+  gap: 16px;
+  margin-top: 16px;
+  padding: 16px;
+}
+
+.three-lab-stage {
+  min-width: 0;
+  aspect-ratio: 3 / 2;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #030714;
+}
+
+.three-lab-stage canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.three-lab-metrics {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.three-lab-metrics div {
+  display: grid;
+  gap: 3px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(105, 247, 255, 0.06);
+}
+
+.three-lab-metrics span {
+  color: #8292b3;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+}
+
+.three-lab-metrics strong {
+  color: #69f7ff;
+  font-size: 22px;
+}
+
+.three-lab-notes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 16px;
+  padding: 16px;
+}
+
+.three-lab-notes article {
+  padding: 16px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.three-lab-notes article.is-selected {
+  border-color: rgba(105, 247, 255, 0.45);
+  background: rgba(105, 247, 255, 0.08);
+}
+
+.three-lab-notes p {
+  margin: 8px 0 0;
+  color: #9faecc;
+  line-height: 1.7;
+}
+
+@media (max-width: 720px) {
+  .three-lab-shell {
+    width: min(100vw - 16px, 620px);
+    padding-top: 8px;
+  }
+
+  .three-lab-header,
+  .three-lab-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .three-lab-stage-card {
+    grid-template-columns: 1fr;
+  }
+
+  .three-lab-stage {
+    aspect-ratio: 9 / 14;
+  }
+
+  .three-lab-metrics {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .three-lab-notes {
+    grid-template-columns: 1fr;
+  }
+}

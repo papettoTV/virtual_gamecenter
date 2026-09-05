@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { ArcadeScreen } from "../features/arcade/ArcadeScreen";
 import { CabinetScreen } from "../features/cabinet/CabinetScreen";
 import { GameScreen } from "../features/game/GameScreen";
@@ -8,7 +8,28 @@ import { loadGameRuntime } from "../games/registry";
 import { BRAND } from "../domain/brand";
 import { createUuid } from "../shared/id";
 
+const ThreeBulletLab = lazy(async () => {
+  const module = await import("../features/labs/ThreeBulletLab");
+  return { default: module.ThreeBulletLab };
+});
+
 export function App() {
+  if (window.location.pathname === "/labs/buzz-barrier-three") {
+    return (
+      <Suspense fallback={(
+        <main style={{ display: "grid", minHeight: "100vh", placeItems: "center", color: "#69f7ff", fontWeight: 800 }}>
+          Three.js検証画面を読み込んでいます…
+        </main>
+      )}>
+        <ThreeBulletLab />
+      </Suspense>
+    );
+  }
+
+  return <ArcadeApp />;
+}
+
+function ArcadeApp() {
   const [activeGameId, setActiveGameId] = useState(() => getGameIdFromLocation());
   const activeGame = resolveGameDefinition(activeGameId);
 
