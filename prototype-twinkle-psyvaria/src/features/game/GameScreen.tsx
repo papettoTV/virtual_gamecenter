@@ -1,9 +1,12 @@
 import type { GameDefinition } from "../../domain/game";
+import "../../games/mochi-beat/style.css";
 
 export function GameScreen({ game }: { game: GameDefinition }) {
   const isSalvage = game.id === "deep-sea-salvage";
+  const isRhythm = game.id === "mochi-beat";
+  const isRhythmPreview = isRhythm && import.meta.env.DEV && new URLSearchParams(window.location.search).get("rhythmPreview") === "1";
   return (
-    <section className="game-screen is-hidden" id="game-screen">
+    <section className={`game-screen is-hidden${isRhythm ? " mochi-screen" : ""}`} id="game-screen">
       <div className="spectator-banner is-hidden" id="spectator-banner">
         <div>
           <strong id="spectator-view-label">観戦中</strong>
@@ -28,7 +31,7 @@ export function GameScreen({ game }: { game: GameDefinition }) {
       <div className="versus-status is-hidden" id="versus-status" role="status">
         対戦者が待っています。ゲーム停止時に確認できます。
       </div>
-      <details className={`debug-panel${isSalvage ? " is-hidden" : ""}`} id="debug-panel">
+      <details className={`debug-panel${isSalvage || isRhythm ? " is-hidden" : ""}`} id="debug-panel">
         <summary>デバッグ設定</summary>
         <div className="debug-panel-body">
           <label htmlFor="bullet-density"><strong>デバッグ: 敵弾量</strong></label>
@@ -69,6 +72,19 @@ export function GameScreen({ game }: { game: GameDefinition }) {
           </svg>
         </button>
         <canvas id="game" width="960" height="640" aria-label={`${game.title} game canvas`} />
+        {isRhythm && <div className="mochi-intro" id="mochi-intro">
+          <span className="mochi-kicker">LISTEN. REPEAT. MOCHI!</span>
+          <h2>もちつきビート</h2>
+          <p>お手本を聞いて、同じリズムでもちつき！</p>
+          <div className="mochi-instructions">
+            <span><b>01</b> 左のうさぎの音を4拍聞く</span>
+            <span><b>02</b> 次の4拍で、同じリズムを返す</span>
+            <span><b>03</b> 休符はお休み。連打せずにトン！</span>
+          </div>
+          <button id="mochi-start" type="button">音を出してスタート</button>
+          <small>スペースキー / 画面タップ · 約1分 · 3ステージ</small>
+          <p id="mochi-audio-error" role="status" />
+        </div>}
         <div className="versus-overlay is-hidden" id="versus-overlay" role="dialog" aria-modal="true">
           <p className="eyebrow" id="versus-eyebrow">Versus</p>
           <h2 id="versus-title">対戦</h2>
@@ -121,8 +137,8 @@ export function GameScreen({ game }: { game: GameDefinition }) {
           </div>
           <div className="ranking-next-actions">
             <button id="ranking-another-game" className="clear-restart-button" type="button">別のゲームをする</button>
-            <button id="ranking-retry" className="clear-restart-button ranking-retry-button" type="button">
-              1クレジットでリトライ
+            <button id={isRhythmPreview ? "mochi-preview-retry" : "ranking-retry"} className="clear-restart-button ranking-retry-button" type="button">
+              {isRhythmPreview ? "もう一度プレビュー" : "1クレジットでリトライ"}
             </button>
           </div>
         </div>
@@ -134,10 +150,17 @@ export function GameScreen({ game }: { game: GameDefinition }) {
 
       <div className="touch-controls" aria-label="スマホ操作">
         <div className="touch-actions">
+          {isRhythm && <button id="mochi-tap" className="touch-button mochi-tap" type="button" disabled>トン！ <small>SPACE / TAP</small></button>}
           {isSalvage && <button id="touch-collection" className="touch-button" type="button">図鑑</button>}
           <button id="touch-pause" className="touch-button" type="button">一時停止</button>
         </div>
       </div>
+      {isRhythm && <div className="mochi-settings">
+        <span id="mochi-status" role="status" aria-live="polite">お手本のあと、同じリズムを返そう。</span>
+        <label>音量 <input id="mochi-volume" type="range" min="0" max="100" defaultValue="65" /></label>
+        <label>タイミング調整 <input id="mochi-offset" type="range" min="-200" max="200" step="10" defaultValue="0" /> <output id="mochi-offset-value">0 ms</output></label>
+        <small>音が遅れて聞こえるときは＋へ調整（開始前のみ）。Pで一時停止。</small>
+      </div>}
 
       <section className="ranking-panel">
         <div className="ranking-list">

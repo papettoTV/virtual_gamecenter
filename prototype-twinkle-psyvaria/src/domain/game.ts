@@ -58,7 +58,22 @@ export const DEEP_SEA_SALVAGE: GameDefinition = {
   status: "active",
 };
 
-export const GAME_CATALOG: readonly GameDefinition[] = [BUZZ_BARRIER, DEEP_SEA_SALVAGE];
+export const MOCHI_BEAT: GameDefinition = {
+  id: "mochi-beat",
+  slug: "mochi-beat",
+  title: "MOCHI BEAT",
+  localizedTitle: "もちつきビート",
+  shortTitle: "MB",
+  description: "お手本を聞いて、トン・トン！うさぎとおもちをつくワンボタンリズムゲーム",
+  currentVersion: "mochi-beat-1",
+  creditCost: 1,
+  iconUrl: "/assets/mochi-beat-icon.svg",
+  promoVideoUrl: "",
+  promoPosterUrl: "/assets/mochi-beat-icon.svg",
+  status: "active",
+};
+
+export const GAME_CATALOG: readonly GameDefinition[] = [BUZZ_BARRIER, DEEP_SEA_SALVAGE, MOCHI_BEAT];
 export const DEFAULT_GAME_ID: GameId = BUZZ_BARRIER.id;
 
 export function getGameDefinition(gameId: string | null | undefined): GameDefinition | null {

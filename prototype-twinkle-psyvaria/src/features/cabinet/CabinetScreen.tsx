@@ -58,7 +58,20 @@ export function CabinetScreen({ game }: { game: GameDefinition }) {
         </section>
 
         <section className="cabinet-help-grid" aria-label="遊び方">
-          {game.id === "deep-sea-salvage" ? <>
+          {game.id === "mochi-beat" ? <>
+            <div>
+              <strong>操作</strong>
+              <span>もちをつく: スペースキー / 画面タップ</span>
+              <span>一時停止: P / 一時停止ボタン</span>
+              <span>音を出して遊ぶのがおすすめです。</span>
+            </div>
+            <div>
+              <strong>あそびかた</strong>
+              <span>はじめの4拍は、左のうさぎのお手本を聞こう。</span>
+              <span>次の4拍で同じリズムを返そう。お休みの間は押さないでね。</span>
+              <span>約1分・3ステージ。少しずつ細かいリズムに挑戦！</span>
+            </div>
+          </> : game.id === "deep-sea-salvage" ? <>
             <div>
               <strong>操作</strong>
               <span>移動: 矢印キー / WASD</span>

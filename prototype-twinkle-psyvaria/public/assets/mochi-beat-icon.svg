@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 640" role="img" aria-labelledby="title desc">
+  <title id="title">MOCHI BEAT もちつきビート</title>
+  <desc id="desc">緑と黄色のエプロンのうさぎが、お手本に合わせて楽しくもちつき。</desc>
+  <rect width="960" height="640" fill="#f8f1db"/>
+  <circle cx="793" cy="155" r="59" fill="#e9b460"/>
+  <ellipse cx="150" cy="573" rx="500" ry="200" fill="#d2dfbf"/>
+  <ellipse cx="850" cy="568" rx="470" ry="187" fill="#c1d3ad"/>
+  <g font-family="sans-serif" text-anchor="middle" fill="#294c40" font-weight="800">
+    <text x="480" y="66" font-size="18" letter-spacing="6">LISTEN. REPEAT. MOCHI!</text>
+    <text x="480" y="143" font-size="67">MOCHI BEAT</text>
+    <text x="480" y="188" font-size="28">もちつきビート</text>
+  </g>
+  <defs>
+    <g id="bunny" stroke="#294c40" stroke-width="4">
+      <ellipse cy="150" rx="62" ry="12" fill="#294c40" opacity=".13" stroke="none"/>
+      <ellipse cx="-25" cy="132" rx="27" ry="15" fill="#fffaf0"/>
+      <ellipse cx="25" cy="132" rx="27" ry="15" fill="#fffaf0"/>
+      <ellipse cy="75" rx="50" ry="61" fill="#fffaf0"/>
+      <path d="M-30 40h60v76h-60z" fill="currentColor" stroke="none"/>
+      <ellipse cx="-25" cy="-66" rx="17" ry="55" fill="#fffaf0"/>
+      <ellipse cx="19" cy="-73" rx="17" ry="55" fill="#fffaf0"/>
+      <path d="M-25-100v65M19-107v65" stroke="#edb3a0" stroke-width="10" stroke-linecap="round"/>
+      <ellipse cy="-8" rx="57" ry="49" fill="#fffaf0"/>
+      <path d="M-21-13v3M21-13v3" stroke-linecap="round" stroke-width="8"/>
+      <path d="M-9 8q9 12 18 0" fill="none"/>
+      <path d="M-38 9h7M31 9h7" stroke="#edb3a0" stroke-width="10" stroke-linecap="round"/>
+      <g transform="translate(50 53) rotate(25)">
+        <rect x="-7" y="-102" width="14" height="122" rx="6" fill="#a87348"/>
+        <rect x="-37" y="-122" width="74" height="36" rx="10" fill="#dfb780"/>
+        <circle r="15" fill="#fffaf0"/>
+      </g>
+    </g>
+  </defs>
+  <use href="#bunny" transform="translate(273 350)" color="#86ada0"/>
+  <use href="#bunny" transform="translate(687 350) scale(-1 1)" color="#e5a852"/>
+  <g stroke="#294c40" stroke-width="4">
+    <rect x="405" y="427" width="150" height="72" rx="19" fill="#bc8858"/>
+    <ellipse cx="480" cy="429" rx="77" ry="26" fill="#dfb780"/>
+    <ellipse cx="480" cy="426" rx="60" ry="17" fill="#8d6441"/>
+    <ellipse cx="480" cy="415" rx="50" ry="24" fill="#fffaf0"/>
+  </g>
+  <g fill="#294c40" font-family="sans-serif" text-anchor="middle" font-weight="800">
+    <text x="480" y="319" font-size="26">♪ トン・トン！</text>
+    <text x="480" y="562" font-size="23">お手本を聞いて、同じリズムで返そう。</text>
+    <text x="480" y="602" font-size="16" letter-spacing="2">SPACE / TAP · 108 BPM · 3 STAGES</text>
+  </g>
+</svg>

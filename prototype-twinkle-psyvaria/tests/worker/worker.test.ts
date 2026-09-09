@@ -203,7 +203,7 @@ describe("Cloudflare Worker", () => {
     await expect(response.json()).resolves.toMatchObject({ error: "unknown_game" });
   });
 
-  it("starts a credit reservation for deep sea salvage", async () => {
+  it.each(["deep-sea-salvage", "mochi-beat"])("starts a credit reservation for %s", async (gameId) => {
     const bootstrapResponse = await exports.default.fetch("http://localhost/api/platform/bootstrap");
     const cookie = bootstrapResponse.headers.get("set-cookie")?.split(";", 1)[0];
     await exports.default.fetch("http://localhost/api/platform/welcome-credit", {
@@ -215,8 +215,8 @@ describe("Cloudflare Worker", () => {
       method: "POST",
       headers: { "Content-Type": "application/json", Cookie: cookie! },
       body: JSON.stringify({
-        cabinetId: "deep-sea-cabinet",
-        gameId: "deep-sea-salvage",
+        cabinetId: `${gameId}-cabinet`,
+        gameId,
         purpose: "solo",
       }),
     });
@@ -226,6 +226,23 @@ describe("Cloudflare Worker", () => {
       reservationId: expect.any(String),
       wallet: { availableTotal: 4, reservedFree: 1 },
     });
+  });
+
+  it("stores mochi beat results separately from the other games", async () => {
+    const bootstrapResponse = await exports.default.fetch("http://localhost/api/platform/bootstrap");
+    const cookie = bootstrapResponse.headers.get("set-cookie")?.split(";", 1)[0];
+    const response = await exports.default.fetch("http://localhost/api/ranking", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie! },
+      body: JSON.stringify({ gameId: "mochi-beat", elapsedTimeMs: 55_556, score: 92_000, cleared: true, maxLevel: 3, defeatedBossCount: 0, clientVersion: "mochi-beat-1" }),
+    });
+    expect(response.status).toBe(200);
+    const rankingResponse = await exports.default.fetch("http://localhost/api/ranking?gameId=mochi-beat&version=mochi-beat-1&type=score");
+    const ranking = await rankingResponse.json<{ rankings: Array<{ score: number }> }>();
+    expect(ranking.rankings).toHaveLength(1);
+    expect(ranking.rankings[0]?.score).toBe(92_000);
+    const otherGameResponse = await exports.default.fetch("http://localhost/api/ranking?gameId=graze-duel&version=mochi-beat-1&type=score");
+    await expect(otherGameResponse.json()).resolves.toMatchObject({ rankings: [] });
   });
 
   it("registers a game-over score without marking the result as cleared", async () => {
