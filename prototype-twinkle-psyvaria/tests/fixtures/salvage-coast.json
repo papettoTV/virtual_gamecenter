@@ -1,0 +1,351 @@
+{
+  "version": 1,
+  "maxDepth": 12000,
+  "points": [
+    {
+      "depth": 0,
+      "left": 0,
+      "right": 0
+    },
+    {
+      "depth": 300,
+      "left": 184,
+      "right": 165
+    },
+    {
+      "depth": 600,
+      "left": 203,
+      "right": 144
+    },
+    {
+      "depth": 900,
+      "left": 201,
+      "right": 131
+    },
+    {
+      "depth": 1200,
+      "left": 182,
+      "right": 132
+    },
+    {
+      "depth": 1500,
+      "left": 98,
+      "right": 148
+    },
+    {
+      "depth": 1800,
+      "left": 138,
+      "right": 174
+    },
+    {
+      "depth": 2100,
+      "left": 138,
+      "right": 138
+    },
+    {
+      "depth": 2400,
+      "left": 318.1117957746479,
+      "right": 217
+    },
+    {
+      "depth": 2700,
+      "left": 350.34771126760563,
+      "right": 218
+    },
+    {
+      "depth": 3000,
+      "left": 384.30017605633805,
+      "right": 204
+    },
+    {
+      "depth": 3300,
+      "left": 404.44542253521126,
+      "right": 178
+    },
+    {
+      "depth": 3600,
+      "left": 397.693661971831,
+      "right": 152
+    },
+    {
+      "depth": 3900,
+      "left": 380.15404929577466,
+      "right": 380.34330985915494
+    },
+    {
+      "depth": 4200,
+      "left": 346.6417253521127,
+      "right": 385.5765845070423
+    },
+    {
+      "depth": 4500,
+      "left": 275.44454225352115,
+      "right": 368.0237676056338
+    },
+    {
+      "depth": 4800,
+      "left": 304.568661971831,
+      "right": 274.76232394366195
+    },
+    {
+      "depth": 5100,
+      "left": 339.48943661971833,
+      "right": 421.8353873239437
+    },
+    {
+      "depth": 5400,
+      "left": 347.00704225352115,
+      "right": 441.6153169014085
+    },
+    {
+      "depth": 5700,
+      "left": 333.4198943661972,
+      "right": 430.48855633802816
+    },
+    {
+      "depth": 6000,
+      "left": 166,
+      "right": 312.9269366197183
+    },
+    {
+      "depth": 6300,
+      "left": 147,
+      "right": 290.669014084507
+    },
+    {
+      "depth": 6600,
+      "left": 117,
+      "right": 250.49735915492954
+    },
+    {
+      "depth": 6900,
+      "left": 80,
+      "right": 243.25704225352115
+    },
+    {
+      "depth": 7200,
+      "left": 131.8661971830986,
+      "right": 207.28433098591552
+    },
+    {
+      "depth": 7500,
+      "left": 423.06778169014086,
+      "right": 193.89524647887322
+    },
+    {
+      "depth": 7800,
+      "left": 619.5818661971831,
+      "right": 180.91549295774644
+    },
+    {
+      "depth": 8100,
+      "left": 675.818661971831,
+      "right": 164.18133802816897
+    },
+    {
+      "depth": 8400,
+      "left": 669,
+      "right": 171
+    },
+    {
+      "depth": 8700,
+      "left": 203.05457746478874,
+      "right": 165.90228873239437
+    },
+    {
+      "depth": 9000,
+      "left": 193.39788732394365,
+      "right": 152
+    },
+    {
+      "depth": 9300,
+      "left": 184.6963028169014,
+      "right": 130
+    },
+    {
+      "depth": 9600,
+      "left": 184.6875,
+      "right": 112
+    },
+    {
+      "depth": 9900,
+      "left": 603.6971830985915,
+      "right": 107
+    },
+    {
+      "depth": 10200,
+      "left": 634.3441901408451,
+      "right": 117
+    },
+    {
+      "depth": 10500,
+      "left": 177,
+      "right": 141
+    },
+    {
+      "depth": 10800,
+      "left": 207,
+      "right": 171
+    },
+    {
+      "depth": 11100,
+      "left": 220,
+      "right": 196
+    },
+    {
+      "depth": 11400,
+      "left": 211,
+      "right": 208
+    },
+    {
+      "depth": 11700,
+      "left": 185,
+      "right": 204
+    },
+    {
+      "depth": 12000,
+      "left": 153,
+      "right": 125
+    }
+  ],
+  "features": [
+    {
+      "id": "kelp-900",
+      "kind": "kelp",
+      "side": "left",
+      "depth": 900
+    },
+    {
+      "id": "kelp-1650",
+      "kind": "kelp",
+      "side": "right",
+      "depth": 1650
+    },
+    {
+      "id": "kelp-2400",
+      "kind": "kelp",
+      "side": "left",
+      "depth": 2400
+    },
+    {
+      "id": "kelp-3150",
+      "kind": "kelp",
+      "side": "right",
+      "depth": 3150
+    },
+    {
+      "id": "kelp-3900",
+      "kind": "kelp",
+      "side": "left",
+      "depth": 3900
+    },
+    {
+      "id": "kelp-4650",
+      "kind": "kelp",
+      "side": "right",
+      "depth": 4650
+    },
+    {
+      "id": "kelp-5400",
+      "kind": "kelp",
+      "side": "left",
+      "depth": 5400
+    },
+    {
+      "id": "kelp-6150",
+      "kind": "kelp",
+      "side": "right",
+      "depth": 6150
+    },
+    {
+      "id": "kelp-6900",
+      "kind": "kelp",
+      "side": "left",
+      "depth": 6900
+    },
+    {
+      "id": "kelp-7650",
+      "kind": "kelp",
+      "side": "right",
+      "depth": 7650
+    },
+    {
+      "id": "kelp-8400",
+      "kind": "kelp",
+      "side": "left",
+      "depth": 8400
+    },
+    {
+      "id": "kelp-9150",
+      "kind": "kelp",
+      "side": "right",
+      "depth": 9150
+    },
+    {
+      "id": "kelp-9900",
+      "kind": "kelp",
+      "side": "left",
+      "depth": 9900
+    },
+    {
+      "id": "kelp-10650",
+      "kind": "kelp",
+      "side": "right",
+      "depth": 10650
+    },
+    {
+      "id": "kelp-11400",
+      "kind": "kelp",
+      "side": "left",
+      "depth": 11400
+    },
+    {
+      "id": "vent-1800",
+      "kind": "vent",
+      "side": "right",
+      "depth": 1800
+    },
+    {
+      "id": "vent-3150",
+      "kind": "vent",
+      "side": "left",
+      "depth": 3150
+    },
+    {
+      "id": "vent-4500",
+      "kind": "vent",
+      "side": "right",
+      "depth": 4500
+    },
+    {
+      "id": "vent-5850",
+      "kind": "vent",
+      "side": "left",
+      "depth": 5850
+    },
+    {
+      "id": "vent-7200",
+      "kind": "vent",
+      "side": "right",
+      "depth": 7200
+    },
+    {
+      "id": "vent-8550",
+      "kind": "vent",
+      "side": "left",
+      "depth": 8550
+    },
+    {
+      "id": "vent-9900",
+      "kind": "vent",
+      "side": "right",
+      "depth": 9900
+    },
+    {
+      "id": "vent-11250",
+      "kind": "vent",
+      "side": "left",
+      "depth": 11250
+    }
+  ]
+}

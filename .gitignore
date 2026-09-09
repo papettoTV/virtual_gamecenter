@@ -66,6 +66,7 @@ coverage
 !.dev.vars.example
 wrangler.toml
 .DS_Store
+*.blend1
 
 # Vite files
 vite.config.js.timestamp-*

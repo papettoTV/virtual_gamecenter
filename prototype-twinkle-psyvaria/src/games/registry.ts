@@ -5,7 +5,12 @@ type GameRuntimeLoader = () => Promise<unknown>;
 const runtimeLoaders: Record<GameId, GameRuntimeLoader> = {
   [MOCHI_BEAT.id]: () => import("./mochi-beat/runtime"),
   [BUZZ_BARRIER.id]: () => import("./graze-duel/runtime"),
-  [DEEP_SEA_SALVAGE.id]: () => import("./deep-sea-salvage/runtime"),
+  [DEEP_SEA_SALVAGE.id]: () => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("modelCatalog") === "1") return import("./deep-sea-salvage/model-catalog-preview");
+    if (params.get("threePreview") === "1") return import("./deep-sea-salvage/three-preview");
+    return import("./deep-sea-salvage/runtime");
+  },
 };
 
 const loadedRuntimes = new Map<GameId, Promise<unknown>>();

@@ -8,6 +8,31 @@
   --danger: #ff4e8a;
 }
 
+.is-deep-sea-model-catalog .game-frame { max-width: 1440px; aspect-ratio: auto; overflow: visible; }
+.is-deep-sea-model-catalog #game,
+.is-deep-sea-model-catalog .game-share-button { display: none; }
+.deep-sea-model-catalog {
+  padding: 26px; border: 1px solid rgba(114, 241, 233, .24); border-radius: 24px;
+  background: linear-gradient(145deg, #071a2b, #020712 64%, #140918); color: #eaffff;
+}
+.deep-sea-model-catalog header { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; margin-bottom: 28px; }
+.deep-sea-model-catalog header p { margin: 0 0 6px; color: #69f7ff; font-weight: 900; letter-spacing: .12em; }
+.deep-sea-model-catalog h1 { margin: 0 0 8px; font-size: clamp(28px, 4vw, 48px); }
+.deep-sea-model-catalog h2 { margin: 30px 0 12px; color: #83fff1; }
+.deep-sea-model-catalog header a { padding: 12px 18px; border: 1px solid #5fffea; border-radius: 12px; color: #dffffb; text-decoration: none; white-space: nowrap; }
+.deep-sea-model-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; }
+.deep-sea-model-grid-boss { grid-template-columns: minmax(260px, 520px); }
+.deep-sea-model-card { display: grid; padding: 12px; border: 1px solid rgba(129, 224, 231, .18); border-radius: 16px; background: rgba(3, 17, 28, .78); }
+.deep-sea-model-card img { width: 100%; aspect-ratio: 16 / 11; object-fit: contain; border-radius: 10px; background: radial-gradient(circle, rgba(32, 88, 105, .34), rgba(0, 4, 10, .82)); }
+.deep-sea-model-card strong { margin-top: 8px; font-size: 16px; }
+.deep-sea-model-card span { color: #a8c6cd; font-size: 12px; }
+.deep-sea-model-card code { margin-top: 5px; color: #718994; font-size: 10px; }
+@media (max-width: 700px) {
+  .deep-sea-model-catalog { padding: 16px; }
+  .deep-sea-model-catalog header { display: grid; }
+  .deep-sea-model-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 * {
   box-sizing: border-box;
 }
@@ -636,6 +661,83 @@ p {
   margin-top: 24px;
 }
 
+.salvage-terrain-editor {
+  width: min(1180px, calc(100vw - 32px));
+  margin: 20px auto 44px;
+  padding: 24px;
+  border: 1px solid rgba(102, 246, 231, .3);
+  border-radius: 20px;
+  background: #07131f;
+  color: #eaffff;
+}
+
+.salvage-terrain-editor[hidden] { display: none; }
+
+.salvage-terrain-editor > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 18px;
+}
+
+.salvage-terrain-editor h2 { margin: 3px 0 6px; font-size: 30px; }
+.salvage-terrain-editor p { margin: 4px 0; color: #a9c7ce; }
+
+.salvage-terrain-editor button {
+  border: 1px solid rgba(117, 255, 239, .35);
+  border-radius: 10px;
+  padding: 10px 14px;
+  background: #102638;
+  color: #eaffff;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.salvage-terrain-editor button:hover,
+.salvage-terrain-editor button.is-active { background: #1d5b67; border-color: #70ffeb; }
+
+.terrain-editor-toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.terrain-editor-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 18px; }
+.terrain-editor-scroll { height: 76vh; overflow-y: auto; border: 1px solid #294554; border-radius: 12px; }
+.terrain-editor-toolbar label { display: flex; align-items: center; gap: 6px; }
+.terrain-editor-toolbar input[type="number"] { width: 100px; }
+
+#terrain-editor-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: auto;
+  border: 0;
+  border-radius: 0;
+  object-fit: fill;
+  background: #061522;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.terrain-editor-workspace aside { display: flex; flex-direction: column; gap: 8px; }
+.terrain-editor-workspace textarea {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid #355766;
+  border-radius: 8px;
+  padding: 8px;
+  background: #020a12;
+  color: #bffdf5;
+  font: 11px/1.4 ui-monospace, monospace;
+}
+
+body.is-terrain-editor .game-frame,
+body.is-terrain-editor .touch-controls,
+body.is-terrain-editor .ranking-panel,
+body.is-terrain-editor .game-footer-actions { display: none; }
+
+@media (max-width: 820px) {
+  .terrain-editor-workspace { grid-template-columns: 1fr; }
+  .salvage-terrain-editor > header { align-items: flex-start; flex-direction: column; }
+}
+
 .game-footer-actions button {
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 12px;
@@ -753,6 +855,27 @@ p {
 .game-frame {
   position: relative;
 }
+
+.three-preview-panel {
+  position: absolute;
+  left: 18px;
+  top: 18px;
+  z-index: 5;
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid rgba(117, 238, 255, .28);
+  border-radius: 10px;
+  background: rgba(0, 9, 18, .72);
+  color: #dffaff;
+  font-size: 11px;
+  pointer-events: auto;
+}
+
+.three-preview-panel strong { color: #7ef4e8; letter-spacing: .08em; }
+.three-preview-panel a { color: #ffe58b; }
+.is-three-preview .game-share-button,
+.is-three-preview .touch-controls { display: none; }
 
 canvas {
   display: block;

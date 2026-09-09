@@ -1,28 +1,61 @@
 import { DEEP_SEA_SALVAGE } from "../../domain/game";
 import { fetchScoreRanking, submitRankingEntry } from "../../features/ranking/ranking-client";
 import {
-  BOSS_RESEARCH_RANGE,
+  BASE_POWER_DRAIN,
+  FISH_PATTERNS,
+  type FishPattern,
+  BOSS_BODY_RADIUS_X,
+  BOSS_BODY_RADIUS_Y,
+  BOSS_TAIL,
+  MAX_HULL,
+  canFishCollide,
+  damageHull,
+  getFishSafetyVisual,
+  isBossBodyColliding,
+  isBossBodyResearchable,
+  getFishSpawnMultiplier,
+  getBossWobbleDepth,
   calculateFinalScore,
   crossedBossDepth,
   DEFAULT_BOSS_INTERVAL,
   DEFAULT_BOSS_START_DEPTH,
   getResearchRewardMultiplier,
   getRetryScoreMultiplier,
+  getCurrentStrength,
+  getPowerDrainMultiplier,
+  getRareSpawnRate,
   getSeaLayer,
+  getRegularFishSpawnCount,
+  getSubmarinePitch,
+  getSubmarineHeadingTarget,
+  getSubmarineLightLevel,
   NORMAL_RESEARCH_RANGE,
   type SeaLayer,
 } from "./core";
+import { circleHitsTerrainWall, findTerrainRecesses, loadTerrainCourse, terrainWallSegments, terrainWidthsAt, type TerrainCourse } from "./terrain";
+import { initTerrainEditor } from "./terrain-editor";
+import type { DeepSeaThreeLayer, ThreeFrame } from "./three-game-layer";
 
-type Phase = "ready" | "dive" | "boss-clear" | "result";
+type Phase = "ready" | "dive" | "hull-break" | "boss-clear" | "result";
 type Species = {
-  id: string; name: string; layer: SeaLayer; rare?: boolean; boss?: boolean;
+  id: keyof typeof FISH_PATTERNS; name: string; layer: SeaLayer; rare?: boolean; boss?: boolean;
   color: string; glow: string; speed: number; research: number; score: number; power: number; shape: number;
 };
 type Fish = {
-  id: number; speciesId: string; x: number; depth: number; vx: number; baseDepth: number;
-  phase: number; research: number; completed: boolean; flash: number;
+  id: number; speciesId: Species["id"]; x: number; depth: number; vx: number; baseDepth: number;
+  phase: number; research: number; completed: boolean; flash: number; completionEffect: number;
+  pattern: FishPattern; activated: boolean; alertTimer: number; inHollow: boolean; homeX: number;
 };
-type BossPass = { active: boolean; x: number; depth: number; direction: 1 | -1; flash: number };
+type BossPass = {
+  active: boolean; x: number; depth: number; baseDepth: number; direction: 1 | -1; flash: number;
+  wobbleAmplitude: number; wobbleFrequency: number; wobblePhase: number;
+};
+type HazardKind = "rock" | "kelp" | "vent";
+type Hazard = {
+  id: number; kind: HazardKind; x: number; depth: number; width: number; height: number;
+  phase: number; dangerous: boolean; side?: -1 | 1; hollowDepth?: number; hollowHeight?: number;
+  topWidth?: number; bottomWidth?: number;
+};
 
 const SPECIES: Species[] = [
   { id: "sun-sardine", name: "ヒカリイワシ", layer: 1, color: "#73d8e6", glow: "#adffff", speed: 32, research: 2.4, score: 420, power: 2.2, shape: 0 },
@@ -47,7 +80,12 @@ const SPECIES: Species[] = [
   { id: "void-manta", name: "ヴォイドマンタ", layer: 3, rare: true, color: "#1e244b", glow: "#bb73ff", speed: 112, research: 13, score: 5_500, power: 8.5, shape: 4 },
   { id: "leviathan", name: "リヴァイアサン", layer: 3, boss: true, color: "#172842", glow: "#ffce59", speed: 0, research: 100, score: 12_000, power: 0, shape: 6 },
 ];
-const speciesById = new Map(SPECIES.map((species) => [species.id, species]));
+const speciesIcons = new Map<string, HTMLImageElement>(SPECIES.map((species) => {
+  const image = new Image(); image.decoding = "async";
+  image.src = `/assets/deep-sea-salvage/encyclopedia/${species.id}.png`;
+  return [species.id, image];
+}));
+const speciesById = new Map<string, Species>(SPECIES.map((species) => [species.id, species]));
 const regularByLayer = new Map<SeaLayer, Species[]>([1, 2, 3].map((layer) => [layer as SeaLayer, SPECIES.filter((s) => s.layer === layer && !s.rare && !s.boss)]));
 const rareSpecies = SPECIES.filter((species) => species.rare);
 
@@ -77,8 +115,10 @@ const touchCollection = document.querySelector<HTMLButtonElement>("#touch-collec
 const shareResultButton = document.querySelector<HTMLButtonElement>("#salvage-share-result");
 const resultCollectionButton = document.querySelector<HTMLButtonElement>("#salvage-result-collection");
 const shareMenu = document.querySelector<HTMLElement>("#salvage-share-menu");
+const shareNativeButton = document.querySelector<HTMLButtonElement>("#salvage-share-native");
 const shareXButton = document.querySelector<HTMLButtonElement>("#salvage-share-x");
 const shareLineButton = document.querySelector<HTMLButtonElement>("#salvage-share-line");
+const shareBlueskyButton = document.querySelector<HTMLButtonElement>("#salvage-share-bluesky");
 const shareSaveButton = document.querySelector<HTMLButtonElement>("#salvage-share-save");
 const shareCopyButton = document.querySelector<HTMLButtonElement>("#salvage-share-copy");
 const startSoloButton = document.querySelector<HTMLButtonElement>("#start-solo");
@@ -93,14 +133,22 @@ const debugNumber = (name: string, fallback: number) => {
 };
 const config = {
   initialPower: debugNumber("power", 100),
-  powerDrain: debugNumber("powerDrain", .19),
-  collisionDrain: debugNumber("collisionDrain", 24),
+  powerDrain: debugNumber("powerDrain", BASE_POWER_DRAIN),
   rareRate2: debugNumber("rareRate2", .001),
   rareRate3: debugNumber("rareRate3", .01),
   researchScale: debugNumber("researchScale", 1),
   bossStart: debugNumber("bossStart", DEFAULT_BOSS_START_DEPTH),
   bossInterval: debugNumber("bossInterval", DEFAULT_BOSS_INTERVAL),
 };
+
+let threeLayer: DeepSeaThreeLayer | null = null;
+const threeRendererEnabled = debugParams.get("renderer") !== "2d" && debugParams.get("threeGame") !== "0";
+if (threeRendererEnabled) {
+  void import("./three-game-layer")
+    .then(({ DeepSeaThreeLayer }) => DeepSeaThreeLayer.create())
+    .then((layer) => { threeLayer = layer; })
+    .catch((error: unknown) => { console.warn("Three.js gameplay layer unavailable; using the 2D renderer.", error); });
+}
 
 let phase: Phase = "ready";
 let paused = true;
@@ -116,6 +164,7 @@ let subVDepth = 0;
 let subHeading = 0;
 let subHeadingTarget = 0;
 let invincible = 0;
+let hull = MAX_HULL;
 let power = 100;
 let earnedScore = 0;
 let finalScore = 0;
@@ -123,18 +172,24 @@ let finalSubtotal = 0;
 let cleared = false;
 let retryCount = 0;
 let nextFishId = 1;
+let nextHazardId = 1;
 let nextBossDepth = 4_000;
 let bossProgress = 0;
-let boss: BossPass = { active: false, x: 0, depth: 0, direction: 1, flash: 0 };
+let boss: BossPass = { active: false, x: 0, depth: 0, baseDepth: 0, direction: 1, flash: 0, wobbleAmplitude: 0, wobbleFrequency: 0, wobblePhase: 0 };
 let bossClearTimer = 0;
+let hullBreakTimer = 0;
+let hullBreakTitle = "船体が大破した";
 let bossGaugeVisible = false;
 let fishes: Fish[] = [];
+let hazards: Hazard[] = [];
+let terrainCourse: TerrainCourse = loadTerrainCourse();
 let targetFishIds = new Set<number>();
 let visitedChunks = new Set<number>();
 let discovered = new Set<string>();
 let researchCounts = new Map<string, number>();
 let message = "P / 画面下のボタンで潜航開始";
 let messageTimer = 99;
+let hazardMessageCooldown = 0;
 
 function showScreen(screen: "arcade" | "cabinet" | "game") {
   document.body.classList.toggle("is-game-screen", screen === "game");
@@ -146,14 +201,21 @@ function showScreen(screen: "arcade" | "cabinet" | "game") {
 function resetRun() {
   phase = "ready"; paused = true; collectionOpen = false; returnToResult = false;
   elapsed = 0; subX = W / 2; subDepth = Math.max(0, debugNumber("startDepth", 0)); maxDepth = subDepth;
-  subVx = 0; subVDepth = 0; subHeading = 0; subHeadingTarget = 0; invincible = 0; power = config.initialPower;
+  subVx = 0; subVDepth = 0; subHeading = 0; subHeadingTarget = 0; invincible = 0;
+  hull = clamp(Math.round(debugNumber("hull", MAX_HULL)), 1, MAX_HULL); power = config.initialPower;
   earnedScore = 0; finalScore = 0; finalSubtotal = 0; cleared = false; retryCount = 0;
-  nextFishId = 1; nextBossDepth = Math.max(config.bossStart, subDepth + 200); bossProgress = debugNumber("bossProgress", 0);
-  boss = { active: false, x: 0, depth: 0, direction: 1, flash: 0 }; bossClearTimer = 0; bossGaugeVisible = false;
-  fishes = []; targetFishIds = new Set(); visitedChunks = new Set(); discovered = new Set(); researchCounts = new Map();
+  nextFishId = 1; nextHazardId = 1; nextBossDepth = Math.max(config.bossStart, subDepth + 200); bossProgress = debugNumber("bossProgress", 0);
+  boss = { active: false, x: 0, depth: 0, baseDepth: 0, direction: 1, flash: 0, wobbleAmplitude: 0, wobbleFrequency: 0, wobblePhase: 0 }; bossClearTimer = 0; hullBreakTimer = 0; bossGaugeVisible = false;
+  fishes = []; terrainCourse = loadTerrainCourse(); hazards = buildTerrainHazards(terrainCourse); targetFishIds = new Set(); visitedChunks = new Set(); discovered = new Set(); researchCounts = new Map(); hazardMessageCooldown = 0;
+  if (debugParams.get("terrainPreview") === "1") {
+    const widths = terrainWidthsAt(terrainCourse, subDepth);
+    subX = (widths.left + W - widths.right) / 2;
+  }
   rankingPanel?.classList.remove("is-visible", "is-submitted");
   if (shareMenu) shareMenu.hidden = true;
+  shareResultButton?.setAttribute("aria-expanded", "false");
   ensureChunks(); setMessage("P / 画面下のボタンで潜航開始", 99); updateButtons();
+  if (debugParams.get("terrainPreview") === "1") setMessage("地形確認（明るく表示） / Pで通常の潜航開始 / 岩壁エディタで編集へ戻る", 99);
 }
 
 function startDive() {
@@ -162,6 +224,7 @@ function startDive() {
 }
 
 function ensureChunks() {
+  if (boss.active) return;
   const center = Math.floor(subDepth / CHUNK_DEPTH);
   for (let chunk = Math.max(0, center - 2); chunk <= center + 3; chunk += 1) {
     if (visitedChunks.has(chunk)) continue;
@@ -173,33 +236,91 @@ function ensureChunks() {
 function spawnChunk(chunk: number) {
   const baseDepth = chunk * CHUNK_DEPTH;
   const layer = getSeaLayer(baseDepth + CHUNK_DEPTH / 2);
+  const chunkHazards = hazards.filter((hazard) => Math.abs(hazard.depth - (baseDepth + CHUNK_DEPTH / 2)) <= CHUNK_DEPTH);
   const regular = regularByLayer.get(layer)!;
-  const count = 3 + Math.floor(Math.random() * 3);
-  for (let i = 0; i < count; i += 1) spawnFish(regular[Math.floor(Math.random() * regular.length)]!, baseDepth + 45 + Math.random() * (CHUNK_DEPTH - 90));
-  const rareRate = layer === 2 ? config.rareRate2 : layer === 3 ? config.rareRate3 : 0;
+  const count = getRegularFishSpawnCount(Math.random());
+  const spawnMultiplier = getFishSpawnMultiplier(baseDepth + CHUNK_DEPTH / 2, config.bossStart, config.bossInterval);
+  for (let i = 0; i < count; i += 1) {
+    if (spawnMultiplier < 1 && Math.random() >= spawnMultiplier) continue;
+    spawnFish(regular[Math.floor(Math.random() * regular.length)]!, baseDepth + 45 + Math.random() * (CHUNK_DEPTH - 90));
+  }
+  const baseRareRate = layer === 2 ? config.rareRate2 : layer === 3 ? config.rareRate3 : 0;
+  const dangerousZone = chunkHazards.some((hazard) => hazard.dangerous);
+  const rareRate = getRareSpawnRate(baseRareRate, dangerousZone) * spawnMultiplier;
   if (Math.random() < rareRate) {
     const candidates = rareSpecies.filter((species) => species.layer <= layer);
-    spawnFish(candidates[Math.floor(Math.random() * candidates.length)]!, baseDepth + 80 + Math.random() * (CHUNK_DEPTH - 160));
+    const dangerousHazard = chunkHazards.find((hazard) => hazard.hollowDepth !== undefined)
+      ?? chunkHazards.find((hazard) => hazard.dangerous);
+    spawnFish(
+      candidates[Math.floor(Math.random() * candidates.length)]!,
+      dangerousHazard?.hollowDepth ?? (dangerousHazard ? dangerousHazard.depth - 70 : baseDepth + 80 + Math.random() * (CHUNK_DEPTH - 160)),
+      dangerousHazard ? dangerSpawnX(dangerousHazard) : undefined,
+      dangerousHazard?.hollowDepth !== undefined,
+    );
   }
 }
 
-function spawnFish(species: Species, depth: number) {
-  let x = 75 + Math.random() * (W - 150);
-  if (Math.abs(depth - subDepth) < 180 && Math.abs(x - subX) < 220) x = x < W / 2 ? 70 : W - 70;
+function dangerSpawnX(hazard: Hazard) {
+  if (hazard.kind !== "rock") return hazard.x;
+  const widths = terrainWidthsAt(terrainCourse, hazard.hollowDepth ?? hazard.depth);
+  return hazard.side === -1 ? widths.left + 42 : W - widths.right - 42;
+}
+
+function buildTerrainHazards(course: TerrainCourse): Hazard[] {
+  const built: Hazard[] = [];
+  const recesses = findTerrainRecesses(course);
+  for (const [segmentIndex, { from, to }] of terrainWallSegments(course).entries()) {
+    const index = segmentIndex + 1;
+    const depth = (from.depth + to.depth) / 2; const height = to.depth - from.depth;
+    const leftWidth = (from.left + to.left) / 2; const rightWidth = (from.right + to.right) / 2;
+    const leftRecess = recesses.find((recess) => recess.side === "left" && recess.depth > from.depth && recess.depth <= to.depth);
+    const rightRecess = recesses.find((recess) => recess.side === "right" && recess.depth > from.depth && recess.depth <= to.depth);
+    built.push({ id: nextHazardId++, kind: "rock", x: 0, depth, width: leftWidth, height, topWidth: from.left, bottomWidth: to.left, phase: index * .73, dangerous: Boolean(leftRecess), side: -1, hollowDepth: leftRecess?.depth, hollowHeight: leftRecess ? 108 : undefined });
+    built.push({ id: nextHazardId++, kind: "rock", x: W - rightWidth, depth, width: rightWidth, height, topWidth: from.right, bottomWidth: to.right, phase: index * .61, dangerous: Boolean(rightRecess), side: 1, hollowDepth: rightRecess?.depth, hollowHeight: rightRecess ? 108 : undefined });
+  }
+  for (const feature of course.features) {
+    const widths = terrainWidthsAt(course, feature.depth); const side: -1 | 1 = feature.side === "left" ? -1 : 1;
+    if (feature.kind === "vent") {
+      built.push({ id: nextHazardId++, kind: "vent", x: side === -1 ? widths.left - 16 : W - widths.right + 16, depth: feature.depth, width: 82, height: 175, phase: feature.depth * .013, dangerous: true, side });
+    } else {
+      const width = 72;
+      built.push({ id: nextHazardId++, kind: "kelp", x: side === -1 ? widths.left - width * .55 : W - widths.right - width * .45, depth: feature.depth, width, height: 165, phase: feature.depth * .009, dangerous: false, side });
+    }
+  }
+  return built;
+}
+
+function spawnFish(species: Species, depth: number, preferredX?: number, inHollow = false) {
+  const [corridorLeft, corridorRight] = corridorBounds(depth);
+  let x = preferredX === undefined
+    ? corridorLeft + Math.random() * Math.max(1, corridorRight - corridorLeft)
+    : preferredX + (Math.random() - .5) * (inHollow ? 52 : 130);
+  x = inHollow ? clamp(x, 35, W - 35) : clamp(x, corridorLeft, corridorRight);
+  if (!inHollow && Math.abs(depth - subDepth) < 180 && Math.abs(x - subX) < 220) x = x < subX ? corridorLeft : corridorRight;
   const direction = Math.random() < .5 ? -1 : 1;
   fishes.push({
     id: nextFishId++, speciesId: species.id, x, depth, baseDepth: depth,
     vx: direction * species.speed * (.72 + Math.random() * .55), phase: Math.random() * Math.PI * 2,
-    research: 0, completed: false, flash: 0,
+    research: 0, completed: false, flash: 0, completionEffect: 0, pattern: FISH_PATTERNS[species.id], activated: false, alertTimer: 0, inHollow, homeX: x,
   });
+}
+
+function corridorBounds(depth: number): [number, number] {
+  const walls = hazards.filter((hazard) => hazard.kind === "rock" && Math.abs(depth - hazard.depth) <= hazard.height / 2);
+  const leftWall = walls.find((hazard) => hazard.side === -1);
+  const rightWall = walls.find((hazard) => hazard.side === 1);
+  const widths = terrainWidthsAt(terrainCourse, depth);
+  return [leftWall ? widths.left + 42 : 75, rightWall ? W - widths.right - 42 : W - 75];
 }
 
 function update(dt: number) {
   messageTimer = Math.max(0, messageTimer - dt);
   if (phase === "boss-clear") { updateBossClear(dt); return; }
+  if (phase === "hull-break") { updateHullBreak(dt); return; }
   if (paused || collectionOpen || phase !== "dive") return;
-  elapsed += dt; invincible = Math.max(0, invincible - dt); power = Math.max(0, power - config.powerDrain * dt);
-  updateSubmarine(dt); ensureChunks(); updateFishes(dt); updateBoss(dt); updateResearch(dt);
+  elapsed += dt; invincible = Math.max(0, invincible - dt); hazardMessageCooldown = Math.max(0, hazardMessageCooldown - dt);
+  power = Math.max(0, power - config.powerDrain * getPowerDrainMultiplier(subDepth) * dt);
+  updateSubmarine(dt); ensureChunks(); updateHazards(dt); updateFishes(dt); updateBoss(dt); updateResearch(dt);
   maxDepth = Math.max(maxDepth, subDepth);
   if (crossedBossDepth(maxDepth, nextBossDepth, boss.active)) startBossPass();
   if (power <= 0) finish(false, "電力が尽きた");
@@ -211,13 +332,22 @@ function updateSubmarine(dt: number) {
   if (pointer.active) { dx = (pointer.x - subX) / 90; dy = (pointer.y - SUB_Y) / 90; }
   const length = Math.hypot(dx, dy);
   if (length > 1) { dx /= length; dy /= length; }
-  subVx += (dx * 225 - subVx) * Math.min(1, dt * 5);
-  subVDepth += (dy * 92 - subVDepth) * Math.min(1, dt * 5);
-  if (Math.abs(subVx) > 8) subHeadingTarget = subVx < 0 ? Math.PI : 0;
+  const currentX = getCurrentVelocity();
+  const currentDepth = getCurrentStrength(subDepth) ? Math.cos(subDepth / 510 + elapsed * .31) * getCurrentStrength(subDepth) * .12 : 0;
+  subVx += (dx * 225 + currentX - subVx) * Math.min(1, dt * 5);
+  subVDepth += (dy * 92 + currentDepth - subVDepth) * Math.min(1, dt * 5);
+  subHeadingTarget = getSubmarineHeadingTarget(dx, subHeadingTarget);
   subHeading += (subHeadingTarget - subHeading) * Math.min(1, dt * 4.2);
   const [leftBound, rightBound] = horizontalBounds();
   subX = clamp(subX + subVx * dt, leftBound, rightBound);
   subDepth = Math.max(0, subDepth + subVDepth * dt);
+}
+
+function getCurrentVelocity(depth = subDepth) {
+  const strength = getCurrentStrength(depth);
+  if (!strength) return 0;
+  const flow = Math.sin(Math.floor(depth / 420) * 1.71 + elapsed * .22);
+  return Math.sign(flow || 1) * strength * (.45 + Math.abs(flow) * .55);
 }
 
 function updateFishes(dt: number) {
@@ -225,19 +355,103 @@ function updateFishes(dt: number) {
     const species = speciesById.get(fish.speciesId)!;
     fish.phase += dt * (species.rare ? 2.2 : .9);
     fish.flash = Math.max(0, fish.flash - dt);
-    fish.x += fish.vx * dt;
-    fish.depth = fish.baseDepth + Math.sin(fish.phase) * (species.rare ? 58 : 18);
-    if (species.rare) fish.x += Math.sin(fish.phase * 1.7) * 42 * dt;
-    if (fish.x < 50 || fish.x > W - 50) { fish.vx *= -1; fish.x = clamp(fish.x, 50, W - 50); }
+    fish.completionEffect = Math.max(0, fish.completionEffect - dt);
+    const currentDrift = getCurrentVelocity(fish.depth) * .28;
+    if (fish.completed && fish.pattern === "ambush") {
+      fish.activated = false; fish.alertTimer = 0;
+      const leaveDirection = fish.x < subX ? -1 : 1;
+      fish.vx += (leaveDirection * species.speed * 1.45 - fish.vx) * Math.min(1, dt * 3.2);
+      fish.baseDepth += clamp(fish.baseDepth - subDepth, -1, 1) * species.speed * .18 * dt;
+      fish.x += (fish.vx + currentDrift) * dt;
+      fish.depth = fish.baseDepth + Math.sin(fish.phase) * 12;
+    } else if (fish.pattern === "cruise") {
+      fish.x += (fish.vx + currentDrift) * dt;
+      fish.depth = fish.baseDepth + Math.sin(fish.phase) * 15;
+    } else if (fish.pattern === "wave") {
+      fish.x += (fish.vx * .82 + Math.sin(fish.phase * 1.45) * species.speed * .32 + currentDrift) * dt;
+      fish.depth = fish.baseDepth + Math.sin(fish.phase * 1.7) * (fish.inHollow ? 34 : species.rare ? 62 : 42);
+    } else if (fish.pattern === "dart") {
+      const burst = .38 + Math.pow(Math.max(0, Math.sin(fish.phase * 1.3)), 3) * 2.2;
+      fish.x += (fish.vx * burst + currentDrift) * dt;
+      fish.depth = fish.baseDepth + Math.sin(fish.phase * .8) * 25;
+    } else {
+      const sy = screenY(fish.depth); const distance = Math.hypot(fish.x - subX, sy - SUB_Y);
+      if (!fish.activated && distance < 265) {
+        fish.alertTimer += dt; fish.flash = .08;
+        if (fish.alertTimer >= .65) fish.activated = true;
+      } else if (!fish.activated) fish.alertTimer = Math.max(0, fish.alertTimer - dt * .5);
+      if (fish.activated) {
+        const desiredDirection = subX < fish.x ? -1 : 1;
+        fish.vx += (desiredDirection * species.speed * 1.18 - fish.vx) * Math.min(1, dt * 2.6);
+        fish.baseDepth += clamp(subDepth - fish.baseDepth, -75, 75) * dt * .62;
+        fish.x += (fish.vx + currentDrift) * dt;
+        fish.depth = fish.baseDepth + Math.sin(fish.phase * 1.9) * 15;
+      } else {
+        fish.x += (fish.vx * .1 + currentDrift) * dt;
+        fish.depth = fish.baseDepth + Math.sin(fish.phase * .65) * 7;
+      }
+    }
+    const [fishLeft, fishRight] = fish.inHollow ? [fish.homeX - 48, fish.homeX + 48] : corridorBounds(fish.depth);
+    if (!(fish.completed && fish.pattern === "ambush") && (fish.x < fishLeft || fish.x > fishRight)) { fish.vx *= -1; fish.x = clamp(fish.x, fishLeft, fishRight); }
     const sy = screenY(fish.depth);
-    if (sy > 76 && sy < H - 35 && Math.hypot(fish.x - subX, sy - SUB_Y) < fishRadius(species) + 16 && invincible <= 0) collide(species, fish.x);
+    if (canFishCollide(fish.completed, invincible) && sy > 76 && sy < H - 35 && Math.hypot(fish.x - subX, sy - SUB_Y) < fishRadius(species) + 16) collide(fish.x);
+  }
+  fishes = fishes.filter((fish) => !(fish.completed && fish.pattern === "ambush" && (fish.x < -90 || fish.x > W + 90)));
+}
+
+function updateHazards(dt: number) {
+  for (const hazard of hazards) {
+    const sy = screenY(hazard.depth);
+    if (sy < -hazard.height - 50 || sy > H + hazard.height + 50) continue;
+    if (hazard.kind === "rock") {
+      if (hitsRockWall(hazard, subX, SUB_Y, 18) && invincible <= 0) {
+        collideHull("岩壁", hazard.x + hazard.width / 2);
+      }
+    } else if (hazard.kind === "kelp") {
+      if (circleHitsRect(subX, SUB_Y, 16, hazard.x, sy - hazard.height, hazard.width, hazard.height)) {
+        subVx *= Math.max(0, 1 - dt * 5); subVDepth *= Math.max(0, 1 - dt * 4); power = Math.max(0, power - dt * .7);
+        if (hazardMessageCooldown <= 0) { setMessage("海藻に絡まった　推進力低下", 1.2); hazardMessageCooldown = 1.8; }
+      }
+    } else if (isVentActive(hazard)) {
+      if (circleHitsRect(subX, SUB_Y, 17, hazard.x - hazard.width / 2, sy - hazard.height, hazard.width, hazard.height) && invincible <= 0) {
+        collideVent(hazard);
+      }
+    }
   }
 }
 
-function collide(species: Species, sourceX: number) {
-  const loss = config.collisionDrain * (species.rare ? 1.2 : species.layer === 3 ? 1.1 : 1);
-  power = Math.max(0, power - loss); invincible = 3; subVx = sourceX < subX ? 180 : -180; subVDepth = -80;
-  setMessage(`衝突　電力 -${Math.round(loss)}%`, 1.6);
+function hitsRockWall(hazard: Hazard, cx: number, cy: number, radius: number) {
+  const sy = screenY(hazard.depth);
+  return circleHitsTerrainWall(cx, cy, radius, hazard.side === -1 ? "left" : "right", sy - hazard.height / 2, sy + hazard.height / 2, hazard.topWidth ?? hazard.width, hazard.bottomWidth ?? hazard.width);
+}
+
+function collideHull(label: string, sourceX: number) {
+  hull = damageHull(hull); invincible = 2.2; subDepth = Math.max(0, subDepth - 7); subVDepth = -78;
+  subVx = subX < sourceX ? -155 : 155;
+  if (hull <= 0) beginHullBreak("船体が大破した");
+  else setMessage(`${label}に接触　船体損傷`, 1.7);
+}
+
+function collideVent(hazard: Hazard) {
+  const loss = 18;
+  power = Math.max(0, power - loss); invincible = 2.2; subDepth = Math.max(0, subDepth - 7); subVDepth = -78;
+  subVx = subX < hazard.x ? -155 : 155;
+  setMessage(`熱水噴出　電力 -${loss}%`, 1.7);
+}
+
+function circleHitsRect(cx: number, cy: number, radius: number, x: number, y: number, width: number, height: number) {
+  const nearestX = clamp(cx, x, x + width); const nearestY = clamp(cy, y, y + height);
+  return Math.hypot(cx - nearestX, cy - nearestY) < radius;
+}
+
+function isVentActive(hazard: Hazard) {
+  return (elapsed + hazard.phase) % 4.8 < 2.25;
+}
+
+function collide(sourceX: number, label = "魚") {
+  hull = damageHull(hull); invincible = 2.2; subVx = sourceX < subX ? 180 : -180; subVDepth = -80;
+  if (hull <= 0) beginHullBreak("船体が大破した");
+  else setMessage(`${label}と衝突　船体損傷`, 1.6);
 }
 
 function chooseResearchTargets(): Fish[] {
@@ -271,25 +485,34 @@ function completeResearch(species: Species, fish: Fish) {
   const gainedScore = Math.floor(species.score * multiplier) + (first ? 300 : 0);
   const gainedPower = species.power * multiplier;
   earnedScore += gainedScore; power = Math.min(100, power + gainedPower);
-  fish.research = 1; fish.completed = true; fish.flash = .7; targetFishIds.delete(fish.id);
+  fish.research = 1; fish.completed = true; fish.flash = .7; fish.completionEffect = 1.6; targetFishIds.delete(fish.id);
   setMessage(first ? `図鑑登録　${species.name}  +${gainedScore}` : gainedScore ? `${species.name} 再調査 +${gainedScore}` : `${species.name} 調査済み（報酬なし）`, 1.8);
 }
 
 function startBossPass() {
+  targetFishIds.clear();
   const direction: 1 | -1 = Math.floor(nextBossDepth / config.bossInterval) % 2 ? 1 : -1;
-  boss = { active: true, x: direction === 1 ? -340 : W + 340, depth: nextBossDepth + 120, direction, flash: 0 };
+  const baseDepth = nextBossDepth + 120;
+  boss = {
+    active: true, x: direction === 1 ? -340 : W + 340, depth: baseDepth, baseDepth, direction, flash: 0,
+    wobbleAmplitude: 55 + Math.random() * 35,
+    wobbleFrequency: .62 + Math.random() * .34,
+    wobblePhase: Math.random() * Math.PI * 2,
+  };
   bossGaugeVisible = false;
   nextBossDepth += config.bossInterval;
-  setMessage("巨大反応接近　発光する頭部を追跡せよ", 3);
+  setMessage("巨大反応接近　胴体・尾の近くでも調査できる", 3);
 }
 
 function updateBoss(dt: number) {
   if (!boss.active) return;
   boss.x += boss.direction * 102 * dt; boss.flash = Math.max(0, boss.flash - dt);
-  const headX = boss.x + boss.direction * 190;
+  boss.depth = getBossWobbleDepth(boss.baseDepth, elapsed, boss.wobbleAmplitude, boss.wobbleFrequency, boss.wobblePhase);
   const sy = screenY(boss.depth);
-  if (sy > 60 && sy < H && Math.hypot(headX - subX, sy - SUB_Y) < 76 && invincible <= 0) collide(speciesById.get("leviathan")!, headX);
-  if ((boss.direction === 1 && boss.x > W + 350) || (boss.direction === -1 && boss.x < -350)) {
+  if (sy > -170 && sy < H + 170 && isBossBodyColliding(subX, SUB_Y, 17, boss.x, sy, boss.direction) && invincible <= 0) {
+    collide(boss.x, "巨大深海魚");
+  }
+  if ((boss.direction === 1 && boss.x > W + 470) || (boss.direction === -1 && boss.x < -470)) {
     boss.active = false; setMessage(`巨大魚を見失った　調査 ${Math.floor(bossProgress)}%`, 2);
   }
 }
@@ -306,8 +529,21 @@ function beginBossClear() {
   discovered.add("leviathan"); researchCounts.set("leviathan", 1);
   phase = "boss-clear"; paused = false; bossClearTimer = 0; boss.flash = 1;
   boss.x = W / 2; boss.depth = subDepth + 28;
+  boss.baseDepth = boss.depth; boss.wobbleAmplitude = 0;
   subVx = 0; subVDepth = 0; targetFishIds.clear();
   setMessage("巨大深海魚の調査完了", 99); updateButtons();
+}
+
+function beginHullBreak(title: string) {
+  if (phase !== "dive") return;
+  phase = "hull-break"; paused = false; hullBreakTimer = 0; hullBreakTitle = title;
+  invincible = 99; subVx = 0; subVDepth = 0; targetFishIds.clear();
+  setMessage("", 0); updateButtons();
+}
+
+function updateHullBreak(dt: number) {
+  hullBreakTimer += dt; elapsed += dt;
+  if (hullBreakTimer >= 3) finish(false, hullBreakTitle);
 }
 
 function updateBossClear(dt: number) {
@@ -318,10 +554,7 @@ function updateBossClear(dt: number) {
 
 function canResearchBoss() {
   if (!boss.active) return false;
-  const headX = boss.x + boss.direction * 155;
-  const sy = screenY(boss.depth);
-  const inFront = Math.abs(headX - W / 2) < W * .48;
-  return inFront && Math.hypot(headX - subX, sy - SUB_Y) <= BOSS_RESEARCH_RANGE;
+  return isBossBodyResearchable(subX, SUB_Y, boss.x, screenY(boss.depth), boss.direction, W, H);
 }
 
 function finish(wasCleared: boolean, title: string) {
@@ -335,6 +568,8 @@ function finish(wasCleared: boolean, title: string) {
 function showResult(title: string, multiplier: number) {
   const rareCount = [...discovered].filter((id) => speciesById.get(id)?.rare).length;
   if (rankingHeading) rankingHeading.textContent = "ランキング登録";
+  if (shareMenu) shareMenu.hidden = true;
+  shareResultButton?.setAttribute("aria-expanded", "false");
   if (rankingResult) rankingResult.textContent = `${title} / SCORE ${finalScore.toLocaleString()}（適用前 ${finalSubtotal.toLocaleString()}・倍率 ${(multiplier * 100).toFixed(0)}%） / 図鑑 ${discovered.size}/21 / レア ${rareCount}/5 / 最大 ${Math.floor(maxDepth).toLocaleString()}m`;
   rankingPanel?.classList.add("is-visible"); rankingPanel?.classList.remove("is-submitted");
   if (rankingSubmit) rankingSubmit.disabled = !rankingName?.value.trim() || finalScore <= 0;
@@ -344,11 +579,22 @@ function showResult(title: string, multiplier: number) {
 function retryFromResult() {
   if (phase !== "result" || cleared) { resetRun(); startDive(); return; }
   retryCount += 1; bossProgress = 0; boss.active = false; bossGaugeVisible = false; power = Math.max(65, config.initialPower * .65);
-  invincible = 3; subX = W / 2; subVx = 0; subVDepth = 0; subHeading = 0; subHeadingTarget = 0; targetFishIds = new Set();
+  invincible = 3; hull = MAX_HULL; subX = findSafeRetryX(); subVx = 0; subVDepth = 0; subHeading = 0; subHeadingTarget = 0; targetFishIds = new Set();
   fishes = fishes.filter((fish) => Math.hypot(fish.x - subX, screenY(fish.depth) - SUB_Y) > 210);
   phase = "dive"; paused = false; cleared = false; finalScore = 0; finalSubtotal = 0;
   rankingPanel?.classList.remove("is-visible", "is-submitted");
   setMessage(`CONTINUE　最終スコア倍率 ${(getRetryScoreMultiplier(retryCount) * 100).toFixed(0)}%`, 3); updateButtons(); lastTime = performance.now();
+}
+
+function findSafeRetryX() {
+  const [left, right] = horizontalBounds();
+  const candidates = [W / 2, W / 2 - 110, W / 2 + 110, W / 2 - 220, W / 2 + 220].map((x) => clamp(x, left, right));
+  return candidates.find((x) => !hazards.some((hazard) => {
+    const sy = screenY(hazard.depth);
+    if (hazard.kind === "rock") return hitsRockWall(hazard, x, SUB_Y, 38);
+    if (hazard.kind === "kelp") return circleHitsRect(x, SUB_Y, 38, hazard.x, sy - hazard.height, hazard.width, hazard.height);
+    return circleHitsRect(x, SUB_Y, 38, hazard.x - hazard.width / 2, sy - hazard.height, hazard.width, hazard.height);
+  })) ?? W / 2;
 }
 
 function togglePause() {
@@ -358,6 +604,7 @@ function togglePause() {
 }
 
 function toggleCollection(force?: boolean) {
+  if (phase === "hull-break") return;
   if (paused && phase === "dive" && force === undefined) return;
   const next = force ?? !collectionOpen;
   collectionOpen = next;
@@ -370,23 +617,184 @@ function toggleCollection(force?: boolean) {
 
 function updateButtons() {
   if (touchPause) {
-    touchPause.textContent = phase === "ready" ? "潜航開始" : phase === "boss-clear" ? "調査完了" : paused ? "再開" : "一時停止";
-    touchPause.disabled = phase === "boss-clear";
+    touchPause.textContent = phase === "ready" ? "潜航開始" : phase === "boss-clear" ? "調査完了" : phase === "hull-break" ? "大破" : paused ? "再開" : "一時停止";
+    touchPause.disabled = phase === "boss-clear" || phase === "hull-break";
   }
-  if (touchCollection) touchCollection.textContent = collectionOpen ? "図鑑を閉じる" : "図鑑";
+  if (touchCollection) { touchCollection.textContent = collectionOpen ? "図鑑を閉じる" : "図鑑"; touchCollection.disabled = phase === "hull-break"; }
 }
 
 function draw() {
   drawBackground();
-  for (const fish of fishes) { const sy = screenY(fish.depth); if (sy > 62 && sy < H + 50) drawFish(fish, sy); }
-  if (boss.active) drawBoss();
-  drawDarkness(); drawDeepSignals(); drawBossSignal(); drawSubmarine(); drawHud();
+  const renderedInThree = drawThreeGameObjects();
+  if (!renderedInThree) {
+    for (const hazard of hazards) { const sy = screenY(hazard.depth); if (sy > -hazard.height - 50 && sy < H + hazard.height + 50) drawHazard(hazard, sy); }
+    for (const fish of fishes) { const sy = screenY(fish.depth); if (sy > 62 && sy < H + 50) drawFish(fish, sy); }
+    if (boss.active) drawBoss();
+  } else drawThreeFishLabels();
+  drawCurrentSignals(); drawDarkness(); drawHazardSignals(); drawDeepSignals(); drawFishSafetySignals(renderedInThree); drawBossSignal(renderedInThree);
+  if (!renderedInThree) drawSubmarine(); else drawThreeSubmarineSignals();
+  drawHud();
   if ((boss.active && bossGaugeVisible) || phase === "boss-clear") drawBossResearchGauge();
-  if (phase === "ready") drawStartOverlay();
+  if (phase === "ready" && debugParams.get("terrainPreview") !== "1") drawStartOverlay();
   if (paused && phase === "dive" && !collectionOpen) drawCollection("pause");
   if (phase === "result" && !collectionOpen) drawOverlay(message, [`SCORE ${finalScore.toLocaleString()}`, `図鑑 ${discovered.size} / 21　最大深度 ${Math.floor(maxDepth).toLocaleString()}m`]);
   if (phase === "boss-clear") drawBossClearSequence();
+  if (phase === "hull-break") drawHullBreakSequence();
   if (collectionOpen) drawCollection();
+}
+
+function drawThreeGameObjects() {
+  if (!threeLayer) return false;
+  const breaking = phase === "hull-break";
+  const submarineAlpha = breaking ? Math.max(0, 1 - hullBreakTimer / 1.35) : invincible > 0 && Math.floor(invincible * 10) % 2 ? .35 : 1;
+  const visibleFishes = fishes.flatMap((fish) => {
+    const y = screenY(fish.depth); if (y < 55 || y > H + 55) return [];
+    const species = speciesById.get(fish.speciesId)!;
+    const radius = fishRadius(species); const distance = Math.hypot(fish.x - subX, y - SUB_Y);
+    const darkness = debugParams.get("terrainPreview") === "1" && phase === "ready" ? 0 : clamp(subDepth / 3500, 0, 1) * .965;
+    const visibility = Math.max(1 - darkness, clamp((210 - distance) / 65, 0, 1));
+    const preparingAmbush = fish.pattern === "ambush" && !fish.completed && !fish.activated && fish.alertTimer > 0;
+    const safety = getFishSafetyVisual(fish.completed, preparingAmbush ? 0 : distance, radius, elapsed);
+    return [{
+      id: fish.id, speciesId: species.id, x: fish.x, y, radius, direction: fish.vx < 0 ? -1 as const : 1 as const,
+      color: species.color, glow: species.glow, known: fish.completed || discovered.has(species.id), completed: fish.completed, rare: Boolean(species.rare),
+      outlineAlpha: safety.showOutline ? safety.alpha * visibility : 0, outlineWarning: safety.warning,
+    }];
+  });
+  // Keep the complete edited course resident in the Three.js scene. Objects are
+  // frustum-culled instead of being destroyed and recreated while scrolling.
+  const terrainHazards = hazards.map((hazard) => ({
+    id: hazard.id, kind: hazard.kind, x: hazard.x + (hazard.kind === "rock" ? hazard.width / 2 : 0),
+    y: screenY(hazard.depth), width: hazard.width, height: hazard.height,
+    topWidth: hazard.topWidth, bottomWidth: hazard.bottomWidth,
+    side: hazard.side, active: hazard.kind !== "vent" || isVentActive(hazard),
+  }));
+  const frame: ThreeFrame = {
+    elapsed,
+    submarine: {
+      x: subX, y: SUB_Y, heading: subHeading, pitch: getSubmarinePitch(subVDepth, subHeading), alpha: submarineAlpha, hull,
+      lightLevel: getSubmarineLightLevel(subDepth),
+      breaking, breakProgress: breaking ? clamp(hullBreakTimer / 1.8, 0, 1) : 0,
+    },
+    fishes: visibleFishes,
+    hazards: terrainHazards,
+    boss: { active: boss.active, x: boss.x, y: screenY(boss.depth), direction: boss.direction, flash: boss.flash, revealed: phase === "boss-clear" },
+  };
+  try { ctx.drawImage(threeLayer.render(frame), 0, 0, W, H); }
+  catch (error) {
+    console.warn("Three.js gameplay render failed; returning to the 2D renderer.", error);
+    threeLayer = null;
+    return false;
+  }
+  return true;
+}
+
+function drawThreeFishLabels() {
+  ctx.save(); ctx.fillStyle = "rgba(235,249,255,.78)"; ctx.font = "900 22px system-ui"; ctx.textAlign = "center";
+  for (const fish of fishes) {
+    const species = speciesById.get(fish.speciesId)!; const y = screenY(fish.depth);
+    if (fish.completed || discovered.has(species.id) || y < 65 || y > H) continue;
+    ctx.fillText("?", fish.x, y - fishRadius(species) - 12);
+  }
+  for (const fish of fishes) {
+    const species = speciesById.get(fish.speciesId)!; const y = screenY(fish.depth); const radius = fishRadius(species);
+    if (y < 65 || y > H || (fish.completed || (!targetFishIds.has(fish.id) && fish.research <= 0))) continue;
+    ctx.fillStyle = "rgba(255,255,255,.24)"; ctx.fillRect(fish.x - 32, y - radius - 22, 64, 5);
+    ctx.fillStyle = "#65ffe9"; ctx.fillRect(fish.x - 32, y - radius - 22, 64 * clamp(fish.research, 0, 1), 5);
+  }
+  ctx.restore();
+}
+
+function drawThreeSubmarineSignals() {
+  if (phase !== "ready") {
+    ctx.save(); ctx.strokeStyle = "rgba(101,255,233,.24)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(subX, SUB_Y, NORMAL_RESEARCH_RANGE, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+  }
+  if (phase === "ready" || hull >= MAX_HULL) return;
+  const bubbleCount = hull === 1 ? 5 : 2;
+  ctx.save(); ctx.strokeStyle = "rgba(176,241,255,.72)"; ctx.lineWidth = 1;
+  for (let i = 0; i < bubbleCount; i += 1) {
+    const age = (elapsed * (30 + i * 4) + i * 13) % 35;
+    ctx.beginPath(); ctx.arc(subX - 8 + i * 4, SUB_Y - 10 - age, 1.5 + i % 2, 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawHazard(hazard: Hazard, sy: number) {
+  ctx.save();
+  if (hazard.kind === "rock") {
+    const side = hazard.side ?? (hazard.x < W / 2 ? -1 : 1);
+    const edgeX = side === -1 ? hazard.x + hazard.width : hazard.x;
+    const outerX = side === -1 ? 0 : W;
+    const inward = side === -1 ? -1 : 1;
+    const top = sy - hazard.height / 2; const bottom = sy + hazard.height / 2;
+    const rock = ctx.createLinearGradient(edgeX, sy, outerX, sy);
+    rock.addColorStop(0, "#718995"); rock.addColorStop(1, "#334752");
+    ctx.fillStyle = rock; ctx.strokeStyle = "#a2bac4"; ctx.lineWidth = 2;
+    const topX = outerX - inward * (hazard.topWidth ?? hazard.width);
+    const bottomX = outerX - inward * (hazard.bottomWidth ?? hazard.width);
+    ctx.beginPath(); ctx.moveTo(outerX, top); ctx.lineTo(topX, top);
+    ctx.lineTo(bottomX, bottom); ctx.lineTo(outerX, bottom); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(topX, top); ctx.lineTo(bottomX, bottom); ctx.stroke();
+
+    if (hazard.hollowDepth !== undefined && hazard.hollowHeight !== undefined) {
+      const hollowY = screenY(hazard.hollowDepth); const glowX = dangerSpawnX(hazard);
+      const caveGlow = ctx.createRadialGradient(glowX, hollowY, 2, glowX, hollowY, 74);
+      caveGlow.addColorStop(0, "rgba(83,219,210,.2)"); caveGlow.addColorStop(1, "rgba(3,18,28,0)");
+      ctx.fillStyle = caveGlow; ctx.fillRect(glowX - 75, hollowY - 65, 150, 130);
+    }
+    ctx.fillStyle = "rgba(112,165,162,.45)";
+    for (let i = 0; i < 7; i += 1) {
+      const markY = top + 35 + i * (hazard.height - 70) / 6;
+      ctx.fillRect(edgeX + inward * (18 + i % 3 * 22), markY + Math.sin(i + hazard.phase) * 5, 18 + i % 2 * 12, 3);
+    }
+  } else if (hazard.kind === "kelp") {
+    ctx.lineCap = "round";
+    const stalks = Math.max(3, Math.floor(hazard.width / 15));
+    for (let i = 0; i < stalks; i += 1) {
+      const x = hazard.x + 7 + i * (hazard.width - 14) / Math.max(1, stalks - 1);
+      ctx.strokeStyle = i % 2 ? "#3d8e70" : "#2e725e"; ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.moveTo(x, sy);
+      ctx.bezierCurveTo(x + Math.sin(elapsed * 1.3 + hazard.phase + i) * 18, sy - hazard.height * .35, x - 18, sy - hazard.height * .68, x + Math.sin(elapsed + i) * 12, sy - hazard.height);
+      ctx.stroke();
+    }
+    ctx.fillStyle = "#274e44"; ctx.fillRect(hazard.x - 5, sy - 7, hazard.width + 10, 12);
+  } else {
+    ctx.translate(hazard.x, sy);
+    ctx.fillStyle = "#283944"; ctx.strokeStyle = "#596d74"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(-45, 0); ctx.lineTo(-24, -42); ctx.lineTo(-7, -25); ctx.lineTo(5, -58); ctx.lineTo(25, -31); ctx.lineTo(43, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = isVentActive(hazard) ? "#ff8f5d" : "#55706f";
+    ctx.beginPath(); ctx.ellipse(0, -48, 12, 5, 0, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawCurrentSignals() {
+  const velocity = getCurrentVelocity();
+  if (!velocity) return;
+  ctx.save(); ctx.globalAlpha = .1 + Math.min(.14, Math.abs(velocity) / 300); ctx.strokeStyle = "#a4f6ff"; ctx.lineWidth = 1.5;
+  const direction = Math.sign(velocity);
+  for (let i = 0; i < 16; i += 1) {
+    const x = ((i * 137 + elapsed * velocity * 2) % (W + 120) + W + 120) % (W + 120) - 60;
+    const y = 90 + i * 43 % (H - 150); const length = 24 + i % 4 * 11;
+    ctx.beginPath(); ctx.moveTo(x - direction * length, y); ctx.lineTo(x, y); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawHazardSignals() {
+  for (const hazard of hazards) {
+    if (hazard.kind !== "vent" || !isVentActive(hazard)) continue;
+    const sy = screenY(hazard.depth); if (sy < 65 || sy > H + hazard.height) continue;
+    ctx.save(); ctx.fillStyle = "#ff9a63"; ctx.shadowColor = "#ff633e"; ctx.shadowBlur = 22;
+    for (let i = 0; i < 8; i += 1) {
+      const progress = ((elapsed * .65 + hazard.phase * .13 + i / 8) % 1);
+      const x = hazard.x + Math.sin(progress * 12 + i) * (8 + progress * 18);
+      const y = sy - 48 - progress * (hazard.height - 42);
+      ctx.globalAlpha = .8 * (1 - progress); ctx.beginPath(); ctx.arc(x, y, 3 + progress * 5, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
 }
 
 function drawBackground() {
@@ -453,7 +861,7 @@ function drawSurfaceScene() {
 
 function drawFish(fish: Fish, sy: number) {
   const species = speciesById.get(fish.speciesId)!;
-  const known = discovered.has(species.id);
+  const known = fish.completed || discovered.has(species.id);
   const radius = fishRadius(species);
   ctx.save(); ctx.translate(fish.x, sy); if (fish.vx < 0) ctx.scale(-1, 1);
   ctx.globalAlpha = known ? 1 : .48; ctx.filter = known ? "none" : "blur(2px)";
@@ -461,20 +869,53 @@ function drawFish(fish: Fish, sy: number) {
   ctx.fillStyle = fish.flash > 0 ? "#ffffff" : species.color;
   drawFishBody(species.shape, radius); ctx.filter = "none"; ctx.shadowBlur = 0;
   ctx.fillStyle = species.glow; ctx.beginPath(); ctx.arc(radius * .48, -3, species.rare ? 4 : 2.6, 0, Math.PI * 2); ctx.fill();
-  if (!known) { ctx.scale(fish.vx < 0 ? -1 : 1, 1); ctx.fillStyle = "#f7ffff"; ctx.font = "900 20px system-ui"; ctx.textAlign = "center"; ctx.fillText("?", 0, -radius - 10); }
+  // Labels remain upright regardless of fish direction.
+  ctx.restore(); ctx.save(); ctx.translate(fish.x, sy);
+  if (!known) { ctx.fillStyle = "#f7ffff"; ctx.font = "900 20px system-ui"; ctx.textAlign = "center"; ctx.fillText("?", 0, -radius - 10); }
   if (targetFishIds.has(fish.id) || (!fish.completed && fish.research > 0)) {
-    ctx.scale(fish.vx < 0 ? -1 : 1, 1); ctx.fillStyle = "rgba(255,255,255,.24)"; ctx.fillRect(-32, -radius - 22, 64, 5);
+    ctx.fillStyle = "rgba(255,255,255,.24)"; ctx.fillRect(-32, -radius - 22, 64, 5);
     ctx.fillStyle = "#65ffe9"; ctx.fillRect(-32, -radius - 22, 64 * clamp(fish.research, 0, 1), 5);
   }
   ctx.restore();
 }
 
-function drawFishBody(shape: number, r: number) {
-  ctx.beginPath();
-  if (shape === 4) { ctx.moveTo(-r * 1.5, 0); ctx.quadraticCurveTo(0, -r, r * 1.5, 0); ctx.quadraticCurveTo(0, r * .5, -r * 1.5, 0); }
-  else if (shape === 5) { ctx.arc(0, -2, r, Math.PI, 0); ctx.lineTo(r * .65, r); ctx.lineTo(0, r * .45); ctx.lineTo(-r * .65, r); ctx.closePath(); }
-  else { ctx.ellipse(0, 0, shape === 2 ? r * 1.7 : r * 1.25, shape === 3 ? r : r * .65, 0, 0, Math.PI * 2); ctx.moveTo(-r, 0); ctx.lineTo(-r * 1.65, -r * .55); ctx.lineTo(-r * 1.65, r * .55); ctx.closePath(); }
-  ctx.fill();
+function drawFishSafetySignals(exactThreeOutline = false) {
+  const darkness = debugParams.get("terrainPreview") === "1" && phase === "ready" ? 0 : clamp(subDepth / 3500, 0, 1) * .965;
+  for (const fish of fishes) {
+    const sy = screenY(fish.depth);
+    if (sy < 76 || sy > H - 35) continue;
+    const species = speciesById.get(fish.speciesId)!; const radius = fishRadius(species);
+    const distance = Math.hypot(fish.x - subX, sy - SUB_Y);
+    const visibility = Math.max(1 - darkness, clamp((210 - distance) / 65, 0, 1));
+    if (visibility < .08) continue;
+    const preparingAmbush = fish.pattern === "ambush" && !fish.completed && !fish.activated && fish.alertTimer > 0;
+    const visual = getFishSafetyVisual(fish.completed, preparingAmbush ? 0 : distance, radius, elapsed);
+    ctx.save(); ctx.translate(fish.x, sy);
+    ctx.globalAlpha = visual.alpha * visibility; ctx.strokeStyle = visual.color;
+    ctx.lineWidth = visual.lineWidth; ctx.shadowColor = visual.color; ctx.shadowBlur = visual.warning ? 8 : 3;
+    if (visual.showOutline && !exactThreeOutline) {
+      ctx.save(); if (fish.vx < 0) ctx.scale(-1, 1);
+      drawFishBody(species.shape, radius + 2, true); ctx.restore();
+    }
+    if (visual.warning) {
+      ctx.font = "900 16px system-ui"; ctx.textAlign = "center"; ctx.fillStyle = visual.color;
+      ctx.fillText("!", radius * 1.8 + 6, -radius * .5);
+    }
+    if (fish.completed && fish.completionEffect > 0) {
+      const progress = 1 - fish.completionEffect / 1.6;
+      ctx.globalAlpha = (1 - progress) * visibility; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0, 0, radius + 6 + progress * 36, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+
+function drawFishBody(shape: number, r: number, strokeOnly = false, target: CanvasRenderingContext2D = ctx) {
+  target.beginPath();
+  if (shape === 4) { target.moveTo(-r * 1.5, 0); target.quadraticCurveTo(0, -r, r * 1.5, 0); target.quadraticCurveTo(0, r * .5, -r * 1.5, 0); }
+  else if (shape === 5) { target.arc(0, -2, r, Math.PI, 0); target.lineTo(r * .65, r); target.lineTo(0, r * .45); target.lineTo(-r * .65, r); target.closePath(); }
+  else { target.ellipse(0, 0, shape === 2 ? r * 1.7 : r * 1.25, shape === 3 ? r : r * .65, 0, 0, Math.PI * 2); target.moveTo(-r, 0); target.lineTo(-r * 1.65, -r * .55); target.lineTo(-r * 1.65, r * .55); target.closePath(); }
+  if (strokeOnly) target.stroke(); else target.fill();
 }
 
 function drawBoss() {
@@ -482,8 +923,8 @@ function drawBoss() {
   const revealed = phase === "boss-clear";
   ctx.save(); ctx.translate(boss.x, sy); if (boss.direction < 0) ctx.scale(-1, 1);
   ctx.shadowColor = revealed ? "#67dff4" : "#244b77"; ctx.shadowBlur = revealed ? 58 : 40; ctx.fillStyle = revealed ? "#327492" : "#14243d";
-  ctx.beginPath(); ctx.ellipse(0, 0, 330, 118, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.moveTo(-280, 0); ctx.lineTo(-470, -150); ctx.lineTo(-420, 0); ctx.lineTo(-470, 150); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0, 0, BOSS_BODY_RADIUS_X, BOSS_BODY_RADIUS_Y, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); BOSS_TAIL.forEach(([x, y], index) => { if (index === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }); ctx.closePath(); ctx.fill();
   if (revealed) {
     ctx.strokeStyle = "rgba(143,255,244,.7)"; ctx.lineWidth = 8; ctx.shadowBlur = 16;
     for (let x = -210; x <= 80; x += 72) { ctx.beginPath(); ctx.arc(x, 2, 52, -.75, .75); ctx.stroke(); }
@@ -520,6 +961,7 @@ function drawBossClearSequence() {
 }
 
 function drawDarkness() {
+  if (phase === "ready" && debugParams.get("terrainPreview") === "1") return;
   const clearReveal = phase === "boss-clear" ? 1 - smoothstep(bossClearTimer / 1.4) : 1;
   const darkness = clamp(subDepth / 3_500, 0, 1) * .965 * clearReveal;
   if (darkness <= .03) return;
@@ -538,19 +980,27 @@ function drawDeepSignals() {
   for (const fish of fishes) {
     const species = speciesById.get(fish.speciesId)!; const sy = screenY(fish.depth);
     if (sy < 65 || sy > H || Math.hypot(fish.x - subX, sy - SUB_Y) < 145) continue;
-    ctx.save(); ctx.globalAlpha = .35 + Math.sin(elapsed * 5 + fish.phase) * .15; ctx.fillStyle = species.glow; ctx.shadowColor = species.glow; ctx.shadowBlur = 18;
+    ctx.save(); ctx.globalAlpha = fish.completed ? .4 : .35 + Math.sin(elapsed * 5 + fish.phase) * .15; ctx.fillStyle = fish.completed ? "#75e8ef" : species.glow; ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 18;
     ctx.beginPath(); ctx.arc(fish.x + (fish.vx > 0 ? 8 : -8), sy - 2, species.rare ? 4 : 2.5, 0, Math.PI * 2); ctx.fill(); ctx.restore();
   }
 }
 
-function drawBossSignal() {
+function drawBossSignal(renderedInThree = false) {
   if (!boss.active || phase === "boss-clear") return;
   const sy = screenY(boss.depth);
+  if (renderedInThree) {
+    const eyeX = boss.x + boss.direction * 155;
+    ctx.save(); ctx.globalAlpha = .92; ctx.fillStyle = "#ffce59"; ctx.shadowColor = "#ffce59"; ctx.shadowBlur = 30;
+    ctx.beginPath(); ctx.arc(eyeX, sy - 18, 16, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    return;
+  }
   ctx.save(); ctx.translate(boss.x, sy); if (boss.direction < 0) ctx.scale(-1, 1);
   ctx.globalAlpha = .28; ctx.fillStyle = "#315277"; ctx.shadowColor = "#487fb6"; ctx.shadowBlur = 35;
-  ctx.beginPath(); ctx.ellipse(0, 0, 330, 118, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0, 0, BOSS_BODY_RADIUS_X, BOSS_BODY_RADIUS_Y, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); BOSS_TAIL.forEach(([x, y], index) => { if (index === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }); ctx.closePath(); ctx.fill();
   ctx.globalAlpha = .92; ctx.fillStyle = "#ffce59"; ctx.shadowColor = "#ffce59"; ctx.shadowBlur = 30;
-  ctx.beginPath(); ctx.arc(155, -18, 18, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+  ctx.beginPath(); ctx.arc(155, -18, 18, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
 }
 
 function drawSubmarine() {
@@ -560,9 +1010,12 @@ function drawSubmarine() {
   const bowTowardViewer = Math.sin(yaw);
   const bodyRadiusX = 15 + 17 * sideAmount;
   const bodyRadiusY = 14 + 3 * bowTowardViewer;
-  const pitch = clamp(subVDepth / 260, -.28, .28) * sideAmount;
-  ctx.save(); ctx.translate(subX, SUB_Y); ctx.rotate(pitch);
-  ctx.globalAlpha = invincible > 0 && Math.floor(invincible * 10) % 2 ? .35 : 1;
+  const pitch = getSubmarinePitch(subVDepth, yaw);
+  const breaking = phase === "hull-break";
+  const shake = breaking ? Math.max(0, 1 - hullBreakTimer / 1.1) : 0;
+  const submarineAlpha = breaking ? Math.max(0, 1 - hullBreakTimer / 1.35) : invincible > 0 && Math.floor(invincible * 10) % 2 ? .35 : 1;
+  ctx.save(); ctx.translate(subX + Math.sin(hullBreakTimer * 62) * 4 * shake, SUB_Y + Math.cos(hullBreakTimer * 49) * 3 * shake); ctx.rotate(pitch);
+  ctx.globalAlpha = submarineAlpha;
 
   // The propeller and tail recede behind the hull as the bow turns toward the viewer.
   if (sideAmount > .04) {
@@ -571,7 +1024,7 @@ function drawSubmarine() {
     ctx.fillStyle = "#b96732"; ctx.fillRect(tailX - side * 4 - 4, -4, 8, 8);
     ctx.strokeStyle = "#f2a251"; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(tailX, -8); ctx.lineTo(tailX, 8); ctx.stroke();
-    ctx.globalAlpha = invincible > 0 && Math.floor(invincible * 10) % 2 ? .35 : 1;
+    ctx.globalAlpha = submarineAlpha;
   }
 
   // Dive planes become symmetrical in the head-on view.
@@ -580,9 +1033,9 @@ function drawSubmarine() {
   ctx.beginPath(); ctx.moveTo(-bodyRadiusX * .55, 2); ctx.lineTo(-bodyRadiusX - finReach, 9); ctx.lineTo(-bodyRadiusX * .7, 10); ctx.closePath(); ctx.fill();
   ctx.beginPath(); ctx.moveTo(bodyRadiusX * .55, 2); ctx.lineTo(bodyRadiusX + finReach, 9); ctx.lineTo(bodyRadiusX * .7, 10); ctx.closePath(); ctx.fill();
 
-  const hull = ctx.createLinearGradient(0, -bodyRadiusY, 0, bodyRadiusY);
-  hull.addColorStop(0, "#f5dc78"); hull.addColorStop(.52, "#d5ad47"); hull.addColorStop(1, "#8f6c2e");
-  ctx.fillStyle = hull; ctx.shadowColor = "rgba(255,221,111,.35)"; ctx.shadowBlur = 10 + bowTowardViewer * 8;
+  const hullGradient = ctx.createLinearGradient(0, -bodyRadiusY, 0, bodyRadiusY);
+  hullGradient.addColorStop(0, "#f8df75"); hullGradient.addColorStop(.52, "#dbae3d"); hullGradient.addColorStop(1, "#bd8f27");
+  ctx.fillStyle = hullGradient; ctx.shadowColor = "rgba(255,221,111,.35)"; ctx.shadowBlur = 10 + bowTowardViewer * 8;
   ctx.beginPath(); ctx.ellipse(0, 0, bodyRadiusX, bodyRadiusY, 0, 0, Math.PI * 2); ctx.fill();
 
   // Project the two circular side windows from the cylindrical hull. Their
@@ -603,27 +1056,112 @@ function drawSubmarine() {
   drawProjectedSideWindow(1);
   drawProjectedSideWindow(-1);
 
-  ctx.globalAlpha = invincible > 0 && Math.floor(invincible * 10) % 2 ? .35 : 1;
+  const drawProjectedHullCrack = (surfaceSide: 1 | -1) => {
+    if (hull >= MAX_HULL) return;
+    const surfaceFacing = surfaceSide * side;
+    if (surfaceFacing <= .02) return;
+    ctx.save();
+    // The crack lies on each side of the curved hull: it becomes edge-on during
+    // the turn, then its counterpart on the other side comes into view.
+    ctx.translate(-7 * side, 1);
+    ctx.scale(surfaceFacing, 1);
+    ctx.globalAlpha *= .45 + surfaceFacing * .55;
+    ctx.strokeStyle = hull === 1 ? "#ffd0aa" : "#ff9d79"; ctx.lineWidth = .75;
+    ctx.shadowColor = hull === 1 ? "#ff3a32" : "#ff6a48"; ctx.shadowBlur = hull === 1 ? 5 : 3;
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    // First damage: several fine, branching fractures instead of one short line.
+    ctx.beginPath();
+    ctx.moveTo(-11, 5); ctx.lineTo(-6, 1); ctx.lineTo(-1, -1); ctx.lineTo(2, -7); ctx.lineTo(1, -11);
+    ctx.moveTo(-6, 1); ctx.lineTo(-8, -5); ctx.lineTo(-5, -9);
+    ctx.moveTo(-1, -1); ctx.lineTo(5, 1); ctx.lineTo(10, -2);
+    ctx.moveTo(5, 1); ctx.lineTo(8, 6); ctx.lineTo(13, 8);
+    ctx.moveTo(-1, -1); ctx.lineTo(-2, 6); ctx.lineTo(-6, 10);
+    if (hull === 1) {
+      // Second damage: the original fracture grows and new branches spread out.
+      ctx.moveTo(-11, 5); ctx.lineTo(-15, 1); ctx.lineTo(-14, -5);
+      ctx.moveTo(1, -11); ctx.lineTo(5, -14);
+      ctx.moveTo(10, -2); ctx.lineTo(15, -6); ctx.lineTo(18, -4);
+      ctx.moveTo(13, 8); ctx.lineTo(16, 12);
+      ctx.moveTo(-6, 10); ctx.lineTo(-11, 13);
+      ctx.moveTo(3, 4); ctx.lineTo(1, 10); ctx.lineTo(5, 14);
+      ctx.moveTo(-10, -3); ctx.lineTo(-15, -9);
+    }
+    ctx.stroke(); ctx.restore();
+  };
+  drawProjectedHullCrack(1);
+  drawProjectedHullCrack(-1);
+
+  ctx.globalAlpha = submarineAlpha;
   ctx.fillStyle = "#87652c";
   ctx.fillRect(-2 - side * 5, -bodyRadiusY - 6, 4, 8);
   ctx.restore();
+  if (phase !== "ready" && hull < MAX_HULL) {
+    const bubbleCount = hull === 1 ? 5 : 2;
+    ctx.save(); ctx.strokeStyle = "rgba(176,241,255,.72)"; ctx.lineWidth = 1;
+    for (let i = 0; i < bubbleCount; i += 1) {
+      const age = (elapsed * (30 + i * 4) + i * 13) % 35;
+      ctx.beginPath(); ctx.arc(subX - 8 + i * 4, SUB_Y - 10 - age, 1.5 + i % 2, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.restore();
+  }
   if (phase !== "ready") {
     ctx.strokeStyle = "rgba(101,255,233,.24)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(subX, SUB_Y, NORMAL_RESEARCH_RANGE, 0, Math.PI * 2); ctx.stroke();
   }
 }
 
+function drawHullBreakSequence() {
+  const t = hullBreakTimer;
+  const burst = smoothstep(Math.min(1, t / 1.8));
+  const flash = Math.max(0, 1 - t / .55);
+  ctx.save();
+  ctx.fillStyle = `rgba(255,70,55,${flash * .16})`; ctx.fillRect(0, 64, W, H - 98);
+  ctx.translate(subX, SUB_Y);
+  ctx.strokeStyle = `rgba(255,210,120,${Math.max(0, 1 - t / 2)})`;
+  ctx.lineWidth = Math.max(.5, 4 - t * 1.5);
+  for (let i = 0; i < 2; i += 1) {
+    ctx.beginPath(); ctx.arc(0, 0, 18 + burst * (48 + i * 34), 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.fillStyle = "#d5ad47"; ctx.strokeStyle = "#fff0a0"; ctx.lineWidth = .7;
+  for (let i = 0; i < 8; i += 1) {
+    const angle = i * Math.PI / 4 + .22;
+    const distance = burst * (30 + i % 3 * 12);
+    ctx.save(); ctx.translate(Math.cos(angle) * distance, Math.sin(angle) * distance); ctx.rotate(angle + t * (i % 2 ? 3 : -3));
+    ctx.beginPath(); ctx.moveTo(-4, -2); ctx.lineTo(6, 0); ctx.lineTo(-3, 4); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
+  }
+  ctx.strokeStyle = "rgba(190,245,255,.82)"; ctx.lineWidth = 1;
+  for (let i = 0; i < 22; i += 1) {
+    const angle = i * 2.4; const distance = burst * (20 + i * 2.6);
+    ctx.beginPath(); ctx.arc(Math.cos(angle) * distance, Math.sin(angle) * distance - t * 13, 1.5 + i % 3, 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.restore();
+  const vignette = Math.max(0, (t - 1.15) / 1.85);
+  ctx.fillStyle = `rgba(0,2,8,${vignette * .72})`; ctx.fillRect(0, 64, W, H - 98);
+}
+
 function drawHud() {
   ctx.fillStyle = "rgba(0,8,18,.86)"; ctx.fillRect(0, 0, W, 64);
   ctx.fillStyle = "#e9ffff"; ctx.font = "800 15px system-ui";
+  const drawHullLamps = (startX: number, y: number) => {
+    for (let i = 0; i < MAX_HULL; i += 1) {
+      ctx.fillStyle = i < hull ? "#7aff9b" : "#5a1d29";
+      ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = i < hull ? 7 : 0;
+      ctx.beginPath(); ctx.arc(startX + i * 15, y, 5, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.shadowBlur = 0;
+  };
   if (isCompactCanvas()) {
     ctx.fillText(`深度 ${Math.floor(subDepth).toLocaleString()}m`, 326, 25); ctx.fillText(`POWER ${Math.ceil(power)}%`, 514, 25);
     ctx.fillText(`SCORE ${earnedScore.toLocaleString()}`, 326, 49); ctx.fillText(`BOSS ${Math.floor(bossProgress)}%`, 514, 49);
     ctx.fillStyle = "#63f4d9"; ctx.fillRect(326, 57, 330 * power / 100, 5);
+    drawHullLamps(704, 24);
   } else {
   ctx.fillText(`深度 ${Math.floor(subDepth).toLocaleString()}m`, 22, 25); ctx.fillText(`最高 ${Math.floor(maxDepth).toLocaleString()}m`, 22, 49);
   ctx.fillText(`図鑑 ${discovered.size}/21`, 200, 25);
+  const current = getCurrentVelocity();
+  if (current) { ctx.fillStyle = "#8fefff"; ctx.fillText(`潮流 ${current > 0 ? "→" : "←"} ${Math.round(Math.abs(current))}`, 200, 49); ctx.fillStyle = "#e9ffff"; }
   ctx.fillText(`SCORE ${earnedScore.toLocaleString()}`, 330, 25); ctx.fillText(`CONTINUE ×${getRetryScoreMultiplier(retryCount).toFixed(2)}`, 330, 49);
   ctx.fillText(`BOSS ${Math.floor(bossProgress)}%`, 555, 25); ctx.fillText(`TIME ${formatTime(elapsed)}`, 555, 49);
+  drawHullLamps(730, 24);
   const barX = W - 28; const barY = 82; const barH = H - 132;
   ctx.fillStyle = "rgba(2,10,18,.88)"; ctx.fillRect(barX - 7, barY - 7, 22, barH + 14);
   ctx.fillStyle = power > 25 ? "#63f4d9" : "#ff526f"; ctx.fillRect(barX, barY + barH * (1 - power / 100), 8, barH * power / 100);
@@ -641,7 +1179,7 @@ function drawCollection(mode: "collection" | "pause" = "collection") {
     const col = index % cols; const row = Math.floor(index / cols); const x = startX + col * cellW; const y = 76 + row * cellH; const known = discovered.has(species.id);
     ctx.fillStyle = known ? "rgba(30,72,90,.72)" : "rgba(255,255,255,.055)"; ctx.strokeStyle = species.rare && known ? "#ffd65c" : known ? "#5fffea" : "rgba(255,255,255,.16)";
     ctx.lineWidth = species.boss ? 3 : 1; ctx.fillRect(x + 4, y, cellW - 8, cellH - 9); ctx.strokeRect(x + 4, y, cellW - 8, cellH - 9);
-    ctx.save(); ctx.translate(x + cellW / 2, y + 57); ctx.fillStyle = known ? species.color : "#182632"; ctx.shadowColor = known ? species.glow : "transparent"; ctx.shadowBlur = known ? 14 : 0; drawFishBody(species.shape === 6 ? 0 : species.shape, species.boss ? 26 : 20); ctx.restore();
+    drawSpeciesPortrait(ctx, species, known, x + 10, y + 10, cellW - 20, 84);
     ctx.fillStyle = known ? "#eaffff" : "#76828c"; ctx.font = "800 12px system-ui"; ctx.textAlign = "center"; ctx.fillText(known ? species.name : "？", x + cellW / 2, y + 112);
     if (species.boss || species.rare) {
       ctx.fillStyle = species.boss ? "#ffce59" : "#e9b5ff"; ctx.font = "700 10px system-ui"; ctx.fillText(species.boss ? "BOSS" : "RARE", x + cellW / 2, y + 134);
@@ -651,6 +1189,18 @@ function drawCollection(mode: "collection" | "pause" = "collection") {
   ctx.fillStyle = "#a9c6ca"; ctx.font = "700 14px system-ui"; ctx.fillText(footer, W / 2, H - 18); ctx.textAlign = "left";
 }
 
+function drawSpeciesPortrait(target: CanvasRenderingContext2D, species: Species, known: boolean, x: number, y: number, width: number, height: number) {
+  const image = speciesIcons.get(species.id);
+  target.save(); target.globalAlpha = known ? 1 : .72;
+  target.filter = known ? "none" : "brightness(0) saturate(0)";
+  if (image?.complete && image.naturalWidth > 0) target.drawImage(image, x, y, width, height);
+  else {
+    target.translate(x + width / 2, y + height / 2); target.fillStyle = known ? species.color : "#182632";
+    drawFishBody(species.shape === 6 ? 0 : species.shape, species.boss ? 26 : 20, false, target);
+  }
+  target.restore();
+}
+
 function drawOverlay(title: string, lines: string[]) {
   ctx.fillStyle = "rgba(0,5,13,.78)"; ctx.fillRect(0, 0, W, H); ctx.textAlign = "center";
   ctx.fillStyle = "#71ffe8"; ctx.font = "900 46px system-ui"; ctx.fillText(title, W / 2, H / 2 - 74);
@@ -658,7 +1208,9 @@ function drawOverlay(title: string, lines: string[]) {
 }
 
 function drawStartOverlay() {
-  const panelX = W / 2 - 300; const panelY = H - 205;
+  const panelX = W / 2 - 300;
+  // Center the instructions between the HUD and the sea surface.
+  const panelY = Math.max(76, (76 + screenY(0) - 154) / 2);
   ctx.fillStyle = "rgba(0,18,30,.76)"; ctx.strokeStyle = "rgba(123,255,238,.42)"; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.roundRect(panelX, panelY, 600, 154, 18); ctx.fill(); ctx.stroke();
   ctx.textAlign = "center"; ctx.fillStyle = "#71ffe8"; ctx.font = "900 34px system-ui"; ctx.fillText("深海サルベージ", W / 2, panelY + 43);
@@ -720,7 +1272,7 @@ async function createShareFile() {
   SPECIES.forEach((species, index) => {
     const x = 75 + index % 11 * 95; const y = 290 + Math.floor(index / 11) * 125; const known = discovered.has(species.id);
     shareCtx.fillStyle = known ? "rgba(45,110,125,.65)" : "rgba(255,255,255,.06)"; shareCtx.fillRect(x, y, 76, 94);
-    shareCtx.fillStyle = known ? species.glow : "#253442"; shareCtx.beginPath(); shareCtx.ellipse(x + 38, y + 38, species.boss ? 28 : 20, species.boss ? 13 : 10, 0, 0, Math.PI * 2); shareCtx.fill();
+    drawSpeciesPortrait(shareCtx, species, known, x + 4, y + 4, 68, 62);
     shareCtx.fillStyle = known ? "#f0ffff" : "#80909b"; shareCtx.textAlign = "center"; shareCtx.font = "800 18px system-ui"; shareCtx.fillText(known ? "✓" : "?", x + 38, y + 78);
   });
   shareCtx.textAlign = "left"; shareCtx.fillStyle = "#ffdb67"; shareCtx.font = "800 25px system-ui"; shareCtx.fillText(cleared ? "巨大深海魚の調査に成功！" : "今回の深海調査記録", 64, 570);
@@ -729,7 +1281,10 @@ async function createShareFile() {
 }
 
 function showShareMenu() {
-  if (shareMenu) shareMenu.hidden = false;
+  if (!shareMenu) return;
+  shareMenu.hidden = false;
+  shareResultButton?.setAttribute("aria-expanded", "true");
+  shareMenu.scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
 
 function setShareFeedback(text: string) {
@@ -740,12 +1295,12 @@ function setShareFeedback(text: string) {
 
 async function shareResult() {
   if (phase !== "result") return;
-  if (import.meta.env.DEV && debugParams.get("shareFallback") === "1") {
-    showShareMenu();
-    return;
-  }
+  showShareMenu();
+}
+
+async function shareWithDevice() {
   const file = await createShareFile();
-  if (!file) { showShareMenu(); return; }
+  if (!file) { setShareFeedback("共有画像を作成できませんでした"); return; }
   try {
     if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
       await navigator.share({ title: "深海サルベージ 調査記録", text: shareText(), url: shareUrl(), files: [file] });
@@ -755,10 +1310,11 @@ async function shareResult() {
       await navigator.share({ title: "深海サルベージ 調査記録", text: shareText(), url: shareUrl() });
       return;
     }
-    showShareMenu();
+    await copyShareText();
+    setShareFeedback("共有機能がないため文章をコピーしました");
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") return;
-    showShareMenu();
+    setShareFeedback("共有できませんでした");
   }
 }
 
@@ -814,8 +1370,10 @@ canvas.addEventListener("pointermove", (event) => { if (pointer.active) { const 
 window.addEventListener("pointerup", () => { pointer.active = false; });
 touchPause?.addEventListener("click", togglePause); touchCollection?.addEventListener("click", () => toggleCollection());
 shareResultButton?.addEventListener("click", () => void shareResult()); resultCollectionButton?.addEventListener("click", () => toggleCollection(true));
+shareNativeButton?.addEventListener("click", () => void shareWithDevice());
 shareXButton?.addEventListener("click", () => window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(`${shareText()}\n${shareUrl()}`)}`, "_blank", "noopener,noreferrer"));
-shareLineButton?.addEventListener("click", () => window.open(`https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(shareUrl())}`, "_blank", "noopener,noreferrer"));
+shareLineButton?.addEventListener("click", () => window.open(`https://line.me/R/msg/text/?${encodeURIComponent(`${shareText()}\n${shareUrl()}`)}`, "_blank", "noopener,noreferrer"));
+shareBlueskyButton?.addEventListener("click", () => window.open(`https://bsky.app/intent/compose?text=${encodeURIComponent(`${shareText()}\n${shareUrl()}`)}`, "_blank", "noopener,noreferrer"));
 shareSaveButton?.addEventListener("click", () => void saveShareImage());
 shareCopyButton?.addEventListener("click", () => void copyShareText());
 rankingRetry?.addEventListener("click", () => { retryFromResult(); showScreen("game"); });
@@ -826,9 +1384,18 @@ window.addEventListener("platform-play-approved", ((event: CustomEvent<{ gameId:
 for (const id of ["back-to-arcade", "cabinet-breadcrumb-arcade", "game-back-to-arcade", "ranking-another-game"]) document.querySelector(`#${id}`)?.addEventListener("click", () => window.location.assign("/"));
 
 function syncInitialScreen() { showScreen(window.location.pathname.startsWith("/cabinets/") ? "cabinet" : "arcade"); }
-function loop(now: number) { const dt = Math.min(.05, (now - lastTime) / 1_000); lastTime = now; update(dt); draw(); requestAnimationFrame(loop); }
+function loop(now: number) {
+  const dt = Math.min(.05, (now - lastTime) / 1_000); lastTime = now;
+  if (!document.hidden) { update(dt); draw(); }
+  requestAnimationFrame(loop);
+}
+document.addEventListener("visibilitychange", () => { lastTime = performance.now(); });
+initTerrainEditor();
 resetRun();
-if (debugParams.get("surfacePreview") === "1") {
+if (debugParams.get("terrainEditor") === "1") {
+  showScreen("game"); updateButtons();
+}
+else if (debugParams.get("surfacePreview") === "1") {
   showScreen("game"); updateButtons();
 }
 else if (debugParams.get("bossPractice") === "1") {

@@ -1,0 +1,33 @@
+{
+  "version": 2,
+  "models": {
+    "submarine": { "url": "/assets/deep-sea-salvage/models/submarine.glb", "scale": 1 },
+    "fish": { "url": "/assets/deep-sea-salvage/models/fish.glb", "scale": 1 },
+    "leviathan": { "url": "/assets/deep-sea-salvage/models/leviathan.glb", "scale": 1 },
+    "kelp": { "url": "/assets/deep-sea-salvage/models/kelp.glb", "scale": 1 },
+    "vent": { "url": "/assets/deep-sea-salvage/models/vent.glb", "scale": 1 },
+    "cliffDetail": { "url": "/assets/deep-sea-salvage/models/cliff-detail.glb", "scale": 1 }
+  },
+  "fishSpecies": {
+    "sun-sardine": { "url": "/assets/deep-sea-salvage/models/sun-sardine.glb", "scale": 1 },
+    "glass-bream": { "url": "/assets/deep-sea-salvage/models/glass-bream.glb", "scale": 1 },
+    "ribbon-goby": { "url": "/assets/deep-sea-salvage/models/ribbon-goby.glb", "scale": 1 },
+    "blue-puffer": { "url": "/assets/deep-sea-salvage/models/blue-puffer.glb", "scale": 1 },
+    "coral-ray": { "url": "/assets/deep-sea-salvage/models/coral-ray.glb", "scale": 1 },
+    "silver-hatchet": { "url": "/assets/deep-sea-salvage/models/silver-hatchet.glb", "scale": 1 },
+    "lantern-cod": { "url": "/assets/deep-sea-salvage/models/lantern-cod.glb", "scale": 1 },
+    "veil-squid": { "url": "/assets/deep-sea-salvage/models/veil-squid.glb", "scale": 1 },
+    "saw-shrimp": { "url": "/assets/deep-sea-salvage/models/saw-shrimp.glb", "scale": 1 },
+    "moon-jelly": { "url": "/assets/deep-sea-salvage/models/moon-jelly.glb", "scale": 1 },
+    "abyss-eel": { "url": "/assets/deep-sea-salvage/models/abyss-eel.glb", "scale": 1 },
+    "black-fang": { "url": "/assets/deep-sea-salvage/models/black-fang.glb", "scale": 1 },
+    "ghost-squid": { "url": "/assets/deep-sea-salvage/models/ghost-squid.glb", "scale": 1 },
+    "star-mouth": { "url": "/assets/deep-sea-salvage/models/star-mouth.glb", "scale": 1 },
+    "deep-ray": { "url": "/assets/deep-sea-salvage/models/deep-ray.glb", "scale": 1 },
+    "prism-fish": { "url": "/assets/deep-sea-salvage/models/prism-fish.glb", "scale": 1 },
+    "crown-jelly": { "url": "/assets/deep-sea-salvage/models/crown-jelly.glb", "scale": 1 },
+    "comet-eel": { "url": "/assets/deep-sea-salvage/models/comet-eel.glb", "scale": 1 },
+    "ruby-angler": { "url": "/assets/deep-sea-salvage/models/ruby-angler.glb", "scale": 1 },
+    "void-manta": { "url": "/assets/deep-sea-salvage/models/void-manta.glb", "scale": 1 }
+  }
+}
