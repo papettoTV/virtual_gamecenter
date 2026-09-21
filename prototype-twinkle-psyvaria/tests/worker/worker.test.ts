@@ -328,6 +328,36 @@ describe("Cloudflare Worker", () => {
     expect(updated.identity.playerName).toBe("変更後の名前");
   });
 
+  it("combines five visitor credits with a one-time five-credit registration bonus", async () => {
+    const bootstrapResponse = await exports.default.fetch("http://localhost/api/platform/bootstrap");
+    const player = await bootstrapResponse.json<{ playerId: string }>();
+    const cookie = bootstrapResponse.headers.get("set-cookie")?.split(";", 1)[0];
+    const token = cookie?.split("=")[1];
+    expect(token).toBeTruthy();
+
+    const welcomeResponse = await exports.default.fetch("http://localhost/api/platform/welcome-credit", {
+      method: "POST",
+      headers: { Cookie: cookie! },
+    });
+    const welcome = await welcomeResponse.json<{ wallet: { availableTotal: number } }>();
+    expect(welcome.wallet.availableTotal).toBe(5);
+
+    const profile = { sub: `google-${crypto.randomUUID()}`, name: "登録テスト" };
+    await registerGoogleAccount(env.DB, { playerId: player.playerId, token: token!, secureCookie: false }, profile);
+    await registerGoogleAccount(env.DB, { playerId: player.playerId, token: token!, secureCookie: false }, profile);
+
+    const registeredResponse = await exports.default.fetch("http://localhost/api/platform/bootstrap", {
+      headers: { Cookie: cookie! },
+    });
+    const registered = await registeredResponse.json<{ wallet: { availableTotal: number } }>();
+    expect(registered.wallet.availableTotal).toBe(10);
+
+    const bonus = await env.DB.prepare(
+      "SELECT COUNT(*) AS count FROM credit_ledger_entries WHERE player_id = ? AND reference_id = 'account-registration-bonus'",
+    ).bind(player.playerId).first<{ count: number }>();
+    expect(bonus?.count).toBe(1);
+  });
+
   it("logs into the shared developer account locally and returns to the source screen", async () => {
     const bootstrapResponse = await exports.default.fetch("http://localhost/api/platform/bootstrap");
     const bootstrap = await bootstrapResponse.json<{
