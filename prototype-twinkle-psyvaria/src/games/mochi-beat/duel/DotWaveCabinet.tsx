@@ -3,7 +3,7 @@ import { copySharedText } from "../../../features/notifications/share";
 import { useEffect, useReducer, useRef } from "react";
 import { createUuid } from "../../../shared/id";
 import { createCabinetClient, type CabinetClient } from "../../../realtime/cabinet-client";
-import type { CabinetState } from "../../../domain/cabinet";
+import type { CabinetState, DotWaveRoster } from "../../../domain/cabinet";
 import type { GameSnapshot, ServerMessage, VersusSeat } from "../../../shared/protocol";
 import { PlatformExperience } from "../../../features/platform/PlatformExperience";
 import { capturePlayCredit, fetchPlatformBootstrap, releasePlayCredit, reservePlayCredit, PlatformApiError } from "../../../features/platform/platform-client";
@@ -17,6 +17,7 @@ export default function DotWaveCabinet() {
   const audio = useRef<DuelAudio | null>(null);
   const clock = useRef(new ServerClock());
   const data = useRef({
+    resultPlayers: null as DotWaveRoster | null,
     cabinetId: "", room: null as CabinetState | null, pending: false, applied: false, queue: 0,
     busy: false, result: null as Extract<ServerMessage, { type: "versusResult" }> | null,
     seat: null as VersusSeat | null, credit: false, reservation: null as string | null, revision: 0,
@@ -104,7 +105,7 @@ export default function DotWaveCabinet() {
         net.role = message.role;
         if (!net.matchId) { net.side = net.role === "player" ? 0 : null; resetGame(); }
       }
-      if (message.type === "cabinetState") { d.room = message.state; if (message.state.status !== "challengePending") d.pending = false; }
+      if (message.type === "cabinetState") { d.room = message.state; if (message.state.status === "result") d.resultPlayers = message.state.dotWavePlayers ?? null; if (message.state.status !== "challengePending") d.pending = false; }
       if (message.type === "viewerKeyframe") {
         const frame = message.snapshot as unknown as DuelFrame;
         if (frame.streamId !== d.viewerStream) { d.viewerStream = frame.streamId; d.bestFrameSeq = -1; }
@@ -124,7 +125,7 @@ export default function DotWaveCabinet() {
         d.reservation = null; walletChanged();
       }
       if (message.type === "challengeAccepted") {
-        d.pending = false; d.applied = false; d.busy = false; d.result = null; d.seat = message.seat; d.rematchPending = false; d.rematchRequested = false;
+        d.pending = false; d.applied = false; d.busy = false; d.result = null; d.resultPlayers = null; d.seat = message.seat; d.rematchPending = false; d.rematchRequested = false;
         net.matchId = message.matchId; net.side = message.seat === "host" ? 0 : 1; net.startsAt = null;
         audio.current?.stop(); resetGame(); render();
         try {
@@ -167,12 +168,14 @@ export default function DotWaveCabinet() {
     });
     // Establish the account cookie before the WebSocket so reservations are tied to its player.
     void fetchPlatformBootstrap().then(() => { if (!disposed) client.current?.join(d.cabinetId, "dot-wave", watch); }).catch(showError);
+    const refreshProfile = () => client.current?.send({ type: "refreshDotWaveProfile" });
+    window.addEventListener("platform-profile-changed", refreshProfile);
     const timer = window.setInterval(() => {
       if (net.connected) client.current?.send({ type: "clockPing", sentAt: Date.now() });
       d.countdown = net.startsAt ? Math.max(0, Math.ceil((net.startsAt - net.now()) / 1000)) : 0;
       render();
     }, 500);
-    return () => { disposed = true; notifications.clearScope("dot-wave"); clearInterval(timer); client.current?.leave(); audio.current?.dispose(); audio.current = null; };
+    return () => { disposed = true; window.removeEventListener("platform-profile-changed", refreshProfile); notifications.clearScope("dot-wave"); clearInterval(timer); client.current?.leave(); audio.current?.dispose(); audio.current = null; };
   }, []);
 
   async function requestChallenge() {
@@ -228,6 +231,10 @@ export default function DotWaveCabinet() {
       audio.current?.stop(); render();
     }
   }
+  const viewingResult = net.role === "spectator" && net.latest?.engine.mode === "online" && ["impact", "finished"].includes(net.latest.engine.phase);
+  const players = d.result && d.resultPlayers ? d.resultPlayers
+    : viewingResult && d.room?.dotWaveResultPlayers ? d.room.dotWaveResultPlayers
+    : d.room?.dotWavePlayers ? [d.room.dotWavePlayers[0], d.room.dotWavePlayers[1] ?? {name:"CPU",wins:0}] as DotWaveRoster : undefined;
   const canChallenge = net.connected && net.role === "spectator" && !net.matchId && d.room && (["soloPlaying", "challengePending", "versusReady", "versusPlaying", "result"].includes(d.room.status) || (d.room.status === "occupied" && net.latest?.engine.phase === "finished"));
   return <>
     <div className="dot-cabinet-bar dot-wave">
@@ -240,7 +247,7 @@ export default function DotWaveCabinet() {
 
 
     </div>
-    <MochiDuel key={d.revision} network={net} sharedAudio={audio}
+    <MochiDuel key={d.revision} players={players} network={net} sharedAudio={audio}
       challengePending={d.pending && net.role === "player"}
       challengeNotice={<>{d.pending && net.role === "player" && <div className="dot-challenge-prompt" role="dialog" aria-label="対戦の申し込み"><strong>対戦の申し込みが来ました</strong><button onClick={() => void respond(true)}>対戦する</button><button onClick={() => void respond(false)}>今回は断る</button></div>}</>}
       boardNotice={<>{net.matchId && !net.startsAt && !d.result && <p role="status">対戦の準備中…</p>}</>}

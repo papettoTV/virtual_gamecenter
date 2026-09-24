@@ -195,3 +195,57 @@ it("accepts a challenge from the solo score screen without starting the next sol
   const countdown = await host.next("versusCountdown");
   expect((await guest.next("versusCountdown")).startsAt).toBe(countdown.startsAt);
 });
+
+it('shares names and champion streaks, preserves draws, transfers the crown and clears an empty seat', async () => {
+  const cabinet = crypto.randomUUID(), hostCookie = await player(), guestCookie = await player();
+  const identity = await (await exports.default.fetch('http://localhost/api/platform/bootstrap', {headers:{Cookie:hostCookie}})).json<{playerId:string}>();
+  await env.DB.prepare('UPDATE players SET guest_name = ? WHERE id = ?').bind('チャンピオンテスト', identity.playerId).run();
+  const host = await connect(hostCookie,cabinet), guest = await connect(guestCookie,cabinet,true);
+  const watcher = await connect(await player(),cabinet,true);
+  expect((await watcher.next('cabinetState',m=>m.state.dotWavePlayers?.[0]?.name==='チャンピオンテスト')).state.dotWavePlayers).toEqual([{name:'チャンピオンテスト',wins:0},null]);
+  const solo = await reserve(hostCookie,cabinet,'solo'); await capture(hostCookie,solo);
+  host.send({type:'startSolo',reservationId:solo}); await host.next('dotWaveSoloStarted');
+  async function battle(hp:[number,number]) {
+    const reservationId = await reserve(guestCookie,cabinet,'challenge');
+    guest.send({type:'requestChallenge',reservationId}); await host.next('challengeReceived');
+    host.send({type:'respondChallenge',accept:true});
+    const {matchId}=await host.next('challengeAccepted'); await guest.next('challengeAccepted');
+    await capture(guestCookie,reservationId);
+    host.send({type:'versusReady',matchId}); guest.send({type:'versusReady',matchId});
+    await host.next('versusCountdown'); await guest.next('versusCountdown');
+    host.send({type:'dotWaveResult',matchId,hp,turn:20});
+    await host.next('versusResult'); await guest.next('versusResult');
+    const result = await watcher.next('cabinetState',m=>m.state.status==='result');
+    // Repeated results cannot add wins.
+    host.send({type:'dotWaveResult',matchId,hp,turn:20});
+    host.send({type:'clockPing',sentAt:123}); await host.next('clockPong');
+    guest.send({type:'dotWaveReturn',matchId});
+    await host.next('versusEnded'); await guest.next('versusEnded');
+    const after = await watcher.next('cabinetState',m=>m.state.status==='soloPlaying' && m.state.dotWavePlayers?.[0]?.wins===(hp[0]>hp[1]?result.state.dotWavePlayers![0]!.wins:hp[0]===hp[1]?2:1));
+    return {result:result.state.dotWavePlayers!,after:after.state.dotWavePlayers!};
+  }
+  expect((await battle([90,0])).after[0]!.wins).toBe(1);
+  expect((await battle([90,0])).after[0]!.wins).toBe(2);
+  expect((await battle([50,50])).after[0]!.wins).toBe(2);
+  watcher.messages.splice(0); // Discard the initial occupied-seat broadcast before testing the new transition.
+  host.send({type:'stopSolo'});
+  expect((await watcher.next('cabinetState',m=>m.state.status==='occupied')).state.dotWavePlayers![0]!.wins).toBe(2);
+  const anotherSolo=await reserve(hostCookie,cabinet,'solo'); await capture(hostCookie,anotherSolo);
+  host.send({type:'startSolo',reservationId:anotherSolo}); await host.next('dotWaveSoloStarted');
+  // Profile edits do not reset the streak; public data contains only the display name and wins.
+  await env.DB.prepare('UPDATE players SET guest_name = ? WHERE id = ?').bind('名前変更テスト',identity.playerId).run();
+  host.send({type:'refreshDotWaveProfile'});
+  expect((await watcher.next('cabinetState',m=>m.state.dotWavePlayers?.[0]?.name==='名前変更テスト')).state.dotWavePlayers![0]).toEqual({name:'名前変更テスト',wins:2});
+  const last = await battle([0,80]);
+  expect(last.result.map(p=>p?.wins)).toEqual([0,1]);
+  expect(last.after[0]).toEqual(last.result[1]);
+  // A late spectator sees the same champion without requiring a game frame.
+  const late = await connect(await player(),cabinet,true);
+  const lateState=(await late.next('cabinetState',m=>m.state.dotWavePlayers?.[0]?.wins===1)).state;
+  expect(lateState.dotWavePlayers![0]).toEqual(last.after[0]);
+  expect(lateState.dotWaveResultPlayers).toEqual(last.result);
+  guest.send({type:'leaveCabinet'});
+  expect((await watcher.next('cabinetState',m=>m.state.status==='empty')).state.dotWavePlayers).toEqual([null,null]);
+  guest.send({type:'joinCabinet',gameId:'dot-wave'}); await guest.next('joinedCabinet');
+  expect((await watcher.next('cabinetState',m=>m.state.status==='occupied'&&m.state.dotWavePlayers?.[0]?.name===last.after[0]!.name)).state.dotWavePlayers![0]!.wins).toBe(0);
+});

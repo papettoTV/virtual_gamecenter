@@ -795,3 +795,18 @@
 .duel-tap { touch-action:none; user-select:none; -webkit-user-select:none; }
 
 .neon-rail-release { fill:#090d20; stroke:currentColor; stroke-width:3; }
+
+.dot-player-roster { display:flex; justify-content:space-between; max-width:880px; margin:0 auto 10px; gap:12px; }
+.dot-player-nameplate { width:38%; min-width:0; text-align:center; color:var(--cyan,#13e5f3); }
+.dot-player-nameplate.side-1 { color:var(--pink,#ff39bc); }
+.dot-player-nameplate strong { display:block; font-size:clamp(12px,2vw,17px); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.dot-champion { height:30px; display:flex; align-items:center; justify-content:center; gap:6px; color:#dfb85d; }
+.dot-champion svg { width:36px; height:26px; }
+.dot-champion span { font-weight:900; font-size:20px; }
+.dot-champion small { font-size:10px; margin-left:3px; }
+.dot-champion.tier-2 { color:#ffe478; filter:drop-shadow(0 0 3px #ffce4470); }
+.dot-champion.tier-3 { color:#fff1af; filter:drop-shadow(0 0 5px #ffd166); }
+.dot-champion.tier-3 svg { width:44px; height:30px; }
+.dot-player-roster.is-entering .dot-champion:not(.tier-0) { animation:dot-crown-entry .65s ease-out both; }
+@keyframes dot-crown-entry { from { transform:translateY(-8px) scale(.6); opacity:0; } to { transform:translateY(0) scale(1); opacity:1; } }
+@media(prefers-reduced-motion:reduce) { .dot-player-roster.is-entering .dot-champion { animation:none; } }

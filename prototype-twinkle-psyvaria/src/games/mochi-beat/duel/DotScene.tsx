@@ -1,3 +1,5 @@
+import type { DotWaveRoster } from "../../../domain/cabinet";
+import { PlayerRoster } from "./PlayerRoster";
 import { turnCue, cueName } from "./turnCue";
 import { BattleIcon } from "./BattleIcon";
 import { memo } from "react";
@@ -50,7 +52,7 @@ const Backdrop=memo(function Backdrop(){
  </g>;
 });
 
-export function DotScene({engine:e,viewSide=0}:{engine:Engine;viewSide?:Side|null}) {
+export function DotScene({engine:e,viewSide=0,players}:{engine:Engine;viewSide?:Side|null;players?:DotWaveRoster}) {
  const beat=Math.max(0,e.seconds/(e.exchange?.beatSeconds??BEAT));
  const attacker=e.exchange?.attacker??e.match.turn%2 as Side;
  const cue=turnCue(attacker,beat);
@@ -62,7 +64,7 @@ export function DotScene({engine:e,viewSide=0}:{engine:Engine;viewSide?:Side|nul
  const power=e.exchange?quality(e.exchange.attack):0;
  const cells=[];
  for(let y=-9;y<=9;y++)for(let x=-9;x<=9;x++)if(Math.hypot(x,y)<9)cells.push(<rect key={`${x}-${y}`} x={480+x*6} y={90+y*6} width="5" height="5" fill={Math.hypot(x,y)>7.8?CYAN:"#102443"}/>);
- return <div className="dot-scene-wrap"><svg className="duel-scene" viewBox="0 0 960 360" role="img" aria-label="シアンとピンクの音の生き物が、音符の弾とシールドで戦うドットのアリーナ" shapeRendering="crispEdges">
+ return <><div className="dot-scene-wrap"><svg className="duel-scene" viewBox="0 0 960 360" role="img" aria-label="シアンとピンクの音の生き物が、音符の弾とシールドで戦うドットのアリーナ" shapeRendering="crispEdges">
   <Backdrop/>
   <g className="dot-reactor" data-heat={heat} aria-label="難しさに応じて光の列が伸びる音符のコア">
    {cells}<Pixels rows={NOTE} x={459} y={66} color={pulse===0?"#ffffff":CYAN}/>
@@ -137,5 +139,7 @@ export function DotScene({engine:e,viewSide=0}:{engine:Engine;viewSide?:Side|nul
      <svg className="dot-turn-arrow" viewBox="0 0 40 20" aria-hidden="true"><path d="M4 2h32L20 18Z" fill="currentColor"/></svg>
    </div>;
  })}
- </div>;
+ </div>
+ <PlayerRoster players={players ?? [{name:e.mode==="local"?"1P":"あなた",wins:0},{name:e.mode==="cpu"?"CPU":"2P",wins:0}]} entrance={e.phase==="intro"||e.phase==="countdown"}/>
+ </>;
 }

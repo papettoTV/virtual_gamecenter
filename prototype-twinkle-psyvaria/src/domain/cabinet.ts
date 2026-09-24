@@ -9,11 +9,16 @@ export type CabinetStatus =
 
 export type CabinetRole = "visitor" | "player" | "spectator";
 
+export type DotWavePlayer = { name: string; wins: number };
+export type DotWaveRoster = [DotWavePlayer | null, DotWavePlayer | null];
+
 export interface CabinetState {
   cabinetId: string;
   gameId: string;
   status: CabinetStatus;
   freePlay: boolean;
+  dotWavePlayers?: DotWaveRoster;
+  dotWaveResultPlayers?: DotWaveRoster;
   playerCount: number;
   spectatorCount: number;
   readyCount: number;

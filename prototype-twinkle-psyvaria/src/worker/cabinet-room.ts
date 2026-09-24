@@ -5,6 +5,7 @@ import {
   reduceCabinetState,
   type CabinetRole,
   type CabinetState,
+  type DotWavePlayer,
 } from "../domain/cabinet";
 import {
   enqueueChallenge,
@@ -23,13 +24,14 @@ import type {
   VersusTerminalReport,
 } from "../shared/protocol";
 import { getGameDefinition } from "../domain/game";
-import { getPlayerIdentity } from "./platform";
+import { getPlayerIdentity, getPlayerIdentityById } from "./platform";
 
 interface ConnectionAttachment {
   clientId: string;
   role: CabinetRole;
   playerId?: string;
   dotWaveCredit?: boolean;
+  dotWavePlayer?: DotWavePlayer;
 }
 
 interface PendingChallenge {
@@ -117,11 +119,12 @@ export class CabinetRoom extends DurableObject<Env> {
     const pair = new WebSocketPair();
     const client = pair[0];
     const server = pair[1];
+    const identity = requestedGame.id === "dot-wave" ? await getPlayerIdentity(request, this.env.DB) : null;
     this.ctx.acceptWebSocket(server);
     const attachment: ConnectionAttachment = {
       clientId: crypto.randomUUID(),
       role: "visitor",
-      ...(requestedGame.id === "dot-wave" ? { playerId: (await getPlayerIdentity(request, this.env.DB))?.playerId } : {}),
+      ...(requestedGame.id === "dot-wave" ? { playerId: identity?.playerId, dotWavePlayer: { name: identity?.playerName ?? "ゲスト", wins: 0 } } : {}),
     };
     server.serializeAttachment(attachment);
     this.send(server, { type: "connected", clientId: attachment.clientId });
@@ -158,6 +161,15 @@ export class CabinetRoom extends DurableObject<Env> {
     }
 
     const attachment = this.attachment(socket);
+    if (message.type === "refreshDotWaveProfile") {
+      if (this.state.gameId !== "dot-wave" || !attachment.playerId) return;
+      const identity = await getPlayerIdentityById(this.env.DB, attachment.playerId);
+      const current = this.attachment(socket);
+      socket.serializeAttachment({ ...current, dotWavePlayer: { name: identity.playerName, wins: current.dotWavePlayer?.wins ?? 0 } });
+      await this.persistState();
+      this.broadcastState();
+      return;
+    }
     if (message.type === "clockPing" && Number.isFinite(message.sentAt)) {
       this.send(socket, { type: "clockPong", sentAt: message.sentAt, serverAt: Date.now() });
       return;
@@ -640,6 +652,16 @@ export class CabinetRoom extends DurableObject<Env> {
   private completeVersusResult(winner: VersusSeat | "draw", reason: string): void {
     const match = this.versusMatch;
     if (!match || this.state.status === "result") return;
+    if (this.state.gameId === "dot-wave" && this.state.status === "versusPlaying" && winner !== "draw") {
+      for (const seat of ["host", "challenger"] as const) {
+        const socket = this.findSocketByClientId(seat === "host" ? match.hostClientId : match.challengerClientId);
+        if (!socket) continue;
+        const attachment = this.attachment(socket);
+        const player = attachment.dotWavePlayer ?? {name: "ゲスト", wins: 0};
+        socket.serializeAttachment({...attachment, dotWavePlayer: {...player, wins: seat === winner ? player.wins + 1 : 0}});
+      }
+    }
+    if (this.state.gameId === "dot-wave") { this.syncDotWavePlayers(); this.state.dotWaveResultPlayers = this.state.dotWavePlayers; }
     match.winner = winner;
     match.resultReason = reason;
     this.state = reduceCabinetState(this.state, { type: "VERSUS_RESULT" });
@@ -792,7 +814,7 @@ export class CabinetRoom extends DurableObject<Env> {
     if (current.role !== "visitor") await this.leave(socket);
 
     const role = watch ? "spectator" : assignCabinetRole(this.state);
-    socket.serializeAttachment({ ...current, role } satisfies ConnectionAttachment);
+    socket.serializeAttachment({ ...this.attachment(socket), role } satisfies ConnectionAttachment);
     this.state = reduceCabinetState(
       this.state,
       role === "player" ? { type: "PLAYER_JOINED" } : { type: "SPECTATOR_JOINED" },
@@ -851,6 +873,7 @@ export class CabinetRoom extends DurableObject<Env> {
       this.challengeQueue = [];
       this.syncQueueCount();
       this.state = reduceCabinetState(this.state, { type: "PLAYER_LEFT" });
+      delete this.state.dotWaveResultPlayers;
       this.latestKeyframe = null;
       this.latestMotionFrame = null;
       this.eventsSinceKeyframe = [];
@@ -859,7 +882,7 @@ export class CabinetRoom extends DurableObject<Env> {
       this.state = reduceCabinetState(this.state, { type: "SPECTATOR_LEFT" });
     }
 
-    socket.serializeAttachment({ ...attachment, role: "visitor" } satisfies ConnectionAttachment);
+    socket.serializeAttachment({ ...attachment, role: "visitor", ...(attachment.dotWavePlayer ? { dotWavePlayer: {...attachment.dotWavePlayer, wins: 0} } : {}) } satisfies ConnectionAttachment);
     await this.persistState();
     this.broadcastState();
   }
@@ -882,7 +905,16 @@ export class CabinetRoom extends DurableObject<Env> {
     }
   }
 
+  private syncDotWavePlayers(): void {
+    if (this.state.gameId !== "dot-wave") return;
+    const host = this.versusMatch ? this.findSocketByClientId(this.versusMatch.hostClientId) : this.findSocketByRole("player");
+    const challenger = this.versusMatch ? this.findSocketByClientId(this.versusMatch.challengerClientId) : null;
+    const player = (socket: WebSocket | null): DotWavePlayer | null => socket ? this.attachment(socket).dotWavePlayer ?? {name: "ゲスト", wins: 0} : null;
+    this.state.dotWavePlayers = [player(host), player(challenger)];
+  }
+
   private broadcastState(): void {
+    this.syncDotWavePlayers();
     this.broadcast({ type: "cabinetState", state: this.state });
     this.broadcastChallengeQueueStatuses();
   }
@@ -949,6 +981,7 @@ export class CabinetRoom extends DurableObject<Env> {
   }
 
   private async persistState(): Promise<void> {
+    this.syncDotWavePlayers();
     await this.ctx.storage.put("cabinet", {
       cabinetId: this.cabinetId,
       state: this.state,

@@ -447,6 +447,7 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
       const { identity } = await updatePlayerName(playerName);
       setPlatform((current) => current ? { ...current, ...identity } : current);
       setEditingName(false);
+      window.dispatchEvent(new Event("platform-profile-changed"));
       notifications.show({ id: "platform-name", type: "success", message: "名前を変更しました。" });
     } catch {
       notifications.show({ id: "platform-name", type: "error", message: "名前を変更できませんでした。" });

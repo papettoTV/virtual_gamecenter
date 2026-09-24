@@ -750,7 +750,7 @@ export async function getPlayerIdentity(
   return getPlayerIdentityById(database, session.playerId);
 }
 
-async function getPlayerIdentityById(
+export async function getPlayerIdentityById(
   database: D1Database,
   playerId: string,
 ): Promise<PlayerIdentity> {

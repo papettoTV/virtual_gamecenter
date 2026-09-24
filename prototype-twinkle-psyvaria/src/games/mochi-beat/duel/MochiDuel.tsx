@@ -1,4 +1,5 @@
 import { notifications } from "../../../features/notifications/notifications";
+import type { DotWaveRoster } from "../../../domain/cabinet";
 import { useEffect, useReducer, useRef, type RefObject, type ReactNode } from "react";
 import { turnCue, cueName, inputHint, countdownCue } from "./turnCue";
 import { DotScene, PixelWord } from "./DotScene";
@@ -13,7 +14,7 @@ type Phase = "countdown" | "intro" | "playing" | "paused" | "impact" | "finished
 export type Engine = { phase: Phase; mode: "cpu" | "local" | "online"; match: Match; selected: number; exchange: Exchange | null; seconds: number; outcome: Resolution | null; impactElapsed: number; feedback: string; cpu: Grade[]; flash: { side: Side; grade: Grade; at: number } | null; inputWarning: { side: Side; at: number; message: string } | null };
 const fresh = (mode: Engine["mode"] = "cpu", ending: Ending = "limited"): Engine => ({ phase: "intro", mode, match: createMatch(ending), selected: 0, exchange: null, seconds: 0, outcome: null, impactElapsed: 0, feedback: "", cpu: [], flash: null, inputWarning: null });
 
-export default function MochiDuel({ network, sharedAudio, boardNotice, resultPanel, challengeNotice, challengePending = false, holdResult = false }: { network?: DuelLink; sharedAudio?: RefObject<DuelAudio | null>; boardNotice?: ReactNode; resultPanel?: ReactNode; challengeNotice?: ReactNode; holdResult?: boolean; challengePending?: boolean } = {}) {
+export default function MochiDuel({ players, network, sharedAudio, boardNotice, resultPanel, challengeNotice, challengePending = false, holdResult = false }: { players?: DotWaveRoster; network?: DuelLink; sharedAudio?: RefObject<DuelAudio | null>; boardNotice?: ReactNode; resultPanel?: ReactNode; challengeNotice?: ReactNode; holdResult?: boolean; challengePending?: boolean } = {}) {
   const engine = useRef(fresh(network?.matchId ? "online" : "cpu"));
   const ownSound = useRef<DuelAudio | null>(null);
   const sound = sharedAudio ?? ownSound;
@@ -32,7 +33,8 @@ export default function MochiDuel({ network, sharedAudio, boardNotice, resultPan
   const alive = useRef(true);
   const [, render] = useReducer((value: number) => value + 1, 0);
   const e = engine.current;
-  const name = (side: Side) => network ? `${side === network.side ? "あなた" : engine.current.mode === "cpu" && side === 1 ? "CPU" : "相手"} / ${side === 0 ? "CYAN" : "PINK"}` : side === 0 ? (engine.current.mode === "local" ? "1P / CYAN" : "あなた") : engine.current.mode === "cpu" ? "CPU / PINK" : "2P / PINK";
+  const roster = useRef(players); roster.current = players;
+  const name = (side: Side) => roster.current?.[side]?.name ?? (network ? `${side === network.side ? "あなた" : engine.current.mode === "cpu" && side === 1 ? "CPU" : "相手"} / ${side === 0 ? "CYAN" : "PINK"}` : side === 0 ? (engine.current.mode === "local" ? "1P / CYAN" : "あなた") : engine.current.mode === "cpu" ? "CPU / PINK" : "2P / PINK");
 
   useEffect(() => { if (holdResult) { engine.current.phase = "finished"; engine.current.match.winner ??= network?.side ?? 0; render(); } }, [holdResult]);
 
@@ -298,7 +300,7 @@ export default function MochiDuel({ network, sharedAudio, boardNotice, resultPan
 
     <section className="duel-board" onClick={event => { if (e.phase === "paused" && !replica && !(event.target instanceof Element && event.target.closest("button, a, input, select, [role=dialog]"))) void pause(); }}>
       <h2 className={e.phase === "countdown" || e.phase === "playing" || e.phase === "impact" ? "dot-sr-only" : undefined} aria-live="polite">{heading}</h2>
-      <DotScene engine={e} viewSide={viewSide} />
+      <DotScene engine={e} viewSide={viewSide} players={players} />
       <div className="duel-board-notice">{boardNotice}</div>
       {e.phase === "paused" && <div className="duel-paused-challenge">{challengeNotice}</div>}
       {e.phase === "countdown" && <div className="duel-start-countdown" role="status" aria-label={`開始まで${Math.max(1, Math.ceil(-e.seconds))}秒`}><strong key={Math.ceil(-e.seconds)}>{Math.max(1, Math.min(3, Math.ceil(-e.seconds)))}</strong></div>}

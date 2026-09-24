@@ -19,6 +19,7 @@ export type ChallengeQueueClientStatus = "none" | "pending" | "queued" | "matche
 export type ClientMessage =
   | { type: "joinCabinet"; gameId: string; watch?: boolean }
   | { type: "clockPing"; sentAt: number }
+  | { type: "refreshDotWaveProfile" }
   | { type: "dotWaveResult"; matchId: string; hp: [number, number]; turn: number }
   | { type: "dotWaveReturn"; matchId: string }
   | { type: "startSolo"; reservationId?: string }
