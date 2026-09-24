@@ -1,14 +1,16 @@
-import { BEAT_SECONDS, COUNT_IN, PATTERNS, TOTAL_BEATS, result, roundAt, type Run } from "./core";
+import { COUNT_IN, PATTERNS, TOTAL_BEATS, roundAt, type Run, type Judgment, displayBeat, SET_BPMS, sessionResult, type RhythmSession } from "./core";
 
-export type Scene = { seconds: number; run: Run; phase: "ready" | "playing" | "paused" | "result"; feedback: string; feedbackAt: number; tappedAt: number };
+import { mochiImpact, drawFinishedMochi, mochiFinish } from "./mochi";
+
+export type Scene = { seconds: number; run: Run; session: RhythmSession; phase: "ready" | "playing" | "paused" | "setBreak" | "completing" | "result"; feedback: string; feedbackAt: number; tappedAt: number; tapJudgment: Judgment | null };
 const INK = "#294c40";
 const CREAM = "#fffaf0";
-const stages = ["おひさま広場", "夕やけピクニック", "お月見パーティー"];
 const skies = ["#f8f1db", "#f6e1d3", "#dfe7f0"];
 
 export function drawScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   const { seconds, run, phase } = scene;
-  const beat = Math.max(0, seconds / BEAT_SECONDS);
+  const beat = displayBeat(seconds, run.beatSeconds);
+  const completed = phase === "completing" || phase === "result";
   const round = roundAt(beat);
   const stage = Math.floor(round / 4);
   const local = (beat - COUNT_IN) % 8;
@@ -61,15 +63,15 @@ export function drawScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   for (let i = 0; i < 16; i++) { ellipse(30 + i * 63, 494 + i % 3 * 13, 3, 6, "#819e78"); }
 
   text("MOCHI BEAT", 36, 42, 17, INK, "left");
-  text(`STAGE ${stage + 1} / 3  ·  ${stages[stage]}`, 36, 70, 14, INK, "left");
-  text(result(run).score.toLocaleString().padStart(6, "0"), 922, 49, 32, INK, "right");
+  text(`SET ${scene.session.setIndex + 1} / 3 · STAGE ${stage + 1} / 3 · ${SET_BPMS[scene.session.setIndex]} BPM`, 36, 70, 14, INK, "left");
+  text(sessionResult(scene.session).score.toLocaleString().padStart(6, "0"), 922, 49, 32, INK, "right");
   text(`${run.combo} COMBO`, 922, 75, 14, INK, "right");
   box(36, 91, 888, 4, 2, "#294c401a");
-  box(36, 91, Math.max(4, Math.min(1, beat / TOTAL_BEATS) * 888), 4, 2, INK);
+  box(36, 91, Math.max(4, Math.min(1, seconds / (TOTAL_BEATS * run.beatSeconds)) * 888), 4, 2, INK);
 
   box(280, 117, 400, 57, 28, responding ? INK : CREAM);
-  text(counting ? "リズムにのろう！" : responding ? "あなたの番！" : "お手本をきこう", 480, 154, 27, responding ? CREAM : INK);
-  text(counting ? "4拍きいて、4拍で返そう" : `フレーズ ${round + 1} / 12`, 480, 202, 15);
+  text(completed ? "3セットクリア！" : counting ? "リズムにのろう！" : responding ? "あなたの番！" : "お手本をきこう", 480, 154, 27, responding ? CREAM : INK);
+  text(completed ? "どんなおもちになったかな？" : counting ? "まずはお手本の4拍。そのあと、あなたの4拍！" : `フレーズ ${round + 1} / 12 · ${responding ? "この4拍が終わったら、お手本へ" : "この4拍を覚えて、次はあなた！"}`, 480, 202, 15);
 
   rabbit(258, 377, false, demoStrike, "#86ada0");
   rabbit(702, 377, true, playerStrike, "#e5a852");
@@ -79,9 +81,25 @@ export function drawScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.moveTo(420 + i * 30, 439); ctx.lineTo(420 + i * 30, 481); ctx.stroke(); }
   ellipse(480, 423, 80, 26, "#dfb780", true);
   ellipse(480, 421, 63, 17, "#8d6441");
-  const squish = Math.max(demoStrike, playerStrike);
-  ellipse(480, 412 + squish * 8, 53 + squish * 11, 27 - squish * 12, CREAM, true);
-  if (squish > .5) for (const [dx, dy] of [[-65, -22], [58, -28], [-25, -60], [30, -65]]) ellipse(480 + dx!, 410 + dy!, 5, 8, CREAM);
+  // A judged hit drives the dough separately from the mallet animation.
+  const playerImpact = mochiImpact(scene.tapJudgment, playerAge);
+  const demoImpact = mochiImpact("perfect", !counting && local < 4 ? demoAge * run.beatSeconds : -1);
+  const impact = playerAge >= 0 && playerAge < .46 && scene.tapJudgment !== null ? playerImpact : demoImpact;
+  const rx = 53 + impact.spread;
+  const y = 412 - impact.bounce;
+  ctx.beginPath();
+  ctx.moveTo(480 - rx, y + 4);
+  ctx.bezierCurveTo(480 - rx, y - 28, 464, y - 26 + impact.dent, 480, y - 26 + impact.dent);
+  ctx.bezierCurveTo(496, y - 26 + impact.dent, 480 + rx, y - 28, 480 + rx, y + 4);
+  ctx.bezierCurveTo(480 + rx, y + 26, 480 - rx, y + 26, 480 - rx, y + 4);
+  ctx.fillStyle = CREAM; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.stroke();
+  if (impact.dent > 18) {
+    ctx.strokeStyle = "#fff7cb"; ctx.lineWidth = 4;
+    for (const direction of [-1, 1]) {
+      ctx.beginPath(); ctx.moveTo(480 + direction * 83, 401); ctx.lineTo(480 + direction * 98, 387); ctx.stroke();
+    }
+  }
+
 
   box(180, 501, 154, 29, 14, !responding ? INK : "#ffffff88");
   box(625, 501, 154, 29, 14, responding ? INK : "#ffffff88");
@@ -99,6 +117,16 @@ export function drawScene(ctx: CanvasRenderingContext2D, scene: Scene) {
     const active = Math.floor(halfBeat * 2) === index;
     ellipse(x, 576, active ? 15 : isNote ? 11 : 5, active ? 15 : isNote ? 11 : 5, active ? "#dfa152" : isNote ? INK : "#bdc7b7");
     if (index % 2 === 0) text(String(index / 2 + 1), x, 604, 12);
+  }
+  if (completed) {
+    // Show the actual finished dish before any ranking controls appear.
+    ctx.save();
+    ctx.translate(180, 220); ctx.scale(600 / 440, 600 / 440);
+    drawFinishedMochi(ctx, mochiFinish(sessionResult(scene.session).score).kind);
+    ctx.restore();
+    box(180, 448, 600, 83, 18, "#fffaf0f5");
+    text(mochiFinish(sessionResult(scene.session).score).title, 480, 481, 27);
+    text("おつかれさま！ まもなく成績を表示します", 480, 514, 16);
   }
   if (counting && phase === "playing") text(String(4 - Math.floor(beat)), 480, 331, 75);
   if (phase === "paused") {

@@ -1,9 +1,8 @@
-import { BUZZ_BARRIER, DEEP_SEA_SALVAGE, MOCHI_BEAT, type GameId } from "../domain/game";
+import { BUZZ_BARRIER, DEEP_SEA_SALVAGE, type GameId } from "../domain/game";
 
 type GameRuntimeLoader = () => Promise<unknown>;
 
 const runtimeLoaders: Record<GameId, GameRuntimeLoader> = {
-  [MOCHI_BEAT.id]: () => import("./mochi-beat/runtime"),
   [BUZZ_BARRIER.id]: () => import("./graze-duel/runtime"),
   [DEEP_SEA_SALVAGE.id]: () => {
     const params = new URLSearchParams(window.location.search);

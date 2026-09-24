@@ -49,6 +49,7 @@ function useCabinets(gameId: string) {
 }
 
 function openCabinet(cabinetId: string, gameId: string) {
+  if (gameId === "dot-wave") { location.assign(`/cabinets/${cabinetId}?game=dot-wave&watch=1`); return; }
   history.pushState({ cabinetId, gameId }, "", `/cabinets/${cabinetId}?game=${encodeURIComponent(gameId)}&watch=1`);
   window.dispatchEvent(new PopStateEvent("popstate"));
 }
@@ -160,7 +161,7 @@ export function CabinetDirectory({ gameId }: { gameId: string }) {
   );
 }
 
-export function CabinetSelector({ game }: { game: GameDefinition }) {
+export function CabinetSelector({ game, onStartSolo }: { game: GameDefinition; onStartSolo?: () => void }) {
   const { cabinets, loading } = useCabinets(game.id);
   const currentCabinetId = window.location.pathname.match(/^\/cabinets\/([^/]+)/)?.[1];
   const playingCabinets = cabinets
@@ -171,6 +172,7 @@ export function CabinetSelector({ game }: { game: GameDefinition }) {
     .slice(0, CABINET_PREVIEW_LIMIT);
 
   const startSolo = () => {
+    if (onStartSolo) { onStartSolo(); return; }
     window.dispatchEvent(new CustomEvent("create-solo-cabinet", {
       detail: { gameId: game.id },
     }));

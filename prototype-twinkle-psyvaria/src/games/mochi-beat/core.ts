@@ -11,14 +11,14 @@ export const PATTERNS: readonly (readonly number[])[] = [
 export const TOTAL_BEATS = COUNT_IN + PATTERNS.length * 8;
 export type Judgment = "perfect" | "good" | "miss";
 export type Note = { beat: number; round: number; judgment: Judgment | null; error: number | null };
-export type Run = { notes: Note[]; combo: number; maxCombo: number; extras: number };
+export type Run = { notes: Note[]; combo: number; maxCombo: number; extras: number; beatSeconds: number };
 
-export function createRun(): Run {
+export function createRun(beatSeconds = BEAT_SECONDS): Run {
   return {
     notes: PATTERNS.flatMap((pattern, round) => pattern.map((beat) => ({
       beat: COUNT_IN + round * 8 + 4 + beat, round, judgment: null, error: null,
     }))),
-    combo: 0, maxCombo: 0, extras: 0,
+    combo: 0, maxCombo: 0, extras: 0, beatSeconds,
   };
 }
 
@@ -29,7 +29,7 @@ export function roundAt(beat: number): number {
 export function missExpired(run: Run, seconds: number): boolean {
   let missed = false;
   for (const note of run.notes) {
-    if (note.judgment === null && seconds - note.beat * BEAT_SECONDS > HIT_WINDOW + 1e-9) {
+    if (note.judgment === null && seconds - note.beat * run.beatSeconds > HIT_WINDOW * run.beatSeconds / BEAT_SECONDS + 1e-9) {
       note.judgment = "miss";
       run.combo = 0;
       missed = true;
@@ -40,12 +40,12 @@ export function missExpired(run: Run, seconds: number): boolean {
 
 export function hit(run: Run, seconds: number): { judgment: Judgment; error: number | null } | null {
   missExpired(run, seconds);
-  const beat = seconds / BEAT_SECONDS;
+  const beat = seconds / run.beatSeconds;
   const note = run.notes.filter((item) => item.judgment === null)
-    .sort((a, b) => Math.abs(a.beat * BEAT_SECONDS - seconds) - Math.abs(b.beat * BEAT_SECONDS - seconds))[0];
-  if (note && Math.abs(seconds - note.beat * BEAT_SECONDS) <= HIT_WINDOW + 1e-9) {
-    const error = seconds - note.beat * BEAT_SECONDS;
-    const judgment = Math.abs(error) <= PERFECT_WINDOW + 1e-9 ? "perfect" : "good";
+    .sort((a, b) => Math.abs(a.beat * run.beatSeconds - seconds) - Math.abs(b.beat * run.beatSeconds - seconds))[0];
+  if (note && Math.abs(seconds - note.beat * run.beatSeconds) <= HIT_WINDOW * run.beatSeconds / BEAT_SECONDS + 1e-9) {
+    const error = seconds - note.beat * run.beatSeconds;
+    const judgment = Math.abs(error) <= PERFECT_WINDOW * run.beatSeconds / BEAT_SECONDS + 1e-9 ? "perfect" : "good";
     note.judgment = judgment; note.error = error;
     run.combo += 1; run.maxCombo = Math.max(run.maxCombo, run.combo);
     return { judgment, error };
@@ -64,3 +64,47 @@ export function result(run: Run) {
   const grade = score >= 95_000 ? "おもちの達人！" : score >= 80_000 ? "ノリノリ名人！" : score >= 60_000 ? "いいかんじ！" : "次はもっとつける！";
   return { perfect, good, miss, score, grade };
 }
+
+
+export const RUN_SECONDS = TOTAL_BEATS * BEAT_SECONDS;
+export const COMPLETION_SECONDS = 3.5;
+
+// Keep the final phrase on its last subdivision instead of wrapping into a new phrase.
+export function displayBeat(seconds: number, beatSeconds = BEAT_SECONDS) {
+  return Math.max(0, Math.min(seconds / beatSeconds, TOTAL_BEATS - 1e-6));
+}
+
+export function advanceCompletion(elapsed: number, delta: number, visible: boolean) {
+  return visible ? Math.min(COMPLETION_SECONDS, elapsed + Math.max(0, Math.min(delta, .1))) : elapsed;
+}
+
+
+export const SET_BPMS = [108, 126, 144] as const;
+export type RhythmSession = { setIndex: number; completedSets: number; runs: Run[] };
+export function createSession(): RhythmSession {
+  return { setIndex: 0, completedSets: 0, runs: SET_BPMS.map((bpm) => createRun(60 / bpm)) };
+}
+export function completeSet(session: RhythmSession) {
+  session.completedSets = Math.max(session.completedSets, session.setIndex + 1);
+  return session.completedSets === SET_BPMS.length;
+}
+export function advanceSet(session: RhythmSession) {
+  if (session.completedSets !== session.setIndex + 1 || session.completedSets >= SET_BPMS.length) return false;
+  const previous = session.runs[session.setIndex]!;
+  session.setIndex += 1;
+  const next = session.runs[session.setIndex]!;
+  next.combo = previous.combo;
+  next.maxCombo = previous.maxCombo;
+  return true;
+}
+export function sessionResult(session: RhythmSession) {
+  const combined: Run = {
+    notes: session.runs.flatMap((run) => run.notes),
+    combo: session.runs[session.setIndex]!.combo,
+    maxCombo: Math.max(...session.runs.map((run) => run.maxCombo)),
+    extras: session.runs.reduce((sum, run) => sum + run.extras, 0),
+    beatSeconds: BEAT_SECONDS,
+  };
+  return { ...result(combined), extras: combined.extras, maxCombo: combined.maxCombo };
+}
+export const SESSION_SECONDS = SET_BPMS.reduce((sum, bpm) => sum + TOTAL_BEATS * 60 / bpm, 0);

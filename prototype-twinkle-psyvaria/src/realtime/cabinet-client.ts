@@ -7,7 +7,7 @@ interface CabinetClientHandlers {
 }
 
 export interface CabinetClient {
-  join(cabinetId: string, gameId: string): void;
+  join(cabinetId: string, gameId: string, watch?: boolean): void;
   leave(): void;
   send(message: ClientMessage | Record<string, unknown>): boolean;
   getBufferedAmount(): number;
@@ -23,6 +23,7 @@ export function createCabinetClient(handlers: CabinetClientHandlers = {}): Cabin
   let cabinetId: string | null = null;
   let gameId: string | null = null;
   let wantsCabinet = false;
+  let watch = false;
   let reconnectTimer: number | null = null;
 
   function connect() {
@@ -42,7 +43,7 @@ export function createCabinetClient(handlers: CabinetClientHandlers = {}): Cabin
 
     socket.addEventListener("open", () => {
       handlers.onConnectionChange?.(true);
-      if (wantsCabinet && gameId) send({ type: "joinCabinet", gameId });
+      if (wantsCabinet && gameId) send({ type: "joinCabinet", gameId, watch });
     });
     socket.addEventListener("close", () => {
       socket = null;
@@ -68,7 +69,8 @@ export function createCabinetClient(handlers: CabinetClientHandlers = {}): Cabin
     return false;
   }
 
-  function join(nextCabinetId: string, nextGameId: string) {
+  function join(nextCabinetId: string, nextGameId: string, asViewer = false) {
+    watch = asViewer;
     if (cabinetId !== nextCabinetId || gameId !== nextGameId) {
       wantsCabinet = false;
       socket?.close();
@@ -77,7 +79,7 @@ export function createCabinetClient(handlers: CabinetClientHandlers = {}): Cabin
       gameId = nextGameId;
     }
     wantsCabinet = true;
-    send({ type: "joinCabinet", gameId: nextGameId });
+    send({ type: "joinCabinet", gameId: nextGameId, watch });
   }
 
   function leave() {

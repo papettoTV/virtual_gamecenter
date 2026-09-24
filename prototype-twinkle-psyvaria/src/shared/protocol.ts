@@ -17,8 +17,11 @@ export interface VersusTerminalReport {
 export type ChallengeQueueClientStatus = "none" | "pending" | "queued" | "matched";
 
 export type ClientMessage =
-  | { type: "joinCabinet"; gameId: string }
-  | { type: "startSolo" }
+  | { type: "joinCabinet"; gameId: string; watch?: boolean }
+  | { type: "clockPing"; sentAt: number }
+  | { type: "dotWaveResult"; matchId: string; hp: [number, number]; turn: number }
+  | { type: "dotWaveReturn"; matchId: string }
+  | { type: "startSolo"; reservationId?: string }
   | { type: "stopSolo" }
   | { type: "leaveCabinet" }
   | { type: "gameKeyframe"; seq: number; snapshot: GameSnapshot }
@@ -36,6 +39,8 @@ export type ClientMessage =
   | { type: "declineRematch"; matchId: string };
 
 export type ServerMessage =
+  | { type: "dotWaveSoloStarted" }
+  | { type: "clockPong"; sentAt: number; serverAt: number }
   | { type: "connected"; clientId: string }
   | { type: "joinedCabinet"; clientId: string; role: CabinetRole }
   | { type: "cabinetState"; state: CabinetState }

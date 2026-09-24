@@ -1,0 +1,797 @@
+
+.dot-wave {
+  --cyan: #13e5f3;
+  --pink: #ff39bc;
+  --lime: #baff39;
+  --ink: #07091a;
+  color: #eaf5ff;
+  width: min(1040px,100% - 32px);
+  margin: 18px auto 40px;
+  font-family: ui-monospace,SFMono-Regular,Menlo,Hiragino Kaku Gothic ProN,monospace;
+  font-size: 14px
+}
+.dot-wave * {
+  box-sizing: border-box
+}
+.dot-wave header {
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 10px;
+  display: flex
+}
+.dot-wave h1 {
+  margin: 6px 0 0;
+  line-height: 1
+}
+.dot-word {
+  width: 280px;
+  max-width: 60vw;
+  height: 41px;
+  display: block
+}
+.duel-eyebrow {
+  color: #9a9dba;
+  letter-spacing: .23em;
+  font-size: 10px
+}
+.dot-wave a {
+  color: #a4abc8;
+  border-bottom: 1px solid #4b4476;
+  padding: 6px 0;
+  font-size: 12px;
+  text-decoration: none
+}
+.dot-wave a:hover {
+  color: var(--cyan)
+}
+.duel-mode-label {
+  color: #a4abc8;
+  letter-spacing: .08em;
+  margin: 12px 0;
+  font-size: 11px
+}
+.duel-health {
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  margin-bottom: 12px;
+  display: grid
+}
+.duel-player {
+  --team: var(--cyan);
+  border: 1px solid #245967;
+  border-left: 4px solid var(--team);
+  background: #0b1527;
+  padding: 9px 12px
+}
+.duel-player.player-1 {
+  --team: var(--pink);
+  border-color: #60204f;
+  border-right: 4px solid var(--team);
+  background: #1c0b25;
+  border-left-width: 1px
+}
+.duel-player>div {
+  color: var(--team);
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  display: flex
+}
+.duel-player small {
+  color: #abb4cc;
+  font-size: 10px;
+  display: block
+}
+.duel-player progress {
+  appearance: none;
+  background: #1c203d;
+  border: 0;
+  width: 100%;
+  height: 8px;
+  margin: 7px 0
+}
+.duel-player progress::-webkit-progress-bar {
+  background: #1c203d
+}
+.duel-player progress::-webkit-progress-value {
+  background: repeating-linear-gradient(to right,var(--team) 0 7px,transparent 7px 9px)
+}
+.duel-player progress::-moz-progress-bar {
+  background: var(--team)
+}
+.duel-board {
+  background: var(--ink);
+  border: 1px solid #3c2961;
+  padding: 16px 18px;
+  position: relative;
+  box-shadow: 5px 5px #17122b
+}
+.duel-board:before,.duel-board:after {
+  content: "";
+  background: var(--cyan);
+  width: 24px;
+  height: 3px;
+  position: absolute;
+  top: -2px
+}
+.duel-board:before {
+  left: 0
+}
+.duel-board:after {
+  background: var(--pink);
+  right: 0
+}
+.dot-wave h2 {
+  text-align: center;
+  color: #f1f5ff;
+  letter-spacing: .04em;
+  min-height: 28px;
+  margin: 0 0 6px;
+  font-size: clamp(14px,2.5vw,21px)
+}
+.duel-scene {
+  width: 100%;
+  max-height: 330px;
+  font-family: inherit;
+  display: block
+}
+.dot-wave p {
+  color: inherit;
+  line-height: 1.8
+}
+.duel-intro-panel {
+  text-align: center;
+  max-width: 850px;
+  margin: 10px auto 0
+}
+.duel-intro-panel>p:first-child {
+  color: var(--cyan);
+  font-size: 18px;
+  font-weight: 700
+}
+.duel-intro-panel ol {
+  text-align: left;
+  counter-reset: steps;
+  grid-template-columns: repeat(3,1fr);
+  gap: 12px;
+  padding: 0;
+  line-height: 1.8;
+  list-style: none;
+  display: grid
+}
+.duel-intro-panel li {
+  background: #111329;
+  border-top: 2px solid #514077;
+  padding: 12px;
+  font-size: 12px
+}
+.duel-intro-panel li strong {
+  color: var(--lime);
+  margin-bottom: 5px;
+  display: block
+}
+.duel-intro-panel>p {
+  margin: 12px 0;
+  font-size: 12px
+}
+.duel-intro-panel label {
+  color: #a5adc7;
+  flex-direction: column;
+  align-items: start;
+  gap: 7px;
+  margin: 8px;
+  font-size: 11px;
+  display: inline-flex
+}
+.dot-wave button,.dot-wave select {
+  font: inherit;
+  color: #eef5ff;
+  cursor: pointer;
+  background: #17132e;
+  border: 1px solid #63537e;
+  border-radius: 0;
+  padding: 12px 16px
+}
+.dot-wave select {
+  max-width: 100%;
+  font-size: 12px
+}
+.dot-wave button:hover:enabled {
+  border-color: var(--cyan);
+  background: #2a2450
+}
+.dot-wave button:focus-visible,.dot-wave select:focus-visible,.dot-wave input:focus-visible,.dot-wave a:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 4px
+}
+.dot-wave button:disabled {
+  opacity: .38;
+  cursor: default
+}
+.dot-wave .duel-primary {
+  background: var(--cyan);
+  color: #051224;
+  letter-spacing: .08em;
+  border: 0;
+  margin: 18px auto 12px;
+  padding: 15px 34px;
+  font-weight: 900;
+  display: block;
+  box-shadow: 4px 4px #14627c
+}
+.dot-wave .duel-primary:hover:enabled {
+  background: #91fbff
+}
+.duel-intro-panel>small {
+  color: #818ba8;
+  margin: 18px 0 4px;
+  font-size: 10px;
+  display: block
+}
+.duel-rhythm {
+  text-align: center;
+  border-top: 1px solid #242040;
+  padding: 6px 0 0
+}
+.duel-rhythm>strong {
+  color: var(--cyan);
+  letter-spacing: .12em;
+  font-size: 12px
+}
+.duel-beats {
+  justify-content: center;
+  gap: 16px;
+  margin: 14px 0;
+  display: flex
+}
+.duel-beats span {
+  color: #78839c;
+  background: #101125;
+  border: 2px dotted #403558;
+  place-items: center;
+  width: 38px;
+  height: 34px;
+  font-size: 12px;
+  display: grid
+}
+.duel-beats .is-note {
+  border-color: var(--cyan);
+  color: var(--cyan);
+  background: #0e2838
+}
+.duel-beats span:nth-child(2n).is-note {
+  border-color: var(--pink);
+  color: var(--pink);
+  background: #301231
+}
+.duel-beats .perfect,.duel-beats span:nth-child(2n).perfect {
+  color: #101b15;
+  border: 2px solid var(--lime);
+  background: var(--lime)
+}
+.duel-beats .good,.duel-beats span:nth-child(2n).good {
+  color: #111827;
+  background: #bedce5;
+  border-color: #bedce5
+}
+.duel-beats .miss,.duel-beats span:nth-child(2n).miss {
+  color: #ff988f;
+  background: #391d38;
+  border-color: #d06773
+}
+.duel-beats .is-current {
+  outline-offset: 4px;
+  outline: 2px solid #fff
+}
+.duel-rhythm p {
+  color: #a5afc9;
+  margin: 6px 0 0;
+  font-size: 11px
+}
+.duel-feedback {
+  text-align: center;
+  min-height: 24px;
+  margin: 12px 0;
+  font-size: 12px;
+  color: var(--lime)!important
+}
+.duel-controls {
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: stretch;
+  gap: 10px;
+  display: flex
+}
+.duel-controls .duel-tap {
+  min-width: 220px;
+  color: var(--cyan);
+  border: 2px solid var(--cyan);
+  touch-action: manipulation;
+  background: #0c3344;
+  font-weight: 700
+}
+.duel-controls .player-1 {
+  color: var(--pink);
+  border-color: var(--pink);
+  background: #32102d
+}
+.duel-controls .duel-tap:enabled {
+  box-shadow: 3px 3px #145269
+}
+.duel-controls .player-1:enabled {
+  box-shadow: 3px 3px #771f67
+}
+.duel-tap small {
+  margin-top: 4px;
+  font-size: 10px;
+  display: block
+}
+.duel-controls label {
+  color: #9da6c1;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  display: flex
+}
+.duel-controls input {
+  accent-color: var(--cyan);
+  width: 85px
+}
+.duel-choice-panel,.duel-impact {
+  text-align: center;
+  min-height: 130px;
+  padding: 12px
+}
+.duel-choice-panel strong,.duel-impact strong {
+  color: var(--lime);
+  font-size: 20px
+}
+.duel-choice-panel p,.duel-impact p {
+  color: #a5afc9;
+  font-size: 12px
+}
+.duel-impact b {
+  color: var(--cyan)
+}
+.dot-wave[data-phase=finished] .duel-board {
+  border-color: var(--lime)
+}
+@media (width<=600px) {
+  .dot-wave {
+    width: calc(100% - 16px);
+    margin: 12px auto 24px;
+    font-size: 12px
+  }
+  .dot-word {
+    width: 210px;
+    height: 31px
+  }
+  .duel-eyebrow {
+    letter-spacing: .1em;
+    font-size: 8px
+  }
+  .dot-wave header {
+    gap: 8px
+  }
+  .dot-wave header a {
+    font-size: 10px
+  }
+  .duel-health {
+    gap: 10px
+  }
+  .duel-player {
+    padding: 8px
+  }
+  .duel-player>div {
+    flex-direction: column;
+    align-items: start;
+    font-size: 10px
+  }
+  .duel-player small {
+    font-size: 9px
+  }
+  .duel-board {
+    padding: 12px 8px
+  }
+  .duel-scene {
+    width: 100%
+  }
+  .duel-intro-panel ol {
+    grid-template-columns: 1fr;
+    gap: 6px
+  }
+  .duel-intro-panel li {
+    padding: 9px
+  }
+  .duel-intro-panel li strong {
+    display: inline
+  }
+  .duel-intro-panel label {
+    margin: 12px 0;
+    display: flex
+  }
+  .duel-intro-panel select {
+    width: 100%
+  }
+  .duel-beats {
+    gap: 9px
+  }
+  .duel-beats span {
+    width: 28px;
+    height: 28px
+  }
+  .duel-controls .duel-tap {
+    flex: 1;
+    min-width: 125px;
+    padding: 12px 6px
+  }
+  .duel-controls label {
+    min-height: 44px
+  }
+  .duel-choice-panel strong,.duel-impact strong {
+    font-size: 16px
+  }
+}
+.dot-wave .dot-sr-only {
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  margin: -1px;
+  padding: 0;
+  position: absolute;
+  overflow: hidden
+}
+.dot-battle-icon {
+  vertical-align: middle;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: inline-block
+}
+.dot-scene-wrap {
+  width: 100%;
+  max-width: 880px;
+  margin-inline: auto;
+  position: relative
+}
+.dot-turn-badge {
+  text-align: center;
+  width: 70px;
+  color: var(--cyan);
+  pointer-events: none;
+  position: absolute;
+  top: 38%
+}
+.dot-turn-badge.side-0 {
+  left: 17.93%;
+  transform: translate(-50%, -100%)
+}
+.dot-turn-badge.side-1 {
+  color: var(--pink);
+  left: 78.55%;
+  transform: translate(-50%, -100%)
+}
+.dot-turn-badge .dot-battle-icon {
+  width: 42px;
+  height: 42px
+}
+.dot-turn-arrow {
+  width: 32px;
+  height: 16px;
+  margin: 5px auto 0;
+  display: block
+}
+.dot-turn-badge.is-next:not(.is-wrong-turn),.duel-controls .duel-tap.is-upcoming:not(.is-wrong-turn) .dot-battle-icon {
+  animation: 1s step-end infinite dot-next-blink
+}
+@keyframes dot-next-blink {
+  0%,to {
+    opacity: 1
+  }
+  55% {
+    opacity: .18
+  }
+}
+.duel-rhythm {
+  --turn-color: var(--cyan);
+  border: 2px solid var(--turn-color);
+  margin-top: 4px;
+  padding: 10px 8px 8px
+}
+.duel-rhythm.turn-1 {
+  --turn-color: var(--pink)
+}
+.duel-rhythm.is-ready {
+  border-color: #292640
+}
+.duel-rhythm.is-opponent {
+  box-shadow: none;
+  border-color: #0000;
+  animation: none
+}
+.duel-rhythm.is-spectator {
+  --turn-color: #a5afc9;
+  box-shadow: none;
+  border-color: #0000;
+  animation: none
+}
+.duel-turn-label {
+  color: var(--turn-color);
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  min-height: 34px;
+  margin-bottom: 8px;
+  display: flex
+}
+.dot-countdown {
+  font-size: 24px;
+  font-weight: 700
+}
+.duel-turn-label.player-0 {
+  color: var(--cyan)
+}
+.duel-turn-label.player-1 {
+  color: var(--pink)
+}
+.duel-rhythm .duel-beats .is-note:not(.perfect):not(.good):not(.miss) {
+  border-color: var(--turn-color);
+  color: var(--turn-color);
+  background: #101125
+}
+.duel-rhythm.is-opponent .duel-beats .is-note:not(.perfect):not(.good):not(.miss) {
+  border-color: #0000
+}
+.duel-rhythm.is-now:not(.is-opponent):not(.is-spectator) {
+  animation: .4s ease-out both dot-turn-frame
+}
+.dot-turn-floor {
+  animation: .4s ease-out both dot-turn-floor
+}
+@keyframes dot-turn-frame {
+  0% {
+    box-shadow: 0 0 0 3px var(--turn-color);
+    border-color: #fff
+  }
+  to {
+    border-color: var(--turn-color);
+    box-shadow: 0 0 #0000
+  }
+}
+@keyframes dot-turn-floor {
+  0% {
+    filter: brightness(2.2)
+  }
+  to {
+    filter: brightness()
+  }
+}
+.duel-controls {
+  margin-top: 18px
+}
+.duel-controls .duel-tap.is-waiting {
+  opacity: .55;
+  box-shadow: none
+}
+.duel-controls .duel-tap.is-upcoming {
+  opacity: 1
+}
+.dot-turn-badge.is-wrong-turn {
+  color: #ffd166
+}
+.duel-controls .duel-tap.is-wrong-turn:enabled {
+  opacity: 1;
+  color: #ffd166;
+  box-shadow: none;
+  background: #2b2118;
+  border-color: #ffd166;
+  animation: .24s steps(2,end) dot-wrong-shake
+}
+.dot-wrong-character,.dot-miss-character {
+  animation: .24s steps(2,end) dot-wrong-shake
+}
+.dot-broken-note {
+  animation: .45s ease-in both dot-note-fall
+}
+.dot-hit-effect.perfect,.dot-hit-effect.good {
+  animation: .45s ease-out both dot-sparkle
+}
+@keyframes dot-wrong-shake {
+  0%,to {
+    transform: translate(0)
+  }
+  25%,75% {
+    transform: translate(-4px)
+  }
+  50% {
+    transform: translate(4px)
+  }
+}
+@keyframes dot-note-fall {
+  0% {
+    opacity: 1;
+    transform: translateY(0)
+  }
+  to {
+    opacity: 0;
+    transform: translateY(22px)
+  }
+}
+@keyframes dot-sparkle {
+  0% {
+    opacity: 1
+  }
+  to {
+    opacity: 0
+  }
+}
+.dot-cue-guide {
+  justify-content: center;
+  gap: 24px;
+  margin: 20px 0;
+  display: flex
+}
+.dot-cue-guide>span {
+  color: var(--cyan);
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  display: flex
+}
+.dot-cue-guide>span:first-child .dot-battle-icon {
+  animation: 1s step-end infinite dot-next-blink
+}
+.duel-impact {
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  display: flex
+}
+.duel-impact .dot-battle-icon {
+  width: 48px;
+  height: 48px
+}
+@media (width<=600px) {
+  .dot-turn-badge {
+    width: 48px
+  }
+  .dot-turn-badge .dot-battle-icon {
+    width: 28px;
+    height: 28px
+  }
+  .dot-turn-arrow {
+    width: 24px;
+    height: 12px;
+    margin-top: 2px
+  }
+  .duel-rhythm {
+    padding: 8px 4px
+  }
+  .duel-beats {
+    gap: 8px
+  }
+  .dot-cue-guide {
+    flex-direction: column;
+    align-items: center;
+    gap: 10px
+  }
+}
+@media (prefers-reduced-motion:reduce) {
+  .duel-rhythm.is-now:not(.is-opponent),.dot-turn-floor,.dot-wrong-character,.dot-miss-character,.dot-broken-note,.dot-hit-effect,.duel-controls .duel-tap.is-wrong-turn:enabled {
+    animation: none
+  }
+  .dot-turn-badge.is-next:not(.is-wrong-turn),.duel-controls .duel-tap.is-upcoming:not(.is-wrong-turn) .dot-battle-icon,.dot-cue-guide>span:first-child .dot-battle-icon {
+    opacity: .65;
+    animation: none
+  }
+}
+.dot-cabinet-bar {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 0;
+  padding-top: 55px;
+  display: flex
+}
+.dot-cabinet-bar>p {
+  overflow-wrap: anywhere;
+  width: 100%;
+  margin: 0;
+  font-size: 12px
+}
+.dot-cabinet-bar>span {
+  flex: 1;
+  min-width: 160px;
+  font-size: 12px
+}
+.dot-cabinet-bar button {
+  font-size: 12px
+}
+.dot-challenge-prompt,.dot-match-result {
+  border: 2px solid var(--cyan);
+  background: #10152c;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px;
+  display: flex
+}
+.dot-match-result {
+  border-color: var(--pink)
+}
+.duel-board {
+  position: relative
+}
+.duel-start-countdown {
+  pointer-events: none;
+  z-index: 3;
+  background: #080c2480;
+  place-items: center;
+  display: grid;
+  position: absolute;
+  inset: 0
+}
+.duel-start-countdown strong {
+  color: #fff;
+  text-shadow: 5px 5px 0 var(--pink),-5px -5px 0 var(--cyan);
+  font-size: clamp(80px,18vw,160px)
+}
+
+.duel-board-notice:has(> *) { position:absolute; inset:0; z-index:5; display:grid; place-content:center; padding:16px; background:#080c24bb; }
+.duel-board-notice .dot-challenge-prompt { width:auto; max-width:520px; }
+.dot-match-result [role=dialog] { width:100%; padding:12px; background:#10152c; border:2px solid var(--cyan); }
+.dot-match-result [role=dialog] strong { display:block; margin-bottom:10px; }
+.duel-challenge-indicator { font-size:12px; color:#ffd166; }
+.duel-paused-challenge:has(> *) { margin:12px auto; max-width:560px; }
+.duel-sound-guide { display:flex; justify-content:center; align-items:center; gap:10px; padding:12px; color:#fff1af; border:2px solid #665328; background:#211c2c; }
+.duel-sound-guide .dot-battle-icon { flex:none; width:28px; height:28px; }
+.dot-bar-damage { animation:dot-bar-damage 1s ease-out both; }
+@keyframes dot-bar-damage { 0%,65% { opacity:1; } 100% { opacity:0; transform:translateY(-10px); } }
+@media (prefers-reduced-motion:reduce) { .dot-bar-damage { animation:none; } }
+
+.duel-controls .duel-sound-toggle { width:48px; height:48px; padding:8px; display:grid; place-items:center; }
+.duel-sound-toggle[aria-pressed="false"] { color:#a5afc9; }
+
+/* Separate full-width rails share the judgement clock and overlap during the lead-in. */
+.duel-rhythm.is-neon { border-color:transparent; padding:6px 0 0; animation:none; }
+.neon-rail { display:block; width:100%; height:auto; overflow:visible; }
+.neon-rail-line { fill:none; stroke:var(--rail-color); stroke-width:2; filter:drop-shadow(0 0 2px var(--rail-color)); }
+.neon-rail-tick { fill:none; stroke:#41465f; stroke-width:2; }
+.neon-rail-note { color:var(--rail-color); }
+.neon-rail-diamond { fill:#090d20; stroke:currentColor; stroke-width:3; stroke-linejoin:miter; }
+.neon-rail-note.perfect { color:#ffe478; filter:drop-shadow(0 0 5px #ffd166a0); }
+.neon-rail-note.good { color:#d8b9ff; filter:drop-shadow(0 0 2px #d8b9ff60); }
+.neon-rail-sparkles,.neon-rail-soft-spark { stroke:currentColor; stroke-width:2; fill:none; }
+.neon-rail-cursor { stroke:#fff; fill:#fff; }
+.neon-rail.is-preview .neon-rail-note { opacity:.55; }
+.neon-rail.is-preview .neon-rail-line { opacity:.4; }
+@media (width<=600px) { .neon-rail { min-height:66px; } }
+@media (width<=600px) {
+  .neon-rail-diamond { transform:scale(1.15); stroke-width:4; }
+  .neon-rail-cursor path:last-child { stroke-width:5; }
+}
+
+.neon-rail-boundary { stroke:#4b526d; stroke-width:1; stroke-dasharray:3 6; fill:none; }
+
+.neon-rail-stack { position:relative; }
+.neon-rail-lane { position:relative; --rail-color:#13e5f3; }
+.neon-rail-owner { display:flex; align-items:center; gap:6px; height:24px; padding-left:34.6%; color:var(--rail-color); }
+.neon-rail-owner svg { width:24px; height:24px; }
+.neon-rail-lane.is-incoming { position:absolute; inset:0; pointer-events:none; }
+.neon-rail-lane.is-incoming .neon-rail-owner { padding-left:3%; }
+.neon-rail-lane.is-incoming .neon-rail-line { opacity:1; }
+@media (width<=600px) { .neon-rail-owner { height:22px; } .neon-rail-owner svg { width:22px; height:22px; } }
+
+.neon-rail-hold rect { fill:currentColor; fill-opacity:.18; stroke:currentColor; stroke-width:2; }
+.neon-rail-hold path { stroke:currentColor; stroke-width:4; }
+.neon-rail-hold rect.neon-rail-hold-fill { fill-opacity:.65; }
+.neon-rail-hold.is-holding { filter:drop-shadow(0 0 5px currentColor); }
+.duel-tap { touch-action:none; user-select:none; -webkit-user-select:none; }
+
+.neon-rail-release { fill:#090d20; stroke:currentColor; stroke-width:3; }

@@ -1,9 +1,9 @@
 import { CabinetSelector } from "../arcade/CabinetDirectory"
 import type { GameDefinition } from "../../domain/game"
 
-export function CabinetScreen({ game }: { game: GameDefinition }) {
+export function CabinetScreen({ game, visible = false, onStartSolo, onBack }: { game: GameDefinition; visible?: boolean; onStartSolo?: () => void; onBack?: () => void }) {
   return (
-    <section className="cabinet-screen is-hidden" id="cabinet-screen">
+    <section className={`cabinet-screen${visible ? "" : " is-hidden"}`} id="cabinet-screen">
       <div className="arcade-card">
         <div className="arcade-heading">
           <div>
@@ -37,7 +37,7 @@ export function CabinetScreen({ game }: { game: GameDefinition }) {
         </div>
 
         <div id="cabinet-selector-title" className="sr-only">筐体選択</div>
-        <CabinetSelector game={game} />
+        <CabinetSelector game={game} onStartSolo={onStartSolo} />
 
         <section
           className="cabinet-promo"
@@ -58,19 +58,9 @@ export function CabinetScreen({ game }: { game: GameDefinition }) {
         </section>
 
         <section className="cabinet-help-grid" aria-label="遊び方">
-          {game.id === "mochi-beat" ? <>
-            <div>
-              <strong>操作</strong>
-              <span>もちをつく: スペースキー / 画面タップ</span>
-              <span>一時停止: P / 一時停止ボタン</span>
-              <span>音を出して遊ぶのがおすすめです。</span>
-            </div>
-            <div>
-              <strong>あそびかた</strong>
-              <span>はじめの4拍は、左のうさぎのお手本を聞こう。</span>
-              <span>次の4拍で同じリズムを返そう。お休みの間は押さないでね。</span>
-              <span>約1分・3ステージ。少しずつ細かいリズムに挑戦！</span>
-            </div>
+          {game.id === "dot-wave" ? <>
+            <div><strong>操作</strong><span>スペース / Fキー / 画面タップ</span><span>音をきいてあそぶゲームです。音を出してね！</span></div>
+            <div><strong>あそびかた</strong><span>音符でこうげき、リズムに合わせてシールドでまもろう。</span><span>観戦から対戦を申し込み、相手が承認すると通信対戦が始まります。</span></div>
           </> : game.id === "deep-sea-salvage" ? <>
             <div>
               <strong>操作</strong>
@@ -105,6 +95,7 @@ export function CabinetScreen({ game }: { game: GameDefinition }) {
         <div className="screen-actions">
           <button
             id="back-to-arcade"
+            onClick={onBack}
             className="secondary-button"
             type="button"
           >

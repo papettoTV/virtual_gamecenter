@@ -70,8 +70,11 @@ export class PlatformApiError extends Error {
   }
 }
 
-export async function fetchPlatformBootstrap(): Promise<PlatformBootstrap> {
-  return requestJson<PlatformBootstrap>("/api/platform/bootstrap");
+let bootstrapRequest: Promise<PlatformBootstrap> | null = null;
+export function fetchPlatformBootstrap(): Promise<PlatformBootstrap> {
+  // Concurrent consumers must share the first request that establishes the guest cookie.
+  bootstrapRequest ??= requestJson<PlatformBootstrap>("/api/platform/bootstrap").finally(() => { bootstrapRequest = null; });
+  return bootstrapRequest;
 }
 
 export async function acceptPolicies(

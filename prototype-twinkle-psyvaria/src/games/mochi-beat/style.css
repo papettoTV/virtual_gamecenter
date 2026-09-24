@@ -8,6 +8,19 @@
 .mochi-intro p { margin: 8px 0; color: #284c40; }
 .mochi-instructions { display: grid; gap: 12px; margin: 20px 0 24px; text-align: left; }
 .mochi-instructions b { color: #b45d3f; margin-right: 10px; }
+.mochi-instructions { width: min(570px, 100%); line-height: 1.65; }
+.mochi-instructions > span b { display: block; }
+.mochi-turn-example { display: flex; align-items: center; justify-content: center; gap: 10px; padding-bottom: 8px; }
+.mochi-turn-example span { padding: 6px 12px; border-radius: 12px; background: #dce9dc; text-align: center; font-weight: 800; }
+.mochi-turn-example span:nth-of-type(2) { background: #f6d39e; }
+.mochi-turn-example b { display: block; margin: 0; }
+.mochi-turn-example i { font-style: normal; }
+.mochi-screen .ranking-overlay { top: 50%; max-height: calc(100% - 24px); overflow-y: auto; }
+.mochi-result-dish { margin: 8px 0 16px; }
+.mochi-screen #mochi-result-art { width: 100%; height: auto; min-height: 0; aspect-ratio: 11 / 4; box-shadow: none; border-radius: 14px; }
+.mochi-result-dish figcaption { display: grid; gap: 5px; margin-top: 8px; }
+.mochi-result-dish strong { color: #ffe3a5; font-size: 21px; }
+.mochi-result-dish span { font-size: 12px; line-height: 1.6; }
 .mochi-intro button, .mochi-screen .mochi-tap { background: #e5a852; color: #243f36; border: 2px solid #284c40; box-shadow: 0 4px 0 #284c40; border-radius: 16px; padding: 14px 28px; font-size: 19px; font-weight: 800; touch-action: manipulation; }
 .mochi-intro button:active, .mochi-screen .mochi-tap:active { transform: translateY(3px); box-shadow: 0 1px 0 #284c40; }
 .mochi-intro small { margin-top: 18px; }
@@ -25,8 +38,8 @@
   .mochi-screen { padding-top: 52px; }
   .mochi-screen .game-frame { aspect-ratio: auto; }
   .mochi-screen #game { height: auto; min-height: 0; aspect-ratio: 3 / 2; object-fit: contain; background: #f8f1db; }
-  .mochi-screen .game-frame:has(.mochi-intro:not([hidden])) #game { min-height: 370px; }
-  .mochi-screen .ranking-overlay { position: relative; left: auto; top: auto; width: 100%; transform: none; margin-top: 12px; }
+  .mochi-screen .game-frame:has(.mochi-intro:not([hidden])) #game { min-height: 620px; }
+  .mochi-screen .ranking-overlay { position: relative; left: auto; top: auto; width: 100%; max-height: none; transform: none; margin-top: 12px; }
   .mochi-screen .mochi-tap { padding: 12px 15px; min-width: 0; width: auto; flex: 1; }
   .mochi-tap small { white-space: nowrap; display: block; margin: 4px 0 0; }
   .mochi-intro { padding: 12px; font-size: 12px; }
@@ -34,3 +47,11 @@
   .mochi-intro button { padding: 10px 18px; font-size: 16px; }
   .mochi-intro small { margin-top: 12px; font-size: 10px; }
 }
+
+.mochi-screen .ranking-overlay.is-visible { animation: mochi-result-enter .45s ease-out; }
+@keyframes mochi-result-enter { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .mochi-screen .ranking-overlay.is-visible { animation: none; } }
+
+.mochi-set-overview { font-size: 13px; line-height: 1.6; }
+.mochi-next-tempo { font-size: clamp(26px, 5vw, 44px); font-weight: 800; }
+.mochi-screen .game-frame:has(#mochi-set-intro:not([hidden])) #game { min-height: 460px; object-fit: contain; }

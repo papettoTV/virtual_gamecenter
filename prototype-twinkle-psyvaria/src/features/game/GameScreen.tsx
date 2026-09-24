@@ -75,15 +75,29 @@ export function GameScreen({ game }: { game: GameDefinition }) {
         {isRhythm && <div className="mochi-intro" id="mochi-intro">
           <span className="mochi-kicker">LISTEN. REPEAT. MOCHI!</span>
           <h2>もちつきビート</h2>
-          <p>お手本を聞いて、同じリズムでもちつき！</p>
+          <p>左のうさぎとあなたが、4拍ずつ交代でもちをつきます。</p>
           <div className="mochi-instructions">
-            <span><b>01</b> 左のうさぎの音を4拍聞く</span>
-            <span><b>02</b> 次の4拍で、同じリズムを返す</span>
-            <span><b>03</b> 休符はお休み。連打せずにトン！</span>
+            <div className="mochi-turn-example" aria-label="お手本4拍、あなた4拍、お手本4拍、あなた4拍の順で繰り返します">
+              <span>お手本 <b>4拍</b></span><i aria-hidden="true">→</i><span>あなた <b>4拍</b></span><i aria-hidden="true">→</i><span>くり返す</span>
+            </div>
+            <span><b>01 聞く</b> はじめは左のうさぎの番。押さずに「トン」の音と間を覚えよう。</span>
+            <span><b>02 まねする</b> 「あなたの番！」が出たら、次の4拍で同じリズムをタップ。</span>
+            <span><b>03 交代する</b> 4拍たつと、またお手本の番。音のない拍は押さずにお休み！</span>
           </div>
+          <p className="mochi-set-overview">3ステージで1セット。108 → 126 → 144 BPMと速くなる3セットに挑戦！<br />セットの間で休憩できます。3セット完走でゲームクリア。</p>
           <button id="mochi-start" type="button">音を出してスタート</button>
-          <small>スペースキー / 画面タップ · 約1分 · 3ステージ</small>
+          <small>スペースキー / 画面タップ · 約2分半 · 3ステージ × 3セット</small>
           <p id="mochi-audio-error" role="status" />
+        </div>}
+        {isRhythm && <div className="mochi-intro" id="mochi-set-intro" hidden>
+          <span className="mochi-kicker">NEXT SET</span>
+          <h2 id="mochi-next-title">次のセットへ</h2>
+          <p id="mochi-next-summary" />
+          <p id="mochi-next-tempo" className="mochi-next-tempo" />
+          <p>同じ3ステージに、もう一度挑戦！<br />お手本4拍 → あなた4拍の交代は同じです。</p>
+          <button id="mochi-next-set" type="button">スペース / タップで開始</button>
+          <small>準備ができるまで、ゆっくり休憩できます。</small>
+          <p id="mochi-next-error" role="status" />
         </div>}
         <div className="versus-overlay is-hidden" id="versus-overlay" role="dialog" aria-modal="true">
           <p className="eyebrow" id="versus-eyebrow">Versus</p>
@@ -98,6 +112,10 @@ export function GameScreen({ game }: { game: GameDefinition }) {
         </div>
         <div className="ranking-submit ranking-overlay" id="ranking-submit-panel">
           <h2 id="ranking-submit-heading">ランキング登録</h2>
+          {isRhythm && <figure className="mochi-result-dish">
+            <canvas id="mochi-result-art" width="440" height="160" role="img" aria-label="完成したもち" />
+            <figcaption><strong id="mochi-finish-title" /><span id="mochi-finish-description" /></figcaption>
+          </figure>}
           {isSalvage && <button id="salvage-share-result" className="ranking-result-share-button" type="button">
             結果をシェア
           </button>}

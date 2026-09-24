@@ -65,7 +65,7 @@ export const MOCHI_BEAT: GameDefinition = {
   localizedTitle: "もちつきビート",
   shortTitle: "MB",
   description: "お手本を聞いて、トン・トン！うさぎとおもちをつくワンボタンリズムゲーム",
-  currentVersion: "mochi-beat-1",
+  currentVersion: "mochi-beat-sets-2",
   creditCost: 1,
   iconUrl: "/assets/mochi-beat-icon.svg",
   promoVideoUrl: "",
@@ -73,7 +73,13 @@ export const MOCHI_BEAT: GameDefinition = {
   status: "active",
 };
 
-export const GAME_CATALOG: readonly GameDefinition[] = [BUZZ_BARRIER, DEEP_SEA_SALVAGE, MOCHI_BEAT];
+export const DOT_WAVE: GameDefinition = {
+  id: "dot-wave", slug: "dot-wave", title: "DOT WAVE", localizedTitle: "ドットウェーブ",
+  shortTitle: "DW", description: "音符で攻めてリズムで守る、観戦・通信対戦対応のネオンバトル",
+  currentVersion: "dot-wave-online-1", creditCost: 1, iconUrl: "/assets/dot-wave-icon.svg",
+  promoVideoUrl: "", promoPosterUrl: "/assets/dot-wave-icon.svg", status: "active",
+};
+export const GAME_CATALOG: readonly GameDefinition[] = [BUZZ_BARRIER, DEEP_SEA_SALVAGE, DOT_WAVE];
 export const DEFAULT_GAME_ID: GameId = BUZZ_BARRIER.id;
 
 export function getGameDefinition(gameId: string | null | undefined): GameDefinition | null {

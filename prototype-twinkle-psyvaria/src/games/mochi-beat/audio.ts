@@ -6,6 +6,7 @@ export class MochiAudio {
   private master = this.context.createGain();
   private nextStep = 0;
   private origin = 0;
+  private beatSeconds = BEAT_SECONDS;
   private voices = new Set<OscillatorNode>();
 
   constructor(volume: number) {
@@ -16,7 +17,8 @@ export class MochiAudio {
   setVolume(volume: number) { this.master.gain.value = Math.max(0, Math.min(1, volume)) * 0.55; }
   get seconds() { return this.context.currentTime - this.origin; }
 
-  async start() {
+  async start(beatSeconds = BEAT_SECONDS) {
+    this.beatSeconds = beatSeconds;
     this.stop();
     await this.context.resume();
     this.origin = this.context.currentTime + 0.18;
@@ -54,9 +56,9 @@ export class MochiAudio {
   }
 
   schedule() {
-    while (this.nextStep / 2 <= TOTAL_BEATS && this.nextStep / 2 * BEAT_SECONDS < this.seconds + 0.12) {
+    while (this.nextStep / 2 < TOTAL_BEATS && this.nextStep / 2 * this.beatSeconds < this.seconds + 0.12) {
       const beat = this.nextStep / 2;
-      const time = this.origin + beat * BEAT_SECONDS;
+      const time = this.origin + beat * this.beatSeconds;
       this.nextStep += 1;
       // Never play a backlog after a stalled event loop.
       if (time < this.context.currentTime - 0.025) continue;

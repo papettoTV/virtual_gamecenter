@@ -33,7 +33,7 @@ type ConsentPurpose = "registration" | "purchase";
 
 const PLAY_BUTTON_IDS = new Set(["start-solo", "ranking-retry"]);
 
-export function PlatformExperience() {
+export function PlatformExperience({ standaloneCredits = false }: { standaloneCredits?: boolean } = {}) {
   const promoCaptureMode = import.meta.env.DEV
     && new URLSearchParams(window.location.search).get("promoCapture") === "1";
   const [platform, setPlatform] = useState<PlatformBootstrap | null>(null);
@@ -160,6 +160,17 @@ export function PlatformExperience() {
   }, [loadPlatform]);
 
   useEffect(() => {
+    if (!standaloneCredits) return;
+    const topUp = () => {
+      setPendingAction(null);
+      if (platform && !platform.welcomeCreditGranted) setWelcomeDialogOpen(true);
+      else setPurchaseDialog("select");
+    };
+    window.addEventListener("request-credit-topup", topUp);
+    return () => window.removeEventListener("request-credit-topup", topUp);
+  }, [standaloneCredits, platform]);
+
+  useEffect(() => {
     if (!["1クレジットを使用しました。", "筐体URLをコピーしました。", "無料5クレジットを受け取りました。"].includes(notice)) return;
     const closeTimer = window.setTimeout(() => setNotice(""), 5000);
     return () => window.clearTimeout(closeTimer);
@@ -270,7 +281,8 @@ export function PlatformExperience() {
       setPlatform({ ...platform, welcomeCreditGranted: true, wallet: result.wallet });
       setWelcomeDialogOpen(false);
       setNotice("無料5クレジットを受け取りました。");
-      setPlayDialog("confirm");
+      setPlayDialog(standaloneCredits ? null : "confirm");
+      if (standaloneCredits) window.dispatchEvent(new Event("platform-wallet-changed"));
     } catch {
       setNotice("無料クレジットを受け取れませんでした。");
     } finally {
@@ -280,6 +292,7 @@ export function PlatformExperience() {
 
   const skipWelcomeCredit = () => {
     setWelcomeDialogOpen(false);
+    if (standaloneCredits) { setPurchaseDialog("select"); return; }
     setPlayDialog((platform?.wallet.availableTotal ?? 0) >= getCurrentGame().creditCost
       ? "confirm"
       : "insufficient");
@@ -552,6 +565,7 @@ export function PlatformExperience() {
                 </small>
               )}
             </div>
+            {standaloneCredits && <button type="button" onClick={() => window.dispatchEvent(new Event("request-credit-topup"))}>クレジットを追加</button>}
             {platform?.accountRegistered && (
               <button
                 className="platform-logout-button"
