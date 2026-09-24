@@ -160,7 +160,7 @@ export function PlatformExperience() {
   }, [loadPlatform]);
 
   useEffect(() => {
-    if (!["1クレジットを使用しました。", "筐体URLをコピーしました。"].includes(notice)) return;
+    if (!["1クレジットを使用しました。", "筐体URLをコピーしました。", "無料5クレジットを受け取りました。"].includes(notice)) return;
     const closeTimer = window.setTimeout(() => setNotice(""), 5000);
     return () => window.clearTimeout(closeTimer);
   }, [notice]);
