@@ -1,3 +1,5 @@
+import { notifications } from "../notifications/notifications";
+import { copySharedText } from "../notifications/share";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   acceptPolicies,
@@ -37,7 +39,7 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
   const promoCaptureMode = import.meta.env.DEV
     && new URLSearchParams(window.location.search).get("promoCapture") === "1";
   const [platform, setPlatform] = useState<PlatformBootstrap | null>(null);
-  const [loadingError, setLoadingError] = useState("");
+
   const [policy, setPolicy] = useState<PolicyKind | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingPlayAction | null>(null);
   const [playDialog, setPlayDialog] = useState<"confirm" | "insufficient" | null>(null);
@@ -46,7 +48,7 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
   const [purchasedCredits, setPurchasedCredits] = useState(0);
   const [purchaseError, setPurchaseError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState("");
+  const [purchaseCheck, setPurchaseCheck] = useState(0);
   const [profileOpen, setProfileOpen] = useState(false);
   const [accountDialogOpen, setAccountDialogOpen] = useState(false);
   const [consentPurpose, setConsentPurpose] = useState<ConsentPurpose | null>(null);
@@ -57,11 +59,11 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
   const profileRef = useRef<HTMLDivElement>(null);
 
   const loadPlatform = useCallback(async () => {
-    setLoadingError("");
+    notifications.dismiss("platform-load");
     try {
       setPlatform(await fetchPlatformBootstrap());
     } catch {
-      setLoadingError("プレイヤー情報を読み込めませんでした。");
+      notifications.show({ id: "platform-load", type: "error", message: "プレイヤー情報を読み込めませんでした。", action: { label: "再読み込み", run: loadPlatform } });
     }
   }, []);
 
@@ -74,11 +76,11 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
     const result = url.searchParams.get("account");
     if (!result) return;
     if (result === "registered") {
-      setNotice("ユーザー登録が完了し、5クレジットを追加しました。");
+      notifications.show({ id: "platform-account", type: "success", message: "ユーザー登録が完了し、5クレジットを追加しました。" });
       void loadPlatform();
       window.dispatchEvent(new Event("restore-ranking-registration"));
     } else {
-      setNotice(accountErrorMessage(url.searchParams.get("reason")));
+      notifications.show({ id: "platform", type: url.searchParams.get("reason") === "cancelled" ? "info" : "error", message: accountErrorMessage(url.searchParams.get("reason")) });
     }
     url.searchParams.delete("account");
     url.searchParams.delete("reason");
@@ -123,6 +125,7 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
     if (purchaseResult !== "success" || !checkoutSessionId) return;
 
     setPurchaseDialog("processing");
+    setPurchaseError("");
     let cancelled = false;
     let pollTimer = 0;
     let attempts = 0;
@@ -151,7 +154,7 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
       cancelled = true;
       window.clearTimeout(pollTimer);
     };
-  }, []);
+  }, [purchaseCheck]);
 
   useEffect(() => {
     const refreshWallet = () => void loadPlatform();
@@ -169,12 +172,6 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
     window.addEventListener("request-credit-topup", topUp);
     return () => window.removeEventListener("request-credit-topup", topUp);
   }, [standaloneCredits, platform]);
-
-  useEffect(() => {
-    if (!["1クレジットを使用しました。", "筐体URLをコピーしました。", "無料5クレジットを受け取りました。"].includes(notice)) return;
-    const closeTimer = window.setTimeout(() => setNotice(""), 5000);
-    return () => window.clearTimeout(closeTimer);
-  }, [notice]);
 
   useEffect(() => {
     if (!profileOpen) return;
@@ -248,7 +245,7 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
   const handleConsent = async () => {
     if (!platform) return;
     setBusy(true);
-    setNotice("");
+    notifications.dismiss("platform");
     try {
       const result = await acceptPolicies(
         platform.consent.termsVersion,
@@ -259,6 +256,7 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
         consent: result.consent,
         wallet: result.wallet,
       });
+      notifications.dismiss("platform-consent");
       const completedPurpose = consentPurpose;
       setConsentPurpose(null);
       if (completedPurpose === "registration") {
@@ -267,7 +265,7 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
         setPurchaseDialog("select");
       }
     } catch {
-      setLoadingError("同意情報を保存できませんでした。");
+      notifications.show({ id: "platform-consent", type: "error", message: "同意情報を保存できませんでした。", action: { label: "再試行", run: handleConsent } });
     } finally {
       setBusy(false);
     }
@@ -280,11 +278,11 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
       const result = await claimWelcomeCredit();
       setPlatform({ ...platform, welcomeCreditGranted: true, wallet: result.wallet });
       setWelcomeDialogOpen(false);
-      setNotice("無料5クレジットを受け取りました。");
+      notifications.show({ id: "platform-welcome", type: "success", message: "無料5クレジットを受け取りました。" });
       setPlayDialog(standaloneCredits ? null : "confirm");
       if (standaloneCredits) window.dispatchEvent(new Event("platform-wallet-changed"));
     } catch {
-      setNotice("無料クレジットを受け取れませんでした。");
+      notifications.show({ id: "platform-welcome", type: "error", message: "無料クレジットを受け取れませんでした。" });
     } finally {
       setBusy(false);
     }
@@ -310,7 +308,7 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
   const handlePlayConfirm = async () => {
     if (!platform || !pendingAction) return;
     setBusy(true);
-    setNotice("");
+    notifications.dismiss("platform");
     let reservationId: string | null = null;
     try {
       const reservation = await reservePlayCredit(getCabinetId(), getCurrentGame().id);
@@ -323,14 +321,14 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
       if (!gameScreen || gameScreen.classList.contains("is-hidden")) {
         const released = await releasePlayCredit(reservation.reservationId);
         updateWallet(released.wallet);
-        setNotice("ゲームを開始できなかったため、クレジットを返却しました。");
+        notifications.show({ id: "platform", type: "info", message: "ゲームを開始できなかったため、クレジットを返却しました。" });
         return;
       }
 
       const captured = await capturePlayCredit(reservation.reservationId);
       updateWallet(captured.wallet);
       recordPlayStartedFromWatch(getCurrentGame().id, getCabinetId());
-      setNotice("1クレジットを使用しました。");
+      notifications.show({ id: "platform", type: "success", message: "1クレジットを使用しました。" });
       setPlayDialog(null);
       setPendingAction(null);
     } catch (error) {
@@ -339,14 +337,14 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
           const released = await releasePlayCredit(reservationId);
           updateWallet(released.wallet);
         } catch {
-          setNotice("クレジット状態を確認できません。画面を再読み込みしてください。");
+          notifications.show({ id: "platform", type: "error", message: "クレジット状態を確認できません。画面を再読み込みしてください。" });
         }
       }
       if (error instanceof PlatformApiError && error.code === "insufficient_credit") {
         if (error.wallet) updateWallet(error.wallet);
         setPlayDialog("insufficient");
       } else {
-        setNotice("ゲーム開始処理に失敗しました。もう一度お試しください。");
+        notifications.show({ id: "platform", type: "error", message: "ゲーム開始処理に失敗しました。もう一度お試しください。" });
       }
     } finally {
       setBusy(false);
@@ -370,12 +368,10 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
           if (error instanceof DOMException && error.name === "AbortError") return;
         }
       }
-      await copyText(trackedShare.url);
+      await copySharedText(trackedShare.url, "platform-share");
       recordShareCreated(getCurrentGame().id, getCabinetId(), trackedShare.shareId);
-      setNotice("観戦用URLをコピーしました。");
-    } catch {
-      setNotice("筐体URLを共有できませんでした。");
-    }
+
+    } catch {}
   };
 
   useEffect(() => {
@@ -386,7 +382,7 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
 
   const handlePurchase = async () => {
     setBusy(true);
-    setPurchaseError("");
+    notifications.dismiss("purchase-checkout");
     try {
       storePendingPlayAction(pendingAction);
       const currency = getPurchaseCurrency();
@@ -398,11 +394,11 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
       window.location.assign(checkout.checkoutUrl);
     } catch (error) {
       const errorCode = error instanceof PlatformApiError ? error.code : "";
-      setPurchaseError(errorCode === "stripe_not_configured"
+      notifications.show({ id: "purchase-checkout", type: "error", message: errorCode === "stripe_not_configured"
         ? "Stripeのテスト用設定が完了していません。"
         : errorCode === "stripe_test_key_required"
           ? "ローカル開発ではStripeのテスト用Secret Keyを使用してください。"
-          : "購入画面を開けませんでした。もう一度お試しください。");
+          : "購入画面を開けませんでした。もう一度お試しください。" });
       setBusy(false);
     }
   };
@@ -443,7 +439,7 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
   const savePlayerName = async () => {
     const playerName = nameDraft.trim();
     if (!playerName || playerName.length > 24) {
-      setNotice("名前は1〜24文字で入力してください。");
+      notifications.show({ id: "platform-name", type: "error", message: "名前は1〜24文字で入力してください。" });
       return;
     }
     setBusy(true);
@@ -451,9 +447,9 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
       const { identity } = await updatePlayerName(playerName);
       setPlatform((current) => current ? { ...current, ...identity } : current);
       setEditingName(false);
-      setNotice("名前を変更しました。");
+      notifications.show({ id: "platform-name", type: "success", message: "名前を変更しました。" });
     } catch {
-      setNotice("名前を変更できませんでした。");
+      notifications.show({ id: "platform-name", type: "error", message: "名前を変更できませんでした。" });
     } finally {
       setBusy(false);
     }
@@ -466,11 +462,11 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
       setPlatform(guestPlatform);
       setProfileOpen(false);
       setEditingName(false);
-      setNotice("ログアウトしました。");
+      notifications.show({ id: "platform-logout", type: "success", message: "ログアウトしました。" });
       window.history.pushState({}, "", "/");
       window.dispatchEvent(new PopStateEvent("popstate"));
     } catch {
-      setNotice("ログアウトできませんでした。");
+      notifications.show({ id: "platform-logout", type: "error", message: "ログアウトできませんでした。" });
     } finally {
       setBusy(false);
     }
@@ -580,19 +576,7 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
         )}
       </div>
 
-      {loadingError && (
-        <div className="platform-error" role="alert">
-          <span>{loadingError}</span>
-          <button type="button" onClick={() => void loadPlatform()}>再読み込み</button>
-        </div>
-      )}
 
-      {notice && (
-        <div className="platform-notice" role="status">
-          {notice}
-          <button type="button" aria-label="閉じる" onClick={() => setNotice("")}>×</button>
-        </div>
-      )}
 
       {accountDialogOpen && (
         <div className="platform-overlay platform-overlay-front" role="dialog" aria-modal="true" aria-labelledby="account-register-title">
@@ -782,7 +766,6 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
                 );
               })}
             </div>
-            {purchaseError && <p className="platform-inline-error" role="alert">{purchaseError}</p>}
             <div className="platform-dialog-actions">
               <button type="button" disabled={busy} onClick={() => {
                 setPurchaseDialog(null);
@@ -804,7 +787,13 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
             <p className="eyebrow">Payment Confirmation</p>
             <h2 id="purchase-processing-title">決済を確認しています</h2>
             <p>Stripeからの決済完了通知を確認後、クレジットを付与します。</p>
-            {purchaseError && <p className="platform-inline-error" role="alert">{purchaseError}</p>}
+            {purchaseError && <>
+              <p className="platform-inline-error" role="alert">{purchaseError}</p>
+              <div className="platform-dialog-actions">
+                <button type="button" onClick={() => { setPurchaseDialog(null); setPurchaseError(""); }}>閉じる</button>
+                <button type="button" onClick={() => setPurchaseCheck(value => value + 1)}>再確認</button>
+              </div>
+            </>}
           </div>
         </div>
       )}
@@ -893,23 +882,6 @@ function getCurrentGame() {
 
 function formatPurchasePrice(unit: PurchaseUnit): string {
   return getPurchaseCurrency() === "jpy" ? `${unit * 100}円` : `$${unit}`;
-}
-
-async function copyText(value: string): Promise<void> {
-  if (navigator.clipboard) {
-    await navigator.clipboard.writeText(value);
-    return;
-  }
-  const textarea = document.createElement("textarea");
-  textarea.value = value;
-  textarea.setAttribute("readonly", "");
-  textarea.style.position = "fixed";
-  textarea.style.opacity = "0";
-  document.body.appendChild(textarea);
-  textarea.select();
-  const copied = document.execCommand("copy");
-  textarea.remove();
-  if (!copied) throw new Error("copy_failed");
 }
 
 async function resolveCabinetShareUrl(): Promise<string> {

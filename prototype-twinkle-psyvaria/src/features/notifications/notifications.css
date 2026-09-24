@@ -1,0 +1,7 @@
+.notification-center { position: fixed; top: max(12px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); width: min(560px, calc(100% - 24px)); z-index: 10000; display: grid; gap: 8px; pointer-events: none; }
+.notification { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border: 1px solid #69f7ff; border-radius: 12px; background: #101827; color: #f5f7ff; box-shadow: 0 6px 24px #0006; pointer-events: auto; }
+.notification span { flex: 1; overflow-wrap: anywhere; }
+.notification-success { border-color: #70f7c8; }
+.notification-error { border-color: #ff8293; }
+.notification button { flex-shrink: 0; color: inherit; background: #ffffff18; border: 1px solid #ffffff40; border-radius: 8px; padding: 8px; cursor: pointer; font: inherit; }
+@media (max-width: 560px) { .notification { gap: 8px; padding: 10px; font-size: 14px; } }

@@ -7,6 +7,8 @@ import { DEFAULT_GAME_ID, DOT_WAVE, resolveGameDefinition } from "../domain/game
 import { loadGameRuntime } from "../games/registry";
 import { BRAND } from "../domain/brand";
 import { createUuid } from "../shared/id";
+import { NotificationCenter } from "../features/notifications/NotificationCenter";
+import { notifications } from "../features/notifications/notifications";
 
 const ThreeBulletLab = lazy(async () => {
   const module = await import("../features/labs/ThreeBulletLab");
@@ -15,6 +17,10 @@ const ThreeBulletLab = lazy(async () => {
 const DotWaveCabinet = lazy(() => import("../games/mochi-beat/duel/DotWaveCabinet"));
 
 export function App() {
+  return <><NotificationCenter /><AppContent /></>;
+}
+
+function AppContent() {
   const requestedGame = new URLSearchParams(location.search).get("game");
   if (requestedGame === "mochi-beat" || ["/labs/dot-wave", "/labs/mochi-duel"].includes(location.pathname) || requestedGame === "dot-wave") {
     if (requestedGame === "dot-wave" && /^\/cabinets\/[^/]+$/.test(location.pathname)) {
@@ -54,6 +60,7 @@ function DotWaveSelection() {
 function ArcadeApp() {
   const [activeGameId, setActiveGameId] = useState(() => getGameIdFromLocation());
   const activeGame = resolveGameDefinition(activeGameId);
+  useEffect(() => () => notifications.clearScope(activeGameId), [activeGameId]);
 
   useEffect(() => {
     void loadGameRuntime(activeGame.id);

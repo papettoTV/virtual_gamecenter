@@ -1,6 +1,8 @@
 import { createCabinetClient } from "../../realtime/cabinet-client";
+import { notifications } from "../../features/notifications/notifications";
 import {
   fetchScoreRanking,
+  loadRankingWithNotice,
   submitRankingEntry,
 } from "../../features/ranking/ranking-client";
 import {
@@ -797,7 +799,7 @@ async function releaseVersusReservation(reservationId) {
     await releasePlayCredit(reservationId);
     window.dispatchEvent(new Event("platform-wallet-changed"));
   } catch {
-    if (spectatorStatusText) spectatorStatusText.textContent = "クレジット状態を再読み込みしてください。";
+    notifications.show({ id: "game-credit", scope: GAME_ID, type: "error", message: "クレジット状態を再読み込みしてください。" });
   }
   if (challengeReservationId === reservationId) challengeReservationId = null;
 }
@@ -808,7 +810,7 @@ async function captureVersusReservation(reservationId) {
     await capturePlayCredit(reservationId);
     window.dispatchEvent(new Event("platform-wallet-changed"));
   } catch {
-    showVersusOverlay("Credit Error", "クレジットを確定できませんでした。再読み込みしてください。", "notice");
+    notifications.show({ id: "game-credit", scope: GAME_ID, type: "error", message: "クレジットを確定できませんでした。再読み込みしてください。" });
   }
   if (challengeReservationId === reservationId) challengeReservationId = null;
 }
@@ -880,7 +882,7 @@ async function requestVersusRematch() {
     });
     showVersusOverlay("Rematch", "再挑戦の承認を待っています。", "waiting");
   } catch {
-    showVersusOverlay("Credit Error", "再挑戦用クレジットを予約できませんでした。", "resultLoser");
+    notifications.show({ id: "game-credit", scope: GAME_ID, type: "error", message: "再挑戦用クレジットを予約できませんでした。" });
   }
 }
 
@@ -944,6 +946,7 @@ function hideVersusOverlay() {
 }
 
 function showScreen(screen) {
+  if (screen === "arcade") notifications.clearScope(GAME_ID);
   currentScreen = screen;
   document.body.classList.toggle("is-game-screen", screen === "game");
   arcadeScreen?.classList.toggle("is-hidden", screen !== "arcade");
@@ -2756,7 +2759,7 @@ async function submitRanking() {
     await loadRanking();
   } catch (error) {
     console.warn(error);
-    setRankingMessage("ランキングAPIに接続できません。Cloudflare Worker設定後に登録できます。");
+    setRankingMessage("");
     updateRankingSubmitState();
   }
 }
@@ -2766,12 +2769,10 @@ async function loadRanking() {
   const targets = getRankingListTargets();
   for (const target of targets) setRankingListMessage(target, "読み込み中...");
 
-  try {
+  await loadRankingWithNotice(GAME_ID, async () => {
+    for (const target of targets) setRankingListMessage(target, "");
     renderRanking(await fetchScoreRanking(GAME_ID, 20, CLIENT_VERSION));
-  } catch (error) {
-    console.warn(error);
-    for (const target of targets) setRankingListMessage(target, "ランキングAPI未接続");
-  }
+  });
 }
 
 function renderRanking(rankings) {

@@ -1,3 +1,4 @@
+import { notifications } from "../../../features/notifications/notifications";
 import { useEffect, useReducer, useRef, type RefObject, type ReactNode } from "react";
 import { turnCue, cueName, inputHint, countdownCue } from "./turnCue";
 import { DotScene, PixelWord } from "./DotScene";
@@ -40,7 +41,7 @@ export default function MochiDuel({ network, sharedAudio, boardNotice, resultPan
     if (sound.current.audible) sound.current.setMuted(true);
     else {
       sound.current.setMuted(false);
-      if (engine.current.phase !== "paused") await sound.current.resume();
+      if (engine.current.phase !== "paused") await sound.current.resume(); notifications.dismiss("game-audio");
       remoteAudioTurn.current = -1;
     }
     render();
@@ -51,7 +52,7 @@ export default function MochiDuel({ network, sharedAudio, boardNotice, resultPan
     busy.current = true;
     try {
       sound.current ??= new DuelAudio();
-      await sound.current.resume();
+      await sound.current.resume(); notifications.dismiss("game-audio");
       if (network && !network.matchId && !await network.beforeSolo()) return;
       if (!alive.current) return;
       sound.current.volume(.65);
@@ -61,7 +62,7 @@ export default function MochiDuel({ network, sharedAudio, boardNotice, resultPan
       current.exchange = createExchange(current.match.turn % 2 as Side, current.selected, beatAt(current.match.turn));
       current.cpu = current.mode === "cpu" ? cpuGrades(current.selected, current.exchange.attacker === 1) : [];
       current.seconds = sound.current.seconds; current.phase = "countdown"; current.feedback = "";
-    } catch { current.feedback = "音を開始できませんでした。もう一度開始ボタンを押してください。"; }
+    } catch { notifications.show({ id: "game-audio", scope: "dot-wave", type: "error", message: "音を開始できませんでした。もう一度開始ボタンを押してください。" }); }
     finally { busy.current = false; if (alive.current) render(); }
   }
   function strike(side: Side) {
@@ -119,8 +120,8 @@ export default function MochiDuel({ network, sharedAudio, boardNotice, resultPan
     busy.current = true;
     try {
       if (current.phase === "playing") { current.phase = "paused"; render(); await sound.current.pause(); }
-      else { await sound.current.resume(); current.phase = "playing"; }
-    } catch { current.phase = "paused"; current.feedback = "音を再開できませんでした。画面をタップするかPキーで再開してください。"; }
+      else { await sound.current.resume(); notifications.dismiss("game-audio"); current.phase = "playing"; }
+    } catch { current.phase = "paused"; notifications.show({ id: "game-audio", scope: "dot-wave", type: "error", message: "音を再開できませんでした。画面をタップするかPキーで再開してください。" }); }
     finally { busy.current = false; if (alive.current) render(); }
   }
 
@@ -324,6 +325,6 @@ export default function MochiDuel({ network, sharedAudio, boardNotice, resultPan
       {e.phase === "finished" && <div className="duel-choice-panel">{challengeNotice}<p>{e.match.hp.includes(0) ? "エネルギーが尽きた。バトル終了！" : "FINAL WAVE完了。残りエネルギーで決着！"}</p><strong>{name(0)} {e.match.hp[0]} : {e.match.hp[1]} {name(1)}</strong><p>与えたダメージ：{MAX_HP - e.match.hp[1]} ／ 受けたダメージ：{MAX_HP - e.match.hp[0]}</p>{resultPanel}{!holdResult && !replica && !network?.matchId && <button className="duel-primary" onClick={() => { sound.current?.stop(); engine.current = fresh(e.mode, e.match.ending); render(); }}>RETRY / もう一度</button>}</div>}
     </section>
     {e.phase !== "paused" && <p className={`duel-feedback ${["playing", "impact", "finished"].includes(e.phase) ? "dot-sr-only" : ""}`} role="status">{replica && viewSide === null ? e.phase === "intro" ? "プレイヤーの開始を待っています。" : "観戦中" : warning ? `${name(warning.side)}：${warning.message} 自分の番までリズムを聞こう。` : e.feedback || "相手の攻撃をよく聞いて、自分の番にリズムを返そう。"}</p>}
-    <div className="duel-controls">{e.phase === "playing" && challengePending && <span className="duel-challenge-indicator" role="status">対戦申込あり · 一時停止で確認</span>}<button className="duel-sound-toggle" aria-label={sound.current?.audible ? "音を消す" : "音を出す"} aria-pressed={Boolean(sound.current?.audible)} onClick={() => void toggleSound().catch(() => { e.feedback = "音を開始できませんでした。スピーカーをもう一度押してください。"; render(); })}><BattleIcon kind={sound.current?.audible ? "sound" : "sound-off"}/></button>{([0, 1] as Side[]).filter((side) => e.mode === "local" || side === viewSide).map((side) => <button key={side} aria-label={`${name(side)}のリズムボタン`} className={`duel-tap player-${side} ${e.phase === "playing" && cue.next === side && cue.current !== side ? "is-upcoming" : ""} ${currentActor !== side ? "is-waiting" : ""} ${warning?.side === side ? "is-wrong-turn" : ""}`} disabled={e.phase !== "playing" || Boolean(network && (!network.connected || (network.startsAt && network.now() < network.startsAt)))} onPointerDown={(event) => { if (!event.isPrimary || event.button !== 0) return; event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); press(side, `pointer-${event.pointerId}`); }} onPointerUp={event => lift(side, `pointer-${event.pointerId}`)} onPointerCancel={event => lift(side, `pointer-${event.pointerId}`)} onLostPointerCapture={event => lift(side, `pointer-${event.pointerId}`)} onClick={(event) => { if (event.detail === 0) { press(side, "accessible"); lift(side, "accessible"); } }}><BattleIcon kind={warning?.side === side ? "wait" : "tap"}/><small>{network || e.mode === "cpu" ? "SPACE / F" : side === 0 ? "F" : "J"}</small></button>)}</div>
+    <div className="duel-controls">{e.phase === "playing" && challengePending && <span className="duel-challenge-indicator" role="status">対戦申込あり · 一時停止で確認</span>}<button className="duel-sound-toggle" aria-label={sound.current?.audible ? "音を消す" : "音を出す"} aria-pressed={Boolean(sound.current?.audible)} onClick={() => void toggleSound().catch(() => { notifications.show({ id: "game-audio", scope: "dot-wave", type: "error", message: "音を開始できませんでした。スピーカーをもう一度押してください。" }); render(); })}><BattleIcon kind={sound.current?.audible ? "sound" : "sound-off"}/></button>{([0, 1] as Side[]).filter((side) => e.mode === "local" || side === viewSide).map((side) => <button key={side} aria-label={`${name(side)}のリズムボタン`} className={`duel-tap player-${side} ${e.phase === "playing" && cue.next === side && cue.current !== side ? "is-upcoming" : ""} ${currentActor !== side ? "is-waiting" : ""} ${warning?.side === side ? "is-wrong-turn" : ""}`} disabled={e.phase !== "playing" || Boolean(network && (!network.connected || (network.startsAt && network.now() < network.startsAt)))} onPointerDown={(event) => { if (!event.isPrimary || event.button !== 0) return; event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); press(side, `pointer-${event.pointerId}`); }} onPointerUp={event => lift(side, `pointer-${event.pointerId}`)} onPointerCancel={event => lift(side, `pointer-${event.pointerId}`)} onLostPointerCapture={event => lift(side, `pointer-${event.pointerId}`)} onClick={(event) => { if (event.detail === 0) { press(side, "accessible"); lift(side, "accessible"); } }}><BattleIcon kind={warning?.side === side ? "wait" : "tap"}/><small>{network || e.mode === "cpu" ? "SPACE / F" : side === 0 ? "F" : "J"}</small></button>)}</div>
   </main>;
 }

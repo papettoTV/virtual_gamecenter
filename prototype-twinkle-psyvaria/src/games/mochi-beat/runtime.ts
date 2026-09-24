@@ -1,5 +1,6 @@
+import { notifications } from "../../features/notifications/notifications";
 import { MOCHI_BEAT } from "../../domain/game";
-import { fetchScoreRanking, submitRankingEntry } from "../../features/ranking/ranking-client";
+import { fetchScoreRanking, submitRankingEntry, loadRankingWithNotice } from "../../features/ranking/ranking-client";
 import { BEAT_SECONDS, COUNT_IN, TOTAL_BEATS, hit, missExpired, roundAt, COMPLETION_SECONDS, advanceCompletion, createSession, advanceSet, completeSet, sessionResult, SET_BPMS, SESSION_SECONDS } from "./core";
 import { MochiAudio } from "./audio";
 import { drawScene, type Scene } from "./render";
@@ -69,14 +70,15 @@ async function begin() {
   try {
     audio ??= new MochiAudio(Number(volume.value) / 100);
     await audio.start(scene.run.beatSeconds);
+    notifications.dismiss("game-audio");
     scene.seconds = 0; scene.tappedAt = -10; scene.feedbackAt = -10; scene.tapJudgment = null; lastSection = -1;
     setIntro.hidden = true;
     intro.hidden = true; scene.phase = "playing";
     offset.disabled = true; tap.disabled = false; pause.disabled = false;
   } catch {
-    element("mochi-audio-error").textContent = "音を開始できませんでした。もう一度スタートを押してください。";
+    notifications.show({ id: "game-audio", scope: MOCHI_BEAT.id, type: "error", message: "音を開始できませんでした。", action: { label: "再試行", run: begin } });
     start.disabled = false; nextSetButton.disabled = false;
-    element("mochi-next-error").textContent = "音を開始できませんでした。もう一度開始ボタンを押してください。";
+
   } finally { transition = false; }
 }
 
@@ -89,10 +91,10 @@ async function togglePause() {
       await audio.pause(); scene.seconds = audio.seconds;
       pause.textContent = "再開"; status.textContent = "一時停止中。再開すると同じ位置から続きます。";
     } else {
-      await audio.resume(); scene.phase = "playing"; tap.disabled = false;
+      await audio.resume(); notifications.dismiss("game-audio"); scene.phase = "playing"; tap.disabled = false;
       pause.textContent = "一時停止"; lastSection = -1;
     }
-  } catch { status.textContent = "音を再開できませんでした。再開ボタンを押してください。"; }
+  } catch { notifications.show({ id: "game-audio", scope: MOCHI_BEAT.id, type: "error", message: "音を再開できませんでした。", action: { label: "再試行", run: togglePause } }); }
   finally { transition = false; }
 }
 
@@ -153,7 +155,7 @@ function finish() {
 }
 
 async function loadRanking() {
-  try {
+  await loadRankingWithNotice(MOCHI_BEAT.id, async () => {
     const entries = await fetchScoreRanking(MOCHI_BEAT.id, 20, MOCHI_BEAT.currentVersion);
     for (const id of ["ranking-list", "ranking-submit-list"]) {
       const body = element(id); body.replaceChildren();
@@ -166,7 +168,7 @@ async function loadRanking() {
       }
       if (!entries.length) rankingMessage(body, "まだ記録がありません");
     }
-  } catch { for (const id of ["ranking-list", "ranking-submit-list"]) rankingMessage(element(id), "ランキングを読み込めませんでした"); }
+  });
 }
 function rankingMessage(body: HTMLElement, message: string) {
   const row = document.createElement("tr"); const cell = document.createElement("td");
@@ -185,7 +187,7 @@ submit.addEventListener("click", async () => {
     await loadRanking();
   } catch {
     if (currentRun !== runId) return;
-    element("ranking-submit-heading").textContent = "登録できませんでした。もう一度お試しください。";
+
     submit.disabled = false;
   } finally { if (currentRun === runId) submitting = false; }
 });

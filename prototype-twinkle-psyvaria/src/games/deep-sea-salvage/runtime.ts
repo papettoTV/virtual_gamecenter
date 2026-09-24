@@ -1,5 +1,7 @@
+import { notifications } from "../../features/notifications/notifications";
+import { copySharedText } from "../../features/notifications/share";
 import { DEEP_SEA_SALVAGE } from "../../domain/game";
-import { fetchScoreRanking, submitRankingEntry } from "../../features/ranking/ranking-client";
+import { fetchScoreRanking, submitRankingEntry, loadRankingWithNotice } from "../../features/ranking/ranking-client";
 import {
   BASE_POWER_DRAIN,
   FISH_PATTERNS,
@@ -192,6 +194,7 @@ let messageTimer = 99;
 let hazardMessageCooldown = 0;
 
 function showScreen(screen: "arcade" | "cabinet" | "game") {
+  if (screen === "arcade") notifications.clearScope(DEEP_SEA_SALVAGE.id);
   document.body.classList.toggle("is-game-screen", screen === "game");
   arcadeScreen?.classList.toggle("is-hidden", screen !== "arcade");
   cabinetScreen?.classList.toggle("is-hidden", screen !== "cabinet");
@@ -1288,9 +1291,7 @@ function showShareMenu() {
 }
 
 function setShareFeedback(text: string) {
-  if (!shareResultButton) return;
-  shareResultButton.textContent = text;
-  window.setTimeout(() => { shareResultButton.textContent = "結果をシェア"; }, 2_000);
+  notifications.show({ id: "game-share", scope: DEEP_SEA_SALVAGE.id, type: text.includes("できません") ? "error" : "success", message: text });
 }
 
 async function shareResult() {
@@ -1328,12 +1329,7 @@ async function saveShareImage() {
 
 async function copyShareText() {
   const text = `${shareText()}\n${shareUrl()}`;
-  if (navigator.clipboard) await navigator.clipboard.writeText(text);
-  else {
-    const textarea = document.createElement("textarea"); textarea.value = text; textarea.style.position = "fixed"; textarea.style.opacity = "0";
-    document.body.appendChild(textarea); textarea.select(); document.execCommand("copy"); textarea.remove();
-  }
-  setShareFeedback("文章をコピーしました");
+  await copySharedText(text, "game-share", DEEP_SEA_SALVAGE.id);
 }
 
 async function submitScore() {
@@ -1342,12 +1338,13 @@ async function submitScore() {
   try {
     await submitRankingEntry({ gameId: DEEP_SEA_SALVAGE.id, elapsedTimeMs: Math.round(elapsed * 1000), cleared, score: finalScore, maxLevel: Math.floor(maxDepth), defeatedBossCount: cleared ? 1 : 0, clientVersion: DEEP_SEA_SALVAGE.currentVersion });
     rankingPanel?.classList.add("is-submitted"); if (rankingHeading) rankingHeading.textContent = "スコアランキング"; await loadRanking();
-  } catch { if (rankingResult) rankingResult.textContent += " / ランキングAPIに接続できません"; rankingSubmit.disabled = false; }
+  } catch { rankingSubmit.disabled = false; }
 }
 
 async function loadRanking() {
-  try { renderRanking(await fetchScoreRanking(DEEP_SEA_SALVAGE.id, 20, DEEP_SEA_SALVAGE.currentVersion)); }
-  catch { for (const element of [rankingList, rankingSubmitList]) if (element) element.innerHTML = '<tr><td colspan="4">ランキングAPI未接続</td></tr>'; }
+  await loadRankingWithNotice(DEEP_SEA_SALVAGE.id, async () => {
+    renderRanking(await fetchScoreRanking(DEEP_SEA_SALVAGE.id, 20, DEEP_SEA_SALVAGE.currentVersion));
+  });
 }
 function renderRanking(entries: Awaited<ReturnType<typeof fetchScoreRanking>>) {
   const html = entries.map((entry, index) => `<tr><td>${index + 1}</td><td>${escapeHtml(entry.player_name)}</td><td>${entry.score.toLocaleString()}</td><td>${new Date(entry.created_at).toLocaleDateString("ja-JP")}</td></tr>`).join("") || '<tr><td colspan="4">まだ記録がありません</td></tr>';
@@ -1375,7 +1372,7 @@ shareXButton?.addEventListener("click", () => window.open(`https://twitter.com/i
 shareLineButton?.addEventListener("click", () => window.open(`https://line.me/R/msg/text/?${encodeURIComponent(`${shareText()}\n${shareUrl()}`)}`, "_blank", "noopener,noreferrer"));
 shareBlueskyButton?.addEventListener("click", () => window.open(`https://bsky.app/intent/compose?text=${encodeURIComponent(`${shareText()}\n${shareUrl()}`)}`, "_blank", "noopener,noreferrer"));
 shareSaveButton?.addEventListener("click", () => void saveShareImage());
-shareCopyButton?.addEventListener("click", () => void copyShareText());
+shareCopyButton?.addEventListener("click", () => void copyShareText().catch(() => {}));
 rankingRetry?.addEventListener("click", () => { retryFromResult(); showScreen("game"); });
 rankingName?.addEventListener("input", () => { if (rankingSubmit) rankingSubmit.disabled = !rankingName.value.trim() || !finalScore; });
 rankingSubmit?.addEventListener("click", () => void submitScore());

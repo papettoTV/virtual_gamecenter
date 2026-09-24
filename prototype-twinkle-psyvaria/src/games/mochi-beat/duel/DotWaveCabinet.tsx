@@ -1,3 +1,5 @@
+import { notifications } from "../../../features/notifications/notifications";
+import { copySharedText } from "../../../features/notifications/share";
 import { useEffect, useReducer, useRef } from "react";
 import { createUuid } from "../../../shared/id";
 import { createCabinetClient, type CabinetClient } from "../../../realtime/cabinet-client";
@@ -16,7 +18,7 @@ export default function DotWaveCabinet() {
   const clock = useRef(new ServerClock());
   const data = useRef({
     cabinetId: "", room: null as CabinetState | null, pending: false, applied: false, queue: 0,
-    busy: false, notice: "", result: null as Extract<ServerMessage, { type: "versusResult" }> | null,
+    busy: false, result: null as Extract<ServerMessage, { type: "versusResult" }> | null,
     seat: null as VersusSeat | null, credit: false, reservation: null as string | null, revision: 0,
     seq: 0, inputSeq: 0, lastPublish: 0, bestFrameSeq: -1, countdown: 0, streamId: createUuid(), viewerStream: "",
     soloReady: null as ((started: boolean) => void) | null, resultAt: 0, returningToCpu: false, rematchPending: false, rematchRequested: false,
@@ -27,7 +29,7 @@ export default function DotWaveCabinet() {
     beforeSolo: async () => {
       const d = data.current;
       if (!link.current.connected || link.current.role !== "player") return false;
-      d.notice = "";
+      notifications.dismiss("dot-wave");
       let reservationId: string | undefined;
       try {
         if (!d.credit) {
@@ -77,9 +79,9 @@ export default function DotWaveCabinet() {
   function walletChanged() { window.dispatchEvent(new Event("platform-wallet-changed")); }
   function showError(error: unknown) {
     const insufficientCredit = error instanceof PlatformApiError && error.code === "insufficient_credit";
-    d.notice = insufficientCredit
+    notifications.show({ id: "dot-wave", scope: "dot-wave", type: "error", message: insufficientCredit
       ? "クレジットが足りません。プロフィールの残高から補充してください。"
-      : "接続またはクレジットの確認に失敗しました。もう一度お試しください。";
+      : "接続またはクレジットの確認に失敗しました。もう一度お試しください。" });
     d.busy = false; render();
     if (insufficientCredit) window.dispatchEvent(new Event("request-credit-topup"));
   }
@@ -87,6 +89,7 @@ export default function DotWaveCabinet() {
 
   useEffect(() => {
     let disposed = false;
+    notifications.clearScope("dot-wave");
     const url = new URL(location.href);
     const existing = url.pathname.match(/^\/cabinets\/([a-zA-Z0-9-]+)$/)?.[1] ?? url.searchParams.get("cabinet");
     d.cabinetId = existing ?? createUuid();
@@ -116,7 +119,7 @@ export default function DotWaveCabinet() {
       if (message.type === "challengePending") { d.applied = true; d.busy = false; }
       if (message.type === "challengeQueueStatus") { d.applied = ["pending", "queued"].includes(message.status); d.queue = message.position ?? 0; }
       if (message.type === "challengeRejected") {
-        d.applied = false; d.busy = false; d.notice = message.reason;
+        d.applied = false; d.busy = false; notifications.show({ id: "dot-wave", scope: "dot-wave", type: "info", message: message.reason });
         if (d.reservation) await releasePlayCredit(d.reservation).catch(() => {});
         d.reservation = null; walletChanged();
       }
@@ -143,14 +146,14 @@ export default function DotWaveCabinet() {
         if (!keepResult) net.side = message.nextRole === "player" ? 0 : null;
         d.credit = message.nextRole === "player";
         if (!keepResult) { d.seat = null; d.result = null; }
-        d.returningToCpu = false; d.rematchPending = false; d.rematchRequested = false; d.busy = false; walletChanged(); d.notice = message.reason;
+        d.returningToCpu = false; d.rematchPending = false; d.rematchRequested = false; d.busy = false; walletChanged(); notifications.show({ id: "dot-wave", scope: "dot-wave", type: "info", message: message.reason });
         net.startCost = d.credit ? 0 : 1;
         audio.current?.stop();
         if (keepResult) { net.latest = null; net.inputs = []; }
         else resetGame();
       }
-      if (message.type === "playerLeft") { net.latest = null; audio.current?.stop(); resetGame(); d.notice = "プレイヤーが席を離れました。"; }
-      if (message.type === "error") { d.notice = message.message; d.busy = false; d.soloReady?.(false); }
+      if (message.type === "playerLeft") { net.latest = null; audio.current?.stop(); resetGame(); notifications.show({ id: "dot-wave", scope: "dot-wave", type: "info", message: "プレイヤーが席を離れました。" }); }
+      if (message.type === "error") { notifications.show({ id: "dot-wave", scope: "dot-wave", type: "error", message: message.message }); d.busy = false; d.soloReady?.(false); }
       render();
     };
     client.current = createCabinetClient({
@@ -169,12 +172,12 @@ export default function DotWaveCabinet() {
       d.countdown = net.startsAt ? Math.max(0, Math.ceil((net.startsAt - net.now()) / 1000)) : 0;
       render();
     }, 500);
-    return () => { disposed = true; clearInterval(timer); client.current?.leave(); audio.current?.dispose(); audio.current = null; };
+    return () => { disposed = true; notifications.clearScope("dot-wave"); clearInterval(timer); client.current?.leave(); audio.current?.dispose(); audio.current = null; };
   }, []);
 
   async function requestChallenge() {
     if (d.busy || d.applied || net.role !== "spectator") return;
-    d.busy = true; d.notice = ""; render();
+    d.busy = true; notifications.dismiss("dot-wave"); render();
     try {
       await unlock();
       const reservation = await reservePlayCredit(d.cabinetId, "dot-wave", "challenge");
@@ -205,8 +208,8 @@ export default function DotWaveCabinet() {
   }
   async function share() {
     const url = `${location.origin}/cabinets/${d.cabinetId}?game=dot-wave&watch=1`;
-    try { await navigator.clipboard.writeText(url); d.notice = "観戦URLをコピーしました。"; }
-    catch { d.notice = url; }
+    try { await copySharedText(url, "game-share", "dot-wave"); }
+    catch {}
     render();
   }
   function takeSeat() {
@@ -234,7 +237,7 @@ export default function DotWaveCabinet() {
       {d.applied && <button onClick={() => client.current?.send({ type: "cancelChallenge" })}>{d.queue ? `${d.queue}人待ち` : "承認待ち"} · キャンセル</button>}
       {net.role === "spectator" && d.room?.playerCount === 0 && <button disabled={!net.connected} onClick={takeSeat}>この席でプレイ</button>}
       {net.role === "spectator" && !net.matchId && d.room?.status === "occupied" && net.latest?.engine.phase !== "finished" && <p role="status">別の画面がプレイヤー席を使用しています。その画面で開始するか、ゲーム一覧に戻って席を空けてください。</p>}
-      {d.notice && <p role="status">{d.notice}</p>}
+
 
     </div>
     <MochiDuel key={d.revision} network={net} sharedAudio={audio}
