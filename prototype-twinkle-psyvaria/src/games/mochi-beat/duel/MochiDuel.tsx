@@ -5,6 +5,7 @@ import { turnCue, cueName, inputHint, countdownCue } from "./turnCue";
 import { DotScene, PixelWord } from "./DotScene";
 import { BattleIcon } from "./BattleIcon";
 import { NeonRail } from "./NeonRail";
+import { musicStages, visibleMusicStage, type MusicStage } from "./musicMood";
 import { DuelAudio } from "./audio";
 import { actorAt, BEAT, beatAt, levelAt, randomMove, cpuGrades, createExchange, createMatch, END_BEAT, expire, MAX_EXCHANGES, MAX_HP, MOVES, resolve, tap, release, type Ending, type Exchange, type Grade, type Match, type Resolution, type Side } from "./core";
 import { INPUT_GRACE, validRemoteTap, type DuelLink, type DuelFrame } from "./network";
@@ -29,6 +30,8 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
   const viewSide = network ? network.side : 0;
   const spectator = Boolean(network && viewSide === null);
   const heldInputs = useRef<[Set<string>, Set<string>]>([new Set(), new Set()]);
+  const musicOverride = useRef<MusicStage | null>(null);
+  const musicLevels = (history: Match["history"]): [MusicStage, MusicStage] => musicOverride.current === null ? musicStages(history) : [musicOverride.current, musicOverride.current];
   const busy = useRef(false);
   const alive = useRef(true);
   const [, render] = useReducer((value: number) => value + 1, 0);
@@ -58,6 +61,7 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
       if (network && !network.matchId && !await network.beforeSolo()) return;
       if (!alive.current) return;
       sound.current.volume(.65);
+      sound.current.setMusicStages(musicLevels(current.match.history));
       current.selected = randomMove(current.match.turn);
       await sound.current.start(current.selected, beatAt(current.match.turn), network?.startsAt ? Math.max(0, (network.startsAt - network.now()) / 1000) : 3, network?.startsAt ? Math.max(0, (network.now() - network.startsAt) / 1000) : 0);
       if (!alive.current) return;
@@ -86,6 +90,7 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
     const grade = tap(current.exchange, side, seconds);
     if (!grade) return;
     sound.current.hit(grade, side !== current.exchange.attacker);
+    if (side !== current.exchange.attacker) sound.current.syncDefenseHold(current.exchange, seconds);
     current.flash = { side, grade, at: seconds };
     if (replica) predicted.current = { turn: current.match.turn, flash: current.flash, warning: null };
     const attacking = side === current.exchange.attacker;
@@ -105,6 +110,7 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
     if (source) held.delete(source); else held.clear();
     if (held.size) return;
     const current = engine.current;
+    if (current.exchange && side !== current.exchange.attacker) sound.current?.stopDefenseHold();
     if (!current.exchange || !sound.current || !["playing", "paused"].includes(current.phase)) return;
     const seconds = replica && network ? (network.now() - remoteTurnOrigin.current) / 1000 : sound.current.seconds;
     if (replica) network?.strike(current.match.turn, seconds, "up");
@@ -144,6 +150,7 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
           engine.current = structuredClone(frame.engine);
           if (network.side === 1) engine.current.feedback = engine.current.feedback.replaceAll("あなた / CYAN", "相手 / CYAN").replaceAll("相手 / PINK", "あなた / PINK");
           remoteTurnOrigin.current = frame.turnStartedAt;
+          sound.current?.setMusicStages(musicLevels(frame.engine.match.history));
           const flash = frame.engine.flash;
           const flashKey = `${frame.engine.match.turn}:${flash?.side}:${flash?.at}`;
           if (flash && frame.engine.phase === "playing" && flashKey !== lastSoundFlash.current) {
@@ -175,7 +182,10 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
             if (prediction.warning && remote.seconds - prediction.warning.at < .75 && actorAt(remote.exchange, remote.seconds) !== network.side) remote.inputWarning = prediction.warning;
           }
           if (remote.inputWarning && (remote.seconds - remote.inputWarning.at >= .75 || actorAt(remote.exchange, remote.seconds) === remote.inputWarning.side)) remote.inputWarning = null;
+          // Local presses/releases play immediately; snapshots drive other players and spectators.
+          if (network.side !== 1 - remote.exchange.attacker) sound.current?.syncDefenseHold(remote.exchange, remote.seconds, remote.phase === "playing" && network.connected);
         }
+        if (!network.connected || !["countdown", "playing"].includes(remote.phase)) sound.current?.stopDefenseHold();
         render();
         return;
       }
@@ -224,6 +234,7 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
             sound.current.hit("miss", side !== exchange.attacker);
           }
         }
+        sound.current.syncDefenseHold(exchange, current.seconds);
         if (sound.current.seconds >= END_BEAT * exchange.beatSeconds + (network?.matchId ? INPUT_GRACE : 0)) {
           current.inputWarning = null;
           current.outcome = resolve(current.match, exchange);
@@ -240,6 +251,7 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
             current.exchange = createExchange(current.match.turn % 2 as Side, current.selected, beatAt(current.match.turn));
             current.cpu = current.mode === "cpu" ? cpuGrades(current.selected, current.exchange.attacker === 1) : [];
             current.flash = null;
+            sound.current.setMusicStages(musicLevels(current.match.history));
             sound.current.advance(current.selected, current.exchange.beatSeconds);
             current.seconds = sound.current.seconds;
           }
@@ -257,7 +269,7 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
     };
     const key = (event: KeyboardEvent) => {
       if (network && (network.side === null || !network.connected)) return;
-      if (event.target instanceof Element && event.target.closest("input, select, textarea, a, [role=dialog]")) return;
+      if (event.target instanceof Element && event.target.closest("input, select, textarea, a, [role=dialog], [data-debug-controls]")) return;
       if (event.target instanceof Element && event.target.closest("button") && event.code === "Space" && !["intro", "playing"].includes(engine.current.phase)) return;
       const current = engine.current;
       if (["Space", "KeyF", "KeyJ", "KeyP"].includes(event.code)) event.preventDefault();
@@ -280,7 +292,7 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
     const animate = (now: number) => { loop(now); frameId = requestAnimationFrame(animate); };
     frameId = requestAnimationFrame(animate);
     const backgroundTick = window.setInterval(() => { if (document.hidden && network?.connected) loop(performance.now()); }, 50);
-    return () => { icon.remove(); document.title = originalTitle; alive.current = false; cancelAnimationFrame(frameId); clearInterval(backgroundTick); if (!sharedAudio) { sound.current?.dispose(); sound.current = null; } window.removeEventListener("keydown", key); window.removeEventListener("keyup", keyUp); window.removeEventListener("blur", autoPause); document.removeEventListener("visibilitychange", visibility); };
+    return () => { icon.remove(); document.title = originalTitle; alive.current = false; cancelAnimationFrame(frameId); clearInterval(backgroundTick); sound.current?.stopDefenseHold(); if (!sharedAudio) { sound.current?.dispose(); sound.current = null; } window.removeEventListener("keydown", key); window.removeEventListener("keyup", keyUp); window.removeEventListener("blur", autoPause); document.removeEventListener("visibilitychange", visibility); };
   }, []);
 
   const attacker = e.exchange?.attacker ?? e.match.turn % 2 as Side;
@@ -300,7 +312,7 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
 
     <section className="duel-board" onClick={event => { if (e.phase === "paused" && !replica && !(event.target instanceof Element && event.target.closest("button, a, input, select, [role=dialog]"))) void pause(); }}>
       <h2 className={e.phase === "countdown" || e.phase === "playing" || e.phase === "impact" ? "dot-sr-only" : undefined} aria-live="polite">{heading}</h2>
-      <DotScene engine={e} viewSide={viewSide} players={players} />
+      <DotScene engine={e} viewSide={viewSide} players={players} musicOverride={musicOverride.current} />
       <div className="duel-board-notice">{boardNotice}</div>
       {e.phase === "paused" && <div className="duel-paused-challenge">{challengeNotice}</div>}
       {e.phase === "countdown" && <div className="duel-start-countdown" role="status" aria-label={`開始まで${Math.max(1, Math.ceil(-e.seconds))}秒`}><strong key={Math.ceil(-e.seconds)}>{Math.max(1, Math.min(3, Math.ceil(-e.seconds)))}</strong></div>}
@@ -328,5 +340,16 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
     </section>
     {e.phase !== "paused" && <p className={`duel-feedback ${["playing", "impact", "finished"].includes(e.phase) ? "dot-sr-only" : ""}`} role="status">{replica && viewSide === null ? e.phase === "intro" ? "プレイヤーの開始を待っています。" : "観戦中" : warning ? `${name(warning.side)}：${warning.message} 自分の番までリズムを聞こう。` : e.feedback || "相手の攻撃をよく聞いて、自分の番にリズムを返そう。"}</p>}
     <div className="duel-controls">{e.phase === "playing" && challengePending && <span className="duel-challenge-indicator" role="status">対戦申込あり · 一時停止で確認</span>}<button className="duel-sound-toggle" aria-label={sound.current?.audible ? "音を消す" : "音を出す"} aria-pressed={Boolean(sound.current?.audible)} onClick={() => void toggleSound().catch(() => { notifications.show({ id: "game-audio", scope: "dot-wave", type: "error", message: "音を開始できませんでした。スピーカーをもう一度押してください。" }); render(); })}><BattleIcon kind={sound.current?.audible ? "sound" : "sound-off"}/></button>{([0, 1] as Side[]).filter((side) => e.mode === "local" || side === viewSide).map((side) => <button key={side} aria-label={`${name(side)}のリズムボタン`} className={`duel-tap player-${side} ${e.phase === "playing" && cue.next === side && cue.current !== side ? "is-upcoming" : ""} ${currentActor !== side ? "is-waiting" : ""} ${warning?.side === side ? "is-wrong-turn" : ""}`} disabled={e.phase !== "playing" || Boolean(network && (!network.connected || (network.startsAt && network.now() < network.startsAt)))} onPointerDown={(event) => { if (!event.isPrimary || event.button !== 0) return; event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); press(side, `pointer-${event.pointerId}`); }} onPointerUp={event => lift(side, `pointer-${event.pointerId}`)} onPointerCancel={event => lift(side, `pointer-${event.pointerId}`)} onLostPointerCapture={event => lift(side, `pointer-${event.pointerId}`)} onClick={(event) => { if (event.detail === 0) { press(side, "accessible"); lift(side, "accessible"); } }}><BattleIcon kind={warning?.side === side ? "wait" : "tap"}/><small>{network || e.mode === "cpu" ? "SPACE / F" : side === 0 ? "F" : "J"}</small></button>)}</div>
+    {import.meta.env.DEV && <div className="dot-music-debug" data-debug-controls>
+      <label>盛り上がりテスト：{musicOverride.current === null ? "自動" : "手動"} · {["通常", "ベース追加", "伴奏追加"][musicOverride.current ?? visibleMusicStage(e.match.history, beat)]}
+        <input type="range" min="0" max="2" step="1" aria-label="盛り上がりモード" aria-valuetext={["通常", "ベース追加", "伴奏追加"][musicOverride.current ?? visibleMusicStage(e.match.history, beat)]} value={musicOverride.current ?? visibleMusicStage(e.match.history, beat)} onChange={event => {
+          musicOverride.current = Number(event.target.value) as MusicStage;
+          sound.current?.setMusicStages(musicLevels(engine.current.match.history)); render();
+        }}/>
+        <span className="dot-music-debug-ticks"><span>通常</span><span>ベース</span><span>伴奏</span></span>
+      </label>
+      <button disabled={musicOverride.current === null} onClick={() => { musicOverride.current = null; sound.current?.setMusicStages(musicLevels(engine.current.match.history)); render(); }}>自動に戻す</button>
+      <small>この画面だけに適用 · 音はプレイ中に確認できます</small>
+    </div>}
   </main>;
 }

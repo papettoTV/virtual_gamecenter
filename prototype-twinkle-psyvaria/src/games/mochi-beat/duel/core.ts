@@ -22,6 +22,12 @@ export const MOVES: readonly Move[] = [
   { name: "LONG BOUNCE", rhythm: "トトン・トーン", beats: [0, .5, 2], holds: {2: 1.5}, power: 30 },
   { name: "DOUBLE HOLD", rhythm: "トーン・トーン", beats: [0, 2], holds: {0: 1.5, 2: 1.5}, power: 32 },
   { name: "HOLD RUSH", rhythm: "トーン・トトトン", beats: [0, 1.5, 2, 2.5, 3], holds: {0: 1}, power: 34 },
+  { name: "QUICK DOUBLE", rhythm: "トトン・トン・トン", beats: [0, .25, 1, 2, 3], power: 30 },
+  { name: "QUICK PICKUP", rhythm: "トン・トトン・トン", beats: [0, 1.75, 2, 3], power: 30 },
+  { name: "QUICK BURST", rhythm: "トトトン・トン・トン", beats: [0, .25, .5, 2, 3], power: 32 },
+  { name: "QUICK ECHO", rhythm: "トトン・トトン", beats: [0, .25, 1.5, 2, 2.25, 3], power: 32 },
+  { name: "QUICK ROLL", rhythm: "トトトトン・トトン", beats: [0, .25, .5, .75, 2, 2.25, 3], power: 34 },
+  { name: "QUICK SHIFT", rhythm: "トン・トトン・トトトン", beats: [0, .75, 1, 2, 2.25, 2.5, 3], power: 34 },
 ] ;
 export const TURNS_PER_LEVEL = 4;
 export const FINAL_LEVEL = 5;
@@ -29,9 +35,13 @@ export const LEVEL_POOLS: readonly (readonly number[])[] = [[0, 3, 4], [1, 5, 6]
 // Tune this single value after playtesting.
 export const HOLD_START_LEVEL = 2;
 export const HOLD_POOLS: readonly (readonly number[])[] = [[15, 16], [16, 17], [17, 18], [18, 19]];
+export const SIXTEENTH_START_LEVEL = 3;
+export const SIXTEENTH_POOLS: readonly (readonly number[])[] = [[20, 21], [22, 23], [24, 25]];
 export function movesAtLevel(level: number): readonly number[] {
   const taps = LEVEL_POOLS[Math.min(level, LEVEL_POOLS.length) - 1]!;
-  return level < HOLD_START_LEVEL ? taps : [...taps, ...HOLD_POOLS[Math.min(level - HOLD_START_LEVEL, HOLD_POOLS.length - 1)]!];
+  const holds = level < HOLD_START_LEVEL ? [] : HOLD_POOLS[Math.min(level - HOLD_START_LEVEL, HOLD_POOLS.length - 1)]!;
+  const quick = level < SIXTEENTH_START_LEVEL ? [] : SIXTEENTH_POOLS[Math.min(level - SIXTEENTH_START_LEVEL, SIXTEENTH_POOLS.length - 1)]!;
+  return [...taps, ...holds, ...quick];
 }
 export type Ending = "limited" | "knockout";
 export function levelAt(turn: number) { return 1 + Math.floor(turn / TURNS_PER_LEVEL); }
@@ -66,12 +76,17 @@ export function actorAt(exchange: Exchange, seconds: number): Side | null {
 // Release windows are wider than press windows, and stay inside the next half-beat.
 export const releaseWindow = (beatSeconds: number) => Math.min(.24, beatSeconds * .4);
 export const perfectReleaseWindow = (beatSeconds: number) => Math.min(.10, beatSeconds * .2);
+// Only tighten dense notes: adjacent sixteenth-note windows must not overlap.
+function pressWindow(chart: Chart, note: Note, beatSeconds: number) {
+  const gap = chart.notes.reduce((gap, other) => other === note ? gap : Math.min(gap, Math.abs(other.beat - note.beat)), Infinity);
+  return Math.min(WINDOW, beatSeconds * .24, gap * beatSeconds * .48);
+}
 export function expire(chart: Chart, seconds: number, beatSeconds = BEAT) {
   for (const note of chart.notes) {
     if (note.grade !== null) continue;
     if (note.holdGrade && note.endBeat !== undefined) {
       if (seconds - note.endBeat * beatSeconds > releaseWindow(beatSeconds) + 1e-9) note.grade = "miss";
-    } else if (seconds - note.beat * beatSeconds > Math.min(WINDOW, beatSeconds * .24) + 1e-9) note.grade = "miss";
+    } else if (seconds - note.beat * beatSeconds > pressWindow(chart, note, beatSeconds) + 1e-9) note.grade = "miss";
   }
 }
 export function tap(exchange: Exchange, side: Side, seconds: number): Grade | null {
@@ -79,8 +94,8 @@ export function tap(exchange: Exchange, side: Side, seconds: number): Grade | nu
   const chart = side === exchange.attacker ? exchange.attack : exchange.defense;
   expire(chart, seconds, exchange.beatSeconds);
   const note = chart.notes.filter((note) => note.grade === null && !note.holdGrade).sort((a, b) => Math.abs(a.beat * exchange.beatSeconds - seconds) - Math.abs(b.beat * exchange.beatSeconds - seconds))[0];
-  if (note && Math.abs(note.beat * exchange.beatSeconds - seconds) <= Math.min(WINDOW, exchange.beatSeconds * .24) + 1e-9) {
-    note.grade = Math.abs(note.beat * exchange.beatSeconds - seconds) <= Math.min(.06, exchange.beatSeconds * .12) + 1e-9 ? "perfect" : "good";
+  if (note && Math.abs(note.beat * exchange.beatSeconds - seconds) <= pressWindow(chart, note, exchange.beatSeconds) + 1e-9) {
+    note.grade = Math.abs(note.beat * exchange.beatSeconds - seconds) <= Math.min(.06, pressWindow(chart, note, exchange.beatSeconds) / 2) + 1e-9 ? "perfect" : "good";
     if (note.endBeat !== undefined) { note.holdGrade = note.grade; note.grade = null; return note.holdGrade; }
     return note.grade;
   }

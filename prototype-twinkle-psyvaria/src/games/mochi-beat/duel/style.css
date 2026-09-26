@@ -810,3 +810,14 @@
 .dot-player-roster.is-entering .dot-champion:not(.tier-0) { animation:dot-crown-entry .65s ease-out both; }
 @keyframes dot-crown-entry { from { transform:translateY(-8px) scale(.6); opacity:0; } to { transform:translateY(0) scale(1); opacity:1; } }
 @media(prefers-reduced-motion:reduce) { .dot-player-roster.is-entering .dot-champion { animation:none; } }
+
+.dot-music-debug { max-width:520px; margin:16px auto; padding:12px; border:1px solid #41465f; background:#10142a; border-radius:8px; color:#c9d5e9; font-size:13px; }
+.dot-music-debug label { display:block; }
+.dot-music-debug input { display:block; width:100%; margin:12px 0 4px; accent-color:#13e5f3; }
+.dot-music-debug-ticks { display:flex; justify-content:space-between; }
+.dot-music-debug small { display:block; margin-top:8px; opacity:.7; }
+.dot-music-debug button { margin-top:10px; }
+
+.dot-music-backdrop { pointer-events:none; animation:dot-music-arrival .7s ease-out both; }
+@keyframes dot-music-arrival { from { opacity:0; } to { opacity:1; } }
+@media(prefers-reduced-motion:reduce) { .dot-music-backdrop { animation:none; } }

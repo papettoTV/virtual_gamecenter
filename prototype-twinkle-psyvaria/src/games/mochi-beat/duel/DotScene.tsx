@@ -1,4 +1,5 @@
 import type { DotWaveRoster } from "../../../domain/cabinet";
+import { visibleMusicStage, type MusicStage } from "./musicMood";
 import { PlayerRoster } from "./PlayerRoster";
 import { turnCue, cueName } from "./turnCue";
 import { BattleIcon } from "./BattleIcon";
@@ -52,7 +53,41 @@ const Backdrop=memo(function Backdrop(){
  </g>;
 });
 
-export function DotScene({engine:e,viewSide=0,players}:{engine:Engine;viewSide?:Side|null;players?:DotWaveRoster}) {
+export function MusicBackdrop({stage,beat}: {stage:MusicStage;beat:number}) {
+ if(stage===0)return null;
+ const pulse=Math.floor(beat*2)%8;
+ const swell=(1+Math.cos(beat*Math.PI*2))/2;
+ return <g key={stage} className="dot-music-backdrop" data-music-stage={stage} aria-label={stage===1?"ベースが加わり床の光が流れる":"伴奏が加わり照明とドットが輝く"}>
+  <rect width="960" height="282" fill={stage===2?"#35125c":"#121d3e"} opacity={stage===2?.65:.35}/>
+  {/* A stepped, lit dance floor stays below the characters and health bars. */}
+  <path d="M0 318h960v42H0Z" fill={stage===2?"#381657":"#10233b"}/>
+  {[0,1,2,3].map(row=><g key={row}>
+   {Array.from({length:32},(_,i)=><rect key={i} x={i*30+(row%2)*6} y={320+row*10} width="22" height={stage===2?7:3} fill={stage===2&&(i+pulse+row)%8===0?LIME:i%2?PINK:CYAN} opacity={stage===2?((i+pulse+row)%8<4?.95:.38):((i+pulse+row)%8<3?.65:.16)}/>)}
+  </g>)}
+  {stage===2&&<g aria-hidden="true">
+   {Array.from({length:60},(_,i)=><rect key={i} x={i*16} y="0" width="10" height="5" fill={i%3===0?LIME:i%2?PINK:CYAN} opacity={(i+pulse)%6<3?.95:.3}/>)}
+   <path d="M0 308h960" stroke={PINK} strokeWidth="3" opacity=".65"/>
+  </g>}
+  {[0,1].map(side=><g key={side} transform={side?"translate(960 0) scale(-1 1)":undefined}>
+   <path d="M0 18h96v6h48v6h48v6h48v6h48" stroke={side?PINK:CYAN} strokeWidth={stage===2?5:3} fill="none" opacity={stage===2?.8:.45}/>
+   <g opacity={stage===2?.75+swell*.2:.45+swell*.15}><Ring x={30} y={102} r={8} color={side?PINK:CYAN}/><Ring x={30} y={204} r={8} color={side?PINK:CYAN}/></g>
+   {Array.from({length:3},(_,col)=><g key={col}>{Array.from({length:(stage===2?10:3)+((col+pulse)%5)},(_,row)=><rect key={row} x={78+col*8} y={276-row*8} width="5" height="5" fill={side?PINK:CYAN} opacity={stage===2?.9:.4}/>)}</g>)}
+   {stage===2&&<>
+    <path d="M36 12h24v18h12v24h18v30h24v30h30v30h48v24h72L120 12Z" fill={side?PINK:CYAN} opacity={.18+swell*.08}/>
+    <path d="M144 12h18v18h18v24h24v24h30v24h36v18h42v18h36L252 12Z" fill={side?CYAN:PINK} opacity=".16"/>
+    {Array.from({length:12},(_,i)=>{
+     const x=120+(i%4)*66, y=14+Math.floor(i/4)*44;
+     return <g key={i} opacity={.45+((i+pulse)%4)*.15} fill={i%2?"#baff39":side?PINK:CYAN}>
+      <rect x={x} y={y} width="7" height="7"/>
+      {(i+pulse)%3!==0&&<><rect x={x-7} y={y} width="4" height="5"/><rect x={x+8} y={y} width="4" height="5"/><rect x={x} y={y-7} width="5" height="4"/><rect x={x} y={y+8} width="5" height="4"/></>}
+     </g>;
+    })}
+   </>}
+  </g>)}
+ </g>;
+}
+
+export function DotScene({engine:e,viewSide=0,players,musicOverride=null}:{engine:Engine;viewSide?:Side|null;players?:DotWaveRoster;musicOverride?:MusicStage|null}) {
  const beat=Math.max(0,e.seconds/(e.exchange?.beatSeconds??BEAT));
  const attacker=e.exchange?.attacker??e.match.turn%2 as Side;
  const cue=turnCue(attacker,beat);
@@ -66,6 +101,7 @@ export function DotScene({engine:e,viewSide=0,players}:{engine:Engine;viewSide?:
  for(let y=-9;y<=9;y++)for(let x=-9;x<=9;x++)if(Math.hypot(x,y)<9)cells.push(<rect key={`${x}-${y}`} x={480+x*6} y={90+y*6} width="5" height="5" fill={Math.hypot(x,y)>7.8?CYAN:"#102443"}/>);
  return <><div className="dot-scene-wrap"><svg className="duel-scene" viewBox="0 0 960 360" role="img" aria-label="シアンとピンクの音の生き物が、音符の弾とシールドで戦うドットのアリーナ" shapeRendering="crispEdges">
   <Backdrop/>
+  {(e.phase==="playing"||musicOverride!==null)&&<MusicBackdrop stage={musicOverride ?? visibleMusicStage(e.match.history,beat)} beat={beat}/>}
   <g className="dot-reactor" data-heat={heat} aria-label="難しさに応じて光の列が伸びる音符のコア">
    {cells}<Pixels rows={NOTE} x={459} y={66} color={pulse===0?"#ffffff":CYAN}/>
    {Array.from({length:16},(_,i)=>{const angle=i*Math.PI/8;const count=2+Math.min(heat,8)+((i+pulse)%3);return <g key={i}>{Array.from({length:count},(_,j)=><rect key={j} x={Math.round((480+Math.cos(angle)*(66+j*7))/6)*6} y={Math.round((90+Math.sin(angle)*(66+j*7))/6)*6} width="5" height="5" fill={[CYAN,PINK,LIME][i%3]}/>)}</g>;})}
