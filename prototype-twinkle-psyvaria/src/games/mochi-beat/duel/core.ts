@@ -28,6 +28,8 @@ export const MOVES: readonly Move[] = [
   { name: "QUICK ECHO", rhythm: "トトン・トトン", beats: [0, .25, 1.5, 2, 2.25, 3], power: 32 },
   { name: "QUICK ROLL", rhythm: "トトトトン・トトン", beats: [0, .25, .5, .75, 2, 2.25, 3], power: 34 },
   { name: "QUICK SHIFT", rhythm: "トン・トトン・トトトン", beats: [0, .75, 1, 2, 2.25, 2.5, 3], power: 34 },
+  { name: "LONG REST", rhythm: "トーーン・トン", beats: [0, 3], holds: {0: 2}, power: 28 },
+  { name: "TWIN HOLD", rhythm: "トーン・トーン", beats: [0, 2], holds: {0: 1, 2: 1}, power: 30 },
 ] ;
 export const TURNS_PER_LEVEL = 4;
 export const FINAL_LEVEL = 5;

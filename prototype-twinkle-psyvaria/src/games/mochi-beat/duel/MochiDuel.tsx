@@ -7,13 +7,14 @@ import { BattleIcon } from "./BattleIcon";
 import { NeonRail } from "./NeonRail";
 import { musicStages, visibleMusicStage, type MusicStage } from "./musicMood";
 import { DuelAudio } from "./audio";
-import { actorAt, BEAT, beatAt, levelAt, randomMove, cpuGrades, createExchange, createMatch, END_BEAT, expire, MAX_EXCHANGES, MAX_HP, MOVES, resolve, tap, release, type Ending, type Exchange, type Grade, type Match, type Resolution, type Side } from "./core";
+import { actorAt, BEAT, beatAt, levelAt, randomMove, cpuGrades, createExchange, END_BEAT, expire, MAX_EXCHANGES, MAX_HP, MOVES, resolve, tap, release, type Ending, type Exchange, type Grade, type Match, type Resolution, type Side } from "./core";
 import { INPUT_GRACE, validRemoteTap, type DuelLink, type DuelFrame } from "./network";
+import { CPU_STAGES, advanceCampaign, freshDuel as fresh, nextCpuStage, randomCpuMove, type CpuStage } from "./campaign";
 import "./style.css";
 
 type Phase = "countdown" | "intro" | "playing" | "paused" | "impact" | "finished";
-export type Engine = { phase: Phase; mode: "cpu" | "local" | "online"; match: Match; selected: number; exchange: Exchange | null; seconds: number; outcome: Resolution | null; impactElapsed: number; feedback: string; cpu: Grade[]; flash: { side: Side; grade: Grade; at: number } | null; inputWarning: { side: Side; at: number; message: string } | null };
-const fresh = (mode: Engine["mode"] = "cpu", ending: Ending = "limited"): Engine => ({ phase: "intro", mode, match: createMatch(ending), selected: 0, exchange: null, seconds: 0, outcome: null, impactElapsed: 0, feedback: "", cpu: [], flash: null, inputWarning: null });
+export type Engine = { cpuStage?: CpuStage; phase: Phase; mode: "cpu" | "local" | "online"; match: Match; selected: number; exchange: Exchange | null; seconds: number; outcome: Resolution | null; impactElapsed: number; feedback: string; cpu: Grade[]; flash: { side: Side; grade: Grade; at: number } | null; inputWarning: { side: Side; at: number; message: string } | null };
+
 
 export default function MochiDuel({ players, network, sharedAudio, boardNotice, resultPanel, challengeNotice, challengePending = false, holdResult = false }: { players?: DotWaveRoster; network?: DuelLink; sharedAudio?: RefObject<DuelAudio | null>; boardNotice?: ReactNode; resultPanel?: ReactNode; challengeNotice?: ReactNode; holdResult?: boolean; challengePending?: boolean } = {}) {
   const engine = useRef(fresh(network?.matchId ? "online" : "cpu"));
@@ -22,7 +23,7 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
   const lastFrame = useRef<DuelFrame | null>(null);
   const lastSoundFlash = useRef("");
   const remoteSeq = useRef(-1);
-  const remoteAudioTurn = useRef(-1);
+  const remoteAudioTurn = useRef("");
   const remoteTurnOrigin = useRef(0);
   const lastRemotePhase = useRef<Phase>("intro");
   const predicted = useRef<{ turn: number; flash: Engine["flash"]; warning: Engine["inputWarning"] } | null>(null);
@@ -37,7 +38,7 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
   const [, render] = useReducer((value: number) => value + 1, 0);
   const e = engine.current;
   const roster = useRef(players); roster.current = players;
-  const name = (side: Side) => roster.current?.[side]?.name ?? (network ? `${side === network.side ? "あなた" : engine.current.mode === "cpu" && side === 1 ? "CPU" : "相手"} / ${side === 0 ? "CYAN" : "PINK"}` : side === 0 ? (engine.current.mode === "local" ? "1P / CYAN" : "あなた") : engine.current.mode === "cpu" ? "CPU / PINK" : "2P / PINK");
+  const name = (side: Side) => engine.current.mode === "cpu" && side === 1 ? CPU_STAGES[engine.current.cpuStage ?? 1].name : roster.current?.[side]?.name ?? (network ? `${side === network.side ? "あなた" : engine.current.mode === "cpu" && side === 1 ? "CPU" : "相手"} / ${side === 0 ? "CYAN" : "PINK"}` : side === 0 ? (engine.current.mode === "local" ? "1P / CYAN" : "あなた") : engine.current.mode === "cpu" ? "CPU / PINK" : "2P / PINK");
 
   useEffect(() => { if (holdResult) { engine.current.phase = "finished"; engine.current.match.winner ??= network?.side ?? 0; render(); } }, [holdResult]);
 
@@ -47,7 +48,7 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
     else {
       sound.current.setMuted(false);
       if (engine.current.phase !== "paused") await sound.current.resume(); notifications.dismiss("game-audio");
-      remoteAudioTurn.current = -1;
+      remoteAudioTurn.current = "";
     }
     render();
   }
@@ -58,11 +59,11 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
     try {
       sound.current ??= new DuelAudio();
       await sound.current.resume(); notifications.dismiss("game-audio");
-      if (network && !network.matchId && !await network.beforeSolo()) return;
+      if (network && !network.matchId && (current.cpuStage ?? 1) === 1 && !await network.beforeSolo()) return;
       if (!alive.current) return;
       sound.current.volume(.65);
       sound.current.setMusicStages(musicLevels(current.match.history));
-      current.selected = randomMove(current.match.turn);
+      current.selected = current.mode === "cpu" ? randomCpuMove(current.cpuStage ?? 1) : randomMove(current.match.turn);
       await sound.current.start(current.selected, beatAt(current.match.turn), network?.startsAt ? Math.max(0, (network.startsAt - network.now()) / 1000) : 3, network?.startsAt ? Math.max(0, (network.now() - network.startsAt) / 1000) : 0);
       if (!alive.current) return;
       current.exchange = createExchange(current.match.turn % 2 as Side, current.selected, beatAt(current.match.turn));
@@ -152,14 +153,14 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
           remoteTurnOrigin.current = frame.turnStartedAt;
           sound.current?.setMusicStages(musicLevels(frame.engine.match.history));
           const flash = frame.engine.flash;
-          const flashKey = `${frame.engine.match.turn}:${flash?.side}:${flash?.at}`;
+          const flashKey = `${frame.engine.cpuStage ?? 1}:${frame.engine.match.turn}:${flash?.side}:${flash?.at}`;
           if (flash && frame.engine.phase === "playing" && flashKey !== lastSoundFlash.current) {
             lastSoundFlash.current = flashKey;
             const local = predicted.current;
             if (!(local?.turn === frame.engine.match.turn && local.flash?.side === flash.side && Math.abs(local.flash.at - flash.at) < .4)) sound.current?.hit(flash.grade, flash.side !== frame.engine.exchange?.attacker);
           }
-          if (["countdown", "playing"].includes(frame.engine.phase) && sound.current && remoteAudioTurn.current !== frame.engine.match.turn) {
-            remoteAudioTurn.current = frame.engine.match.turn;
+          if (["countdown", "playing"].includes(frame.engine.phase) && sound.current && remoteAudioTurn.current !== `${frame.engine.cpuStage ?? 1}:${frame.engine.match.turn}`) {
+            remoteAudioTurn.current = `${frame.engine.cpuStage ?? 1}:${frame.engine.match.turn}`;
             void sound.current.startAt(frame.engine.selected, frame.engine.exchange!.beatSeconds, frame.turnStartedAt, () => network.now());
           }
           if (frame.engine.phase !== lastRemotePhase.current) {
@@ -247,7 +248,7 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
           } else {
             sound.current.resolve(current.outcome.damage, current.outcome.counter);
             if (levelAt(current.match.turn) !== levelAt(current.match.turn - 1)) sound.current.rise();
-            current.selected = randomMove(current.match.turn);
+            current.selected = current.mode === "cpu" ? randomCpuMove(current.cpuStage ?? 1) : randomMove(current.match.turn);
             current.exchange = createExchange(current.match.turn % 2 as Side, current.selected, beatAt(current.match.turn));
             current.cpu = current.mode === "cpu" ? cpuGrades(current.selected, current.exchange.attacker === 1) : [];
             current.flash = null;
@@ -261,7 +262,7 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
         current.impactElapsed += dt;
         if (current.impactElapsed >= 2.2) {
           current.phase = "finished";
-          if (network && !network.matchId) network.soloEnded();
+          if (network && !network.matchId && (current.mode !== "cpu" || !nextCpuStage(current.cpuStage ?? 1, current.match))) network.soloEnded();
         }
         render();
       }
@@ -295,6 +296,19 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
     return () => { icon.remove(); document.title = originalTitle; alive.current = false; cancelAnimationFrame(frameId); clearInterval(backgroundTick); sound.current?.stopDefenseHold(); if (!sharedAudio) { sound.current?.dispose(); sound.current = null; } window.removeEventListener("keydown", key); window.removeEventListener("keyup", keyUp); window.removeEventListener("blur", autoPause); document.removeEventListener("visibilitychange", visibility); };
   }, []);
 
+  function nextStage() {
+    if (replica || network?.matchId || busy.current || (network && !network.connected)) return;
+    const next = advanceCampaign(engine.current);
+    if (!next) return;
+    sound.current?.stop();
+    heldInputs.current.forEach(held => held.clear());
+    engine.current = next;
+    render();
+  }
+  const stage = e.cpuStage ?? 1;
+  const stageInfo = CPU_STAGES[stage];
+  const next = e.mode === "cpu" ? nextCpuStage(stage, e.match) : null;
+  const cleared = e.mode === "cpu" && e.match.winner === 0;
   const attacker = e.exchange?.attacker ?? e.match.turn % 2 as Side;
   const beat = Math.max(0, e.seconds / (e.exchange?.beatSeconds ?? BEAT));
   const currentActor = e.exchange ? actorAt(e.exchange, e.seconds) : null;
@@ -304,11 +318,11 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
   const cueSide = cue.current ?? cue.next;
   const opponentCue = e.mode !== "local" && cueSide !== viewSide;
   const countdown = countdownCue(attacker, beat, e.mode, viewSide);
-  const heading = e.phase === "intro" ? "SEND THE BEAT. BREAK THE WAVE."  : e.phase === "paused" ? "PAUSED / 一時停止" : e.phase === "finished" ? e.match.winner === "draw" ? "DRAW / 引き分け" : `${name(e.match.winner!)}の勝ち！` : e.phase === "impact" ? e.outcome!.damage ? "CORE HIT! パルス直撃！" : "攻撃を防いだ！" : beat < 4 ? `${name(attacker)}、次の攻撃！ ${4 - Math.floor(beat)}` : beat < 8 ? `${name(attacker)}の攻撃！` : `${name((1 - attacker) as Side)}、リズムで守れ！`;
+  const heading = e.phase === "intro" ? "SEND THE BEAT. BREAK THE WAVE."  : e.phase === "paused" ? "PAUSED / 一時停止" : e.phase === "finished" && cleared ? next ? `${stageInfo.label} CLEAR!` : "ALL STAGES CLEAR!" : e.phase === "finished" ? e.match.winner === "draw" ? "DRAW / 引き分け" : `${name(e.match.winner!)}の勝ち！` : e.phase === "impact" ? e.outcome!.damage ? "CORE HIT! パルス直撃！" : "攻撃を防いだ！" : beat < 4 ? `${name(attacker)}、次の攻撃！ ${4 - Math.floor(beat)}` : beat < 8 ? `${name(attacker)}の攻撃！` : `${name((1 - attacker) as Side)}、リズムで守れ！`;
 
   return <main className="dot-wave" data-phase={e.phase}>
     <header><div><span className="duel-eyebrow">NEON RHYTHM BATTLE</span><h1><PixelWord /></h1></div><a href="/">ゲーム一覧へ</a></header>
-    <div className="duel-mode-label">{e.mode === "cpu" ? "CPU対戦" : e.mode === "online" ? "通信対戦" : "同じ端末で2人対戦"} · {e.phase === "intro" ? "攻守交代のリズムバトル" : `攻防 ${e.match.turn + (e.phase === "impact" || e.phase === "finished" ? 0 : 1)}${e.match.ending === "limited" ? ` / ${MAX_EXCHANGES}` : ""}`}</div>
+    <div className="duel-mode-label">{e.mode === "cpu" ? `CPU対戦 · ${stageInfo.label} / 3` : e.mode === "online" ? "通信対戦" : "同じ端末で2人対戦"} · {e.phase === "intro" ? "攻守交代のリズムバトル" : `攻防 ${e.match.turn + (e.phase === "impact" || e.phase === "finished" ? 0 : 1)}${e.match.ending === "limited" ? ` / ${MAX_EXCHANGES}` : ""}`}</div>
 
     <section className="duel-board" onClick={event => { if (e.phase === "paused" && !replica && !(event.target instanceof Element && event.target.closest("button, a, input, select, [role=dialog]"))) void pause(); }}>
       <h2 className={e.phase === "countdown" || e.phase === "playing" || e.phase === "impact" ? "dot-sr-only" : undefined} aria-live="polite">{heading}</h2>
@@ -318,14 +332,15 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
       {e.phase === "countdown" && <div className="duel-start-countdown" role="status" aria-label={`開始まで${Math.max(1, Math.ceil(-e.seconds))}秒`}><strong key={Math.ceil(-e.seconds)}>{Math.max(1, Math.min(3, Math.ceil(-e.seconds)))}</strong></div>}
       {e.phase === "intro" && <p className="duel-sound-guide"><BattleIcon kind="sound"/><strong>音をきいてあそぶゲームです。音を出してね！</strong></p>}
       {e.phase === "intro" && !replica && !network?.matchId && <div className="duel-intro-panel">
+        {e.mode === "cpu" && <div className="dot-stage-intro"><strong>{stageInfo.label} · {stageInfo.name}</strong><span>{stageInfo.title}</span><p>{stageInfo.description}</p><small>{stage === 3 ? "勝利で全ステージクリア！" : "勝利で次のステージへ · 各ステージで体力が回復"}</small></div>}
         <div className="dot-cue-guide"><span><BattleIcon kind="tap"/><span>チカチカ → もうすぐ</span></span><span><BattleIcon kind="note"/><span>音符でこうげき</span></span><span><BattleIcon kind="shield"/><span>シールドでまもる</span></span></div>
         <ol><li><strong>攻める4拍：</strong>毎回ランダムに決まるお手本に合わせてタップ。正確なほど強い音符パルスに。</li><li><strong>守る4拍：</strong>相手のリズムをまねして受け止める。外した分だけエネルギーが減る！</li><li><strong>攻守交代：</strong>止まらず次の4拍で準備、続けて攻撃！完全防御で次の攻撃が強くなる。</li></ol>
         <p>手と矢印がチカチカしたら、つぎはきみ！ 光りつづけたら、リズムにあわせておそう。金色の音符は、つぎのこうげきが強くなるしるし。</p>
         <label>決着のつけ方 <select value={e.match.ending} onChange={(event) => { e.match.ending = event.target.value as Ending; render(); }}><option value="limited">FINAL WAVEまで（残りエネルギーで決着）</option><option value="knockout">KNOCKOUTまで</option></select></label>
-        {!network && <label>遊び方 <select value={e.mode} onChange={(event) => { e.mode = event.target.value as Engine["mode"]; render(); }}><option value="cpu">CPUと対戦</option><option value="local">同じ端末で2人対戦</option></select></label>}
-        <p>白い光とひし形が重なったらタップ！ 金色はぴったり、薄紫はおしい。長い帯は、おしつづけて終点の輪で離そう！</p>
+        {!network && <label>遊び方 <select value={e.mode} onChange={(event) => { engine.current = fresh(event.target.value as Engine["mode"], e.match.ending); render(); }}><option value="cpu">CPUと対戦</option><option value="local">同じ端末で2人対戦</option></select></label>}
+        <p>白い光とひし形が重なったらタップ！ 金色はぴったり、薄紫はおしい。{(e.mode !== "cpu" || stage > 1) && "長い帯は、おしつづけて終点の輪で離そう！"}</p>
         <p className="duel-input-hint">{e.mode === "cpu" ? "スペース / F / タップでパルス" : "CYAN：F　PINK：J / それぞれのタップボタン"}</p>
-        <button className="duel-primary" onClick={() => void begin()} disabled={Boolean(network && !network.connected)}>START / {network ? network.startCost ? "1クレジットで開始" : "続ける" : "対戦開始"}</button>
+        <button className="duel-primary" onClick={() => void begin()} disabled={Boolean(network && !network.connected)}>START / {e.mode === "cpu" && stage > 1 ? `${stageInfo.label} 開始` : network ? network.startCost ? "1クレジットで開始" : "続ける" : "対戦開始"}</button>
         <small>{network ? "観戦・通信対戦に対応" : "同じ端末で対戦"} · 自動でリズムが変わる連続バトル</small>
       </div>}
       {e.phase === "playing" && <div key={`${e.match.turn}-${cue.phase}`} className={`duel-rhythm is-neon turn-${cueSide} ${cue.phase === "ready" ? "is-ready" : "is-now"} ${spectator ? "is-spectator" : opponentCue ? "is-opponent" : ""}`} aria-label={`${cue.current === null ? "次" : "今"}は${cueName(cueSide, e.mode, viewSide)}の${cue.role}。技：${move.name}。${move.rhythm}`}>
@@ -336,7 +351,7 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
 
       {e.phase === "paused" && <div className="duel-choice-panel"><p>音と判定を同じ位置で止めています。</p>{!replica && <p>画面をタップ / Pキーで再開</p>}</div>}
       {e.phase === "impact" && <div className="duel-impact" role="img" aria-label={e.outcome!.damage > 0 ? `${e.outcome!.damage}ダメージ` : "攻撃を防いだ"}><BattleIcon kind={e.outcome!.damage > 0 ? "note" : "shield"}/><strong>{e.outcome!.damage > 0 ? `−${e.outcome!.damage}` : "0"}</strong></div>}
-      {e.phase === "finished" && <div className="duel-choice-panel">{challengeNotice}<p>{e.match.hp.includes(0) ? "エネルギーが尽きた。バトル終了！" : "FINAL WAVE完了。残りエネルギーで決着！"}</p><strong>{name(0)} {e.match.hp[0]} : {e.match.hp[1]} {name(1)}</strong><p>与えたダメージ：{MAX_HP - e.match.hp[1]} ／ 受けたダメージ：{MAX_HP - e.match.hp[0]}</p>{resultPanel}{!holdResult && !replica && !network?.matchId && <button className="duel-primary" onClick={() => { sound.current?.stop(); engine.current = fresh(e.mode, e.match.ending); render(); }}>RETRY / もう一度</button>}</div>}
+      {e.phase === "finished" && <div className="duel-choice-panel">{challengeNotice}<p>{cleared ? next ? `${stageInfo.name}を撃破！ 次は${CPU_STAGES[next].title} ${CPU_STAGES[next].name}。` : "ラスボスを撃破！ 3ステージ制覇、おめでとう！" : e.match.hp.includes(0) ? "エネルギーが尽きた。バトル終了！" : "FINAL WAVE完了。残りエネルギーで決着！"}</p><strong>{name(0)} {e.match.hp[0]} : {e.match.hp[1]} {name(1)}</strong><p>与えたダメージ：{MAX_HP - e.match.hp[1]} ／ 受けたダメージ：{MAX_HP - e.match.hp[0]}</p>{resultPanel}{!holdResult && !replica && !network?.matchId && (next ? <button className="duel-primary" disabled={Boolean(network && !network.connected)} onClick={nextStage}>NEXT / {CPU_STAGES[next].label}へ</button> : <button className="duel-primary" onClick={() => { sound.current?.stop(); heldInputs.current.forEach(held => held.clear()); engine.current = fresh(e.mode, e.match.ending); render(); }}>{e.mode === "cpu" ? "RETRY / 1st STAGEから" : "RETRY / もう一度"}</button>)}</div>}
     </section>
     {e.phase !== "paused" && <p className={`duel-feedback ${["playing", "impact", "finished"].includes(e.phase) ? "dot-sr-only" : ""}`} role="status">{replica && viewSide === null ? e.phase === "intro" ? "プレイヤーの開始を待っています。" : "観戦中" : warning ? `${name(warning.side)}：${warning.message} 自分の番までリズムを聞こう。` : e.feedback || "相手の攻撃をよく聞いて、自分の番にリズムを返そう。"}</p>}
     <div className="duel-controls">{e.phase === "playing" && challengePending && <span className="duel-challenge-indicator" role="status">対戦申込あり · 一時停止で確認</span>}<button className="duel-sound-toggle" aria-label={sound.current?.audible ? "音を消す" : "音を出す"} aria-pressed={Boolean(sound.current?.audible)} onClick={() => void toggleSound().catch(() => { notifications.show({ id: "game-audio", scope: "dot-wave", type: "error", message: "音を開始できませんでした。スピーカーをもう一度押してください。" }); render(); })}><BattleIcon kind={sound.current?.audible ? "sound" : "sound-off"}/></button>{([0, 1] as Side[]).filter((side) => e.mode === "local" || side === viewSide).map((side) => <button key={side} aria-label={`${name(side)}のリズムボタン`} className={`duel-tap player-${side} ${e.phase === "playing" && cue.next === side && cue.current !== side ? "is-upcoming" : ""} ${currentActor !== side ? "is-waiting" : ""} ${warning?.side === side ? "is-wrong-turn" : ""}`} disabled={e.phase !== "playing" || Boolean(network && (!network.connected || (network.startsAt && network.now() < network.startsAt)))} onPointerDown={(event) => { if (!event.isPrimary || event.button !== 0) return; event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); press(side, `pointer-${event.pointerId}`); }} onPointerUp={event => lift(side, `pointer-${event.pointerId}`)} onPointerCancel={event => lift(side, `pointer-${event.pointerId}`)} onLostPointerCapture={event => lift(side, `pointer-${event.pointerId}`)} onClick={(event) => { if (event.detail === 0) { press(side, "accessible"); lift(side, "accessible"); } }}><BattleIcon kind={warning?.side === side ? "wait" : "tap"}/><small>{network || e.mode === "cpu" ? "SPACE / F" : side === 0 ? "F" : "J"}</small></button>)}</div>

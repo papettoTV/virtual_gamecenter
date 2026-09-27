@@ -1,5 +1,6 @@
 import type { DotWaveRoster } from "../../../domain/cabinet";
 import { visibleMusicStage, type MusicStage } from "./musicMood";
+import { CPU_STAGES } from "./campaign";
 import { PlayerRoster } from "./PlayerRoster";
 import { turnCue, cueName } from "./turnCue";
 import { BattleIcon } from "./BattleIcon";
@@ -10,6 +11,8 @@ import type { Engine } from "./MochiDuel";
 const CYAN = "#13e5f3", PINK = "#ff39bc", LIME = "#baff39";
 const NOTE = ["00011000", "00011110", "00011011", "00011001", "00011000", "01111000", "11111000", "01110000"];
 const BODY = ["00000011000000000", "00000111000000000", "00000011100000000", "00001111111000000", "00111111111110000", "01111111111111000", "01111111111111100", "11111111111111100", "11111111111111110", "11111111111111111", "11111111111111100", "01111111111111100", "00111111111111000", "00011111111110000", "00001111111100000", "00011000001100000"];
+const IRON_BODY = ["00110000000001100", "00111000000011100", "00111100000111100", "00011111111111000", "00111111111111100", "01111111111111110", "11111111111111111", "11111111111111111", "11111111111111111", "01111111111111110", "01111111111111110", "00111111111111100", "00111111111111100", "00011111111111000", "00011100000111000", "00111100000111100"];
+const NOVA_BODY = ["00000000100000000", "00010001110001000", "00011011111011000", "00011111111111000", "00111111111111100", "01111111111111110", "01111111111111110", "00111111111111100", "00111111111111100", "01111111111111110", "01111111111111110", "00111111111111100", "00011111111111000", "00001111111110000", "00000111111100000", "00000001110000000"];
 const LETTERS: Record<string, string[]> = {
  D:["11110","10001","10001","10001","10001","10001","11110"], O:["01110","10001","10001","10001","10001","10001","01110"], T:["11111","00100","00100","00100","00100","00100","00100"],
  W:["10001","10001","10001","10101","10101","10101","01010"], A:["01110","10001","10001","11111","10001","10001","10001"], V:["10001","10001","10001","10001","10001","01010","00100"], E:["11111","10000","10000","11110","10000","10000","11111"],
@@ -99,7 +102,7 @@ export function DotScene({engine:e,viewSide=0,players,musicOverride=null}:{engin
  const power=e.exchange?quality(e.exchange.attack):0;
  const cells=[];
  for(let y=-9;y<=9;y++)for(let x=-9;x<=9;x++)if(Math.hypot(x,y)<9)cells.push(<rect key={`${x}-${y}`} x={480+x*6} y={90+y*6} width="5" height="5" fill={Math.hypot(x,y)>7.8?CYAN:"#102443"}/>);
- return <><div className="dot-scene-wrap"><svg className="duel-scene" viewBox="0 0 960 360" role="img" aria-label="シアンとピンクの音の生き物が、音符の弾とシールドで戦うドットのアリーナ" shapeRendering="crispEdges">
+ return <><div className="dot-scene-wrap"><svg className="duel-scene" viewBox="0 0 960 360" role="img" aria-label={e.mode === "cpu" ? `シアンと${CPU_STAGES[e.cpuStage ?? 1].name}が、音符の弾とシールドで戦うドットのアリーナ` : "シアンとピンクの音の生き物が、音符の弾とシールドで戦うドットのアリーナ"} shapeRendering="crispEdges">
   <Backdrop/>
   {(e.phase==="playing"||musicOverride!==null)&&<MusicBackdrop stage={musicOverride ?? visibleMusicStage(e.match.history,beat)} beat={beat}/>}
   <g className="dot-reactor" data-heat={heat} aria-label="難しさに応じて光の列が伸びる音符のコア">
@@ -108,7 +111,9 @@ export function DotScene({engine:e,viewSide=0,players,musicOverride=null}:{engin
   </g>
   {Array.from({length:24},(_,i)=><rect key={i} x={336+i*12} y="222" width="3" height="3" fill={i%4===pulse?"#516575":"#21213e"}/>)}
   {([0,1] as Side[]).map(side=>{
-   const color=side===0?CYAN:PINK;
+   const bossStage=e.mode==="cpu"&&side===1?e.cpuStage??1:null;
+   const color=side===0?CYAN:bossStage?CPU_STAGES[bossStage].color:PINK;
+   const body=bossStage===2?IRON_BODY:bossStage===3?NOVA_BODY:BODY;
    const x=side===0?114:696;
    const hit=flash?.side===side?flash.grade:null;
    const damaged=result&&side!==result.attacker&&result.damage>0;
@@ -120,9 +125,15 @@ export function DotScene({engine:e,viewSide=0,players,musicOverride=null}:{engin
    const y=150+bob+(hit==="perfect"?-12:hit==="miss"?10:0);
    const wrong=warning?.side===side;
    return <g key={side}>
-    <g transform={`translate(${x} ${y}) scale(1.4)`} opacity={defeated?.45:1} data-fatigue={fatigue}>
+    <g data-cpu-stage={bossStage ?? undefined} aria-label={bossStage ? `${CPU_STAGES[bossStage].title} ${CPU_STAGES[bossStage].name}` : undefined} transform={`translate(${x} ${y}) scale(1.4)`} opacity={defeated?.45:1} data-fatigue={fatigue}>
      <g key={wrong?`wait-${warning.at}`:hit?`hit-${flash!.at}`:"normal"} className={wrong?"dot-wrong-character":hit==="miss"?"dot-miss-character":undefined}>
-     <Pixels rows={BODY} x={0} y={0} color={wrong?"#ffd166":damaged?"#ffffff":hit==="miss"?"#697487":hit==="perfect"?"#ffffff":color}/>
+     {bossStage===3&&<g fill={color} opacity={damaged?.9:.7}>
+      <path d="M6 36H-6V24H-18V12H-30V54H-18V66H-6V78H12Z M96 36H108V24H120V12H132V54H120V66H108V78H90Z"/>
+      <path d="M12 30H0V18H-12V6H-24 M90 30H102V18H114V6H126" stroke="#eee3ff" strokeWidth="3" fill="none"/>
+     </g>}
+     <Pixels rows={body} x={0} y={0} color={wrong?"#ffd166":damaged?"#ffffff":hit==="miss"?"#697487":hit==="perfect"?"#ffffff":color}/>
+     {bossStage===2&&<g fill="#fff0c2"><rect x="18" y="30" width="18" height="6"/><rect x="66" y="30" width="18" height="6"/><rect x="6" y="54" width="12" height="24"/><rect x="84" y="54" width="12" height="24"/></g>}
+     {bossStage===3&&<path d="M51 18 60 30 51 42 42 30Z" fill="#faff9b"/>}
      {defeated ? <><Pixels rows={["10001","01010","00100","01010","10001"]} x={33} y={45} size={3} color="#ffffff"/><Pixels rows={["10001","01010","00100","01010","10001"]} x={63} y={45} size={3} color="#ffffff"/></> : <>
        <rect x="36" y="48" width="11" height={eyeHeight} fill="#ffffff"/><rect x="66" y="48" width="11" height={eyeHeight} fill="#ffffff"/>
        {eyeHeight>=8&&<><rect x={side===0?42:36} y="51" width="5" height="5" fill="#0b1632"/><rect x={side===0?72:66} y="51" width="5" height="5" fill="#0b1632"/></>}
@@ -176,6 +187,6 @@ export function DotScene({engine:e,viewSide=0,players,musicOverride=null}:{engin
    </div>;
  })}
  </div>
- <PlayerRoster players={players ?? [{name:e.mode==="local"?"1P":"あなた",wins:0},{name:e.mode==="cpu"?"CPU":"2P",wins:0}]} entrance={e.phase==="intro"||e.phase==="countdown"}/>
+ <PlayerRoster players={e.mode==="cpu" ? [players?.[0] ?? {name:"あなた",wins:0}, {name:CPU_STAGES[e.cpuStage ?? 1].name,wins:0}] : players ?? [{name:e.mode==="local"?"1P":"あなた",wins:0},{name:"2P",wins:0}]} entrance={e.phase==="intro"||e.phase==="countdown"}/>
  </>;
 }
