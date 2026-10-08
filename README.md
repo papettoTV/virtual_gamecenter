@@ -2,18 +2,19 @@
 
 オンライン上にゲームセンター体験を作るための試作リポジトリです。
 
-現在は、弾幕かすり・無敵体当たり・ボス撃破型シューティングのプロトタイプを開発しています。
+複数のゲームと、観戦・ランキング・アカウント・クレジット購入などの共通機能を開発しています。
 
-## Prototype
+## Structure
 
-- `prototype-twinkle-psyvaria/`
+- `apps/web/`: WebアプリケーションとCloudflareバックエンド
+- `docs/`: サービス要件・設計資料
 
 ## Development Workflow
 
 基本方針は、ローカルで開発・確認し、まとまったタイミングでCloudflareへデプロイします。
 
 ```bash
-cd prototype-twinkle-psyvaria
+cd apps/web
 npm install
 npm run dev
 ```
