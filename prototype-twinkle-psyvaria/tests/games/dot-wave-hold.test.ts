@@ -1,9 +1,9 @@
 import { expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { MOVES, HOLD_START_LEVEL, movesAtLevel, createExchange, tap, release, expire, quality, releaseWindow, perfectReleaseWindow } from '../../src/games/mochi-beat/duel/core';
-import { NeonRail } from '../../src/games/mochi-beat/duel/NeonRail';
-import {validRemoteTap} from '../../src/games/mochi-beat/duel/network';
+import { MOVES, HOLD_START_LEVEL, movesAtLevel, createExchange, tap, release, expire, quality, releaseWindow, perfectReleaseWindow } from '../../src/games/dot-wave/duel/core';
+import { NeonRail } from '../../src/games/dot-wave/duel/NeonRail';
+import {validRemoteTap} from '../../src/games/dot-wave/duel/network';
 
 it('keeps level one tap-only and mixes multiple hold patterns into every later level', () => {
   expect(HOLD_START_LEVEL).toBe(2);

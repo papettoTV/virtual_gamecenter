@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { freshScore, scoreNote, scoreChart, comboMultiplier, awardBossBonus, readBest, saveBest } from '../../src/games/mochi-beat/duel/score';
-import { createExchange, tap, release, expire } from '../../src/games/mochi-beat/duel/core';
-import { freshDuel, advanceCampaign } from '../../src/games/mochi-beat/duel/campaign';
+import { freshScore, scoreNote, scoreChart, comboMultiplier, awardBossBonus, readBest, saveBest } from '../../src/games/dot-wave/duel/score';
+import { createExchange, tap, release, expire } from '../../src/games/dot-wave/duel/core';
+import { freshDuel, advanceCampaign } from '../../src/games/dot-wave/duel/campaign';
 afterEach(() => vi.unstubAllGlobals());
 it('uses the current combo for three-note multiplier steps, caps at two, and keeps counting', () => {
   const score = freshScore();

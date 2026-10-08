@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
-import { MOVES, SIXTEENTH_POOLS, movesAtLevel, createExchange, tap, quality } from '../../src/games/mochi-beat/duel/core';
-import { railX } from '../../src/games/mochi-beat/duel/NeonRail';
+import { MOVES, SIXTEENTH_POOLS, movesAtLevel, createExchange, tap, quality } from '../../src/games/dot-wave/duel/core';
+import { railX } from '../../src/games/dot-wave/duel/NeonRail';
 
 it('introduces multiple sixteenth patterns from level three while retaining existing rhythms', () => {
   const quick = SIXTEENTH_POOLS.flat();

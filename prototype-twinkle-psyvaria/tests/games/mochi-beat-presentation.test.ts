@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mochiFinish, mochiImpact } from "../../src/games/mochi-beat/mochi";
+import { mochiFinish, mochiImpact } from "../../src/games/dot-wave/mochi";
 
 describe("mochi presentation", () => {
   it.each([[0, "poor"], [59_999, "poor"], [60_000, "standard"], [79_999, "standard"], [80_000, "excellent"], [100_000, "excellent"]])("finishes score %s as %s", (score, kind) => {
@@ -24,7 +24,7 @@ describe("mochi presentation", () => {
   });
 });
 
-import { advanceCompletion, COMPLETION_SECONDS, displayBeat, RUN_SECONDS, TOTAL_BEATS, COUNT_IN } from "../../src/games/mochi-beat/core";
+import { advanceCompletion, COMPLETION_SECONDS, displayBeat, RUN_SECONDS, TOTAL_BEATS, COUNT_IN } from "../../src/games/dot-wave/core";
 
 describe("mochi ending", () => {
   it("holds the final response subdivision even after the song ends", () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createSession, advanceSet, completeSet, sessionResult, SET_BPMS, SESSION_SECONDS, TOTAL_BEATS, hit, displayBeat } from "../../src/games/mochi-beat/core";
+import { createSession, advanceSet, completeSet, sessionResult, SET_BPMS, SESSION_SECONDS, TOTAL_BEATS, hit, displayBeat } from "../../src/games/dot-wave/core";
 
 describe("three rhythm sets", () => {
   it("uses progressively faster clocks and restarts each chart with a count-in", () => {

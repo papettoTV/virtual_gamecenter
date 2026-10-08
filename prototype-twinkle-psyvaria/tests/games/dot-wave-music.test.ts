@@ -1,8 +1,8 @@
 import {expect,it} from 'vitest';
 import {createElement} from 'react';import {renderToStaticMarkup} from 'react-dom/server';
-import {musicStage,visibleMusicStage} from '../../src/games/mochi-beat/duel/musicMood';
-import {MusicBackdrop} from '../../src/games/mochi-beat/duel/DotScene';
-import type {Resolution} from '../../src/games/mochi-beat/duel/core';
+import {musicStage,visibleMusicStage} from '../../src/games/dot-wave/duel/musicMood';
+import {MusicBackdrop} from '../../src/games/dot-wave/duel/DotScene';
+import type {Resolution} from '../../src/games/dot-wave/duel/core';
 const round=(a:number,d:number):Resolution=>({attacker:0,power:22,damage:0,blocked:22,counter:false,attackQuality:a,defenseQuality:d});
 const rounds=(count:number,a:number,d:number):Resolution[]=>Array.from({length:count},(_,i)=>({...round(a,d),attacker:i%2 as 0|1}));
 it('builds the base layer over at least three exchanges and never unlocks the top with good-only timing',()=>{

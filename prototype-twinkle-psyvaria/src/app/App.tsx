@@ -14,7 +14,7 @@ const ThreeBulletLab = lazy(async () => {
   const module = await import("../features/labs/ThreeBulletLab");
   return { default: module.ThreeBulletLab };
 });
-const DotWaveCabinet = lazy(() => import("../games/mochi-beat/duel/DotWaveCabinet"));
+const DotWaveCabinet = lazy(() => import("../games/dot-wave/duel/DotWaveCabinet"));
 
 export function App() {
   return <><NotificationCenter /><AppContent /></>;

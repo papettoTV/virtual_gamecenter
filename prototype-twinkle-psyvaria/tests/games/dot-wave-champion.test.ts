@@ -1,7 +1,7 @@
 import {createElement} from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {expect,it} from 'vitest';
-import {PlayerRoster,crownTier} from '../../src/games/mochi-beat/duel/PlayerRoster';
+import {PlayerRoster,crownTier} from '../../src/games/dot-wave/duel/PlayerRoster';
 it('uses three crown tiers and renders names safely without a crown for CPU',()=>{
  expect([0,1,2,3,4,5,20].map(crownTier)).toEqual([0,1,1,2,2,3,3]);
  const html=renderToStaticMarkup(createElement(PlayerRoster,{players:[{name:'<img src=x>',wins:5},{name:'CPU',wins:0}],entrance:true}));

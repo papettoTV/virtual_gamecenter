@@ -1,5 +1,5 @@
 import type { GameDefinition } from "../../domain/game";
-import "../../games/mochi-beat/style.css";
+import "../../games/dot-wave/style.css";
 
 export function GameScreen({ game }: { game: GameDefinition }) {
   const isSalvage = game.id === "deep-sea-salvage";

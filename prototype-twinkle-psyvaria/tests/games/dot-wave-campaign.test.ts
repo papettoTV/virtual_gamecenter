@@ -1,9 +1,9 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it } from 'vitest';
-import { CPU_STAGES, advanceCampaign, cpuMoves, freshDuel, nextCpuStage, randomCpuMove } from '../../src/games/mochi-beat/duel/campaign';
-import { BEAT, MOVES, createExchange, exchangeLimit, resolve, type Side } from '../../src/games/mochi-beat/duel/core';
-import { DotScene } from '../../src/games/mochi-beat/duel/DotScene';
+import { CPU_STAGES, advanceCampaign, cpuMoves, freshDuel, nextCpuStage, randomCpuMove } from '../../src/games/dot-wave/duel/campaign';
+import { BEAT, MOVES, createExchange, exchangeLimit, resolve, type Side } from '../../src/games/dot-wave/duel/core';
+import { DotScene } from '../../src/games/dot-wave/duel/DotScene';
 
 it('keeps stage one on whole-beat taps and stage two on whole-beat taps and holds', () => {
   for (const stage of [1, 2] as const) {

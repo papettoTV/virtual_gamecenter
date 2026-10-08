@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { DuelAudio } from "../../src/games/mochi-beat/duel/audio";
-import { BEAT, END_BEAT, createExchange, tap, release, releaseWindow } from "../../src/games/mochi-beat/duel/core";
+import { DuelAudio } from "../../src/games/dot-wave/duel/audio";
+import { BEAT, END_BEAT, createExchange, tap, release, releaseWindow } from "../../src/games/dot-wave/duel/core";
 
 let clock = 0;
 const starts: number[] = [];

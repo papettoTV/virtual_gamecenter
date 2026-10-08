@@ -1,8 +1,8 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
-import { createExchange, tap } from "../../src/games/mochi-beat/duel/core";
-import { NeonRail, railState, railX, railLanes } from "../../src/games/mochi-beat/duel/NeonRail";
+import { createExchange, tap } from "../../src/games/dot-wave/duel/core";
+import { NeonRail, railState, railX, railLanes } from "../../src/games/dot-wave/duel/NeonRail";
 
 it.each([60/108, 60/156, 60/216])("aligns each diamond with the judgement clock at tempo %s", beatSeconds => {
   const exchange = createExchange(0, 12, beatSeconds);

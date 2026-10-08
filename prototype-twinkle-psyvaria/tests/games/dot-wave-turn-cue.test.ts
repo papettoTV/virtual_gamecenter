@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { turnCue, inputHint, countdownCue } from "../../src/games/mochi-beat/duel/turnCue";
-import { createExchange, tap, type Side } from "../../src/games/mochi-beat/duel/core";
+import { turnCue, inputHint, countdownCue } from "../../src/games/dot-wave/duel/turnCue";
+import { createExchange, tap, type Side } from "../../src/games/dot-wave/duel/core";
 
 describe.each([0, 1] as Side[])("turn cues with side %i attacking", attacker => {
   const defender = (1 - attacker) as Side;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_EXCHANGES, LEVEL_POOLS, movesAtLevel, beatAt, levelAt, randomMove, BEAT, createExchange, createMatch, cpuGrades, quality, resolve, tap, type Exchange, type Grade, type Side } from "../../src/games/mochi-beat/duel/core";
+import { MAX_EXCHANGES, LEVEL_POOLS, movesAtLevel, beatAt, levelAt, randomMove, BEAT, createExchange, createMatch, cpuGrades, quality, resolve, tap, type Exchange, type Grade, type Side } from "../../src/games/dot-wave/duel/core";
 
 function graded(side: Side, attack: Grade, defense: Grade, move = 0): Exchange {
   const exchange = createExchange(side, move);

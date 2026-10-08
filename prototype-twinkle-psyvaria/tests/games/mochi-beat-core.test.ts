@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BEAT_SECONDS, COUNT_IN, HIT_WINDOW, PATTERNS, PERFECT_WINDOW, TOTAL_BEATS, createRun, hit, missExpired, result } from "../../src/games/mochi-beat/core";
+import { BEAT_SECONDS, COUNT_IN, HIT_WINDOW, PATTERNS, PERFECT_WINDOW, TOTAL_BEATS, createRun, hit, missExpired, result } from "../../src/games/dot-wave/core";
 
 describe("mochi beat rhythm judgment", () => {
   it("copies every demonstration into the following four-beat response", () => {

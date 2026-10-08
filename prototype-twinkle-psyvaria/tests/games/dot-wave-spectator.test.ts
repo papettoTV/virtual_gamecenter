@@ -1,9 +1,9 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
-import { DotScene } from "../../src/games/mochi-beat/duel/DotScene";
-import type { Engine } from "../../src/games/mochi-beat/duel/MochiDuel";
-import { createMatch, createExchange, BEAT } from "../../src/games/mochi-beat/duel/core";
+import { DotScene } from "../../src/games/dot-wave/duel/DotScene";
+import type { Engine } from "../../src/games/dot-wave/duel/MochiDuel";
+import { createMatch, createExchange, BEAT } from "../../src/games/dot-wave/duel/core";
 
 function battle(): Engine {
   const exchange = createExchange(0, 0, BEAT);

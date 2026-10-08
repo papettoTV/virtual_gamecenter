@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { ServerClock, validRemoteTap } from "../../src/games/mochi-beat/duel/network";
-import { countdownCue, cueName } from "../../src/games/mochi-beat/duel/turnCue";
+import { ServerClock, validRemoteTap } from "../../src/games/dot-wave/duel/network";
+import { countdownCue, cueName } from "../../src/games/dot-wave/duel/turnCue";
 
 describe("DOT WAVE network", () => {
   it("accepts bounded latency but rejects duplicate, old-turn, future and nonfinite input", () => {

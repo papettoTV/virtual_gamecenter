@@ -1,5 +1,5 @@
 import {expect,it} from 'vitest';
-import {cometMotion} from '../../src/games/mochi-beat/duel/DotScene';
+import {cometMotion} from '../../src/games/dot-wave/duel/DotScene';
 it('grows a tail, keeps it through a hold, and lets its end reach the shield',()=>{
  expect(cometMotion(.5,1.5)).toEqual({head:.5,length:204});
  expect(cometMotion(1,1.5)).toEqual({head:1,length:408});
