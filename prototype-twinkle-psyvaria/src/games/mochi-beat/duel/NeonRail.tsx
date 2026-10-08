@@ -1,4 +1,3 @@
-import { BattleIcon } from "./BattleIcon";
 import type { CSSProperties } from "react";
 import type { Exchange, Grade, Side } from "./core";
 
@@ -25,11 +24,7 @@ export function NeonRail({ exchange, seconds, viewSide = null }: { exchange: Exc
     const owner = offset === 4 ? exchange.attacker : (1 - exchange.attacker) as Side;
     const own = owner === viewSide;
     const color = owner === 0 ? "#13e5f3" : "#ff39bc";
-    return <div key={offset} className={`neon-rail-lane${index === 1 ? " is-incoming" : ""}`} style={{ "--rail-color": color } as CSSProperties}>
-      <div className="neon-rail-owner" role="img" aria-label={`${own ? "あなた" : viewSide === null ? owner === 0 ? "シアン" : "ピンク" : "相手"}の${offset === 4 ? "攻撃" : "防御"}${index === 1 ? "、2拍前から準備" : ""}`}>
-        <svg viewBox="0 0 32 32" aria-hidden="true" shapeRendering="crispEdges"><path fill="currentColor" d="M12 2h6v4h4v4h4v4h4v10h-4v4H6v-4H2V14h4v-4h6Z"/><path fill="#fff" d="M9 14h4v6H9Zm10 0h4v6h-4Z"/><path stroke="#fff" fill="none" d="M12 23h8"/></svg>
-        <BattleIcon kind={offset === 4 ? "note" : "shield"}/>
-      </div>
+    return <div key={offset} className={`neon-rail-lane${index === 1 ? " is-incoming" : ""}`} style={{ "--rail-color": color } as CSSProperties} role="group" aria-label={`${own ? "あなた" : viewSide === null ? owner === 0 ? "シアン" : "ピンク" : "相手"}の${offset === 4 ? "攻撃" : "防御"}${index === 1 ? "、2拍前から準備" : ""}`}>
       <RailTrack exchange={exchange} seconds={seconds} offset={offset} incoming={index === 1}/>
     </div>;
   })}</div>;
@@ -38,7 +33,7 @@ export function NeonRail({ exchange, seconds, viewSide = null }: { exchange: Exc
 function RailTrack({ exchange, seconds, offset: requestedOffset, incoming = false }: { exchange: Exchange; seconds: number; offset: 4 | 8; incoming?: boolean }) {
   const { preview, offset, progress, cursorVisible, notes } = railState(exchange, seconds, requestedOffset);
   const cursor = railX(progress);
-  return <svg className={`neon-rail${preview ? " is-preview" : ""}`} viewBox="0 0 1000 112" role="img" aria-label={preview ? "次のリズム。ひし形と白い光が重なったらタップ" : "白い光が左から右に進むリズムレール。金色はぴったり、薄紫はおしい。長い帯は終点の輪で離す"}>
+  return <svg className={`neon-rail${preview ? " is-preview" : ""}`} viewBox="0 24 1000 72" role="img" aria-label={preview ? "次のリズム。ひし形と白い光が重なったらタップ" : "白い光が左から右に進むリズムレール。金色はぴったり、薄紫はおしい。長い帯は終点の輪で離す"}>
     <path className="neon-rail-line" d={`M24 56H${incoming ? railX(0) : 976}`} />
     {!incoming && <path className="neon-rail-boundary" d={`M${railX(0)} 28v56`} />}
     {(incoming ? [] : [-2, -1, 0, 1, 2, 3, 4]).map(beat => <path key={beat} className="neon-rail-tick" d={`M${railX(beat)} 87v4`} />)}

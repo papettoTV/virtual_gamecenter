@@ -77,7 +77,7 @@ export const DOT_WAVE: GameDefinition = {
   id: "dot-wave", slug: "dot-wave", title: "DOT WAVE", localizedTitle: "ドットウェーブ",
   shortTitle: "DW", description: "音符で攻めてリズムで守る、観戦・通信対戦対応のネオンバトル",
   currentVersion: "dot-wave-online-1", creditCost: 1, iconUrl: "/assets/dot-wave-icon.svg",
-  promoVideoUrl: "", promoPosterUrl: "/assets/dot-wave-icon.svg", status: "active",
+  promoVideoUrl: "/dot-wave-promo.mp4?v=20261007", promoPosterUrl: "/dot-wave-promo-poster.jpg?v=20261007", status: "active",
 };
 export const GAME_CATALOG: readonly GameDefinition[] = [BUZZ_BARRIER, DEEP_SEA_SALVAGE, DOT_WAVE];
 export const DEFAULT_GAME_ID: GameId = BUZZ_BARRIER.id;

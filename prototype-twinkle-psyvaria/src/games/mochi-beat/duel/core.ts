@@ -57,12 +57,13 @@ export const MAX_EXCHANGES = TURNS_PER_LEVEL * FINAL_LEVEL;
 export const BEAT = 60 / 108;
 export const END_BEAT = 12;
 export const WINDOW = .15;
-export type Note = { beat: number; grade: Grade | null; endBeat?: number; holdGrade?: Grade };
-export type Chart = { notes: Note[]; extras: number };
+export type Note = { beat: number; grade: Grade | null; endBeat?: number; holdGrade?: Grade; scored?: boolean };
+export type Chart = { notes: Note[]; extras: number; scoredExtras?: number };
 export type Exchange = { attacker: Side; move: number; beatSeconds: number; attack: Chart; defense: Chart; resolved: boolean };
-export type Match = { ending: Ending; hp: [number, number]; bonus: [number, number]; turn: number; winner: Side | "draw" | null; history: Resolution[] };
+export type Match = { maxExchanges?: number; ending: Ending; hp: [number, number]; bonus: [number, number]; turn: number; winner: Side | "draw" | null; history: Resolution[] };
 export type Resolution = { attacker: Side; power: number; damage: number; blocked: number; counter: boolean; attackQuality: number; defenseQuality: number };
-export function createMatch(ending: Ending = "limited"): Match { return { ending, hp: [MAX_HP, MAX_HP], bonus: [0, 0], turn: 0, winner: null, history: [] }; }
+export function exchangeLimit(match: Match): number { return match.maxExchanges ?? MAX_EXCHANGES; }
+export function createMatch(ending: Ending = "limited", maxExchanges = MAX_EXCHANGES): Match { return { maxExchanges, ending, hp: [MAX_HP, MAX_HP], bonus: [0, 0], turn: 0, winner: null, history: [] }; }
 export function createExchange(attacker: Side, move: number, beatSeconds = BEAT): Exchange {
   if (!Number.isInteger(move) || !MOVES[move]) throw new Error("unknown_move");
   const chart = (offset: number): Chart => ({ extras: 0, notes: MOVES[move]!.beats.map((beat) => ({ beat: beat + offset, grade: null, ...(MOVES[move]!.holds?.[beat] ? { endBeat: beat + offset + MOVES[move]!.holds![beat]! } : {}) })) });
@@ -134,7 +135,7 @@ export function resolve(match: Match, exchange: Exchange): Resolution {
   match.hp[defender] = Math.max(0, match.hp[defender] - damage);
   match.turn += 1;
   if (match.hp[defender] === 0) match.winner = attacker;
-  else if (match.ending === "limited" && match.turn >= MAX_EXCHANGES) match.winner = match.hp[0] === match.hp[1] ? "draw" : match.hp[0] > match.hp[1] ? 0 : 1;
+  else if (match.ending === "limited" && match.turn >= exchangeLimit(match)) match.winner = match.hp[0] === match.hp[1] ? "draw" : match.hp[0] > match.hp[1] ? 0 : 1;
   const outcome = { attacker, power, damage, blocked: power - damage, counter, attackQuality, defenseQuality };
   match.history.push(outcome);
   return outcome;

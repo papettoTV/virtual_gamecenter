@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it } from 'vitest';
 import { CPU_STAGES, advanceCampaign, cpuMoves, freshDuel, nextCpuStage, randomCpuMove } from '../../src/games/mochi-beat/duel/campaign';
-import { BEAT, MOVES, createExchange, resolve, type Side } from '../../src/games/mochi-beat/duel/core';
+import { BEAT, MOVES, createExchange, exchangeLimit, resolve, type Side } from '../../src/games/mochi-beat/duel/core';
 import { DotScene } from '../../src/games/mochi-beat/duel/DotScene';
 
 it('keeps stage one on whole-beat taps and stage two on whole-beat taps and holds', () => {
@@ -78,4 +78,27 @@ it('renders distinct bosses and their names for players and spectators without c
   const html = renderToStaticMarkup(createElement(DotScene, {engine:freshDuel('online')}));
   expect(html).not.toContain('data-cpu-stage');
   expect(html).not.toContain('IRON BEAT');
+});
+
+it.each([[1, 10], [2, 10], [3, 20]] as const)('ends CPU stage %i at %i turns when neither side is knocked out', (stage, turns) => {
+  const engine = freshDuel('cpu', 'limited', stage);
+  expect(exchangeLimit(engine.match)).toBe(turns);
+  for (let turn = 0; turn < turns; turn++) {
+    expect(engine.match.winner).toBeNull();
+    const exchange = createExchange(turn % 2 as Side, 0);
+    for (const chart of [exchange.attack, exchange.defense]) for (const note of chart.notes) note.grade = 'perfect';
+    resolve(engine.match, exchange);
+  }
+  expect(engine.match.turn).toBe(turns);
+  expect(engine.match.hp).toEqual([100, 100]);
+  expect(engine.match.winner).toBe('draw');
+});
+it('keeps multiplayer at twenty turns and applies each next stage limit', () => {
+  for (const mode of ['local', 'online'] as const) expect(exchangeLimit(freshDuel(mode).match)).toBe(20);
+  const engine = freshDuel();
+  engine.phase = 'finished'; engine.match.winner = 0;
+  const second = advanceCampaign(engine)!;
+  expect(exchangeLimit(second.match)).toBe(10);
+  second.phase = 'finished'; second.match.winner = 0;
+  expect(exchangeLimit(advanceCampaign(second)!.match)).toBe(20);
 });

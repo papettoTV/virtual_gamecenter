@@ -80,11 +80,15 @@ export default function DotWaveCabinet() {
   function walletChanged() { window.dispatchEvent(new Event("platform-wallet-changed")); }
   function showError(error: unknown) {
     const insufficientCredit = error instanceof PlatformApiError && error.code === "insufficient_credit";
-    notifications.show({ id: "dot-wave", scope: "dot-wave", type: "error", message: insufficientCredit
-      ? "クレジットが足りません。プロフィールの残高から補充してください。"
-      : "接続またはクレジットの確認に失敗しました。もう一度お試しください。" });
     d.busy = false; render();
-    if (insufficientCredit) window.dispatchEvent(new Event("request-credit-topup"));
+    if (insufficientCredit) {
+      notifications.dismiss("dot-wave");
+      window.dispatchEvent(new CustomEvent("request-credit-topup", { detail: {
+        onDecline: () => notifications.show({ id: "dot-wave", scope: "dot-wave", type: "error",
+          message: "クレジットが足りません。プロフィールの残高から補充してください。" }),
+      } }));
+    } else notifications.show({ id: "dot-wave", scope: "dot-wave", type: "error",
+      message: "接続またはクレジットの確認に失敗しました。もう一度お試しください。" });
   }
   async function unlock() { audio.current ??= new DuelAudio(); await audio.current.resume(); }
 
@@ -239,11 +243,11 @@ export default function DotWaveCabinet() {
   return <>
     <div className="dot-cabinet-bar dot-wave">
       <span>{!net.connected ? "接続中…" : net.matchId ? net.side === 1 ? "あなたはピンク側" : "あなたはシアン側" : net.role === "player" ? "あなたの筐体" : "観戦中"} · {d.room?.spectatorCount ?? 0}人</span>
-      <button onClick={() => void share()}>観戦URLを共有</button>
-      {canChallenge && !d.applied && <button disabled={d.busy} onClick={() => void requestChallenge()}>1クレジットで対戦</button>}
+      <div className="dot-cabinet-actions"><button onClick={() => void share()}>観戦URLを共有</button>
+      <div className="dot-cabinet-seat-action">{canChallenge && !d.applied && <button disabled={d.busy} onClick={() => void requestChallenge()}>1クレジットで対戦</button>}
       {d.applied && <button onClick={() => client.current?.send({ type: "cancelChallenge" })}>{d.queue ? `${d.queue}人待ち` : "承認待ち"} · キャンセル</button>}
-      {net.role === "spectator" && d.room?.playerCount === 0 && <button disabled={!net.connected} onClick={takeSeat}>この席でプレイ</button>}
-      {net.role === "spectator" && !net.matchId && d.room?.status === "occupied" && net.latest?.engine.phase !== "finished" && <p role="status">別の画面がプレイヤー席を使用しています。その画面で開始するか、ゲーム一覧に戻って席を空けてください。</p>}
+      {net.role === "spectator" && d.room?.playerCount === 0 && <button disabled={!net.connected} onClick={takeSeat}>この席でプレイ</button>}</div></div>
+      {net.role === "spectator" && !net.matchId && d.room?.status === "occupied" && net.latest?.engine.phase !== "finished" && <p className="dot-cabinet-status-note" role="status">別の画面がプレイヤー席を使用しています。その画面で開始するか、ゲーム一覧に戻って席を空けてください。</p>}
 
 
     </div>

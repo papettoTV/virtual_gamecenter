@@ -1,11 +1,12 @@
-import { MOVES, createMatch, type Match } from './core';
+import { MAX_EXCHANGES, MOVES, createMatch, type Match } from './core';
+import { freshScore } from './score';
 import type { Engine } from './MochiDuel';
 
 export type CpuStage = 1 | 2 | 3;
 export const CPU_STAGES = {
-  1: { label: '1st STAGE', name: 'PULSE', title: '基本のリズム', description: 'まずはタップだけ。拍に合わせてリズムを返そう。', color: '#ff39bc' },
-  2: { label: '2nd STAGE', name: 'IRON BEAT', title: '中ボス', description: '長押しが登場。帯の終点まで押して、輪に合わせて離そう。', color: '#ffac45' },
-  3: { label: '3rd STAGE', name: 'NOVA', title: 'ラスボス', description: '長押しに加えて8分音符が登場。拍と拍の間の音も聴き取ろう。', color: '#b49aff' },
+  1: { turns: 10, label: '1st STAGE', name: 'PULSE', title: '基本のリズム', description: 'まずはタップだけ。拍に合わせてリズムを返そう。', color: '#ff39bc' },
+  2: { turns: 10, label: '2nd STAGE', name: 'IRON BEAT', title: '中ボス', description: '長押しが登場。帯の終点まで押して、輪に合わせて離そう。', color: '#ffac45' },
+  3: { turns: 20, label: '3rd STAGE', name: 'NOVA', title: 'ラスボス', description: '長押しに加えて8分音符が登場。拍と拍の間の音も聴き取ろう。', color: '#b49aff' },
 } as const;
 
 export function cpuMoves(stage: CpuStage): number[] {
@@ -25,9 +26,9 @@ export function nextCpuStage(stage: CpuStage, match: Match): CpuStage | null {
   return match.winner === 0 && stage < 3 ? (stage + 1) as CpuStage : null;
 }
 export function freshDuel(mode: Engine['mode'] = 'cpu', ending: Match['ending'] = 'limited', cpuStage: CpuStage = 1): Engine {
-  return { phase: 'intro', mode, cpuStage, match: createMatch(ending), selected: 0, exchange: null, seconds: 0, outcome: null, impactElapsed: 0, feedback: '', cpu: [], flash: null, inputWarning: null };
+  return { phase: 'intro', mode, cpuStage, elapsedPlayMs: 0, score: freshScore(), match: createMatch(ending, mode === 'cpu' ? CPU_STAGES[cpuStage].turns : MAX_EXCHANGES), selected: 0, exchange: null, seconds: 0, outcome: null, impactElapsed: 0, feedback: '', cpu: [], flash: null, inputWarning: null };
 }
 export function advanceCampaign(engine: Engine): Engine | null {
   const next = engine.mode === 'cpu' && engine.phase === 'finished' ? nextCpuStage(engine.cpuStage ?? 1, engine.match) : null;
-  return next ? freshDuel('cpu', engine.match.ending, next) : null;
+  return next ? { ...freshDuel('cpu', engine.match.ending, next), score: { ...(engine.score ?? freshScore()) }, elapsedPlayMs: engine.elapsedPlayMs ?? 0 } : null;
 }

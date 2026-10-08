@@ -521,6 +521,7 @@
   animation: none
 }
 .duel-turn-label {
+  position: relative;
   color: var(--turn-color);
   justify-content: center;
   align-items: center;
@@ -781,12 +782,8 @@
 
 .neon-rail-stack { position:relative; }
 .neon-rail-lane { position:relative; --rail-color:#13e5f3; }
-.neon-rail-owner { display:flex; align-items:center; gap:6px; height:24px; padding-left:34.6%; color:var(--rail-color); }
-.neon-rail-owner svg { width:24px; height:24px; }
 .neon-rail-lane.is-incoming { position:absolute; inset:0; pointer-events:none; }
-.neon-rail-lane.is-incoming .neon-rail-owner { padding-left:3%; }
 .neon-rail-lane.is-incoming .neon-rail-line { opacity:1; }
-@media (width<=600px) { .neon-rail-owner { height:22px; } .neon-rail-owner svg { width:22px; height:22px; } }
 
 .neon-rail-hold rect { fill:currentColor; fill-opacity:.18; stroke:currentColor; stroke-width:2; }
 .neon-rail-hold path { stroke:currentColor; stroke-width:4; }
@@ -826,3 +823,75 @@
 .dot-stage-intro strong { display:block; color:#f2dbff; font-size:1.15rem; letter-spacing:.08em; }
 .dot-stage-intro span { color:#ffd166; }
 .dot-stage-intro p { margin:8px 0; }
+
+.dot-score-result { display:flex; flex-wrap:wrap; justify-content:center; gap:8px 20px; margin:12px 0; font-size:.85rem; color:#bac9e5; }
+.dot-score-result strong { color:#ffd166; font-variant-numeric:tabular-nums; }
+
+.neon-rail-combo { position:absolute; left:calc(50% + 26px); top:5px; display:inline-block; white-space:nowrap; pointer-events:none; color:#13e5f3; font-size:clamp(14px, 3.5vw, 18px); line-height:24px; font-weight:900; font-variant-numeric:tabular-nums; text-shadow:0 2px 0 #101529; }
+.neon-rail-combo.is-max { color:#ffd166; }
+
+/* Keep changing labels out of the anchors used by the player. */
+.duel-mode-label { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-variant-numeric:tabular-nums; }
+.duel-turn-label { height:34px; min-height:34px; }
+.dot-countdown { position:absolute; left:calc(50% + 26px); top:2px; width:2ch; text-align:left; font-variant-numeric:tabular-nums; }
+.duel-rhythm.is-inactive { visibility:hidden; pointer-events:none; }
+.duel-board > h2 { position:absolute; top:10px; left:12px; right:12px; z-index:6; height:28px; min-height:28px; margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; pointer-events:none; }
+.duel-board > h2.dot-sr-only { z-index:-1; }
+.duel-state-overlay { position:absolute; inset:0; z-index:4; overflow:auto; overscroll-behavior:contain; scrollbar-gutter:stable; background:#080c24f5; padding:44px 16px 16px; }
+.duel-start-panel { padding-top:16px; }
+.duel-start-actions { margin-bottom:20px; }
+.duel-start-actions .duel-input-hint { margin-top:0; }
+.duel-board > .duel-impact { position:absolute; inset:0; z-index:3; pointer-events:none; display:grid; place-content:center; }
+.duel-feedback.dot-sr-only { margin:0; }
+.duel-controls { position:relative; min-height:64px; }
+.duel-challenge-indicator { position:absolute; right:0; bottom:100%; max-width:100%; padding:2px 6px; background:#10152c; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; pointer-events:none; }
+.duel-paused-challenge:has(> *), .duel-result-challenge:has(> *) { position:absolute; inset:0; z-index:7; display:grid; place-content:center; max-width:none; margin:0; padding:16px; background:#080c24f5; }
+.dot-match-result { position:relative; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+.dot-match-result > strong { grid-column:1/-1; }
+.dot-match-result > [role=dialog] { position:absolute; inset:0; z-index:2; overflow:auto; }
+.dot-match-result > button { min-width:0; min-height:48px; white-space:normal; }
+.dot-score-result { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); }
+.dot-score-result span { min-width:0; }
+.dot-score-result strong { display:block; white-space:nowrap; }
+.dot-champion { position:relative; }
+.dot-champion svg, .dot-champion.tier-3 svg { position:absolute; left:calc(50% - 18px); width:36px; height:26px; }
+.dot-champion span { position:absolute; left:calc(50% + 22px); white-space:nowrap; font-variant-numeric:tabular-nums; }
+.dot-cabinet-bar { position:relative; display:grid; grid-template-columns:minmax(0,1fr) auto; }
+.dot-cabinet-bar > span { min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-variant-numeric:tabular-nums; }
+.dot-cabinet-actions { display:grid; grid-template-columns:repeat(2,170px); gap:10px; align-items:center; }
+.dot-cabinet-seat-action { min-height:34px; }
+.dot-cabinet-actions button { width:100%; min-height:34px; }
+.dot-cabinet-bar > .dot-cabinet-status-note { position:absolute; top:100%; left:0; z-index:8; padding:8px 12px; border:1px solid #41465f; background:#10142a; }
+@media (width<=600px) {
+  .dot-cabinet-bar { grid-template-columns:minmax(0,1fr); }
+  .dot-cabinet-actions { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .dot-score-result { grid-template-columns:minmax(0,1fr); gap:6px; }
+  .dot-score-result span { display:flex; justify-content:space-between; gap:8px; }
+  .dot-champion span { font-size:16px; }
+}
+.duel-controls .duel-tap { box-sizing:border-box; height:64px; padding:4px 12px; display:flex; flex-direction:column; justify-content:center; align-items:center; }
+
+/* The turn cue shares the name row; the rail has no separate cue row. */
+.dot-player-roster { margin-bottom:0; }
+.dot-player-nameplate strong { height:34px; line-height:34px; }
+.duel-rhythm.is-neon { position:relative; padding:0; }
+.duel-rhythm .duel-turn-label { position:absolute; top:-40px; left:0; right:0; margin:0; }
+@media (width<=600px) { .neon-rail { min-height:48px; } }
+
+.duel-rhythm.is-neon .neon-rail-stack { margin-top:-6px; }
+
+.duel-mode-label { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.duel-mode-info { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.duel-inline-score { flex:none; font:inherit; letter-spacing:inherit; white-space:nowrap; font-variant-numeric:tabular-nums; }
+
+.duel-choice-panel.is-stage-clear { display:grid; place-content:center; }
+
+.dot-ranking { margin:14px auto; max-width:520px; }
+.dot-ranking-score { margin:8px 0; font-variant-numeric:tabular-nums; }
+.dot-ranking > button { min-width:200px; min-height:44px; }
+.dot-ranking-name { display:block; margin:6px 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.dot-ranking table { width:100%; table-layout:fixed; margin-top:12px; border-collapse:collapse; font-size:12px; font-variant-numeric:tabular-nums; }
+.dot-ranking th,.dot-ranking td { padding:6px; border-bottom:1px solid #303653; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.dot-ranking th:first-child { width:40px; }
+.dot-ranking th:last-child { width:85px; }
+.dot-ranking td:last-child { text-align:right; color:#ffd166; }

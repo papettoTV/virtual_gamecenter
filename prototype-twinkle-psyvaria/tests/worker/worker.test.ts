@@ -427,3 +427,20 @@ describe("Cloudflare Worker", () => {
     });
   });
 });
+
+it('registers a DOT WAVE all-clear score under the current player and its scoring version', async () => {
+  const bootstrapResponse = await exports.default.fetch('http://localhost/api/platform/bootstrap');
+  const identity = await bootstrapResponse.json<{playerName:string}>();
+  const cookie = bootstrapResponse.headers.get('set-cookie')!.split(';',1)[0];
+  const response = await exports.default.fetch('http://localhost/api/ranking', {
+    method:'POST', headers:{'Content-Type':'application/json',Cookie:cookie!},
+    body:JSON.stringify({gameId:'dot-wave',clientVersion:'dot-wave-score-1',score:26170,
+      elapsedTimeMs:120000,cleared:true,maxLevel:3,defeatedBossCount:3}),
+  });
+  expect(response.status).toBe(200);
+  const rankingResponse = await exports.default.fetch('http://localhost/api/ranking?gameId=dot-wave&type=score&version=dot-wave-score-1');
+  const data = await rankingResponse.json<{rankings:Array<{player_name:string;score:number;cleared:number;defeated_boss_count:number}>}>();
+  expect(data.rankings).toContainEqual(expect.objectContaining({player_name:identity.playerName,score:26170,cleared:1,defeated_boss_count:3}));
+  const other = await exports.default.fetch('http://localhost/api/ranking?gameId=dot-wave&type=score&version=other-score-version');
+  expect((await other.json<{rankings:unknown[]}>()).rankings).toEqual([]);
+});

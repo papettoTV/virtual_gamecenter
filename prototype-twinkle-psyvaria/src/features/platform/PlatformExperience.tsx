@@ -55,6 +55,7 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
   const [welcomeDialogOpen, setWelcomeDialogOpen] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
+  const declinedCreditRequest = useRef<(() => void) | null>(null);
   const bypassGate = useRef(false);
   const profileRef = useRef<HTMLDivElement>(null);
 
@@ -164,10 +165,18 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
 
   useEffect(() => {
     if (!standaloneCredits) return;
-    const topUp = () => {
+    const topUp = (event: Event) => {
+      const request = (event as CustomEvent<{ onDecline?: () => void }>).detail;
+      declinedCreditRequest.current = request?.onDecline ?? null;
       setPendingAction(null);
+      setPlayDialog(null);
+      setPurchaseDialog(null);
       if (platform && !platform.welcomeCreditGranted) setWelcomeDialogOpen(true);
-      else setPurchaseDialog("select");
+      else if (declinedCreditRequest.current) {
+        const notify = declinedCreditRequest.current;
+        declinedCreditRequest.current = null;
+        notify();
+      } else setPurchaseDialog("select");
     };
     window.addEventListener("request-credit-topup", topUp);
     return () => window.removeEventListener("request-credit-topup", topUp);
@@ -278,6 +287,7 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
       const result = await claimWelcomeCredit();
       setPlatform({ ...platform, welcomeCreditGranted: true, wallet: result.wallet });
       setWelcomeDialogOpen(false);
+      declinedCreditRequest.current = null;
       notifications.show({ id: "platform-welcome", type: "success", message: "無料5クレジットを受け取りました。" });
       setPlayDialog(standaloneCredits ? null : "confirm");
       if (standaloneCredits) window.dispatchEvent(new Event("platform-wallet-changed"));
@@ -290,7 +300,12 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
 
   const skipWelcomeCredit = () => {
     setWelcomeDialogOpen(false);
-    if (standaloneCredits) { setPurchaseDialog("select"); return; }
+    if (standaloneCredits) {
+      const notify = declinedCreditRequest.current;
+      declinedCreditRequest.current = null;
+      if (notify) notify(); else setPurchaseDialog("select");
+      return;
+    }
     setPlayDialog((platform?.wallet.availableTotal ?? 0) >= getCurrentGame().creditCost
       ? "confirm"
       : "insufficient");

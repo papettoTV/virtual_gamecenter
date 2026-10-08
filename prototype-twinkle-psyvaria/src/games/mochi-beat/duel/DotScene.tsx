@@ -9,6 +9,8 @@ import { BEAT, levelAt, quality, type Side } from "./core";
 import type { Engine } from "./MochiDuel";
 
 const CYAN = "#13e5f3", PINK = "#ff39bc", LIME = "#baff39";
+// Character pixels are six scene units, scaled by 1.4.
+const RIGHT_SHIELD_X = 684 - 6 * 1.4;
 const NOTE = ["00011000", "00011110", "00011011", "00011001", "00011000", "01111000", "11111000", "01110000"];
 const BODY = ["00000011000000000", "00000111000000000", "00000011100000000", "00001111111000000", "00111111111110000", "01111111111111000", "01111111111111100", "11111111111111100", "11111111111111110", "11111111111111111", "11111111111111100", "01111111111111100", "00111111111111000", "00011111111110000", "00001111111100000", "00011000001100000"];
 const IRON_BODY = ["00110000000001100", "00111000000011100", "00111100000111100", "00011111111111000", "00111111111111100", "01111111111111110", "11111111111111111", "11111111111111111", "11111111111111111", "01111111111111110", "01111111111111110", "00111111111111100", "00111111111111100", "00011111111111000", "00011100000111000", "00111100000111100"];
@@ -148,7 +150,7 @@ export function DotScene({engine:e,viewSide=0,players,musicOverride=null}:{engin
       <Pixels rows={NOTE} x={side===0?72:858} y={228} size={5} color="#ffd166"/>
       <path d={`M${side===0?86:872} 220v-24m-9 9 9-9 9 9`} stroke="#ffd166" strokeWidth="4" fill="none"/>
     </g>}
-    {e.phase==="playing"&&beat>=8&&side!==attacker&&<g opacity={hit==="miss"?.22:1}>{Array.from({length:17},(_,i)=><rect key={i} x={side===0?270-Math.abs(i-8)*3:684+Math.abs(i-8)*3} y={168+i*6} width="5" height="5" fill={hit==="perfect"?LIME:color}/>)}</g>}
+    {e.phase==="playing"&&beat>=8&&side!==attacker&&<g opacity={hit==="miss"?.22:1}>{Array.from({length:17},(_,i)=><rect key={i} x={side===0?270-Math.abs(i-8)*3:RIGHT_SHIELD_X+Math.abs(i-8)*3} y={168+i*6} width="5" height="5" fill={hit==="perfect"?LIME:color}/>)}</g>}
     {hit&&<g key={flash!.at} className={`dot-hit-effect ${hit}`} aria-label={hit==="miss"?"音符が崩れて落ちる":hit==="perfect"?"大きなきらめき":"小さなきらめき"}>
       {hit==="miss"?<g className="dot-broken-note">
         <Pixels rows={["001100","001110","001001","001000","110000","110000"]} x={x+(side===0?162:-54)} y={160} size={6} color="#ff988f"/>
@@ -163,7 +165,7 @@ export function DotScene({engine:e,viewSide=0,players,musicOverride=null}:{engin
    const travel=beat-(note.beat-1);if(travel<0||travel>1.35+duration||power===0)return null;
    const blocked=note.grade==="perfect"||note.grade==="good";
    const progress=Math.min(travel,1);
-   const x=attacker===0?270+progress*408:684-progress*408;
+   const x=attacker===0?270+progress*(RIGHT_SHIELD_X-270):684-progress*408;
    const charged=e.match.bonus[attacker]>0;
    const color=charged?"#ffd166":attacker===0?CYAN:PINK;
    return <g key={i}>{blocked&&travel>=1+duration?<g>{Array.from({length:8},(_,k)=><rect key={k} x={Math.round((x+Math.cos(k*Math.PI/4)*(12+(travel-1-duration)*80))/6)*6} y={Math.round((220+Math.sin(k*Math.PI/4)*(12+(travel-1-duration)*80))/6)*6} width="5" height="5" fill={note.grade==="perfect"?LIME:color}/>)}</g>:duration>0?<NoteComet x={x} length={cometMotion(travel,duration).length} side={attacker} color={color} size={charged?7:5}/>:<Pixels rows={NOTE} x={Math.round(x/6)*6-12} y={204} size={charged?7:power>.65?5:4} color={color}/>}</g>;
