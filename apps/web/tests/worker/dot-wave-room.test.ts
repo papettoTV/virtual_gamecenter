@@ -37,8 +37,8 @@ async function capture(cookie: string, id: string) {
   const response = await exports.default.fetch(`http://localhost/api/platform/credit-reservations/${id}/capture`, { method: "POST", headers: { Cookie: cookie } });
   expect(response.status).toBe(200);
 }
-async function connect(cookie: string, cabinet: string, watch = false) {
-  const response = await exports.default.fetch(`http://localhost/api/cabinets/${cabinet}/ws?gameId=dot-wave`, { headers: { Upgrade: "websocket", Cookie: cookie } });
+async function connect(cookie: string, cabinet: string, watch = false, gameId = "dot-wave") {
+  const response = await exports.default.fetch(`http://localhost/api/cabinets/${cabinet}/ws?gameId=${gameId}`, { headers: { Upgrade: "websocket", Cookie: cookie } });
   expect(response.status).toBe(101);
   const socket = response.webSocket!; socket.accept(); sockets.push(socket);
   const messages: ServerMessage[] = [];
@@ -56,10 +56,35 @@ async function connect(cookie: string, cabinet: string, watch = false) {
       listeners.add(check); check();
     });
   }
-  send({ type: "joinCabinet", gameId: "dot-wave", watch });
+  send({ type: "joinCabinet", gameId, watch });
   await next("joinedCabinet");
   return { socket, send, next, messages };
 }
+
+it("streams salvage to free spectators, replays to late arrivals and clears on departure", async () => {
+  const cabinet = crypto.randomUUID();
+  const viewerCookie = await player();
+  const viewer = await connect(viewerCookie, cabinet, true, "deep-sea-salvage");
+  expect((await viewer.next("cabinetState", message => message.state.playerCount === 0)).state.playerCount).toBe(0);
+  const host = await connect(await player(), cabinet, false, "deep-sea-salvage");
+  host.send({ type: "startSolo" });
+  await host.next("cabinetState", message => message.state.status === "soloPlaying");
+  const snapshot = { gameId: "deep-sea-salvage", version: 1, state: { subX: 480, phase: "dive" }, world: { terrainCourse: {} } };
+  host.send({ type: "gameKeyframe", seq: 1, snapshot });
+  expect((await viewer.next("viewerKeyframe")).snapshot).toEqual(snapshot);
+  const frame = { gameId: "deep-sea-salvage", version: 1, state: { subX: 520, phase: "boss-clear" } };
+  host.send({ type: "gameMotionFrame", seq: 2, frame });
+  expect((await viewer.next("viewerMotionFrame")).frame).toEqual(frame);
+  viewer.send({ type: "gameMotionFrame", seq: 3, frame: { subX: 999 } });
+  viewer.send({ type: "clockPing", sentAt: 1 }); await viewer.next("clockPong");
+  const late = await connect(await player(), cabinet, true, "deep-sea-salvage");
+  expect((await late.next("viewerKeyframe")).snapshot).toEqual(snapshot);
+  expect((await late.next("viewerMotionFrame")).frame).toEqual(frame);
+  const balance = await exports.default.fetch("http://localhost/api/platform/bootstrap", { headers: { Cookie: viewerCookie } });
+  expect((await balance.json<{ wallet: { availableTotal: number } }>()).wallet.availableTotal).toBe(5);
+  host.send({ type: "leaveCabinet" }); await viewer.next("playerLeft");
+  expect((await viewer.next("cabinetState", message => message.state.status === "empty")).state.playerCount).toBe(0);
+});
 
 it("keeps a watch link in spectator mode even when the cabinet is empty", async () => {
   const viewer = await connect(await player(), crypto.randomUUID(), true);

@@ -1,11 +1,16 @@
 import { notifications } from "../../features/notifications/notifications";
 import { copySharedText } from "../../features/notifications/share";
+import { createCabinetClient } from "../../realtime/cabinet-client";
+import { createUuid } from "../../shared/id";
+import { recordWatchStarted } from "../../features/engagement/engagement-client";
+import type { CabinetRole, CabinetState } from "../../domain/cabinet";
+import type { ServerMessage } from "../../shared/protocol";
+import { SalvageLiveBuffer, type Phase, type Fish, type BossPass, type Hazard, type SalvageLiveState, type SalvageLiveWorld } from "./live-state";
 import { DEEP_SEA_SALVAGE } from "../../domain/game";
 import { fetchScoreRanking, submitRankingEntry, loadRankingWithNotice } from "../../features/ranking/ranking-client";
 import {
   BASE_POWER_DRAIN,
   FISH_PATTERNS,
-  type FishPattern,
   BOSS_BODY_RADIUS_X,
   BOSS_BODY_RADIUS_Y,
   BOSS_TAIL,
@@ -38,25 +43,9 @@ import { circleHitsTerrainWall, findTerrainRecesses, loadTerrainCourse, terrainW
 import { initTerrainEditor } from "./terrain-editor";
 import type { DeepSeaThreeLayer, ThreeFrame } from "./three-game-layer";
 
-type Phase = "ready" | "dive" | "hull-break" | "boss-clear" | "result";
 type Species = {
   id: keyof typeof FISH_PATTERNS; name: string; layer: SeaLayer; rare?: boolean; boss?: boolean;
   color: string; glow: string; speed: number; research: number; score: number; power: number; shape: number;
-};
-type Fish = {
-  id: number; speciesId: Species["id"]; x: number; depth: number; vx: number; baseDepth: number;
-  phase: number; research: number; completed: boolean; flash: number; completionEffect: number;
-  pattern: FishPattern; activated: boolean; alertTimer: number; inHollow: boolean; homeX: number;
-};
-type BossPass = {
-  active: boolean; x: number; depth: number; baseDepth: number; direction: 1 | -1; flash: number;
-  wobbleAmplitude: number; wobbleFrequency: number; wobblePhase: number;
-};
-type HazardKind = "rock" | "kelp" | "vent";
-type Hazard = {
-  id: number; kind: HazardKind; x: number; depth: number; width: number; height: number;
-  phase: number; dangerous: boolean; side?: -1 | 1; hollowDepth?: number; hollowHeight?: number;
-  topWidth?: number; bottomWidth?: number;
 };
 
 const SPECIES: Species[] = [
@@ -192,6 +181,100 @@ let researchCounts = new Map<string, number>();
 let message = "P / 画面下のボタンで潜航開始";
 let messageTimer = 99;
 let hazardMessageCooldown = 0;
+let runId = createUuid();
+let cabinetId = window.location.pathname.match(/^\/cabinets\/([^/]+)/)?.[1] ?? null;
+let cabinetRole: CabinetRole = "visitor";
+let playing = false;
+let watching = new URLSearchParams(window.location.search).get("watch") === "1";
+let autoWatch = true;
+let viewerHasState = false;
+let streamSequence = 0;
+let lastStreamAt = 0;
+let lastWorldAt = -Infinity;
+const liveBuffer = new SalvageLiveBuffer();
+const spectatorBanner = document.querySelector<HTMLElement>("#spectator-banner");
+const spectatorStatus = document.querySelector<HTMLElement>("#spectator-status-text");
+const spectatorCount = document.querySelector<HTMLElement>("#spectator-count");
+const cabinetClient = createCabinetClient({
+  onMessage: handleCabinetMessage,
+  onConnectionChange(connected) {
+    if (watching && spectatorStatus) spectatorStatus.textContent = connected ? "ライブ映像を受信しています。" : "再接続しています…";
+  },
+  onError(message) { notifications.show({ id: "salvage-connection", scope: DEEP_SEA_SALVAGE.id, type: "error", message }); },
+});
+
+function enterWatch() {
+  watching = true;
+  playing = false;
+  keys.clear(); pointer.active = false;
+  showScreen("game");
+  if (cabinetId) recordWatchStarted(DEEP_SEA_SALVAGE.id, cabinetId);
+}
+
+function handleCabinetMessage(event: ServerMessage) {
+  if (event.type === "joinedCabinet") {
+    cabinetRole = event.role;
+    if (playing && cabinetRole === "player") {
+      cabinetClient.send({ type: "startSolo" });
+      lastWorldAt = -Infinity; lastStreamAt = 0;
+    } else if (playing) {
+      playing = false; enterWatch();
+    }
+  }
+  if (event.type === "cabinetState") {
+    updateAudience(event.state);
+    if (!playing && autoWatch && (watching || event.state.playerCount > 0)) enterWatch();
+  }
+  if (event.type === "viewerKeyframe" || event.type === "viewerMotionFrame") {
+    const payload = event.type === "viewerKeyframe" ? event.snapshot : event.frame;
+    if (payload.gameId !== DEEP_SEA_SALVAGE.id || payload.version !== 1 || !payload.state) return;
+    const state = payload.state as unknown as SalvageLiveState;
+    if (!watching || !liveBuffer.push(state, event.seq, performance.now())) return;
+    if (event.type === "viewerKeyframe" && payload.world) {
+      const world = payload.world as unknown as SalvageLiveWorld;
+      terrainCourse = world.terrainCourse; hazards = world.hazards;
+    }
+    viewerHasState = true;
+    if (spectatorStatus) spectatorStatus.textContent = state.phase === "result" ? "プレイヤーが続けるか終了するかを選んでいます。" : "ライブ観戦中";
+  }
+  if (event.type === "playerLeft") {
+    viewerHasState = false; liveBuffer.clear();
+    if (spectatorStatus) spectatorStatus.textContent = "プレイヤーが筐体を離れました。";
+  }
+  if (event.type === "error") notifications.show({ id: "salvage-connection", scope: DEEP_SEA_SALVAGE.id, type: "error", message: event.message });
+}
+
+function updateAudience(state: CabinetState) {
+  if (spectatorCount) spectatorCount.textContent = `観戦者 ${state.spectatorCount}人`;
+  const pulse = document.querySelector<HTMLElement>("#player-crowd-pulse");
+  pulse?.classList.toggle("is-hidden", state.spectatorCount === 0 || !playing);
+  pulse?.style.setProperty("--crowd-intensity", String(Math.min(1, Math.log2(state.spectatorCount + 1) / 4)));
+}
+
+function publishLiveState(now: number) {
+  if (!playing || cabinetRole !== "player" || now - lastStreamAt < 1000 / 15 || cabinetClient.getBufferedAmount() > 64_000) return;
+  const state: SalvageLiveState = {
+    runId, phase, paused, collectionOpen, elapsed, subX, subDepth, maxDepth, subVDepth, subHeading,
+    invincible, hull, power, earnedScore, finalScore, cleared, retryCount, bossProgress, boss,
+    bossClearTimer, hullBreakTimer, hullBreakTitle, bossGaugeVisible, fishes,
+    targetFishIds: [...targetFishIds], discovered: [...discovered], message, messageTimer,
+  };
+  const keyframe = now - lastWorldAt >= 1000;
+  const payload = { gameId: DEEP_SEA_SALVAGE.id, version: 1, state, ...(keyframe ? { world: { terrainCourse, hazards } } : {}) };
+  if (cabinetClient.send({ type: keyframe ? "gameKeyframe" : "gameMotionFrame", seq: ++streamSequence, [keyframe ? "snapshot" : "frame"]: payload })) {
+    lastStreamAt = now;
+    if (keyframe) lastWorldAt = now;
+  }
+}
+
+function applyLiveState(now: number) {
+  const state = liveBuffer.sample(now);
+  if (!state) return;
+  ({ phase, paused, collectionOpen, elapsed, subX, subDepth, maxDepth, subVDepth, subHeading,
+    invincible, hull, power, earnedScore, finalScore, cleared, retryCount, bossProgress, boss,
+    bossClearTimer, hullBreakTimer, hullBreakTitle, bossGaugeVisible, fishes, message, messageTimer } = state);
+  targetFishIds = new Set(state.targetFishIds); discovered = new Set(state.discovered);
+}
 
 function showScreen(screen: "arcade" | "cabinet" | "game") {
   if (screen === "arcade") notifications.clearScope(DEEP_SEA_SALVAGE.id);
@@ -199,9 +282,14 @@ function showScreen(screen: "arcade" | "cabinet" | "game") {
   arcadeScreen?.classList.toggle("is-hidden", screen !== "arcade");
   cabinetScreen?.classList.toggle("is-hidden", screen !== "cabinet");
   gameScreen?.classList.toggle("is-hidden", screen !== "game");
+  document.body.classList.toggle("is-spectator", watching && screen === "game");
+  spectatorBanner?.classList.toggle("is-hidden", !watching || screen !== "game");
+  document.querySelector("#challenge-request")?.classList.add("is-hidden");
+  document.querySelector("#open-terrain-editor")?.classList.toggle("is-hidden", watching);
 }
 
 function resetRun() {
+  runId = createUuid(); lastWorldAt = -Infinity; lastStreamAt = 0;
   phase = "ready"; paused = true; collectionOpen = false; returnToResult = false;
   elapsed = 0; subX = W / 2; subDepth = Math.max(0, debugNumber("startDepth", 0)); maxDepth = subDepth;
   subVx = 0; subVDepth = 0; subHeading = 0; subHeadingTarget = 0; invincible = 0;
@@ -566,6 +654,7 @@ function finish(wasCleared: boolean, title: string) {
   const score = calculateFinalScore({ earnedScore, cleared, remainingPower: power, retryCount });
   finalSubtotal = score.subtotal; finalScore = score.total;
   setMessage(title, 99); showResult(title, score.multiplier); updateButtons();
+  if (playing) cabinetClient.send({ type: "stopSolo" });
 }
 
 function showResult(title: string, multiplier: number) {
@@ -601,12 +690,14 @@ function findSafeRetryX() {
 }
 
 function togglePause() {
+  if (watching) return;
   if (collectionOpen) { toggleCollection(); return; }
   if (phase === "ready") startDive(); else if (phase === "dive") paused = !paused;
   updateButtons();
 }
 
 function toggleCollection(force?: boolean) {
+  if (watching) return;
   if (phase === "hull-break") return;
   if (paused && phase === "dive" && force === undefined) return;
   const next = force ?? !collectionOpen;
@@ -640,7 +731,7 @@ function draw() {
   if ((boss.active && bossGaugeVisible) || phase === "boss-clear") drawBossResearchGauge();
   if (phase === "ready" && debugParams.get("terrainPreview") !== "1") drawStartOverlay();
   if (paused && phase === "dive" && !collectionOpen) drawCollection("pause");
-  if (phase === "result" && !collectionOpen) drawOverlay(message, [`SCORE ${finalScore.toLocaleString()}`, `図鑑 ${discovered.size} / 21　最大深度 ${Math.floor(maxDepth).toLocaleString()}m`]);
+  if (phase === "result" && !collectionOpen) drawOverlay(message, [`SCORE ${finalScore.toLocaleString()}`, watching ? "プレイヤーの選択を待っています" : `図鑑 ${discovered.size} / 21　最大深度 ${Math.floor(maxDepth).toLocaleString()}m`]);
   if (phase === "boss-clear") drawBossClearSequence();
   if (phase === "hull-break") drawHullBreakSequence();
   if (collectionOpen) drawCollection();
@@ -1353,6 +1444,7 @@ function renderRanking(entries: Awaited<ReturnType<typeof fetchScoreRanking>>) {
 function escapeHtml(value: string) { const element = document.createElement("span"); element.textContent = value; return element.innerHTML; }
 
 window.addEventListener("keydown", (event) => {
+  if (watching) return;
   keys.add(event.code); if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(event.code)) event.preventDefault();
   if (event.code === "KeyP") togglePause();
   if (event.code === "KeyF") toggleCollection();
@@ -1360,6 +1452,7 @@ window.addEventListener("keydown", (event) => {
 });
 window.addEventListener("keyup", (event) => keys.delete(event.code));
 canvas.addEventListener("pointerdown", (event) => {
+  if (watching) return;
   if (collectionOpen && returnToResult) { toggleCollection(false); return; }
   const rect = canvas.getBoundingClientRect(); pointer.active = true; pointer.x = (event.clientX - rect.left) * W / rect.width; pointer.y = (event.clientY - rect.top) * H / rect.height;
 });
@@ -1373,17 +1466,52 @@ shareLineButton?.addEventListener("click", () => window.open(`https://line.me/R/
 shareBlueskyButton?.addEventListener("click", () => window.open(`https://bsky.app/intent/compose?text=${encodeURIComponent(`${shareText()}\n${shareUrl()}`)}`, "_blank", "noopener,noreferrer"));
 shareSaveButton?.addEventListener("click", () => void saveShareImage());
 shareCopyButton?.addEventListener("click", () => void copyShareText().catch(() => {}));
-rankingRetry?.addEventListener("click", () => { retryFromResult(); showScreen("game"); });
+rankingRetry?.addEventListener("click", () => {
+  if (!watching) { retryFromResult(); showScreen("game"); if (playing) cabinetClient.send({ type: "startSolo" }); }
+});
 rankingName?.addEventListener("input", () => { if (rankingSubmit) rankingSubmit.disabled = !rankingName.value.trim() || !finalScore; });
 rankingSubmit?.addEventListener("click", () => void submitScore());
-window.addEventListener("create-solo-cabinet", ((event: CustomEvent<{ gameId: string }>) => { if (event.detail?.gameId === DEEP_SEA_SALVAGE.id) startSoloButton?.click(); }) as EventListener);
-window.addEventListener("platform-play-approved", ((event: CustomEvent<{ gameId: string }>) => { if (event.detail?.gameId === DEEP_SEA_SALVAGE.id) { resetRun(); showScreen("game"); lastTime = performance.now(); } }) as EventListener);
+window.addEventListener("create-solo-cabinet", ((event: CustomEvent<{ gameId: string }>) => {
+  if (event.detail?.gameId !== DEEP_SEA_SALVAGE.id) return;
+  cabinetClient.leave(); cabinetRole = "visitor"; playing = watching = false; autoWatch = false;
+  liveBuffer.clear(); viewerHasState = false; cabinetId = createUuid();
+  history.pushState({}, "", `/cabinets/${cabinetId}?game=${DEEP_SEA_SALVAGE.id}`);
+  cabinetClient.join(cabinetId, DEEP_SEA_SALVAGE.id, true);
+  startSoloButton?.click();
+}) as EventListener);
+window.addEventListener("platform-play-approved", ((event: CustomEvent<{ gameId: string }>) => {
+  if (event.detail?.gameId !== DEEP_SEA_SALVAGE.id || !cabinetId) return;
+  watching = false; playing = true; resetRun(); showScreen("game"); lastTime = performance.now();
+  cabinetClient.join(cabinetId, DEEP_SEA_SALVAGE.id);
+}) as EventListener);
+document.querySelector("#spectator-game-back")?.addEventListener("click", () => {
+  watching = false; autoWatch = false; showScreen("cabinet");
+});
+window.addEventListener("pagehide", () => cabinetClient.leave());
+window.addEventListener("popstate", () => {
+  cabinetClient.leave(); cabinetRole = "visitor"; playing = false;
+  liveBuffer.clear(); viewerHasState = false;
+  cabinetId = window.location.pathname.match(/^\/cabinets\/([^/]+)/)?.[1] ?? null;
+  watching = new URLSearchParams(window.location.search).get("watch") === "1";
+  autoWatch = true;
+  syncInitialScreen();
+});
 for (const id of ["back-to-arcade", "cabinet-breadcrumb-arcade", "game-back-to-arcade", "ranking-another-game"]) document.querySelector(`#${id}`)?.addEventListener("click", () => window.location.assign("/"));
 
-function syncInitialScreen() { showScreen(window.location.pathname.startsWith("/cabinets/") ? "cabinet" : "arcade"); }
+function syncInitialScreen() {
+  showScreen(cabinetId ? watching ? "game" : "cabinet" : "arcade");
+  if (cabinetId) cabinetClient.join(cabinetId, DEEP_SEA_SALVAGE.id, true);
+}
 function loop(now: number) {
   const dt = Math.min(.05, (now - lastTime) / 1_000); lastTime = now;
-  if (!document.hidden) { update(dt); draw(); }
+  if (!document.hidden) {
+    if (watching) {
+      applyLiveState(now);
+      if (viewerHasState) draw();
+      else { ctx.fillStyle = "#04101c"; ctx.fillRect(0, 0, W, H); drawOverlay("LIVE", [spectatorStatus?.textContent ?? "プレイヤーのゲーム開始を待っています"]); }
+    } else { update(dt); draw(); }
+  }
+  publishLiveState(now);
   requestAnimationFrame(loop);
 }
 document.addEventListener("visibilitychange", () => { lastTime = performance.now(); });
