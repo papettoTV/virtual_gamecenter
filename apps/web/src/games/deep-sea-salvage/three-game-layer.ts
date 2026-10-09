@@ -51,6 +51,10 @@ export class DeepSeaThreeLayer {
   private cliffTemplate: THREE.Group | null = null;
   private fishMeshes = new Map<number, THREE.Group>();
   private hazardMeshes = new Map<number, THREE.Object3D>();
+  private disposed = false;
+  private readonly geometries = new Set<THREE.BufferGeometry>();
+  private readonly materials = new Set<THREE.Material>();
+  private readonly textures = new Set<THREE.Texture>();
   private readonly cracks = new THREE.Group();
   private readonly rockMaterial = new THREE.MeshStandardMaterial({
     color: 0x78939f, roughness: .98, metalness: .02,
@@ -86,17 +90,54 @@ export class DeepSeaThreeLayer {
 
   static async create() {
     const layer = new DeepSeaThreeLayer();
-    await layer.loadModels();
-    return layer;
+    try {
+      await layer.loadModels();
+      return layer;
+    } catch (error) {
+      layer.dispose();
+      throw error;
+    }
   }
 
   render(frame: ThreeFrame) {
+    if (this.disposed) throw new Error("deep_sea_layer_disposed");
     this.updateSubmarine(frame);
     this.updateFishes(frame.fishes, frame.elapsed);
     this.updateHazards(frame.hazards, frame.elapsed);
     this.updateBoss(frame.boss);
     this.composer.render();
     return this.canvas;
+  }
+
+  dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.collectResources(this.scene);
+    this.materials.add(this.rockMaterial);
+    this.materials.add(this.rockEdgeMaterial);
+    this.materials.add(this.kelpMaterial);
+    for (const geometry of this.geometries) geometry.dispose();
+    for (const material of this.materials) material.dispose();
+    for (const texture of this.textures) texture.dispose();
+    this.geometries.clear(); this.materials.clear(); this.textures.clear();
+    this.cautionOutline.selectedObjects = []; this.dangerOutline.selectedObjects = [];
+    for (const pass of this.composer.passes) pass.dispose();
+    this.composer.dispose();
+    this.renderer.dispose();
+    this.renderer.forceContextLoss();
+    this.scene.clear(); this.fishMeshes.clear(); this.hazardMeshes.clear(); this.fishTemplates.clear();
+  }
+
+  private collectResources(root: THREE.Object3D) {
+    root.traverse((object) => {
+      if (!(object instanceof THREE.Mesh || object instanceof THREE.Line || object instanceof THREE.Points)) return;
+      this.geometries.add(object.geometry);
+      const materials = Array.isArray(object.material) ? object.material : [object.material];
+      for (const material of materials) {
+        this.materials.add(material);
+        for (const value of Object.values(material)) if (value instanceof THREE.Texture) this.textures.add(value);
+      }
+    });
   }
 
   private makeOutlinePass(color: number, strength: number, glow: number) {
@@ -117,6 +158,7 @@ export class DeepSeaThreeLayer {
       const root = (await loader.loadAsync(entry.url)).scene;
       root.scale.multiplyScalar(entry.scale ?? 1);
       root.traverse((object) => { if (object instanceof THREE.Mesh) { object.castShadow = false; object.receiveShadow = false; } });
+      this.collectResources(root);
       return root;
     };
     const load = async (key: keyof NonNullable<ModelManifest["models"]>) => {
@@ -134,9 +176,10 @@ export class DeepSeaThreeLayer {
     this.createDamageCracks(); this.submarine.add(this.cracks); this.scene.add(this.submarine);
     this.fishTemplate = await load("fish"); this.fishTemplate.visible = false; this.scene.add(this.fishTemplate);
     const speciesEntries = Object.entries(manifest.fishSpecies ?? {});
-    await Promise.all(speciesEntries.map(async ([id, entry]) => {
+    const speciesResults = await Promise.allSettled(speciesEntries.map(async ([id, entry]) => {
       const model = await loadEntry(entry); model.visible = false; this.fishTemplates.set(id, model); this.scene.add(model);
     }));
+    for (const result of speciesResults) if (result.status === "rejected") throw result.reason;
     if (manifest.models?.leviathan) this.bossRoot.add(await load("leviathan")); else this.createBoss();
     if (manifest.models?.kelp) { this.kelpTemplate = await load("kelp"); this.kelpTemplate.visible = false; this.scene.add(this.kelpTemplate); }
     if (manifest.models?.vent) { this.ventTemplate = await load("vent"); this.ventTemplate.visible = false; this.scene.add(this.ventTemplate); }
@@ -267,7 +310,7 @@ export class DeepSeaThreeLayer {
 
   private updateHazards(states: ThreeHazardState[], elapsed: number) {
     const visibleIds = new Set(states.map((state) => state.id));
-    for (const [id, hazard] of this.hazardMeshes) if (!visibleIds.has(id)) { this.hazardRoot.remove(hazard); this.hazardMeshes.delete(id); }
+    for (const [id, hazard] of this.hazardMeshes) if (!visibleIds.has(id)) { this.collectResources(hazard); this.hazardRoot.remove(hazard); this.hazardMeshes.delete(id); }
     for (const state of states) {
       let object = this.hazardMeshes.get(state.id);
       if (!object) {

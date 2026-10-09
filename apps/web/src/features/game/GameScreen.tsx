@@ -1,12 +1,16 @@
 import type { GameDefinition } from "../../domain/game";
-import "../../games/dot-wave/style.css";
+import { DebugPanel, getGameUI } from "../../games/ui-registry";
+import { navigate } from "../../shared/navigation";
 
-export function GameScreen({ game }: { game: GameDefinition }) {
-  const isSalvage = game.id === "deep-sea-salvage";
-  const isRhythm = game.id === "mochi-beat";
-  const isRhythmPreview = isRhythm && import.meta.env.DEV && new URLSearchParams(window.location.search).get("rhythmPreview") === "1";
+export interface GameScreenProps {
+  game: GameDefinition;
+}
+
+export function GameScreen({ game }: GameScreenProps) {
+  const ui = getGameUI(game.id);
+  const { FrameIntro, SetIntro, ResultPresentation, ResultShareAction, ResultSummaryAction, ResultMenu, AfterFrame, TouchActions, Settings, FooterAction, RetryAction } = ui;
   return (
-    <section className={`game-screen is-hidden${isRhythm ? " mochi-screen" : ""}`} id="game-screen">
+    <section className={`game-screen is-hidden${ui.screenClassName ? ` ${ui.screenClassName}` : ""}`} id="game-screen">
       <div className="spectator-banner is-hidden" id="spectator-banner">
         <div>
           <strong id="spectator-view-label">観戦中</strong>
@@ -31,29 +35,7 @@ export function GameScreen({ game }: { game: GameDefinition }) {
       <div className="versus-status is-hidden" id="versus-status" role="status">
         対戦者が待っています。ゲーム停止時に確認できます。
       </div>
-      <details className={`debug-panel${isSalvage || isRhythm ? " is-hidden" : ""}`} id="debug-panel">
-        <summary>デバッグ設定</summary>
-        <div className="debug-panel-body">
-          <label htmlFor="bullet-density"><strong>デバッグ: 敵弾量</strong></label>
-          <input id="bullet-density" type="range" min="1" max="10" step="1" defaultValue="2" />
-          <span><b id="bullet-density-value">2</b> / 10</span>
-          <label className="debug-toggle">
-            <input id="player-hitbox-toggle" type="checkbox" defaultChecked />
-            <span>自機の当たり判定あり</span>
-          </label>
-          <label className="debug-toggle">
-            <input id="debug-ranking-preview-toggle" type="checkbox" />
-            <span>ゲーム開始3秒後にランキング登録を表示</span>
-          </label>
-          <div className="debug-stepper" aria-label="レベルごとの必要ゲージ増加量">
-            <strong>デバッグ: ゲージ増加難度</strong>
-            <button id="gauge-growth-down" type="button">−</button>
-            <b id="gauge-growth-value">30</b>
-            <button id="gauge-growth-up" type="button">＋</button>
-            <span>レベルごとに必要ゲージ +<b id="gauge-growth-label">30</b></span>
-          </div>
-        </div>
-      </details>
+      <DebugPanel hidden={ui.debugPanelHidden} />
 
       <div className="game-frame">
         <div className="player-crowd-pulse is-hidden" id="player-crowd-pulse" aria-hidden="true" />
@@ -72,33 +54,8 @@ export function GameScreen({ game }: { game: GameDefinition }) {
           </svg>
         </button>
         <canvas id="game" width="960" height="640" aria-label={`${game.title} game canvas`} />
-        {isRhythm && <div className="mochi-intro" id="mochi-intro">
-          <span className="mochi-kicker">LISTEN. REPEAT. MOCHI!</span>
-          <h2>もちつきビート</h2>
-          <p>左のうさぎとあなたが、4拍ずつ交代でもちをつきます。</p>
-          <div className="mochi-instructions">
-            <div className="mochi-turn-example" aria-label="お手本4拍、あなた4拍、お手本4拍、あなた4拍の順で繰り返します">
-              <span>お手本 <b>4拍</b></span><i aria-hidden="true">→</i><span>あなた <b>4拍</b></span><i aria-hidden="true">→</i><span>くり返す</span>
-            </div>
-            <span><b>01 聞く</b> はじめは左のうさぎの番。押さずに「トン」の音と間を覚えよう。</span>
-            <span><b>02 まねする</b> 「あなたの番！」が出たら、次の4拍で同じリズムをタップ。</span>
-            <span><b>03 交代する</b> 4拍たつと、またお手本の番。音のない拍は押さずにお休み！</span>
-          </div>
-          <p className="mochi-set-overview">3ステージで1セット。108 → 126 → 144 BPMと速くなる3セットに挑戦！<br />セットの間で休憩できます。3セット完走でゲームクリア。</p>
-          <button id="mochi-start" type="button">音を出してスタート</button>
-          <small>スペースキー / 画面タップ · 約2分半 · 3ステージ × 3セット</small>
-          <p id="mochi-audio-error" role="status" />
-        </div>}
-        {isRhythm && <div className="mochi-intro" id="mochi-set-intro" hidden>
-          <span className="mochi-kicker">NEXT SET</span>
-          <h2 id="mochi-next-title">次のセットへ</h2>
-          <p id="mochi-next-summary" />
-          <p id="mochi-next-tempo" className="mochi-next-tempo" />
-          <p>同じ3ステージに、もう一度挑戦！<br />お手本4拍 → あなた4拍の交代は同じです。</p>
-          <button id="mochi-next-set" type="button">スペース / タップで開始</button>
-          <small>準備ができるまで、ゆっくり休憩できます。</small>
-          <p id="mochi-next-error" role="status" />
-        </div>}
+        <FrameIntro game={game} />
+        <SetIntro game={game} />
         <div className="versus-overlay is-hidden" id="versus-overlay" role="dialog" aria-modal="true">
           <p className="eyebrow" id="versus-eyebrow">Versus</p>
           <h2 id="versus-title">対戦</h2>
@@ -112,28 +69,13 @@ export function GameScreen({ game }: { game: GameDefinition }) {
         </div>
         <div className="ranking-submit ranking-overlay" id="ranking-submit-panel">
           <h2 id="ranking-submit-heading">ランキング登録</h2>
-          {isRhythm && <figure className="mochi-result-dish">
-            <canvas id="mochi-result-art" width="440" height="160" role="img" aria-label="完成したもち" />
-            <figcaption><strong id="mochi-finish-title" /><span id="mochi-finish-description" /></figcaption>
-          </figure>}
-          {isSalvage && <button id="salvage-share-result" className="ranking-result-share-button" type="button">
-            結果をシェア
-          </button>}
+          <ResultPresentation game={game} />
+          <ResultShareAction game={game} />
           <div className="ranking-result-summary">
             <p id="ranking-result">ゲーム終了時にスコアを登録できます。</p>
-            {isSalvage && <button id="salvage-result-collection" className="ranking-result-collection-button" type="button">
-              図鑑
-            </button>}
+            <ResultSummaryAction game={game} />
           </div>
-          {isSalvage && <div id="salvage-share-menu" className="salvage-share-menu" hidden>
-            <p>投稿先を選んでください。端末の共有では結果画像も一緒に送れます。</p>
-            <button id="salvage-share-native" type="button">端末の共有メニュー</button>
-            <button id="salvage-share-x" type="button">Xで共有</button>
-            <button id="salvage-share-line" type="button">LINEで共有</button>
-            <button id="salvage-share-bluesky" type="button">Blueskyで共有</button>
-            <button id="salvage-share-save" type="button">シェア用画像を保存</button>
-            <button id="salvage-share-copy" type="button">文章をコピー</button>
-          </div>}
+          <ResultMenu game={game} />
           <div className="ranking-form">
             <input id="ranking-name" type="hidden" />
             <div className="ranking-name-summary">
@@ -156,73 +98,25 @@ export function GameScreen({ game }: { game: GameDefinition }) {
             <RankingTable bodyId="ranking-submit-list" label="登録後のスコアランキング" />
           </div>
           <div className="ranking-next-actions">
-            <button id="ranking-another-game" className="clear-restart-button" type="button">別のゲームをする</button>
-            <button id={isRhythmPreview ? "mochi-preview-retry" : "ranking-retry"} className="clear-restart-button ranking-retry-button" type="button">
-              {isRhythmPreview ? "もう一度プレビュー" : "1クレジットでリトライ"}
-            </button>
+            <button id="ranking-another-game" className="clear-restart-button" type="button" onClickCapture={event => { event.stopPropagation(); navigate("/"); }}>別のゲームをする</button>
+            <RetryAction game={game} />
           </div>
         </div>
       </div>
 
-      {isSalvage && <section className="salvage-terrain-editor" id="salvage-terrain-editor" hidden>
-        <header>
-          <div>
-            <p className="eyebrow">DEEP SEA SALVAGE / DEVELOPMENT TOOL</p>
-            <h2>海底岩壁エディタ</h2>
-            <p>深度0〜12,000mの左右岩壁と、海藻・熱水噴出口の位置を編集できます。</p>
-          </div>
-          <button id="terrain-editor-play" type="button">保存してゲームで確認</button>
-        </header>
-        <div className="terrain-editor-toolbar" role="toolbar" aria-label="地形編集ツール">
-          <button className="is-active" data-terrain-tool="wall" type="button">岩壁を描く</button>
-          <button data-terrain-tool="kelp" type="button">海藻を配置</button>
-          <button data-terrain-tool="vent" type="button">熱水噴出口を配置</button>
-          <button data-terrain-tool="erase" type="button">設備を削除</button>
-          <button id="terrain-editor-undo" type="button">元に戻す</button>
-          <button id="terrain-editor-reset" type="button">初期地形へ戻す</button>
-        </div>
-        <div className="terrain-editor-toolbar">
-          <label><input id="terrain-editor-overview" type="checkbox" /> 全体図（縦方向を圧縮）</label>
-          <label>確認する深度 (m) <input id="terrain-editor-preview-depth" type="number" min="0" max="12000" step="100" defaultValue="0" /></label>
-          <button id="terrain-editor-jump" type="button">この深度へ移動</button>
-          <button id="terrain-editor-preview" type="button">保存して指定深度を確認</button>
-          <span id="terrain-editor-scale">ゲームと同じ縦横比。スクロールして深い場所を編集できます。</span>
-        </div>
-        <div className="terrain-editor-workspace">
-          <div className="terrain-editor-scroll">
-            <canvas id="terrain-editor-canvas" width="960" height="12000" aria-label="海底岩壁編集キャンバス" />
-          </div>
-          <aside>
-            <strong>操作方法</strong>
-            <p>岩壁: 輪郭をつかんでドラッグ。中央を越えて張り出せます（通路は最低120px）。</p>
-            <p>海藻・熱水噴出口: 岩壁付近をクリック。既存の印をドラッグすると移動</p>
-            <p>削除: 消したい設備をクリック</p>
-            <label htmlFor="terrain-editor-json">コースJSON</label>
-            <textarea id="terrain-editor-json" rows={12} spellCheck={false} />
-            <button id="terrain-editor-export" type="button">JSONを表示</button>
-            <button id="terrain-editor-import" type="button">JSONを読み込む</button>
-            <p id="terrain-editor-status" role="status" />
-          </aside>
-        </div>
-      </section>}
+      <AfterFrame game={game} />
 
       <div className="spectator-game-actions">
-        <button id="spectator-game-back" className="secondary-button" type="button">筐体画面に戻る</button>
+        <button id="spectator-game-back" className="secondary-button" type="button" onClickCapture={event => { event.stopPropagation(); navigate(`/?game=${encodeURIComponent(game.id)}`); }}>筐体画面に戻る</button>
       </div>
 
       <div className="touch-controls" aria-label="スマホ操作">
         <div className="touch-actions">
-          {isRhythm && <button id="mochi-tap" className="touch-button mochi-tap" type="button" disabled>トン！ <small>SPACE / TAP</small></button>}
-          {isSalvage && <button id="touch-collection" className="touch-button" type="button">図鑑</button>}
+          <TouchActions game={game} />
           <button id="touch-pause" className="touch-button" type="button">一時停止</button>
         </div>
       </div>
-      {isRhythm && <div className="mochi-settings">
-        <span id="mochi-status" role="status" aria-live="polite">お手本のあと、同じリズムを返そう。</span>
-        <label>音量 <input id="mochi-volume" type="range" min="0" max="100" defaultValue="65" /></label>
-        <label>タイミング調整 <input id="mochi-offset" type="range" min="-200" max="200" step="10" defaultValue="0" /> <output id="mochi-offset-value">0 ms</output></label>
-        <small>音が遅れて聞こえるときは＋へ調整（開始前のみ）。Pで一時停止。</small>
-      </div>}
+      <Settings game={game} />
 
       <section className="ranking-panel">
         <div className="ranking-list">
@@ -232,8 +126,8 @@ export function GameScreen({ game }: { game: GameDefinition }) {
       </section>
 
       <div className="game-footer-actions">
-        {isSalvage && <button id="open-terrain-editor" className="secondary-button" type="button">岩壁エディタ</button>}
-        <button id="game-back-to-arcade" className="secondary-button" type="button">別のゲームをする</button>
+        <FooterAction game={game} />
+        <button id="game-back-to-arcade" className="secondary-button" type="button" onClickCapture={event => { event.stopPropagation(); navigate("/"); }}>別のゲームをする</button>
       </div>
     </section>
   );

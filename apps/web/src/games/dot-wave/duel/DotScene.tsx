@@ -6,7 +6,7 @@ import { turnCue, cueName } from "./turnCue";
 import { BattleIcon } from "./BattleIcon";
 import { memo } from "react";
 import { BEAT, levelAt, quality, type Side } from "./core";
-import type { Engine } from "./MochiDuel";
+import type { Engine } from "./engine";
 
 const CYAN = "#13e5f3", PINK = "#ff39bc", LIME = "#baff39";
 // Character pixels are six scene units, scaled by 1.4.

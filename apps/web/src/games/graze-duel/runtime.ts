@@ -1,3 +1,1 @@
-import "./legacy-runtime";
-
-export {};
+export { mountGame } from "./legacy-runtime";

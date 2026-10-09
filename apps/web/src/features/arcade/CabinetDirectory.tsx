@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import "./cabinet-directory.css";
 import type { GameDefinition } from "../../domain/game";
+import { gameHost } from "../../game-sdk/game-host";
 
 interface CabinetEntry {
   cabinetId: string;
@@ -49,7 +50,6 @@ function useCabinets(gameId: string) {
 }
 
 function openCabinet(cabinetId: string, gameId: string) {
-  if (gameId === "dot-wave") { location.assign(`/cabinets/${cabinetId}?game=dot-wave&watch=1`); return; }
   history.pushState({ cabinetId, gameId }, "", `/cabinets/${cabinetId}?game=${encodeURIComponent(gameId)}&watch=1`);
   window.dispatchEvent(new PopStateEvent("popstate"));
 }
@@ -173,9 +173,7 @@ export function CabinetSelector({ game, onStartSolo }: { game: GameDefinition; o
 
   const startSolo = () => {
     if (onStartSolo) { onStartSolo(); return; }
-    window.dispatchEvent(new CustomEvent("create-solo-cabinet", {
-      detail: { gameId: game.id },
-    }));
+    void gameHost.selectSolo();
   };
 
   return (

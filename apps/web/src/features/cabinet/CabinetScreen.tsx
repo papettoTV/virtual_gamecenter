@@ -1,5 +1,7 @@
 import { CabinetSelector } from "../arcade/CabinetDirectory"
 import type { GameDefinition } from "../../domain/game"
+import { gameHost } from "../../game-sdk/game-host"
+import { navigate } from "../../shared/navigation"
 
 export function CabinetScreen({ game, visible = false, onStartSolo, onBack }: { game: GameDefinition; visible?: boolean; onStartSolo?: () => void; onBack?: () => void }) {
   return (
@@ -24,6 +26,7 @@ export function CabinetScreen({ game, visible = false, onStartSolo, onBack }: { 
             id="start-solo"
             className="cabinet-start-button"
             type="button"
+            onClick={() => gameHost.requestPlay("start")}
           >
             ゲームスタート
           </button>
@@ -95,7 +98,7 @@ export function CabinetScreen({ game, visible = false, onStartSolo, onBack }: { 
         <div className="screen-actions">
           <button
             id="back-to-arcade"
-            onClick={onBack}
+            onClickCapture={event => { event.stopPropagation(); if (onBack) onBack(); else navigate("/"); }}
             className="secondary-button"
             type="button"
           >

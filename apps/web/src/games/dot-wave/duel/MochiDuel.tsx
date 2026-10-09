@@ -8,14 +8,14 @@ import { NeonRail } from "./NeonRail";
 import { musicStages, visibleMusicStage, type MusicStage } from "./musicMood";
 import { DuelAudio } from "./audio";
 import { DotWaveRanking } from "./DotWaveRanking";
-import { actorAt, BEAT, beatAt, levelAt, randomMove, cpuGrades, createExchange, END_BEAT, expire, exchangeLimit, MAX_HP, MOVES, resolve, tap, release, type Exchange, type Grade, type Match, type Resolution, type Side } from "./core";
+import { actorAt, BEAT, beatAt, levelAt, randomMove, cpuGrades, createExchange, END_BEAT, expire, exchangeLimit, MAX_HP, MOVES, resolve, tap, release, type Match, type Side } from "./core";
 import { INPUT_GRACE, validRemoteTap, type DuelLink, type DuelFrame } from "./network";
-import { CPU_STAGES, advanceCampaign, freshDuel as fresh, nextCpuStage, randomCpuMove, type CpuStage } from "./campaign";
-import { freshScore, scoreChart, awardBossBonus, readBest, saveBest, type Score } from "./score";
+import { CPU_STAGES, advanceCampaign, freshDuel as fresh, nextCpuStage, randomCpuMove } from "./campaign";
+import { freshScore, scoreChart, awardBossBonus, readBest, saveBest } from "./score";
 import "./style.css";
 
-type Phase = "countdown" | "intro" | "playing" | "paused" | "impact" | "finished";
-export type Engine = { elapsedPlayMs?: number; comboFlash?: { combo: number; at: number; turn: number }; score?: Score; cpuStage?: CpuStage; phase: Phase; mode: "cpu" | "local" | "online"; match: Match; selected: number; exchange: Exchange | null; seconds: number; outcome: Resolution | null; impactElapsed: number; feedback: string; cpu: Grade[]; flash: { side: Side; grade: Grade; at: number } | null; inputWarning: { side: Side; at: number; message: string } | null };
+import type { Engine, Phase } from "./engine";
+export type { Engine } from "./engine";
 
 
 export default function MochiDuel({ players, network, sharedAudio, boardNotice, resultPanel, challengeNotice, challengePending = false, holdResult = false }: { players?: DotWaveRoster; network?: DuelLink; sharedAudio?: RefObject<DuelAudio | null>; boardNotice?: ReactNode; resultPanel?: ReactNode; challengeNotice?: ReactNode; holdResult?: boolean; challengePending?: boolean } = {}) {

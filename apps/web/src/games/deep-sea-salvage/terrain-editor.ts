@@ -13,20 +13,26 @@ import {
 
 type Tool = "wall" | TerrainFeatureKind | "erase";
 
-export function initTerrainEditor() {
+export function initTerrainEditor(): () => void {
+  const controller = new AbortController();
+  const cleanups: Array<() => void> = [];
+  const cleanup = () => { controller.abort(); for (const action of cleanups.splice(0)) action(); };
   const openButton = document.querySelector<HTMLButtonElement>("#open-terrain-editor");
   openButton?.addEventListener("click", () => {
     const url = new URL(window.location.href); url.searchParams.set("game", "deep-sea-salvage"); url.searchParams.set("terrainEditor", "1");
     window.location.assign(url);
-  });
-  if (new URLSearchParams(window.location.search).get("terrainEditor") !== "1") return;
+  }, { signal: controller.signal });
+  if (new URLSearchParams(window.location.search).get("terrainEditor") !== "1") return cleanup;
 
   const section = document.querySelector<HTMLElement>("#salvage-terrain-editor");
   const canvas = document.querySelector<HTMLCanvasElement>("#terrain-editor-canvas")!;
   const textarea = document.querySelector<HTMLTextAreaElement>("#terrain-editor-json")!;
   const status = document.querySelector<HTMLElement>("#terrain-editor-status");
-  if (!section || !canvas || !textarea) return;
-  const ctx = canvas.getContext("2d")!; if (!ctx) return;
+  if (!section || !canvas || !textarea) return cleanup;
+  const ctx = canvas.getContext("2d")!; if (!ctx) return cleanup;
+  const wasHidden = section.hidden;
+  const hadEditorClass = document.body.classList.contains("is-terrain-editor");
+  cleanups.push(() => { section.hidden = wasHidden; document.body.classList.toggle("is-terrain-editor", hadEditorClass); });
   section.hidden = false; document.body.classList.add("is-terrain-editor");
 
   let course = loadTerrainCourse(); let tool: Tool = "wall"; let dragging = false; let selectedFeatureId: string | null = null;
@@ -38,8 +44,8 @@ export function initTerrainEditor() {
   const scrollToPreviewDepth = () => {
     if (!overview.checked) scrollArea.scrollTop = (Number(previewDepth.value) || 0) / course.maxDepth * canvas.getBoundingClientRect().height - scrollArea.clientHeight / 2;
   };
-  previewDepth.addEventListener("change", scrollToPreviewDepth);
-  document.querySelector("#terrain-editor-jump")?.addEventListener("click", scrollToPreviewDepth);
+  previewDepth.addEventListener("change", scrollToPreviewDepth, { signal: controller.signal });
+  document.querySelector("#terrain-editor-jump")?.addEventListener("click", scrollToPreviewDepth, { signal: controller.signal });
   overview.addEventListener("change", () => {
     const centerDepth = (scrollArea.scrollTop + scrollArea.clientHeight / 2) / canvas.getBoundingClientRect().height * course.maxDepth;
     canvas.height = overview.checked ? 760 : course.maxDepth;
@@ -47,7 +53,7 @@ export function initTerrainEditor() {
     if (scale) scale.textContent = overview.checked ? "全体図は縦方向を圧縮しています。形状確認はチェックを外してください。" : "ゲームと同じ縦横比。スクロールして深い場所を編集できます。";
     draw();
     scrollArea.scrollTop = centerDepth / course.maxDepth * canvas.getBoundingClientRect().height - scrollArea.clientHeight / 2;
-  });
+  }, { signal: controller.signal });
   const history: TerrainCourse[] = [];
   const clone = (value: TerrainCourse) => structuredClone(value);
   const pushHistory = () => { history.push(clone(course)); if (history.length > 30) history.shift(); };
@@ -91,23 +97,23 @@ export function initTerrainEditor() {
     draw();
   };
 
-  canvas.addEventListener("pointerdown", (event) => { pushHistory(); dragging = true; canvas.setPointerCapture(event.pointerId); const point = pointerPosition(event); editAt(point.x, point.y, true); });
-  canvas.addEventListener("pointermove", (event) => { if (!dragging || tool === "erase") return; const point = pointerPosition(event); editAt(point.x, point.y, false); });
-  canvas.addEventListener("pointerup", () => { dragging = false; selectedFeatureId = null; wallSide = null; });
-  canvas.addEventListener("pointercancel", () => { dragging = false; selectedFeatureId = null; wallSide = null; });
+  canvas.addEventListener("pointerdown", (event) => { pushHistory(); dragging = true; canvas.setPointerCapture(event.pointerId); const point = pointerPosition(event); editAt(point.x, point.y, true); }, { signal: controller.signal });
+  canvas.addEventListener("pointermove", (event) => { if (!dragging || tool === "erase") return; const point = pointerPosition(event); editAt(point.x, point.y, false); }, { signal: controller.signal });
+  canvas.addEventListener("pointerup", () => { dragging = false; selectedFeatureId = null; wallSide = null; }, { signal: controller.signal });
+  canvas.addEventListener("pointercancel", () => { dragging = false; selectedFeatureId = null; wallSide = null; }, { signal: controller.signal });
 
   document.querySelectorAll<HTMLButtonElement>("[data-terrain-tool]").forEach((button) => button.addEventListener("click", () => {
     tool = button.dataset.terrainTool as Tool;
     document.querySelectorAll("[data-terrain-tool]").forEach((candidate) => candidate.classList.toggle("is-active", candidate === button));
     setStatus(`${button.textContent ?? "ツール"}を選択中`);
-  }));
-  document.querySelector("#terrain-editor-undo")?.addEventListener("click", () => { const previous = history.pop(); if (previous) { course = previous; draw(); setStatus("1つ前の状態へ戻しました"); } });
-  document.querySelector("#terrain-editor-reset")?.addEventListener("click", () => { pushHistory(); course = createDefaultTerrain(); draw(); setStatus("初期地形へ戻しました（まだ保存されていません）"); });
-  document.querySelector("#terrain-editor-export")?.addEventListener("click", () => { textarea.value = JSON.stringify(course, null, 2); setStatus("現在のコースJSONを表示しました"); });
+  }, { signal: controller.signal }));
+  document.querySelector("#terrain-editor-undo")?.addEventListener("click", () => { const previous = history.pop(); if (previous) { course = previous; draw(); setStatus("1つ前の状態へ戻しました"); } }, { signal: controller.signal });
+  document.querySelector("#terrain-editor-reset")?.addEventListener("click", () => { pushHistory(); course = createDefaultTerrain(); draw(); setStatus("初期地形へ戻しました（まだ保存されていません）"); }, { signal: controller.signal });
+  document.querySelector("#terrain-editor-export")?.addEventListener("click", () => { textarea.value = JSON.stringify(course, null, 2); setStatus("現在のコースJSONを表示しました"); }, { signal: controller.signal });
   document.querySelector("#terrain-editor-import")?.addEventListener("click", () => {
     try { pushHistory(); course = sanitizeTerrainCourse(JSON.parse(textarea.value)); draw(); setStatus("JSONを読み込みました（まだ保存されていません）"); }
     catch { setStatus("JSONの形式を確認してください"); }
-  });
+  }, { signal: controller.signal });
   const saveAndPreview = (atDepth: boolean) => {
     try {
       saveTerrainCourse(course);
@@ -125,8 +131,8 @@ export function initTerrainEditor() {
       setStatus("保存できませんでした。編集内容はこの画面に残っています。コースJSONを控え、ブラウザの保存設定を確認してください。");
     }
   };
-  document.querySelector("#terrain-editor-play")?.addEventListener("click", () => saveAndPreview(false));
-  document.querySelector("#terrain-editor-preview")?.addEventListener("click", () => saveAndPreview(true));
+  document.querySelector("#terrain-editor-play")?.addEventListener("click", () => saveAndPreview(false), { signal: controller.signal });
+  document.querySelector("#terrain-editor-preview")?.addEventListener("click", () => saveAndPreview(true), { signal: controller.signal });
 
   function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -160,5 +166,9 @@ export function initTerrainEditor() {
     }
   }
 
-  draw(); requestAnimationFrame(scrollToPreviewDepth); setStatus("地形はこのブラウザ・同じURLに保存されます。深度を入力して「この深度へ移動」で編集位置へ移動、「指定深度を確認」でその場所を明るく確認できます。");
+  draw();
+  const previewFrame = requestAnimationFrame(scrollToPreviewDepth);
+  cleanups.push(() => cancelAnimationFrame(previewFrame));
+  setStatus("地形はこのブラウザ・同じURLに保存されます。深度を入力して「この深度へ移動」で編集位置へ移動、「指定深度を確認」でその場所を明るく確認できます。");
+  return cleanup;
 }

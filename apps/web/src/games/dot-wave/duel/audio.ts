@@ -3,6 +3,7 @@ import { BEAT, END_BEAT, MOVES, releaseWindow, type Exchange, type Grade } from 
 import type { MusicStage } from "./musicMood";
 
 export class DuelAudio {
+  private disposed = false;
   private context = new AudioContext({ latencyHint: "interactive" });
   private gain = this.context.createGain();
   private muted = false;
@@ -22,10 +23,12 @@ export class DuelAudio {
   volume(value: number) { this.outputVolume = value * .5; this.gain.gain.value = this.muted ? 0 : this.outputVolume; }
   async start(move: number, beatSeconds = BEAT, delay = .2, elapsed = 0) {
     await this.resume();
+    if (this.disposed) return;
     this.setStart(move, beatSeconds, delay, elapsed);
   }
   async startAt(move: number, beatSeconds: number, startsAt: number, now: () => number) {
     await this.resume();
+    if (this.disposed) return;
     const seconds = (now() - startsAt) / 1000;
     this.setStart(move, beatSeconds, Math.max(0, -seconds), Math.max(0, seconds));
   }
@@ -43,8 +46,9 @@ export class DuelAudio {
     this.move = move;
     this.schedule();
   }
-  async pause() { this.stopDefenseHold(); await this.context.suspend(); }
+  async pause() { if (this.disposed) return; this.stopDefenseHold(); await this.context.suspend(); }
   async resume() {
+    if (this.disposed) return;
     const resumed = this.context.resume();
     // Start a silent source inside the tap gesture as well as resuming the context.
     if (this.context.state !== "running") {
@@ -55,7 +59,7 @@ export class DuelAudio {
     await resumed;
   }
   stop() { this.stopDefenseHold(); for (const voice of this.voices) voice.stop(); this.voices.clear(); }
-  dispose() { this.stop(); void this.context.close(); }
+  dispose() { if (this.disposed) return; this.disposed = true; this.stop(); void this.context.close(); }
   stopDefenseHold() {
     const hold = this.defenseHold;
     if (!hold) return;
@@ -67,6 +71,7 @@ export class DuelAudio {
     this.voices.delete(hold.oscillator);
   }
   syncDefenseHold(exchange: Exchange, seconds: number, enabled = true) {
+    if (this.disposed) return;
     const note = enabled && !exchange.resolved ? exchange.defense.notes.find(note =>
       note.grade === null && note.holdGrade && note.endBeat !== undefined
       && seconds < note.endBeat * exchange.beatSeconds + releaseWindow(exchange.beatSeconds)) : undefined;
@@ -103,6 +108,7 @@ export class DuelAudio {
     oscillator.start(at); oscillator.stop(end + .02);
   }
   private tone(time: number, hz: number, duration: number, volume: number, end = hz, wave: OscillatorType = "square") {
+    if (this.disposed) return;
     const oscillator = this.context.createOscillator(); const gain = this.context.createGain();
     oscillator.type = wave;
     oscillator.frequency.setValueAtTime(hz, time); oscillator.frequency.exponentialRampToValueAtTime(end, time + duration);

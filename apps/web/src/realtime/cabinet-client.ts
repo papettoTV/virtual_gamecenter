@@ -1,6 +1,6 @@
 import type { ClientMessage, ServerMessage } from "../shared/protocol";
 
-interface CabinetClientHandlers {
+export interface CabinetClientHandlers {
   onConnectionChange?: (connected: boolean) => void;
   onMessage?: (message: ServerMessage) => void;
   onError?: (message: string) => void;
@@ -41,17 +41,21 @@ export function createCabinetClient(handlers: CabinetClientHandlers = {}): Cabin
       return;
     }
 
-    socket.addEventListener("open", () => {
+    const connection = socket;
+    connection.addEventListener("open", () => {
+      if (socket !== connection) return;
       handlers.onConnectionChange?.(true);
       if (wantsCabinet && gameId) send({ type: "joinCabinet", gameId, watch });
     });
-    socket.addEventListener("close", () => {
+    connection.addEventListener("close", () => {
+      if (socket !== connection) return;
       socket = null;
       handlers.onConnectionChange?.(false);
       if (wantsCabinet) reconnectTimer = window.setTimeout(connect, 1000);
     });
-    socket.addEventListener("error", () => handlers.onConnectionChange?.(false));
-    socket.addEventListener("message", (event) => {
+    connection.addEventListener("error", () => { if (socket === connection) handlers.onConnectionChange?.(false); });
+    connection.addEventListener("message", (event) => {
+      if (socket !== connection) return;
       try {
         handlers.onMessage?.(JSON.parse(event.data));
       } catch {

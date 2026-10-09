@@ -1,6 +1,6 @@
 import { MAX_EXCHANGES, MOVES, createMatch, type Match } from './core';
 import { freshScore } from './score';
-import type { Engine } from './MochiDuel';
+import type { Engine } from './engine';
 
 export type CpuStage = 1 | 2 | 3;
 export const CPU_STAGES = {

@@ -1,3 +1,5 @@
+import type { GameContext, GameInstance } from "../../game-sdk/contracts";
+
 const fish = [
   ["sun-sardine", "ヒカリイワシ", "イワシ型"], ["glass-bream", "ガラスダイ", "タイ型"],
   ["ribbon-goby", "リボンハゼ", "ハゼ型"], ["blue-puffer", "アオフグ", "フグ型"],
@@ -24,21 +26,45 @@ function cards(items: ReadonlyArray<readonly [string, string, string]>) {
   </article>`).join("");
 }
 
-function showCatalog() {
-  document.body.classList.add("is-game-screen", "is-deep-sea-model-catalog");
-  document.querySelector("#arcade-screen")?.classList.add("is-hidden");
-  document.querySelector("#cabinet-screen")?.classList.add("is-hidden");
-  document.querySelector("#game-screen")?.classList.remove("is-hidden");
-  const frame = document.querySelector(".game-frame");
-  if (!frame || frame.querySelector(".deep-sea-model-catalog")) return;
-  const catalog = document.createElement("section"); catalog.className = "deep-sea-model-catalog";
-  catalog.innerHTML = `<header><div><p>DEEP SEA SALVAGE / ORGANIC REALISM PASS</p><h1>3Dモデル 全体確認</h1><span>同じ照明・正投影で比較。画像を押すと拡大で確認できます。</span></div><a href="?game=deep-sea-salvage&surfacePreview=1">ゲームで確認</a></header>
-    <h2>通常魚 15種</h2><div class="deep-sea-model-grid">${cards(fish)}</div>
-    <h2>レア魚 5種</h2><div class="deep-sea-model-grid">${cards(rare)}</div>
-    <h2>ボス魚</h2><div class="deep-sea-model-grid deep-sea-model-grid-boss">${cards([["leviathan", "リヴァイアサン", "架空の装甲深海怪物"]])}</div>
-    <h2>環境・障害物</h2><div class="deep-sea-model-grid">${cards(environment)}</div>`;
-  frame.appendChild(catalog);
-}
+export function mountGame(context: GameContext): GameInstance {
+  const scope = context.lifetime;
+  const instance: GameInstance = { play: () => !scope.disposed, dispose: () => scope.dispose() };
+  if (scope.disposed) return instance;
+  const screenClasses = new Map<Element, Map<string, boolean>>();
+  function setScreenClass(element: Element | null, className: string, enabled: boolean) {
+    if (!element) return;
+    let previous = screenClasses.get(element);
+    if (!previous) { previous = new Map(); screenClasses.set(element, previous); }
+    if (!previous.has(className)) previous.set(className, element.classList.contains(className));
+    element.classList.toggle(className, enabled);
+  }
+  scope.own(() => {
+    for (const [element, previous] of screenClasses) {
+      for (const [className, enabled] of previous) element.classList.toggle(className, enabled);
+    }
+  });
+  let catalog: HTMLElement | null = null;
+  scope.own(() => catalog?.remove());
 
-showCatalog(); requestAnimationFrame(showCatalog);
-export {};
+  function showCatalog() {
+    if (scope.disposed) return;
+    setScreenClass(document.body, "is-game-screen", true);
+    setScreenClass(document.body, "is-deep-sea-model-catalog", true);
+    setScreenClass(document.querySelector("#arcade-screen"), "is-hidden", true);
+    setScreenClass(document.querySelector("#cabinet-screen"), "is-hidden", true);
+    setScreenClass(document.querySelector("#game-screen"), "is-hidden", false);
+    const frame = document.querySelector(".game-frame");
+    if (!frame || frame.querySelector(".deep-sea-model-catalog")) return;
+    catalog = document.createElement("section"); catalog.className = "deep-sea-model-catalog";
+    catalog.innerHTML = `<header><div><p>DEEP SEA SALVAGE / ORGANIC REALISM PASS</p><h1>3Dモデル 全体確認</h1><span>同じ照明・正投影で比較。画像を押すと拡大で確認できます。</span></div><a href="?game=deep-sea-salvage&surfacePreview=1">ゲームで確認</a></header>
+      <h2>通常魚 15種</h2><div class="deep-sea-model-grid">${cards(fish)}</div>
+      <h2>レア魚 5種</h2><div class="deep-sea-model-grid">${cards(rare)}</div>
+      <h2>ボス魚</h2><div class="deep-sea-model-grid deep-sea-model-grid-boss">${cards([["leviathan", "リヴァイアサン", "架空の装甲深海怪物"]])}</div>
+      <h2>環境・障害物</h2><div class="deep-sea-model-grid">${cards(environment)}</div>`;
+    frame.appendChild(catalog);
+  }
+
+  showCatalog();
+  scope.frame(showCatalog);
+  return instance;
+}

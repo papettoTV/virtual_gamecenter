@@ -1,5 +1,5 @@
 import type { CabinetRole } from "../../../domain/cabinet";
-import type { Engine } from "./MochiDuel";
+import type { Engine } from "./engine";
 import type { Side, Match } from "./core";
 
 export const INPUT_GRACE = .3;
