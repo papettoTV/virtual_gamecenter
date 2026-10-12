@@ -16,7 +16,7 @@ export function checkReleaseConfig(config, environment) {
   const selected = config.env?.[environment];
   if (!selected) return [`${environment} の設定がありません。`];
   const errors = [];
-  if (environment === "production" && (selected.workers_dev !== false || !selected.routes?.some((route) => route.pattern === "pulbase.com" && route.custom_domain === true))) errors.push("本番はpulbase.comのCustom Domainを使用し、workers.devを無効にしてください。");
+  if (selected.workers_dev !== false || selected.routes?.length) errors.push("公開URLはPagesで管理します。バックエンドWorkerのworkers.devと公開routesを無効にしてください。");
   if (selected.vars?.APP_ENV !== environment) errors.push("APP_ENVが選択した環境と一致しません。");
   if (selected.vars?.DEVELOPER_AUTH_ENABLED !== "false") errors.push("公開先の開発者ログインはfalseが必要です。");
   if (selected.vars?.CREDIT_PURCHASES_ENABLED !== "false") errors.push("無料ベータでは購入停止が必要です。");

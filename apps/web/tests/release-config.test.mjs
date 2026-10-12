@@ -24,11 +24,14 @@ test("環境未指定・未知環境では公開/移行できない", () => {
   }
 });
 
-test("本番ドメイン設定の欠落を拒否する", () => {
-  for (const field of ["routes", "workers_dev"]) {
-    const config = ready();
-    delete config.env.production[field];
-    assert.ok(checkReleaseConfig(config, "production").some((error) => error.includes("pulbase.com")));
+test("Pagesの公開ドメインをWorkerで奪う設定を拒否する", () => {
+  for (const environment of ["staging", "production"]) {
+    for (const field of ["routes", "workers_dev"]) {
+      const config = ready();
+      if (field === "routes") config.env[environment].routes = [{ pattern: "pulbase.com", custom_domain: true }];
+      else delete config.env[environment].workers_dev;
+      assert.ok(checkReleaseConfig(config, environment).some((error) => error.includes("Pages")));
+    }
   }
 });
 

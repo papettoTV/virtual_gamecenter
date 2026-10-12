@@ -1,0 +1,15 @@
+{
+  "project": "virtual-gamecenter",
+  "rootDirectory": "apps/web",
+  "production": {
+    "branch": "main",
+    "url": "https://virtual-gamecenter.pages.dev",
+    "customDomains": ["https://pulbase.com"],
+    "backendWorker": "pulbase-production"
+  },
+  "staging": {
+    "branch": "develop",
+    "url": "https://develop.virtual-gamecenter.pages.dev",
+    "backendWorker": "pulbase-staging"
+  }
+}

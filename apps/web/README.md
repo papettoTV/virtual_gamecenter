@@ -73,6 +73,8 @@ StripeのWebhook送信先には `https://<公開ドメイン>/api/platform/strip
 
 `production`を指定すると本番が対象です。環境を省略したdeploy/リモート移行は拒否します。詳しい作成・認証・移行・限定公開の順序は [`../../docs/production-environments.md`](../../docs/production-environments.md) を参照してください。デプロイは明示的な指示があるときだけ実施します。
 
+公開入口はCloudflare Pagesです。mainが`virtual-gamecenter.pages.dev`と`pulbase.com`、developが検証用`develop.virtual-gamecenter.pages.dev`に対応します。`npm run pages:target:check -- staging|production`でリポジトリ内の対応表を検査できます。`npm run deploy`は環境別バックエンドWorkerの操作であり、Pagesのデプロイ・カスタムドメイン設定・Service Binding接続も完了するコマンドではありません。
+
 ## 構成
 
 - `src/app`: Reactの画面構成と起動

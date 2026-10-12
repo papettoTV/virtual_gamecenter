@@ -11,6 +11,8 @@ concurrency:
   cancel-in-progress: true
 jobs:
   verify:
+    env:
+      PULBASE_TARGET_ENVIRONMENT: ${{ (github.base_ref == 'main' || github.ref_name == 'main') && 'production' || 'staging' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -24,8 +26,11 @@ jobs:
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
       - run: npm ci
+      - name: Check Pages branch and environment mapping
+        run: npm run pages:target:check -- "$PULBASE_TARGET_ENVIRONMENT"
       - name: Configure disposable local test credentials
         run: |
           printf '%s\n' 'GOOGLE_CLIENT_ID=ci-example.apps.googleusercontent.com' 'GOOGLE_CLIENT_SECRET=ci-example' 'STRIPE_SECRET_KEY=sk_test_ci_example' 'STRIPE_WEBHOOK_SECRET=whsec_ci_example' > .dev.vars
       - run: npm test
-      - run: npm run build
+      - name: Build for the target environment without deploying
+        run: CLOUDFLARE_ENV="$PULBASE_TARGET_ENVIRONMENT" npm run build
