@@ -104,7 +104,7 @@ Cloudflare・Google・Stripeの管理画面上の本番設定は、この資料�
 
 | ID | 作業 | 完了条件 | 状態 | 担当 | 証跡・メモ |
 | --- | --- | --- | --- | --- | --- |
-| EN-01 | 本番と検証環境を分離する | DB、Stripeキー・Webhook、Google OAuth、環境変数を分離。テストデータが本番に混ざらない | 対応中 | — | staging/productionのWorker・D1・R2・DO設定と共用/仮ID拒否チェックを追加。実リソース・OAuth・Secretは未設定。既存環境の扱いとドメインを確認中。[環境・リリース手順](production-environments.md) |
+| EN-01 | 本番と検証環境を分離する | DB、Stripeキー・Webhook、Google OAuth、環境変数を分離。テストデータが本番に混ざらない | 対応中 | — | 本番pulbase.com/mainを新設、既存virtual-gamecenter.pages.dev/developを検証として維持と確定。Worker・D1・R2・DOの共用/仮ID拒否チェックを追加。実リソース・OAuth・SecretとPages→検証Worker接続は未設定。[環境・リリース手順](production-environments.md) |
 | EN-02 | 本番ドメイン・一般公開・ログインを設定する | HTTPS、Basic認証の公開切替、Google本番設定・戻り先を確認。開発者ログインを本番で無効化 | 未着手 | — | 現在は秘密情報を削除するだけでは一般公開できない構成 |
 | EN-03 | セキュリティレビューを実施する | プレイヤー・筐体の権限、残高・料金操作、CSRF・Origin、秘密情報・ログの扱いを確認し、重大問題を解消 | 未着手 | — | HTTP APIとWebSocketの両方を対象 |
 | EN-04 | 乱用・負荷・費用対策を用意する | API連打、無料特典乱用、大量筐体作成・観戦接続への制限と、費用通知を確認 | 未着手 | — | 無料公開でも必要 |

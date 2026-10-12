@@ -13,6 +13,8 @@
 
 基本方針は、ローカルで開発・確認し、まとまったタイミングでCloudflareへデプロイします。
 
+通常の開発・push先は `develop`（検証：`virtual-gamecenter.pages.dev`）。`main` は本番 `pulbase.com` 用です。mainへのマージ・pushはリリース指示があるときだけ行います。Pagesから現行Workerへの接続は準備中です。
+
 ```bash
 cd apps/web
 npm install
@@ -42,7 +44,7 @@ npm run deploy -- staging
 ## Deployment
 
 - 現行構成は静的画面・API・観戦通信を1つのCloudflare Workerへ統合しています。
-- 本番URLは未確定。過去のPages/API URLを現在の公開先として案内しないでください。
+- 本番URL：`https://pulbase.com/`（main、新設準備中）。検証URL：`https://virtual-gamecenter.pages.dev/`（develop、既存を維持しWorker接続を準備）。GitのpushだけでAPI/観戦の動作まで確認済みとは扱いません。
 - 環境未指定のデプロイ・リモート移行は拒否します。準備中の仮D1 IDも公開用に使用できません。
 
 ## License

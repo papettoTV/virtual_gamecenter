@@ -2,7 +2,7 @@ import { readFile, rm } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve, sep } from "node:path";
-import { checkBuildConfig, checkReleaseConfig } from "./release-config.mjs";
+import { checkBuildConfig, checkReleaseBranch, checkReleaseConfig } from "./release-config.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const [command, environment, ...extra] = process.argv.slice(2);
@@ -14,6 +14,12 @@ function run(executable, args, env = process.env) {
 
 try {
   if (!["check", "build", "deploy", "migrate"].includes(command) || extra.length) throw new Error("使用方法: release.mjs check|build|deploy|migrate staging|production");
+  if (command === "deploy" || command === "migrate") {
+    const current = spawnSync("git", ["branch", "--show-current"], { cwd: root, encoding: "utf8" });
+    if (current.error || current.status !== 0) throw new Error("公開元ブランチを確認できません。");
+    const branchErrors = checkReleaseBranch(environment, current.stdout.trim());
+    if (branchErrors.length) throw new Error(branchErrors.join("\n"));
+  }
   const { experimental_readRawConfig } = await import("wrangler");
   const { rawConfig: config } = experimental_readRawConfig({ config: resolve(root, "wrangler.jsonc") });
   const errors = checkReleaseConfig(config, environment);

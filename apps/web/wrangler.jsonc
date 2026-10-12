@@ -61,6 +61,8 @@
     },
     "production": {
       "name": "pulbase-production",
+      "workers_dev": false,
+      "routes": [{ "pattern": "pulbase.com", "custom_domain": true }],
       "vars": {
         "APP_ENV": "production",
         "DEVELOPER_AUTH_ENABLED": "false",

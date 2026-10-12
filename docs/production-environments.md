@@ -2,7 +2,24 @@
 
 更新日：2026-10-13。今回の作業はリポジトリ内の準備のみ。Cloudflare上の作成・移行・Secret登録・デプロイ・一般公開は未実施。
 
-## 棚卸しの結果
+## 確定した公開先とブランチ
+
+- 本番：`https://pulbase.com/`、`main`。既存環境とは別に本番を新設する。
+- 検証：既存の `https://virtual-gamecenter.pages.dev/`、`develop`。通常の開発・pushはdevelopで行い、本番へのmainマージ/pushは明示的なリリース指示がある場合だけ行う。
+- GitHubにdevelopがなかったため、ローカルの未pushの10コミットを維持してmainからdevelopを作成した。origin/mainへは反映しない。
+- Workerの公開・リモート移行もブランチを確認する。本番はmain、検証はdevelop以外から拒否。ビルド・設定確認はレビュー用に両環境を実行できる。
+
+### PagesのURLを維持するための接続（未実装・未設定）
+
+現行アプリはWorkers Static Assets/API/Durable Objects/Cronを統合したWorker構成であり、静的ファイルをPagesへ置くだけではAPI・観戦・定期削除まで動かない。検証Workerをそのままpages.devへ割り当てる設定も今回追加していない。
+
+検証では、既存Pagesを入口に残し、Pages FunctionsのゲートウェイからService Bindingで検証Workerへリクエストを転送する構成を準備する。ゲーム画面・API・観戦通信を同じ検証URLから使い、筐体DOと削除CronはWorker側に残す。ゲートウェイ、WebSocket/Origin/Google戻り先の検証、Pages側binding/ビルド設定は次の作業。
+
+Pagesプロジェクトでは、固定の `virtual-gamecenter.pages.dev` にdevelopの内容を出すため、管理画面の **Production branchをdevelop** にする必要がある。「Production」はPages内での固定URLのブランチという意味で、このサービスの本番mainとは別。変更は未実施。Git連携の自動ビルド/公開が現在有効かも未確認。
+
+参考：[Pages Service Bindings / Durable Objects](https://developers.cloudflare.com/pages/functions/bindings/)。Pages内では筐体DOを作成/デプロイせずWorker側へ分離する。
+
+## 前回の棚卸し（公開先決定前）
 
 従来はローカル/公開に同じ `wrangler.jsonc` のルート設定を使用していた。ルートには既存D1のID、開発者ログイン有効、購入停止、削除証跡R2、毎時Cronがある。既存クラウドの実状態・ドメイン・移行適用状況・Secretの設定値は確認していない。READMEに残っていた旧Pages/API URLを現在の公開先とみなさない。
 
@@ -33,8 +50,8 @@ D1の環境別IDは意図的な仮値。リソースの存在を意味せず、�
 
 ## 次の作業：判断・リソース作成（未実施）
 
-1. 本番URL：独自ドメインを使うか、当初はworkers.devにするか決定する。
-2. 既存公開環境を検証用に残すか、本番へ引き継ぐか決定する。現在の設定案は新しい検証/本番リソースを別々に作る方針。既存を流用する場合は構成と共用チェックを改めて見直す。
+1. 本番URLはpulbase.com、既存のPages検証URLは維持と確定。本番WorkerにCustom Domain設定を準備し、workers.devは無効化する。本番DNS/ドメインの管理権限・設定は未確認。
+2. 既存Pagesを検証用に残す。Pagesから検証Workerへの接続を準備する。既存DB/R2/認証/台帳を引き継ぐかは実際のbindingを棚卸しして決め、未確認のIDやテストデータを本番へコピーしない。
 3. 対象Cloudflareアカウントと権限を確認する。既存環境のデータ・バックアップ・適用済み移行を確認し、必要なら保存/移行を別計画にする。
 4. 検証用D1と非公開R2を作成し、実際のD1 IDを `env.staging` へ設定。公開バケット機能や公開アクセスは有効にしない。Basic認証と検証Google OAuthのSecretを登録する。
 5. `release:check -- staging` が成功したら、対象DB名を確認して全マイグレーションを適用。検証環境へ限定公開し、特典・ログイン・観戦・退会・Cron・復元を検証する。
@@ -60,6 +77,8 @@ npm run deploy -- staging
 限定公開の確認後に、Basic認証の一般公開切替を別変更としてレビューする。現在の認証コードはSecret未設定で503を返すため、Secretを消すだけでは一般公開にならない。また、一部の共有画像/結果や計測入口は既存設計でBasic認証より先に処理されるため、Basic認証を全コンテンツの完全な非公開保証とは扱わず、EN-03で公開範囲を確認する。
 
 ## ローカル検証の証跡（2026-10-13）
+
+公開先決定後：developへの切替、ドメイン・CI対象ブランチ・公開元ブランチチェックを追加。全435テスト（Vitest414、解析10、公開設定11）とローカルビルド成功。Pagesゲートウェイは未実装であり、今回のpushはGitブランチの整備であって、検証サイトの最新アプリ稼働確認ではない。
 
 - 全テスト433件成功：Vitest 53ファイル・414件、解析ランタイム10件、公開設定チェック9件。
 - ローカル、staging、productionの3設定で型検査・ビルド成功。未作成の仮リソースのまま環境別コンパイルを確認しただけで、デプロイはしていない。最後にローカル用ビルドへ戻した。

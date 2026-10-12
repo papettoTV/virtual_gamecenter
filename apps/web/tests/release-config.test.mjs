@@ -1,9 +1,16 @@
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { checkBuildConfig, checkReleaseConfig } from "../scripts/release-config.mjs";
+import { checkBuildConfig, checkReleaseBranch, checkReleaseConfig } from "../scripts/release-config.mjs";
 
 const configured = JSON.parse(readFileSync(new URL("../wrangler.jsonc", import.meta.url), "utf8"));
+test("検証はdevelop、本番はmain以外の公開操作を拒否する", () => {
+  assert.deepEqual(checkReleaseBranch("staging", "develop"), []);
+  assert.deepEqual(checkReleaseBranch("production", "main"), []);
+  for (const [environment, branch] of [["production", "develop"], ["staging", "main"], ["production", ""], [undefined, "develop"]]) {
+    assert.ok(checkReleaseBranch(environment, branch).length);
+  }
+});
 function ready() {
   const config = structuredClone(configured);
   config.env.staging.d1_databases[0].database_id = "11111111-1111-4111-8111-111111111111";
@@ -14,6 +21,14 @@ function ready() {
 test("環境未指定・未知環境では公開/移行できない", () => {
   for (const environment of [undefined, "", "local", "prod"]) {
     assert.ok(checkReleaseConfig(ready(), environment).length > 0);
+  }
+});
+
+test("本番ドメイン設定の欠落を拒否する", () => {
+  for (const field of ["routes", "workers_dev"]) {
+    const config = ready();
+    delete config.env.production[field];
+    assert.ok(checkReleaseConfig(config, "production").some((error) => error.includes("pulbase.com")));
   }
 });
 

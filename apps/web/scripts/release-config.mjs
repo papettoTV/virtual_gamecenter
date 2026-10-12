@@ -1,5 +1,10 @@
 export const releaseEnvironments = ["staging", "production"];
 
+export function checkReleaseBranch(environment, branch) {
+  const expected = { staging: "develop", production: "main" }[environment];
+  return expected && branch === expected ? [] : [`${environment}の公開/リモート移行は${expected ?? "指定環境の"}ブランチから実施してください。`];
+}
+
 function binding(config, name, type) {
   return config?.[type]?.find((item) => item.binding === name);
 }
@@ -11,6 +16,7 @@ export function checkReleaseConfig(config, environment) {
   const selected = config.env?.[environment];
   if (!selected) return [`${environment} の設定がありません。`];
   const errors = [];
+  if (environment === "production" && (selected.workers_dev !== false || !selected.routes?.some((route) => route.pattern === "pulbase.com" && route.custom_domain === true))) errors.push("本番はpulbase.comのCustom Domainを使用し、workers.devを無効にしてください。");
   if (selected.vars?.APP_ENV !== environment) errors.push("APP_ENVが選択した環境と一致しません。");
   if (selected.vars?.DEVELOPER_AUTH_ENABLED !== "false") errors.push("公開先の開発者ログインはfalseが必要です。");
   if (selected.vars?.CREDIT_PURCHASES_ENABLED !== "false") errors.push("無料ベータでは購入停止が必要です。");
