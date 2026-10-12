@@ -6,6 +6,7 @@ import { cleanPurchaseParams, getPurchaseCurrency, restoreStoredPlayAction, stor
 import { notifications } from "../notifications/notifications";
 
 interface CreditPurchaseOptions {
+  purchasesEnabled?: boolean;
   pendingAction: PendingPlayAction | null;
   setPendingAction: Dispatch<SetStateAction<PendingPlayAction | null>>;
   setPlayDialog: Dispatch<SetStateAction<"confirm" | "insufficient" | null>>;
@@ -13,7 +14,7 @@ interface CreditPurchaseOptions {
   updateWallet: (wallet: WalletSummary) => void;
 }
 
-export function useCreditPurchase({ pendingAction, setPendingAction, setPlayDialog, setBusy, updateWallet }: CreditPurchaseOptions) {
+export function useCreditPurchase({ pendingAction, setPendingAction, setPlayDialog, setBusy, updateWallet, purchasesEnabled = false }: CreditPurchaseOptions) {
   const [purchaseDialog, setPurchaseDialog] = useState<PurchaseDialog>(null);
   const [purchaseUnit, setPurchaseUnit] = useState<PurchaseUnit>(1);
   const [purchasedCredits, setPurchasedCredits] = useState(0);
@@ -65,6 +66,11 @@ export function useCreditPurchase({ pendingAction, setPendingAction, setPlayDial
   }, [purchaseCheck]);
 
   const handlePurchase = async () => {
+    if (!purchasesEnabled) {
+      setPurchaseDialog(null);
+      notifications.show({ id: "purchase-checkout", type: "info", message: "無料ベータ期間中はクレジットを購入できません。" });
+      return;
+    }
     setBusy(true);
     notifications.dismiss("purchase-checkout");
     try {

@@ -183,7 +183,7 @@ export function createDotWaveCabinetController(
       notifications.dismiss("dot-wave");
       window.dispatchEvent(new CustomEvent("request-credit-topup", { detail: {
         onDecline: () => { if (!disposed) notifications.show({ id: "dot-wave", scope: "dot-wave", type: "error",
-          message: "クレジットが足りません。プロフィールの残高から補充してください。" }); },
+          message: "クレジットが不足しています。補充状況はプロフィールで確認できます。" }); },
       } }));
     } else notifications.show({ id: "dot-wave", scope: "dot-wave", type: "error",
       message: "接続またはクレジットの確認に失敗しました。もう一度お試しください。" });

@@ -1,6 +1,7 @@
 import { env, exports } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerGoogleAccount } from "../../src/worker/google-auth";
+import betaMigration from "../../migrations/0018_beta_daily_refills.sql?raw";
 
 beforeAll(async () => {
   await env.DB.batch([
@@ -19,6 +20,7 @@ beforeAll(async () => {
     env.DB.prepare("CREATE TABLE game_results (id TEXT PRIMARY KEY, game_id TEXT NOT NULL, game_version TEXT NOT NULL, mode TEXT NOT NULL, player_id TEXT, player_name TEXT NOT NULL, cleared INTEGER NOT NULL, clear_time_ms INTEGER, score INTEGER NOT NULL, max_level INTEGER NOT NULL, defeated_boss_count INTEGER NOT NULL)"),
     env.DB.prepare("CREATE TABLE live_engagement_events (id TEXT PRIMARY KEY, event_type TEXT NOT NULL, game_id TEXT NOT NULL, cabinet_id TEXT NOT NULL, source_cabinet_id TEXT, player_id TEXT, share_id TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)"),
   ]);
+  await env.DB.batch(betaMigration.split(/;\s*(?=CREATE)/).map((sql) => env.DB.prepare(sql)));
 });
 
 describe("Cloudflare Worker", () => {

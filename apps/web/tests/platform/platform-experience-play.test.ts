@@ -255,12 +255,26 @@ describe("typed platform play integration", () => {
     expect(notifications.show).toHaveBeenCalledWith(expect.objectContaining({ type: "info" }));
   });
 
-  it("opens the insufficient dialog without executing play", () => {
+  it("opens the insufficient dialog after checking today's refill without executing play", async () => {
     runtime.states[0] = { ...platform, wallet: { ...platform.wallet, availableTotal: 0 } };
+    bootstrapPlatform = runtime.states[0] as PlatformBootstrap;
+    vi.mocked(fetchPlatformBootstrap).mockResolvedValue(bootstrapPlatform);
     mount();
     gameHost.requestPlay("start");
+    await flush();
     expect(runtime.states[3]).toBe("insufficient");
     expect(executePlay).not.toHaveBeenCalled();
+  });
+
+  it("rechecks an exhausted long-open tab and resumes confirmation after daily refill", async () => {
+    runtime.states[0] = { ...platform, wallet: { ...platform.wallet, availableTotal: 0 } };
+    vi.mocked(fetchPlatformBootstrap).mockResolvedValue({ ...platform, wallet: { ...platform.wallet, freeBalance: 3, availableFree: 3, availableTotal: 3 } });
+    mount();
+    gameHost.requestPlay("start");
+    await flush();
+    expect(runtime.states[3]).toBe("confirm");
+    expect((runtime.states[0] as PlatformBootstrap).wallet.availableTotal).toBe(3);
+    expect(play).not.toHaveBeenCalled();
   });
 
   it("preserves insufficient-credit errors and the supplied wallet", async () => {

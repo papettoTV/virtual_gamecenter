@@ -24,6 +24,16 @@ export interface PlatformBootstrap {
   welcomeCreditGranted: boolean;
   wallet: WalletSummary;
   creditCost: number;
+  creditPolicy?: CreditPolicy;
+}
+
+export interface CreditPolicy {
+  purchasesEnabled: boolean;
+  dailyRefillTarget: number;
+  timeZone: "Asia/Tokyo";
+  nextRefillAt: string;
+  refilledToday: boolean;
+  refilledAmount: number;
 }
 
 export function createGoogleRegistrationUrl(returnTo: string): string {

@@ -4,6 +4,8 @@ import {
   type GoogleAuthEnv,
 } from "./google-auth";
 import { DEFAULT_GAME_ID, getGameDefinition } from "../domain/game";
+import { reconcileBetaCredits } from "./beta-credits";
+export type { CreditPolicy } from "./beta-credits";
 
 const SESSION_COOKIE = "vgc_session";
 const DEVICE_COOKIE = "vgc_device";
@@ -17,6 +19,7 @@ const CREDIT_UNITS = new Set([1, 3, 5, 10]);
 const STRIPE_SIGNATURE_TOLERANCE_SECONDS = 300;
 
 export interface StripePaymentEnv {
+  CREDIT_PURCHASES_ENABLED?: string;
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
 }
@@ -91,6 +94,11 @@ export async function handlePlatformRequest(
   const url = new URL(request.url);
   if (!url.pathname.startsWith("/api/platform/")) return null;
 
+  if (url.pathname === "/api/platform/credit-purchases/checkout"
+    && request.method === "POST" && paymentEnv.CREDIT_PURCHASES_ENABLED !== "true") {
+    return Response.json({ error: "purchases_disabled" }, { status: 403 });
+  }
+
   if (url.pathname === "/api/platform/stripe/webhook" && request.method === "POST") {
     return handleStripeWebhook(request, database, paymentEnv);
   }
@@ -111,6 +119,9 @@ export async function handlePlatformRequest(
     const device = getOrCreateDeviceIdentity(request, session.token);
     const consent = await getConsentState(database, session.playerId);
     const welcomeCreditGranted = await ensureDeviceWelcomeCreditState(database, device.token, session.playerId);
+    const creditPolicy = await reconcileBetaCredits(
+      database, session.playerId, await hashToken(device.token), paymentEnv.CREDIT_PURCHASES_ENABLED === "true",
+    );
     const wallet = await getWalletSummary(database, session.playerId);
     const identity = await getPlayerIdentityById(database, session.playerId);
     return platformJson(
@@ -122,6 +133,7 @@ export async function handlePlatformRequest(
         developerLoginAvailable: isDeveloperAuthAvailable(url, paymentEnv),
         consent,
         welcomeCreditGranted,
+        creditPolicy,
         wallet,
         creditCost: PLAY_CREDIT_COST,
       },
@@ -166,6 +178,13 @@ export async function handlePlatformRequest(
 
   const session = await getExistingPlayerSession(request, database);
   if (!session) return Response.json({ error: "player_session_required" }, { status: 401 });
+
+  const creditDevice = getOrCreateDeviceIdentity(request, session.token);
+  const creditJson = (body: unknown, init?: ResponseInit): Response => {
+    const response = Response.json(body, init);
+    if (creditDevice.setCookie) response.headers.append("Set-Cookie", createDeviceCookie(creditDevice));
+    return response;
+  };
 
   if (url.pathname === "/api/platform/auth/logout" && request.method === "POST") {
     const device = getOrCreateDeviceIdentity(request, session.token);
@@ -256,7 +275,11 @@ export async function handlePlatformRequest(
   }
 
   if (url.pathname === "/api/platform/credits" && request.method === "GET") {
-    return Response.json({ wallet: await getWalletSummary(database, session.playerId) });
+    await ensureDeviceWelcomeCreditState(database, creditDevice.token, session.playerId);
+    const creditPolicy = await reconcileBetaCredits(
+      database, session.playerId, await hashToken(creditDevice.token), paymentEnv.CREDIT_PURCHASES_ENABLED === "true",
+    );
+    return creditJson({ wallet: await getWalletSummary(database, session.playerId), creditPolicy });
   }
 
   if (url.pathname === "/api/platform/profile" && request.method === "PATCH") {
@@ -398,13 +421,17 @@ export async function handlePlatformRequest(
     const cabinetId = sanitizeId(body?.cabinetId, "cabinet");
     const game = getGameDefinition(String(body?.gameId || DEFAULT_GAME_ID));
     if (!game || game.status !== "active") {
-      return Response.json({ error: "unknown_game" }, { status: 404 });
+      return creditJson({ error: "unknown_game" }, { status: 404 });
     }
     const purpose = body?.purpose === "challenge" || body?.purpose === "rematch"
       ? body.purpose
       : "solo";
     const reservationId = crypto.randomUUID();
     const playSessionId = crypto.randomUUID();
+    await ensureDeviceWelcomeCreditState(database, creditDevice.token, session.playerId);
+    await reconcileBetaCredits(
+      database, session.playerId, await hashToken(creditDevice.token), paymentEnv.CREDIT_PURCHASES_ENABLED === "true",
+    );
     const wallet = await getWalletSummary(database, session.playerId);
     const balanceType = wallet.availableFree >= game.creditCost ? "free" : "purchased";
     const expiresAt = new Date(
@@ -439,7 +466,7 @@ export async function handlePlatformRequest(
       ]);
     } catch (error) {
       if (String(error).includes("insufficient_credit")) {
-        return Response.json(
+        return creditJson(
           {
             error: "insufficient_credit",
             wallet: await getWalletSummary(database, session.playerId),
@@ -450,7 +477,7 @@ export async function handlePlatformRequest(
       throw error;
     }
 
-    return Response.json({
+    return creditJson({
       reservationId,
       playSessionId,
       wallet: await getWalletSummary(database, session.playerId),
@@ -476,10 +503,10 @@ export async function handlePlatformRequest(
     }>();
 
     if (!reservation) {
-      return Response.json({ error: "reservation_not_found" }, { status: 404 });
+      return creditJson({ error: "reservation_not_found" }, { status: 404 });
     }
     if (reservation.status !== "active") {
-      return Response.json({
+      return creditJson({
         reservationId,
         status: reservation.status,
         wallet: await getWalletSummary(database, session.playerId),
@@ -526,7 +553,7 @@ export async function handlePlatformRequest(
       ]);
     }
 
-    return Response.json({
+    return creditJson({
       reservationId,
       status: action === "capture" ? "captured" : "released",
       wallet: await getWalletSummary(database, session.playerId),

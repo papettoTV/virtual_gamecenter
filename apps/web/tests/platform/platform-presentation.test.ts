@@ -36,6 +36,7 @@ function profileProps(overrides: Partial<PlatformProfileProps> = {}): PlatformPr
 
 function purchaseProps(overrides: Partial<CreditPurchaseDialogsProps> = {}): CreditPurchaseDialogsProps {
   return {
+    purchasesEnabled: true,
     purchaseDialog: "select", setPurchaseDialog: vi.fn(), purchaseUnit: 1,
     setPurchaseUnit: vi.fn(), purchasedCredits: 0, purchaseError: "",
     setPurchaseError: vi.fn(), setPurchaseCheck: vi.fn(), busy: false,
@@ -83,8 +84,16 @@ describe("platform presentation", () => {
   });
 
   it("keeps one standalone credit top-up button", () => {
-    const markup = renderToStaticMarkup(createElement(PlatformProfile, profileProps({ standaloneCredits: true })));
+    const markup = renderToStaticMarkup(createElement(PlatformProfile, profileProps({ standaloneCredits: true, platform: { ...platform, creditPolicy: { purchasesEnabled: true, dailyRefillTarget: 3, timeZone: "Asia/Tokyo", nextRefillAt: "2026-10-12T15:00:00Z", refilledToday: false, refilledAmount: 0 } } })));
     expect(markup.match(/クレジットを追加/g)).toHaveLength(1);
+  });
+
+  it("hides purchasing during free beta while explaining the daily refill", () => {
+    const markup = renderToStaticMarkup(createElement(PlatformProfile, profileProps({ standaloneCredits: true, platform: { ...platform, creditPolicy: { purchasesEnabled: false, dailyRefillTarget: 3, timeZone: "Asia/Tokyo", nextRefillAt: "2026-10-12T15:00:00Z", refilledToday: true, refilledAmount: 0 } } })));
+    expect(markup).not.toContain("クレジットを追加");
+    expect(markup).toContain("日本時間・1日1回");
+    expect(markup).toContain("本日の補充は利用済み");
+    expect(renderToStaticMarkup(createElement(CreditPurchaseDialogs, purchaseProps({ purchasesEnabled: false })))).toBe("");
   });
 
   it("preserves name editing callbacks", () => {

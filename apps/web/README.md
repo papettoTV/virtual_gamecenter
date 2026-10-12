@@ -2,6 +2,17 @@
 
 オンライン上にゲームセンター体験を再現するためのプラットフォーム試作です。最初のゲームとして、弾幕かすり・無敵体当たり・ボス撃破型シューティング「BUZZ BARRIER（バズバリア）」を収録しています。
 
+## 無料ベータのクレジット
+
+- 購入は停止しています（`CREDIT_PURCHASES_ENABLED=false`）。購入ボタンは表示せず、Checkout APIも拒否します。
+- 初回特典5枚（端末ごとに一度）とユーザー登録特典5枚は維持します。
+- 初回特典の受取済み端末または無料付与履歴のあるプレイヤーは、日本時間で1日1回、残高が3枚未満なら3枚まで補充します。3枚以上なら追加しません。
+- 残高は無料分と既存購入分の合計で判定し、仮確保分も未消費として含めます。初回の5枚を使った当日も、条件を満たせば補充できます。
+- 補充は訪問・残高確認・プレイ前にサーバーで処理します。日付変更時の定期ジョブは不要です。
+- 既存残高と決済済み取引の照合・Webhookは保持します。本番反映前にマイグレーション`0018`を適用してください。
+
+公開準備の優先順位は、リポジトリの`docs/production-launch-checklist.md`を参照してください。
+
 ## ローカル開発
 
 初回のみ依存パッケージとローカルD1を準備します。
@@ -12,7 +23,7 @@ npm run db:migrate:local
 npm run dev
 ```
 
-Stripe決済をローカルで確認する場合は、`.dev.vars.example`を`.dev.vars`へコピーし、Stripeのテスト用Secret Key（`sk_test_...`）を設定します。ローカル環境では誤課金防止のため本番用Secret Keyを拒否します。
+Stripe決済の開発を再開してローカルで確認する場合だけ、`.dev.vars.example`を`.dev.vars`へコピーし、`CREDIT_PURCHASES_ENABLED=true`とStripeのテスト用Secret Key（`sk_test_...`）を設定します。無料ベータ公開環境では有効化しないでください。ローカル環境では誤課金防止のため本番用Secret Keyを拒否します。
 
 ```bash
 stripe login
@@ -49,8 +60,6 @@ npm run preview
 npm run db:migrate:remote
 npx wrangler secret put BASIC_AUTH_USERNAME
 npx wrangler secret put BASIC_AUTH_PASSWORD
-npx wrangler secret put STRIPE_SECRET_KEY
-npx wrangler secret put STRIPE_WEBHOOK_SECRET
 npm run deploy
 ```
 

@@ -52,6 +52,7 @@ function renderPurchase(options = purchaseOptions()) {
 
 function purchaseOptions() {
   return {
+    purchasesEnabled: true,
     pendingAction: "retry" as const, setPendingAction: vi.fn(),
     setPlayDialog: vi.fn(), setBusy: vi.fn(), updateWallet: vi.fn(),
   };
@@ -90,6 +91,14 @@ describe("platform account and purchase logic", () => {
     vi.unstubAllGlobals();
     vi.resetAllMocks();
     vi.useRealTimers();
+  });
+
+  it("blocks checkout during the free beta without persisting a pending purchase", async () => {
+    await renderPurchase({ ...purchaseOptions(), purchasesEnabled: false }).handlePurchase();
+    expect(createCreditCheckout).not.toHaveBeenCalled();
+    expect(assign).not.toHaveBeenCalled();
+    expect(storage.size).toBe(0);
+    expect(notifications.show).toHaveBeenCalledWith(expect.objectContaining({ type: "info" }));
   });
 
   it("persists the pending action before redirecting to checkout", async () => {

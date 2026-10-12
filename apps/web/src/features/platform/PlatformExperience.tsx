@@ -30,6 +30,7 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
   const promoCaptureMode = import.meta.env.DEV
     && new URLSearchParams(window.location.search).get("promoCapture") === "1";
   const [platform, setPlatform] = useState<PlatformBootstrap | null>(null);
+  const purchasesEnabled = platform?.creditPolicy?.purchasesEnabled === true;
 
   const [policy, setPolicy] = useState<PolicyKind | null>(null);
   const [pendingAction, setPendingAction] = useState<PlayAction | null>(null);
@@ -45,7 +46,9 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
   const loadPlatform = useCallback(async () => {
     notifications.dismiss("platform-load");
     try {
-      setPlatform(await fetchPlatformBootstrap());
+      const updated = await fetchPlatformBootstrap();
+      setPlatform(updated);
+      if (updated.creditPolicy?.refilledAmount) notifications.show({ id: "daily-credit", type: "success", message: `本日の無料クレジットを${updated.creditPolicy.refilledAmount}枚補充しました。` });
     } catch {
       notifications.show({ id: "platform-load", type: "error", message: "プレイヤー情報を読み込めませんでした。", action: { label: "再読み込み", run: loadPlatform } });
     }
@@ -67,7 +70,7 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
     purchaseDialog, setPurchaseDialog, purchaseUnit, setPurchaseUnit,
     purchasedCredits, purchaseError, setPurchaseError, setPurchaseCheck,
     handlePurchase, closePurchaseComplete,
-  } = useCreditPurchase({ pendingAction, setPendingAction, setPlayDialog, setBusy, updateWallet });
+  } = useCreditPurchase({ pendingAction, setPendingAction, setPlayDialog, setBusy, updateWallet, purchasesEnabled });
 
   useEffect(() => {
     void loadPlatform();
@@ -92,11 +95,12 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
         const notify = declinedCreditRequest.current;
         declinedCreditRequest.current = null;
         notify();
-      } else setPurchaseDialog("select");
+      } else if (purchasesEnabled) setPurchaseDialog("select");
+      else setPlayDialog("insufficient");
     };
     window.addEventListener("request-credit-topup", topUp);
     return () => window.removeEventListener("request-credit-topup", topUp);
-  }, [standaloneCredits, platform]);
+  }, [standaloneCredits, platform, purchasesEnabled]);
 
   const requestPlay = useCallback((action: PlayAction) => {
     if (!platform) return;
@@ -105,11 +109,18 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
       setWelcomeDialogOpen(true);
       return;
     }
-    setPlayDialog(
-      platform.wallet.availableTotal >= getCurrentGame().creditCost
-        ? "confirm"
-        : "insufficient",
-    );
+    if (platform.wallet.availableTotal >= getCurrentGame().creditCost) {
+      setPlayDialog("confirm");
+      return;
+    }
+    setBusy(true);
+    void fetchPlatformBootstrap().then(updated => {
+      setPlatform(updated);
+      if (updated.creditPolicy?.refilledAmount) notifications.show({ id: "daily-credit", type: "success", message: `本日の無料クレジットを${updated.creditPolicy.refilledAmount}枚補充しました。` });
+      setPlayDialog(updated.wallet.availableTotal >= getCurrentGame().creditCost ? "confirm" : "insufficient");
+    }).catch(() => {
+      notifications.show({ id: "platform-credit", type: "error", message: "クレジットを確認できませんでした。もう一度お試しください。" });
+    }).finally(() => setBusy(false));
   }, [platform]);
 
   useEffect(() => gameHost.subscribe(requestPlay), [requestPlay]);
@@ -144,7 +155,7 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
       setConsentPurpose(null);
       if (completedPurpose === "registration") {
         setAccountDialogOpen(true);
-      } else if (completedPurpose === "purchase") {
+      } else if (completedPurpose === "purchase" && purchasesEnabled) {
         setPurchaseDialog("select");
       }
     } catch {
@@ -177,7 +188,8 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
     if (standaloneCredits) {
       const notify = declinedCreditRequest.current;
       declinedCreditRequest.current = null;
-      if (notify) notify(); else setPurchaseDialog("select");
+      if (notify) notify(); else if (purchasesEnabled) setPurchaseDialog("select");
+      else setPlayDialog("insufficient");
       return;
     }
     setPlayDialog((platform?.wallet.availableTotal ?? 0) >= getCurrentGame().creditCost
@@ -237,6 +249,7 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
   return (
     <>
       <PlatformProfile
+        refreshCredits={() => void loadPlatform()}
         platform={platform}
         profileOpen={profileOpen}
         profileRef={profileRef}
@@ -286,7 +299,7 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
               </p>
             ) : (
               <p>
-                ゲーム開始には1クレジット必要です。クレジットを購入しますか？
+                {purchasesEnabled ? "ゲーム開始には1クレジット必要です。クレジットを購入しますか？" : "無料ベータ期間中は購入できません。毎日、残高が3枚未満なら3枚まで補充します（日本時間・1日1回）。本日の補充が利用済みなら、翌日またお越しください。"}
               </p>
             )}
             <div className={`platform-dialog-actions play-credit-actions${playDialog === "confirm" ? " is-confirm" : ""}`}>
@@ -313,19 +326,27 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
                 setPlayDialog(null);
                 setPendingAction(null);
               }}>
-                {playDialog === "confirm" ? "キャンセル" : "いいえ"}
+                {playDialog === "confirm" ? "キャンセル" : purchasesEnabled ? "いいえ" : "閉じる"}
               </button>
               {playDialog === "confirm" && (
                 <button className="platform-primary-button play-credit-start-button" type="button" disabled={busy} onClick={() => void handlePlayConfirm()}>
                   {busy ? "準備中…" : "1クレジットで開始"}
                 </button>
               )}
-              {playDialog === "insufficient" && (
+              {playDialog === "insufficient" && purchasesEnabled && (
                 <button className="platform-primary-button" type="button" onClick={() => {
                   setPlayDialog(null);
                   setPurchaseDialog("select");
                 }}>
                   はい
+                </button>
+              )}
+              {playDialog === "insufficient" && !purchasesEnabled && !platform?.accountRegistered && (
+                <button className="platform-primary-button" type="button" onClick={() => {
+                  setPlayDialog(null);
+                  requestUserRegistration();
+                }}>
+                  ユーザー登録で5枚を受け取る
                 </button>
               )}
             </div>
@@ -334,6 +355,7 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
       )}
 
       <CreditPurchaseDialogs
+        purchasesEnabled={purchasesEnabled}
         purchaseDialog={purchaseDialog}
         setPurchaseDialog={setPurchaseDialog}
         purchaseUnit={purchaseUnit}

@@ -1476,6 +1476,32 @@ canvas {
   grid-column: 1 / -1;
 }
 
+.platform-beta-credits {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(105, 247, 255, 0.06);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.platform-beta-credits strong,
+.platform-beta-credits small {
+  display: block;
+}
+
+.platform-beta-credits strong {
+  color: var(--accent);
+}
+
+.platform-beta-credits p {
+  margin: 6px 0;
+}
+
+.platform-beta-credits small {
+  color: var(--muted);
+}
+
 .platform-account-register-button {
   margin-top: 7px;
   padding: 6px 8px;

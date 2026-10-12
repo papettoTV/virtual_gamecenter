@@ -3,6 +3,7 @@ import type { PurchaseDialog, PurchaseUnit } from "./platform-types";
 import { formatPurchasePrice } from "./purchase-utils";
 
 export interface CreditPurchaseDialogsProps {
+  purchasesEnabled?: boolean;
   purchaseDialog: PurchaseDialog;
   setPurchaseDialog: Dispatch<SetStateAction<PurchaseDialog>>;
   purchaseUnit: PurchaseUnit;
@@ -18,10 +19,10 @@ export interface CreditPurchaseDialogsProps {
   requestUserRegistration: () => void;
 }
 
-export function CreditPurchaseDialogs({ purchaseDialog, setPurchaseDialog, purchaseUnit, setPurchaseUnit, purchasedCredits, purchaseError, setPurchaseError, setPurchaseCheck, busy, setPlayDialog, handlePurchase, closePurchaseComplete, requestUserRegistration }: CreditPurchaseDialogsProps) {
+export function CreditPurchaseDialogs({ purchaseDialog, setPurchaseDialog, purchaseUnit, setPurchaseUnit, purchasedCredits, purchaseError, setPurchaseError, setPurchaseCheck, busy, setPlayDialog, handlePurchase, closePurchaseComplete, requestUserRegistration, purchasesEnabled = false }: CreditPurchaseDialogsProps) {
   return (
     <>
-      {purchaseDialog === "select" && (
+      {purchasesEnabled && purchaseDialog === "select" && (
         <div className="platform-overlay platform-overlay-front" role="dialog" aria-modal="true" aria-labelledby="purchase-title">
           <div className="platform-dialog">
             <p className="eyebrow">Credit Shop</p>

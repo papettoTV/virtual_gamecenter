@@ -1,6 +1,7 @@
 import { env, exports } from "cloudflare:workers";
 import { beforeAll, afterEach, expect, it } from "vitest";
 import type { ClientMessage, ServerMessage } from "../../src/shared/protocol";
+import betaMigration from "../../migrations/0018_beta_daily_refills.sql?raw";
 
 beforeAll(async () => {
   const tables = [
@@ -17,6 +18,7 @@ beforeAll(async () => {
     "CREATE TABLE cabinet_directory (cabinet_id TEXT PRIMARY KEY, game_id TEXT, status TEXT, player_count INTEGER, spectator_count INTEGER, updated_at INTEGER)",
   ];
   await env.DB.batch(tables.map(sql => env.DB.prepare(sql)));
+  await env.DB.batch(betaMigration.split(/;\s*(?=CREATE)/).map((sql) => env.DB.prepare(sql)));
 });
 
 const sockets: WebSocket[] = [];

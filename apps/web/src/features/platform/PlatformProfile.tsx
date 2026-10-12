@@ -16,9 +16,10 @@ export interface PlatformProfileProps {
   handleLogout: () => Promise<void>;
   requestUserRegistration: () => void;
   standaloneCredits: boolean;
+  refreshCredits?: () => void;
 }
 
-export function PlatformProfile({ platform, profileOpen, profileRef, setProfileOpen, editingName, setEditingName, nameDraft, setNameDraft, busy, savePlayerName, handleLogout, requestUserRegistration, standaloneCredits }: PlatformProfileProps) {
+export function PlatformProfile({ platform, profileOpen, profileRef, setProfileOpen, editingName, setEditingName, nameDraft, setNameDraft, busy, savePlayerName, handleLogout, requestUserRegistration, standaloneCredits, refreshCredits }: PlatformProfileProps) {
   const wallet = platform?.wallet;
   return (
     <>
@@ -29,7 +30,10 @@ export function PlatformProfile({ platform, profileOpen, profileRef, setProfileO
           aria-label="プロフィールを表示"
           aria-expanded={profileOpen}
           aria-controls="platform-profile-menu"
-          onClick={() => setProfileOpen((open) => !open)}
+          onClick={() => {
+            if (!profileOpen) refreshCredits?.();
+            setProfileOpen((open) => !open);
+          }}
         >
           <span className="platform-profile-icon" aria-hidden="true">
             <span />
@@ -103,11 +107,17 @@ export function PlatformProfile({ platform, profileOpen, profileRef, setProfileO
               <strong>{wallet ? wallet.availableTotal : "—"}</strong>
               {wallet && (
                 <small>
-                  無料 {wallet.availableFree} / 購入 {wallet.availablePurchased}
+                  無料 {wallet.availableFree}{wallet.availablePurchased > 0 || platform?.creditPolicy?.purchasesEnabled ? ` / 購入 ${wallet.availablePurchased}` : ""}
                 </small>
               )}
             </div>
-            {standaloneCredits && <button type="button" onClick={() => window.dispatchEvent(new Event("request-credit-topup"))}>クレジットを追加</button>}
+            {platform?.creditPolicy && !platform.creditPolicy.purchasesEnabled && <div className="platform-beta-credits">
+              <strong>無料ベータ</strong>
+              <p>毎日、残高が3枚未満なら3枚まで無料で補充します（日本時間・1日1回）。</p>
+              <small>{platform.creditPolicy.refilledToday ? "本日の補充は利用済みです。" : "残高が3枚未満になったら、プレイ開始前や再訪問時に補充します。"}</small>
+              <small>次の日の開始：{new Date(platform.creditPolicy.nextRefillAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}</small>
+            </div>}
+            {standaloneCredits && platform?.creditPolicy?.purchasesEnabled && <button type="button" onClick={() => window.dispatchEvent(new Event("request-credit-topup"))}>クレジットを追加</button>}
             {platform?.accountRegistered && (
               <button
                 className="platform-logout-button"
