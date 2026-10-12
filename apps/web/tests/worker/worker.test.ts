@@ -115,6 +115,24 @@ describe("Cloudflare Worker", () => {
     expect(ranking.rankings[0]?.player_name).not.toBe("CHANGED-NAME");
   });
 
+  it("requires the revised policy version without treating old consent as new consent", async () => {
+    const response = await exports.default.fetch("http://localhost/api/platform/bootstrap");
+    const initial = await response.json<{ playerId: string; consent: { termsVersion: string; privacyVersion: string } }>();
+    expect(initial.consent).toMatchObject({ termsVersion: "2026-10-12", privacyVersion: "2026-10-12" });
+    const cookie = response.headers.get("set-cookie")?.split(";", 1)[0];
+    await env.DB.batch(["terms", "privacy"].map(policyType => env.DB.prepare(
+      "INSERT INTO consent_records (id, player_id, policy_type, policy_version) VALUES (?, ?, ?, ?)",
+    ).bind(crypto.randomUUID(), initial.playerId, policyType, "2026-07-26")));
+    const current = await exports.default.fetch("http://localhost/api/platform/bootstrap", { headers: { Cookie: cookie! } });
+    expect((await current.json<{ consent: { accepted: boolean } }>()).consent.accepted).toBe(false);
+    const stale = await exports.default.fetch("http://localhost/api/platform/consents", {
+      method: "POST", headers: { Cookie: cookie!, "Content-Type": "application/json" },
+      body: JSON.stringify({ termsVersion: "2026-07-26", privacyVersion: "2026-07-26" }),
+    });
+    expect(stale.status).toBe(409);
+    expect(await stale.json()).toEqual({ error: "policy_version_mismatch" });
+  });
+
   it("separates policy consent from the one-time welcome credit", async () => {
     const bootstrapResponse = await exports.default.fetch("http://localhost/api/platform/bootstrap");
     const initial = await bootstrapResponse.json<{

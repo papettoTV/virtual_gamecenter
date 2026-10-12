@@ -18,7 +18,7 @@ export function PlatformPolicies({ policy, setPolicy }: PlatformPoliciesProps) {
         <strong>{BRAND.name} · {BRAND.category}</strong>
         <button type="button" onClick={() => setPolicy("terms")}>利用規約</button>
         <button type="button" onClick={() => setPolicy("privacy")}>プライバシーポリシー</button>
-        <span>お問い合わせ（準備中）</span>
+        <a href="https://x.com/papettoTV" target="_blank" rel="noopener noreferrer">お問い合わせ：X @papettoTV</a>
         <span>特定商取引法に基づく表記は有料化前に公開予定</span>
       </footer>
     </>
@@ -38,7 +38,7 @@ export function PolicyDialog({ kind, onClose }: PolicyDialogProps) {
         <button className="platform-dialog-close" type="button" aria-label="閉じる" onClick={onClose}>
           × 閉じる
         </button>
-        <h2>{isTerms ? "利用規約（プロトタイプ版）" : "プライバシーポリシー（プロトタイプ版）"}</h2>
+        <h2>{isTerms ? "利用規約（無料ベータ版）" : "プライバシーポリシー（無料ベータ版）"}</h2>
         <iframe
           className="policy-document-frame"
           title={isTerms ? "利用規約全文" : "プライバシーポリシー全文"}

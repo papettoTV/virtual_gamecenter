@@ -1887,6 +1887,13 @@ canvas {
   height: min(560px, calc(100vh - 190px));
 }
 
+.policy-dialog > h2 {
+  padding-right: 80px;
+  margin: 0 0 18px;
+  font-size: clamp(18px, 4vw, 24px);
+  line-height: 1.45;
+}
+
 .platform-footer {
   display: flex;
   flex-wrap: wrap;
