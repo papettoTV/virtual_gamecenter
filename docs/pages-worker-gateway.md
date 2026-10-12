@@ -34,6 +34,7 @@ Wrangler Pagesは任意の設定ファイルパスを受け付けないため、
 - Google OAuthとBasic認証の検証用Secretを登録。Googleの許可URIは `https://develop.virtual-gamecenter.pages.dev/api/platform/auth/google/callback`。
 - 検証Pages：deploy alias `develop.virtual-gamecenter.pages.dev`、deployment `fefce738`。mainのProduction branchと既存Production設定は維持。
 - PagesのGit連携による再ビルドにも同じgatewayを含める。共有build_configはapps/web/npm run build/dist/clientへ維持。
+- developへのpush後、GitHub CI（Web checks）成功。Git連携の再公開 `88d519a1` でも開始/観戦通信を再実測し成功。共有ビルド設定とProduction branch/main・既存Production bindingの維持を確認。
 
 ## 検証結果
 
