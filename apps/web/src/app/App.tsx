@@ -16,6 +16,7 @@ import { navigate } from "../shared/navigation";
 import { SharedResultPage } from "../features/sharing/SharedResultPage";
 import { SharePanel } from "../features/sharing/ShareActions";
 import { sharePanel } from "../features/sharing/share-service";
+import { AnalyticsConsent } from "../features/analytics/AnalyticsConsent";
 
 const ThreeBulletLab = lazy(async () => {
   const module = await import("../features/labs/ThreeBulletLab");
@@ -40,7 +41,7 @@ export function App() {
     if (!resultMatch) document.title = selection || isCabinet ? `${game.title}${url.searchParams.get("watch") === "1" ? "の観戦" : ""} | PULBASE` : `${BRAND.name} | ${BRAND.category}`;
   }, [address]);
   const chooseGame = (gameId: string) => navigate("/?game=" + encodeURIComponent(gameId));
-  return <><NotificationCenter /><SharePanel />{
+  return <><NotificationCenter /><SharePanel /><AnalyticsConsent />{
     resultMatch ? <SharedResultPage key={resultMatch[1]} resultId={resultMatch[1]!} /> :
     url.pathname === "/labs/buzz-barrier-three" ?
       <Suspense fallback={<Loading />}><ThreeBulletLab /></Suspense> :

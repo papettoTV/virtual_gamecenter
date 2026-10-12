@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { PolicyKind } from "./platform-types";
 import { BRAND } from "../../domain/brand";
+import { openAnalyticsSettings } from "../analytics/AnalyticsConsent";
 
 export interface PlatformPoliciesProps {
   policy: PolicyKind | null;
@@ -18,6 +19,7 @@ export function PlatformPolicies({ policy, setPolicy }: PlatformPoliciesProps) {
         <strong>{BRAND.name} · {BRAND.category}</strong>
         <button type="button" onClick={() => setPolicy("terms")}>利用規約</button>
         <button type="button" onClick={() => setPolicy("privacy")}>プライバシーポリシー</button>
+        <button type="button" onClick={openAnalyticsSettings}>アクセス解析設定</button>
         <a href="https://x.com/papettoTV" target="_blank" rel="noopener noreferrer">お問い合わせ：X @papettoTV</a>
         <span>特定商取引法に基づく表記は有料化前に公開予定</span>
       </footer>

@@ -238,7 +238,7 @@ describe("beta purchase gate", () => {
 
   it("explicitly enables Stripe checkout, while disabled mode still processes existing webhook and status", async () => {
     const player = await guest();
-    await api("consents", player.cookie, "POST", { termsVersion: "2026-10-12.2", privacyVersion: "2026-10-12.2" });
+    await api("consents", player.cookie, "POST", { termsVersion: "2026-10-12.3", privacyVersion: "2026-10-12.3" });
     const checkoutId = `cs_${crypto.randomUUID()}`;
     const stripe = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id: checkoutId, url: "https://checkout.stripe.com/test" }));
     const checkout = await api("credit-purchases/checkout", player.cookie, "POST", { unitCount: 1 }, { CREDIT_PURCHASES_ENABLED: "true", STRIPE_SECRET_KEY: "sk_test_example" });

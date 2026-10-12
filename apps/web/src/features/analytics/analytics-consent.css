@@ -1,0 +1,11 @@
+.analytics-consent { display: flex; align-items: center; gap: 16px; width: min(1120px, calc(100% - 32px)); box-sizing: border-box; margin: 12px auto; padding: 14px 18px; border: 1px solid #43616f; border-radius: 12px; background: #15192b; color: #edf2ff; font-size: 12px; }
+.analytics-consent p { margin: 6px 0; line-height: 1.6; }
+.analytics-consent small { display: block; color: #b3c0d8; line-height: 1.6; }
+.analytics-consent a { color: #65edf4; }
+.analytics-consent-actions { display: flex; flex-wrap: wrap; gap: 8px; flex-shrink: 0; }
+.analytics-consent-actions button { padding: 10px 14px; border: 1px solid #63778e; border-radius: 8px; background: #23344a; color: #fff; font-weight: bold; cursor: pointer; }
+.analytics-consent-actions .analytics-consent-close { background: transparent; }
+@media (max-width: 720px) {
+  .analytics-consent { flex-direction: column; align-items: stretch; }
+  .analytics-consent-actions button { flex: 1; }
+}
