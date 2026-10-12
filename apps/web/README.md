@@ -60,18 +60,18 @@ npm run preview
 - ランキング・ゲーム結果・クレジット: D1
 - ローカル実行: Cloudflare Vite plugin
 
-本番反映時は、先にD1マイグレーションとBasic認証のSecretを設定します。
+本番と検証のWorker・D1・R2・Google認証を分離します。環境別DB IDは未作成の仮値のため、リリースチェックは現在失敗するのが正常です。先にリソース作成・Secret登録・公開判定が必要です。既存の共通設定は自動でクラウドへ反映しません。
 
 ```bash
-npm run db:migrate:remote
-npx wrangler secret put BASIC_AUTH_USERNAME
-npx wrangler secret put BASIC_AUTH_PASSWORD
-npm run deploy
+npm run release:check -- staging
+npm run db:migrate:remote -- staging
+npm run build:staging
+npm run deploy -- staging
 ```
 
 StripeのWebhook送信先には `https://<公開ドメイン>/api/platform/stripe/webhook` を設定し、`checkout.session.completed` を購読します。購入クレジットは成功画面では付与せず、署名検証済みWebhookを受信した時点でD1台帳へ冪等付与します。
 
-`npm run deploy` は本番公開を行うため、明示的にデプロイするときだけ実行します。
+`production`を指定すると本番が対象です。環境を省略したdeploy/リモート移行は拒否します。詳しい作成・認証・移行・限定公開の順序は [`../../docs/production-environments.md`](../../docs/production-environments.md) を参照してください。デプロイは明示的な指示があるときだけ実施します。
 
 ## 構成
 

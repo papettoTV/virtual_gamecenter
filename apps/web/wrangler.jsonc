@@ -4,6 +4,7 @@
   "main": "src/worker/index.ts",
   "compatibility_date": "2026-07-26",
   "vars": {
+    "APP_ENV": "local",
     "DEVELOPER_AUTH_ENABLED": "true",
     "CREDIT_PURCHASES_ENABLED": "false"
   },
@@ -38,5 +39,43 @@
     "enabled": true
   },
   "triggers": { "crons": ["0 * * * *"] },
-  "r2_buckets": [{ "binding": "DELETION_AUDIT", "bucket_name": "pulbase-deletion-audit" }]
+  "r2_buckets": [{ "binding": "DELETION_AUDIT", "bucket_name": "pulbase-deletion-audit" }],
+  "env": {
+    "staging": {
+      "name": "pulbase-staging",
+      "vars": {
+        "APP_ENV": "staging",
+        "DEVELOPER_AUTH_ENABLED": "false",
+        "CREDIT_PURCHASES_ENABLED": "false"
+      },
+      "secrets": { "required": ["BASIC_AUTH_USERNAME", "BASIC_AUTH_PASSWORD", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"] },
+      "durable_objects": { "bindings": [{ "name": "CABINET_ROOMS", "class_name": "CabinetRoom" }] },
+      "d1_databases": [{
+        "binding": "DB",
+        "database_name": "pulbase-staging",
+        "database_id": "00000000-0000-0000-0000-000000000001",
+        "migrations_dir": "migrations"
+      }],
+      "r2_buckets": [{ "binding": "DELETION_AUDIT", "bucket_name": "pulbase-staging-deletion-audit" }],
+      "triggers": { "crons": ["0 * * * *"] }
+    },
+    "production": {
+      "name": "pulbase-production",
+      "vars": {
+        "APP_ENV": "production",
+        "DEVELOPER_AUTH_ENABLED": "false",
+        "CREDIT_PURCHASES_ENABLED": "false"
+      },
+      "secrets": { "required": ["BASIC_AUTH_USERNAME", "BASIC_AUTH_PASSWORD", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"] },
+      "durable_objects": { "bindings": [{ "name": "CABINET_ROOMS", "class_name": "CabinetRoom" }] },
+      "d1_databases": [{
+        "binding": "DB",
+        "database_name": "pulbase-production",
+        "database_id": "00000000-0000-0000-0000-000000000002",
+        "migrations_dir": "migrations"
+      }],
+      "r2_buckets": [{ "binding": "DELETION_AUDIT", "bucket_name": "pulbase-production-deletion-audit" }],
+      "triggers": { "crons": ["0 * * * *"] }
+    }
+  }
 }

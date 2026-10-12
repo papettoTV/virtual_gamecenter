@@ -23,7 +23,7 @@ npm run dev
 スマホで確認する場合は、PCとスマホを同じWi-Fiにつなぎ、`Network` のURLをスマホで開きます。
 
 ローカル開発中はBasic認証を無効化しています。
-Cloudflare Pages上ではBasic認証が有効です。
+Cloudflareの限定公開先ではBasic認証を維持します。本番・検証環境の準備と公開判定は [`docs/production-environments.md`](docs/production-environments.md) を参照してください。
 
 公開前のビルド確認:
 
@@ -35,13 +35,15 @@ npm run preview
 Cloudflareへ反映:
 
 ```bash
-npm run deploy
+npm run release:check -- staging
+npm run deploy -- staging
 ```
 
 ## Deployment
 
-- Game: https://virtual-gamecenter.pages.dev/
-- Ranking API: https://graze-duel-ranking-api.aegfrompsbt.workers.dev/api/ranking
+- 現行構成は静的画面・API・観戦通信を1つのCloudflare Workerへ統合しています。
+- 本番URLは未確定。過去のPages/API URLを現在の公開先として案内しないでください。
+- 環境未指定のデプロイ・リモート移行は拒否します。準備中の仮D1 IDも公開用に使用できません。
 
 ## License
 

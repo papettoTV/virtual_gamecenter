@@ -10,15 +10,19 @@
     "start": "vite",
     "generate-types": "wrangler types",
     "typecheck": "npm run generate-types && tsc --noEmit",
-    "test": "vitest run && npm run test:analytics",
+    "test": "vitest run && npm run test:analytics && npm run test:release",
     "test:analytics": "node --test tests/analytics-runtime.test.mjs",
+    "test:release": "node --test tests/release-config.test.mjs",
     "build": "npm run typecheck && vite build",
     "preview": "vite preview --host 0.0.0.0",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
-    "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "db:migrate:remote": "node scripts/release.mjs migrate",
+    "release:check": "node scripts/release.mjs check",
+    "build:staging": "node scripts/release.mjs build staging",
+    "build:production": "node scripts/release.mjs build production",
     "stripe:check": "./scripts/check-stripe-test-config.sh",
     "stripe:listen": "./scripts/stripe-listen.sh",
-    "deploy": "npm run build && wrangler deploy"
+    "deploy": "node scripts/release.mjs deploy"
   },
   "dependencies": {
     "@vitejs/plugin-react": "6.0.3",
