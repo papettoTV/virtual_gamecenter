@@ -1,7 +1,7 @@
 import { getGameDefinition } from "../domain/game";
 
 const EVENTS = new Set(["share_opened", "share_link_copied", "share_target_opened", "share_native_handoff", "share_image_saved", "result_viewed", "play_started_from_result"]);
-const CHANNELS = new Set(["native", "x", "line", "bluesky", "clipboard", "download"]);
+const CHANNELS = new Set(["facebook", "native", "x", "line", "bluesky", "clipboard", "download"]);
 const SAFE_ID = /^[a-zA-Z0-9-]{1,100}$/;
 
 export async function handleSharingEvent(request: Request, db: D1Database): Promise<Response> {

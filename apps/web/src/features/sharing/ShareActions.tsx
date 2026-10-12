@@ -6,7 +6,8 @@ import { presentResult } from "./result-presenters";
 import { getResultImageRenderer } from "./result-images";
 import { recordSharingEvent } from "./sharing-events";
 import { copySharedText } from "../notifications/share";
-import { notifications } from "../notifications/notifications";
+import { createSocialShareUrl, type SocialTarget } from "./social-targets";
+import { SocialPostPreview } from "./SocialPostPreview";
 import "./sharing.css";
 
 export function ResultShareButton({ draft, placement }: { draft?: SharedResultDraft; placement?: string }) {
@@ -65,7 +66,7 @@ export function SharePanel() {
   const panel = useSyncExternalStore(sharePanel.subscribe, sharePanel.getSnapshot);
   const [text, setText] = useState("");
   const [image, setImage] = useState<File | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [previewTarget, setPreviewTarget] = useState<SocialTarget>("x");
   const closeButton = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     setText(panel?.text ?? ""); setImage(null);
@@ -92,22 +93,8 @@ export function SharePanel() {
   }, [Boolean(panel)]);
   if (!panel) return null;
   const track = (event: "share_target_opened" | "share_link_copied" | "share_native_handoff" | "share_image_saved", channel: string) => recordSharingEvent(event, panel, channel);
-  const shareNative = async () => {
-    if (!navigator.share) return;
-    setBusy(true);
-    try {
-      const data: ShareData = { title: panel.title, text, url: panel.url };
-      if (image && navigator.canShare?.({ files: [image] })) data.files = [image];
-      await navigator.share(data);
-      track("share_native_handoff", "native");
-    } catch (error) {
-      if (!(error instanceof DOMException && error.name === "AbortError")) notifications.show({ id: "share", type: "error", message: "共有できませんでした。文章とURLをコピーしてお試しください。" });
-    } finally { setBusy(false); }
-  };
-  const openTarget = (target: "x" | "line" | "bluesky") => {
-    const message = encodeURIComponent(`${text}\n${panel.url}`);
-    const destinations = { x: `https://twitter.com/intent/tweet?text=${message}`, line: `https://line.me/R/msg/text/?${message}`, bluesky: `https://bsky.app/intent/compose?text=${message}` };
-    window.open(destinations[target], "_blank", "noopener,noreferrer"); track("share_target_opened", target);
+  const openTarget = (target: SocialTarget) => {
+    window.open(createSocialShareUrl(target, text, panel.url), "_blank", "noopener,noreferrer"); track("share_target_opened", target);
   };
   return <div className="share-overlay" onKeyDown={event => event.stopPropagation()} onKeyUp={event => event.stopPropagation()} onClick={event => event.stopPropagation()} onPointerDown={event => event.stopPropagation()}>
     <section className="share-dialog" role="dialog" aria-modal="true" aria-labelledby="share-title">
@@ -120,14 +107,14 @@ export function SharePanel() {
         <textarea id="share-text" rows={4} value={text} onChange={event => setText(event.target.value)} />
         <p className="share-url">{panel.url}</p>
         <div className="share-actions">
-          {typeof navigator.share === "function" && <button type="button" disabled={busy} onClick={() => void shareNative()}>端末の共有メニュー</button>}
-          <button type="button" onClick={() => openTarget("x")}>X</button><button type="button" onClick={() => openTarget("line")}>LINE</button><button type="button" onClick={() => openTarget("bluesky")}>Bluesky</button>
+          <button type="button" onClick={() => openTarget("facebook")}>Facebookで共有</button><button type="button" onClick={() => openTarget("x")}>Xで共有</button>
           <button type="button" onClick={() => void copySharedText(`${text}\n${panel.url}`, "share").then(() => track("share_link_copied", "clipboard")).catch(() => {})}>文章とURLをコピー</button>
           {image && <button type="button" onClick={() => {
             const url = URL.createObjectURL(image); const link = document.createElement("a"); link.href = url; link.download = image.name; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); track("share_image_saved", "download");
           }}>結果画像を保存</button>}
         </div>
-        {panel.result && <small>結果URLからいつでも確認できます。X等への投稿画像は、保存した画像を添付できます。</small>}
+        <small>Facebookの本文は「文章とURLをコピー」から貼り付けてください。画像を直接投稿する場合は、保存した結果画像を添付できます。</small>
+        <SocialPostPreview panel={panel} text={text} target={previewTarget} onChange={setPreviewTarget} />
       </>}
     </section>
   </div>;

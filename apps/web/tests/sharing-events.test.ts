@@ -12,8 +12,8 @@ function post(body: unknown, origin = "http://localhost") {
 }
 
 describe("sharing interaction events", () => {
-  it("records separately from actual SNS publication and deduplicates retries", async () => {
-    const event = { eventId: crypto.randomUUID(), eventType: "share_target_opened", kind: "result", gameId: "graze-duel", targetId: crypto.randomUUID(), channel: "x", shareId: crypto.randomUUID() };
+  it.each(["facebook", "x"])("records %s separately from actual SNS publication and deduplicates retries", async channel => {
+    const event = { eventId: crypto.randomUUID(), eventType: "share_target_opened", kind: "result", gameId: "graze-duel", targetId: crypto.randomUUID(), channel, shareId: crypto.randomUUID() };
     expect((await post(event)).status).toBe(200); expect((await post(event)).status).toBe(200);
     const rows = await env.DB.prepare("SELECT * FROM sharing_events").all();
     expect(rows.results).toHaveLength(1);
