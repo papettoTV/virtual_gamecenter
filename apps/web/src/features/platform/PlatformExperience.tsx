@@ -11,7 +11,7 @@ import type { PlayAction } from "../../game-sdk/contracts";
 import { gameHost } from "../../game-sdk/game-host";
 import { executePlay } from "./play-service";
 import { notifications } from "../notifications/notifications";
-import { copySharedText } from "../notifications/share";
+import { liveSharing, shareLive } from "../sharing/share-service";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   acceptPolicies,
@@ -23,9 +23,7 @@ import {
 } from "./platform-client";
 import { resolveGameDefinition } from "../../domain/game";
 import {
-  createTrackedWatchUrl,
   recordPlayStartedFromWatch,
-  recordShareCreated,
 } from "../engagement/engagement-client";
 
 export function PlatformExperience({ standaloneCredits = false }: { standaloneCredits?: boolean } = {}) {
@@ -222,26 +220,8 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
   };
 
   const shareCabinetUrl = async () => {
-    const baseShareUrl = await resolveCabinetShareUrl();
-    const trackedShare = createTrackedWatchUrl(baseShareUrl);
-    try {
-      if (navigator.share) {
-        try {
-          await navigator.share({
-            title: getCurrentGame().title,
-            text: "いま行われているライブプレイを一緒に観戦できます。",
-            url: trackedShare.url,
-          });
-          recordShareCreated(getCurrentGame().id, getCabinetId(), trackedShare.shareId);
-          return;
-        } catch (error) {
-          if (error instanceof DOMException && error.name === "AbortError") return;
-        }
-      }
-      await copySharedText(trackedShare.url, "platform-share");
-      recordShareCreated(getCurrentGame().id, getCabinetId(), trackedShare.shareId);
-
-    } catch {}
+    const context = liveSharing.getSnapshot();
+    await shareLive(context ?? { gameId: getCurrentGame().id, cabinetId: getCabinetId(), role: "player", phase: "ready" });
   };
 
   useEffect(() => {
@@ -385,23 +365,4 @@ function getCabinetId(): string {
 
 function getCurrentGame() {
   return resolveGameDefinition(new URL(window.location.href).searchParams.get("game"));
-}
-
-async function resolveCabinetShareUrl(): Promise<string> {
-  let shareOrigin = window.location.origin;
-  if (["localhost", "127.0.0.1"].includes(window.location.hostname)) {
-    try {
-      const response = await fetch("/api/local-address");
-      if (response.ok) {
-        const localAddress = await response.json() as { address: string; port: number };
-        shareOrigin = `http://${localAddress.address}:${localAddress.port}`;
-      }
-    } catch {
-      shareOrigin = window.location.origin;
-    }
-  }
-  const shareUrl = new URL(`${shareOrigin}${window.location.pathname}`);
-  shareUrl.searchParams.set("game", getCurrentGame().id);
-  shareUrl.searchParams.set("watch", "1");
-  return shareUrl.toString();
 }

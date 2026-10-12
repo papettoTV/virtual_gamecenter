@@ -3,7 +3,7 @@ import type { GameDefinition, GameId } from "../domain/game";
 import { gameHost } from "../game-sdk/game-host";
 import { DebugPanel } from "./graze-duel/ui/DebugPanel";
 import { MochiIntro, MochiSetIntro, MochiResult, MochiTouchAction, MochiSettings, MochiRetryAction } from "./mochi-beat/ui/MochiGameUI";
-import { SalvageResultShare, SalvageResultCollection, SalvageShareMenu, SalvageTerrainEditor, SalvageTouchCollection, SalvageEditorAction } from "./deep-sea-salvage/ui/SalvageGameUI";
+import { SalvageResultCollection, SalvageTerrainEditor, SalvageTouchCollection, SalvageEditorAction } from "./deep-sea-salvage/ui/SalvageGameUI";
 import "./dot-wave/style.css";
 
 export { DebugPanel };
@@ -18,9 +18,7 @@ export interface GameUIConfig {
   FrameIntro: ComponentType<GameUIProps>;
   SetIntro: ComponentType<GameUIProps>;
   ResultPresentation: ComponentType<GameUIProps>;
-  ResultShareAction: ComponentType<GameUIProps>;
   ResultSummaryAction: ComponentType<GameUIProps>;
-  ResultMenu: ComponentType<GameUIProps>;
   AfterFrame: ComponentType<GameUIProps>;
   TouchActions: ComponentType<GameUIProps>;
   Settings: ComponentType<GameUIProps>;
@@ -42,9 +40,7 @@ const defaultGameUI: GameUIConfig = {
   FrameIntro: EmptySlot,
   SetIntro: EmptySlot,
   ResultPresentation: EmptySlot,
-  ResultShareAction: EmptySlot,
   ResultSummaryAction: EmptySlot,
-  ResultMenu: EmptySlot,
   AfterFrame: EmptySlot,
   TouchActions: EmptySlot,
   Settings: EmptySlot,
@@ -56,9 +52,7 @@ const gameUIRegistry: Readonly<Record<GameId, Partial<GameUIConfig>>> = {
   "dot-wave": {},
   "deep-sea-salvage": {
     debugPanelHidden: true,
-    ResultShareAction: SalvageResultShare,
     ResultSummaryAction: SalvageResultCollection,
-    ResultMenu: SalvageShareMenu,
     AfterFrame: SalvageTerrainEditor,
     TouchActions: SalvageTouchCollection,
     FooterAction: SalvageEditorAction,

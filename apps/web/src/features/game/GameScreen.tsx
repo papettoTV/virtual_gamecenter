@@ -1,6 +1,7 @@
 import type { GameDefinition } from "../../domain/game";
 import { DebugPanel, getGameUI } from "../../games/ui-registry";
 import { navigate } from "../../shared/navigation";
+import { LiveShareButton, ResultShareButton } from "../sharing/ShareActions";
 
 export interface GameScreenProps {
   game: GameDefinition;
@@ -8,7 +9,7 @@ export interface GameScreenProps {
 
 export function GameScreen({ game }: GameScreenProps) {
   const ui = getGameUI(game.id);
-  const { FrameIntro, SetIntro, ResultPresentation, ResultShareAction, ResultSummaryAction, ResultMenu, AfterFrame, TouchActions, Settings, FooterAction, RetryAction } = ui;
+  const { FrameIntro, SetIntro, ResultPresentation, ResultSummaryAction, AfterFrame, TouchActions, Settings, FooterAction, RetryAction } = ui;
   return (
     <section className={`game-screen is-hidden${ui.screenClassName ? ` ${ui.screenClassName}` : ""}`} id="game-screen">
       <div className="spectator-banner is-hidden" id="spectator-banner">
@@ -56,6 +57,7 @@ export function GameScreen({ game }: GameScreenProps) {
         <canvas id="game" width="960" height="640" aria-label={`${game.title} game canvas`} />
         <FrameIntro game={game} />
         <SetIntro game={game} />
+        <LiveShareButton />
         <div className="versus-overlay is-hidden" id="versus-overlay" role="dialog" aria-modal="true">
           <p className="eyebrow" id="versus-eyebrow">Versus</p>
           <h2 id="versus-title">対戦</h2>
@@ -66,16 +68,16 @@ export function GameScreen({ game }: GameScreenProps) {
             <button id="versus-danger" className="is-hidden" type="button">拒否する</button>
             <button id="versus-primary" className="platform-primary-button" type="button">はい</button>
           </div>
+          <ResultShareButton placement="versus-result" />
         </div>
         <div className="ranking-submit ranking-overlay" id="ranking-submit-panel">
           <h2 id="ranking-submit-heading">ランキング登録</h2>
           <ResultPresentation game={game} />
-          <ResultShareAction game={game} />
+          <ResultShareButton />
           <div className="ranking-result-summary">
             <p id="ranking-result">ゲーム終了時にスコアを登録できます。</p>
             <ResultSummaryAction game={game} />
           </div>
-          <ResultMenu game={game} />
           <div className="ranking-form">
             <input id="ranking-name" type="hidden" />
             <div className="ranking-name-summary">

@@ -34,7 +34,7 @@ beforeEach(() => {
   services.release.mockResolvedValue({});
   services.resume.mockResolvedValue(undefined);
   const location = { href: "http://localhost/cabinets/test?game=dot-wave", origin: "http://localhost" };
-  vi.stubGlobal("window", Object.assign(new EventTarget(), { setInterval, setTimeout }));
+  vi.stubGlobal("window", Object.assign(new EventTarget(), { setInterval: globalThis.setInterval.bind(globalThis), setTimeout: globalThis.setTimeout.bind(globalThis) }));
   vi.stubGlobal("location", location);
   vi.stubGlobal("history", { replaceState: vi.fn() });
   controller = createDotWaveCabinetController(render, callbacks => { handlers = callbacks; return client; });

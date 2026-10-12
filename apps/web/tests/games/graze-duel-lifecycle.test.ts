@@ -4,8 +4,24 @@ import { mountGame } from "../../src/games/graze-duel/runtime";
 import { createInputController } from "../../src/games/graze-duel/input";
 import { createGrazeAudio } from "../../src/games/graze-duel/audio";
 import { BUZZ_BARRIER } from "../../src/domain/game";
+import type { createGameState } from "../../src/games/graze-duel/state";
 
-const mocks = vi.hoisted(() => ({ leave: vi.fn(), send: vi.fn(), rendererDispose: vi.fn(), requestPlay: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  leave: vi.fn(), send: vi.fn(), rendererDispose: vi.fn(), requestPlay: vi.fn(),
+  setResult: vi.fn(), clearResult: vi.fn(), setLiveContext: vi.fn(), overlay: false,
+  state: null as ReturnType<typeof createGameState> | null,
+}));
+vi.mock("../../src/games/graze-duel/state", async importOriginal => {
+  const original = await importOriginal<typeof import("../../src/games/graze-duel/state")>();
+  return { ...original, createGameState: (...args: Parameters<typeof original.createGameState>) => {
+    mocks.state = original.createGameState(...args);
+    return mocks.state;
+  } };
+});
+vi.mock("../../src/features/sharing/result-sharing", () => ({
+  resultSharing: { setResult: mocks.setResult, clear: mocks.clearResult },
+}));
+vi.mock("../../src/features/sharing/share-service", () => ({ setLiveContext: mocks.setLiveContext }));
 vi.mock("../../src/realtime/cabinet-client", () => ({
   createCabinetClient: (handlers: { onConnectionChange(value: boolean): void; onMessage(message: unknown): void }) => ({
     join() {
@@ -37,6 +53,7 @@ describe("BUZZ BARRIER instance lifecycle", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.overlay = false; mocks.state = null;
     frames = new Map();
     let nextFrame = 1;
     vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
@@ -64,7 +81,7 @@ describe("BUZZ BARRIER instance lifecycle", () => {
       getContext: () => ({}), closest: () => null,
       setPointerCapture: vi.fn(), hasPointerCapture: () => true, releasePointerCapture: vi.fn(),
     }) as unknown as HTMLCanvasElement;
-    vi.stubGlobal("document", { querySelector: (selector: string) => selector === "#game" ? canvas : null, body: { classList } });
+    vi.stubGlobal("document", { querySelector: (selector: string) => selector === "#game" ? canvas : selector === ".share-overlay" && mocks.overlay ? {} : null, body: { classList } });
     vi.stubGlobal("history", { pushState: vi.fn() });
   });
 
@@ -112,6 +129,47 @@ describe("BUZZ BARRIER instance lifecycle", () => {
     expect(mocks.requestPlay).toHaveBeenCalledTimes(1);
     instance.dispose();
     expect(frames.size).toBe(0);
+  });
+
+  it("records legitimate zero-score game over without ranking and clears on retry/disposal", async () => {
+    const lifetime = new GameLifetime();
+    const instance = mountGame({ game: BUZZ_BARRIER, lifetime });
+    await instance.prepareSolo?.(); await instance.play("start");
+    expect(mocks.setResult).not.toHaveBeenCalled();
+    keyboard.dispatchEvent(keyEvent("Space"));
+    mocks.state!.players[0]!.lives = 0;
+    mocks.state!.players[0]!.level = 7;
+    let time = performance.now();
+    for (let frame = 0; frame < 66; frame++) {
+      const [handle, callback] = [...frames.entries()][0]!;
+      frames.delete(handle); time += 34; callback(time);
+    }
+    expect(mocks.setResult).toHaveBeenCalledTimes(1);
+    expect(mocks.setResult.mock.calls[0]![0]).toMatchObject({
+      gameId: BUZZ_BARRIER.id, cleared: false, score: 0, metrics: { maxLevel: 7, defeatedBossCount: 0 },
+    });
+    expect(mocks.setResult.mock.calls[0]![0].elapsedTimeMs).toBeGreaterThan(0);
+    mocks.clearResult.mockClear();
+    await instance.play("retry");
+    expect(mocks.clearResult).toHaveBeenCalledWith(BUZZ_BARRIER.id);
+    instance.dispose();
+    expect(mocks.clearResult).toHaveBeenCalledWith(BUZZ_BARRIER.id);
+    expect(mocks.setLiveContext).toHaveBeenLastCalledWith(null);
+  });
+
+  it("does not consume textarea spaces or retry shortcuts while sharing is open", async () => {
+    const lifetime = new GameLifetime();
+    const instance = mountGame({ game: BUZZ_BARRIER, lifetime });
+    await instance.prepareSolo?.(); await instance.play("start");
+    mocks.overlay = true;
+    const space = keyEvent("Space");
+    keyboard.dispatchEvent(space); keyboard.dispatchEvent(keyEvent("KeyR"));
+    expect(space.defaultPrevented).toBe(false);
+    expect(mocks.requestPlay).not.toHaveBeenCalled();
+    mocks.overlay = false;
+    keyboard.dispatchEvent(keyEvent("KeyR"));
+    expect(mocks.requestPlay).toHaveBeenCalledTimes(1);
+    instance.dispose();
   });
 
   it("keeps keyboard and touch behavior and clears input on disposal", () => {

@@ -2,6 +2,8 @@ import { createCabinetSession } from "../../game-sdk/cabinet-session";
 import { GameLifetime } from "../../game-sdk/lifetime";
 import { gameHost } from "../../game-sdk/game-host";
 import { createUuid } from "../../shared/id";
+import { resultSharing } from "../../features/sharing/result-sharing";
+import { setLiveContext } from "../../features/sharing/share-service";
 import { notifications } from "../../features/notifications/notifications";
 import {
   fetchScoreRanking,
@@ -221,10 +223,13 @@ export function mountGame(context) {
   let defeatedBossCount = 0;
   let gameOver = false;
   let paused = false;
+  let pausedForLiveShare = false;
   let waitingForStart = false;
   let nextBulletId = 1;
   let clearGame = false;
   let lastRankingResult = null;
+  let sharedRunId = createUuid();
+  let liveShareContextKey = "";
   let rankingSubmittedForResult = false;
   let gameOverRankingTimer = 0;
   let rankingInputUnlockTimeout = 0;
@@ -319,8 +324,8 @@ export function mountGame(context) {
     canvas,
     keyboardTarget: window,
     getState: () => ({
-      spectator: cabinetRole === "spectator",
-      versusParticipant: isVersusParticipant(),
+      spectator: cabinetRole === "spectator" || Boolean(document.querySelector(".share-overlay")),
+      versusParticipant: isVersusParticipant() && !document.querySelector(".share-overlay"),
       screen: currentScreen,
       gameOver,
       compact: isCompactView(),
@@ -338,6 +343,9 @@ export function mountGame(context) {
 
 
   function resetGame() {
+    pausedForLiveShare = false;
+    resultSharing.clear(BUZZ_BARRIER.id);
+    sharedRunId = createUuid();
     for (const player of players) {
       player.x = player.fieldX + FIELD_WIDTH / 2;
       player.y = FIELD_BOTTOM - 58;
@@ -391,6 +399,9 @@ export function mountGame(context) {
   }
 
   function resetGameForRetry() {
+    pausedForLiveShare = false;
+    resultSharing.clear(BUZZ_BARRIER.id);
+    sharedRunId = createUuid();
     for (const player of players) {
       player.x = player.fieldX + FIELD_WIDTH / 2;
       player.y = FIELD_BOTTOM - 58;
@@ -683,6 +694,7 @@ export function mountGame(context) {
     if (!lastRankingResult || !rankingSubmitPanel?.classList.contains("is-visible")) return;
     window.sessionStorage.setItem(RANKING_REGISTRATION_RETURN_KEY, JSON.stringify({
       result: lastRankingResult,
+      sharedResult: resultSharing.getPublishedSnapshot() ?? resultSharing.getSnapshot(),
       message: rankingResult?.textContent ?? "",
     }));
   });
@@ -907,6 +919,7 @@ export function mountGame(context) {
     arcadeScreen?.classList.toggle("is-hidden", screen !== "arcade");
     cabinetScreen?.classList.toggle("is-hidden", screen !== "cabinet");
     gameScreen?.classList.toggle("is-hidden", screen !== "game");
+    updateLiveShareContext();
   }
 
   function enterCabinet(cabinetId, updateUrl = true) {
@@ -1294,6 +1307,14 @@ export function mountGame(context) {
   }
 
   function showVersusResult(message) {
+    const ownReport = versusSeat === "host" ? message.host : message.challenger;
+    if (isVersusParticipant() && ownReport) {
+      resultSharing.setResult({
+        id: sharedRunId, gameId: BUZZ_BARRIER.id, gameVersion: BUZZ_BARRIER.currentVersion,
+        elapsedTimeMs: Math.max(1, ownReport.matchElapsedMs), cleared: ownReport.reason === "cleared", score: ownReport.score,
+        metrics: { maxLevel: players[0].level, defeatedBossCount, mode: "versus", outcome: message.winner === "draw" ? "draw" : message.winner === versusSeat ? "win" : "lose" },
+      });
+    }
     versusPhase = "result";
     versusResult = message;
     paused = true;
@@ -1954,6 +1975,7 @@ export function mountGame(context) {
     const delta = Math.min((now - lastTime) / 1000, 0.033);
     lastTime = now;
     update(delta);
+    updateLiveShareContext();
     draw();
     recordRenderStats(performance.now() - workStartedAt);
     scope.frame(loop);
@@ -2152,7 +2174,8 @@ export function mountGame(context) {
 
   function togglePauseState() {
     if (gameOver) return;
-    if (isVersusParticipant()) return;
+    if (isVersusParticipant() && !pausedForLiveShare) return;
+    pausedForLiveShare = false;
     if (waitingForStart) {
       waitingForStart = false;
       paused = false;
@@ -2169,7 +2192,39 @@ export function mountGame(context) {
     return Boolean(versusMatchId && versusSeat && versusPhase !== "none");
   }
 
+  scope.own(() => {
+    resultSharing.clear(BUZZ_BARRIER.id);
+    setLiveContext(null);
+  });
+  const pauseBeforeShare = () => {
+    if (!gameSessionActive || (cabinetRole !== "player" && !isVersusParticipant())
+      || waitingForStart || gameOver || clearGame) return;
+    paused = true;
+    pausedForLiveShare = true;
+    resetTouchMove();
+    updatePauseButton();
+    queueSyncEvent({ type: "pauseChanged", paused, waitingForStart }, true);
+    broadcastMotionFrame(true);
+  };
+  scope.listen(window, "before-live-share", pauseBeforeShare);
+  scope.listen(window, "request-cabinet-share", pauseBeforeShare);
+
+  function updateLiveShareContext() {
+    const context = currentCabinetId && currentScreen === "game" ? {
+        gameId: BUZZ_BARRIER.id, cabinetId: currentCabinetId,
+        role: cabinetRole === "player" || isVersusParticipant() ? "player" : "spectator",
+        phase: gameOver || clearGame || versusPhase === "result" ? "finished"
+          : waitingForStart ? "ready" : paused ? "paused" : "playing",
+    } : null;
+    const key = JSON.stringify(context);
+    if (key !== liveShareContextKey) {
+      liveShareContextKey = key;
+      setLiveContext(context);
+    }
+  }
+
   function updatePauseButton() {
+    updateLiveShareContext();
     if (!touchPause) return;
     touchPause.textContent = waitingForStart ? "ゲーム開始" : paused ? "再開" : "一時停止";
   }
@@ -2571,6 +2626,14 @@ export function mountGame(context) {
       maxLevel: players[0].level,
       defeatedBossCount,
     };
+    if (!debugMessage && gameSessionActive && cabinetRole === "player" && !isVersusParticipant()
+      && (cleared ? clearGame : gameOver && players[0].lives <= 0)) {
+      resultSharing.setResult({
+        id: sharedRunId, gameId: BUZZ_BARRIER.id, gameVersion: BUZZ_BARRIER.currentVersion,
+        elapsedTimeMs: Math.max(1, elapsedTimeMs), cleared, score: totalScore,
+        metrics: { maxLevel: players[0].level, defeatedBossCount },
+      });
+    }
     rankingSubmittedForResult = false;
     rankingSubmitPanel?.classList.remove("is-submitted");
     if (rankingSubmitHeading) rankingSubmitHeading.textContent = "ランキング登録";
@@ -2605,6 +2668,10 @@ export function mountGame(context) {
       const restored = JSON.parse(stored);
       if (!restored?.result) return;
       lastRankingResult = restored.result;
+      if (restored.sharedResult?.gameId === BUZZ_BARRIER.id) {
+        if (restored.sharedResult.playerName) resultSharing.usePublished(restored.sharedResult);
+        else resultSharing.setResult(restored.sharedResult);
+      }
       rankingSubmittedForResult = false;
       if (rankingResult && typeof restored.message === "string") {
         rankingResult.textContent = restored.message;

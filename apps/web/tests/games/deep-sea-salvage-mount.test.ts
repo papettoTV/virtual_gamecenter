@@ -3,13 +3,18 @@ import { GameLifetime } from "../../src/game-sdk/lifetime";
 import { gameHost } from "../../src/game-sdk/game-host";
 import { DEEP_SEA_SALVAGE } from "../../src/domain/game";
 import { mountGame } from "../../src/games/deep-sea-salvage/runtime";
+import type { createState } from "../../src/games/deep-sea-salvage/state";
+import { SPECIES } from "../../src/games/deep-sea-salvage/species";
 
 const mocks = vi.hoisted(() => ({
   sessions: [] as Array<{ role: string; join: ReturnType<typeof vi.fn>; leave: ReturnType<typeof vi.fn>; send: ReturnType<typeof vi.fn>; waitForPlayer: ReturnType<typeof vi.fn> }>,
   rendererDispose: vi.fn(), draw: vi.fn(), reset: vi.fn(), startDive: vi.fn(), continueRun: vi.fn(),
   editorCleanup: vi.fn(), renderers: [] as Array<{ dispose: ReturnType<typeof vi.fn>; setThreeLayer: ReturnType<typeof vi.fn> }>,
   createThreeLayer: vi.fn(), fetchRanking: vi.fn(async () => []),
-  states: [] as Array<{ phase: string }>,
+  states: [] as Array<ReturnType<typeof createState>>,
+  finishes: [] as Array<(title: string, multiplier: number) => void>,
+  messages: [] as Array<(message: unknown) => void>,
+  setResult: vi.fn(), clearResult: vi.fn(), setLiveContext: vi.fn(),
 }));
 
 vi.mock("../../src/game-sdk/cabinet-session", () => ({
@@ -18,6 +23,7 @@ vi.mock("../../src/game-sdk/cabinet-session", () => ({
       role: "visitor", join: vi.fn(), leave: vi.fn(), send: vi.fn(() => true), getBufferedAmount: () => 0,
       waitForPlayer: vi.fn(async () => { session.role = "player"; options.onMessage({ type: "joinedCabinet", role: "player" }); return true; }),
     };
+    mocks.messages.push(options.onMessage);
     options.lifetime.own(session.leave); mocks.sessions.push(session); return session;
   },
 }));
@@ -33,8 +39,9 @@ vi.mock("../../src/games/deep-sea-salvage/renderer", () => ({
   },
 }));
 vi.mock("../../src/games/deep-sea-salvage/simulation", () => ({
-  createSimulation: (state: { phase: string }) => {
+  createSimulation: (state: ReturnType<typeof createState>, _config: unknown, _input: unknown, _geometry: unknown, hooks: { onFinish: (title: string, multiplier: number) => void }) => {
     mocks.states.push(state);
+    mocks.finishes.push(hooks.onFinish);
     return { reset: mocks.reset, update: vi.fn(), ensureChunks: vi.fn(), startDive: mocks.startDive, continueRun: mocks.continueRun, setMessage: vi.fn() };
   },
 }));
@@ -42,6 +49,10 @@ vi.mock("../../src/games/deep-sea-salvage/terrain-editor", () => ({ initTerrainE
 vi.mock("../../src/games/deep-sea-salvage/three-game-layer", () => ({ DeepSeaThreeLayer: { create: mocks.createThreeLayer } }));
 vi.mock("../../src/features/notifications/notifications", () => ({ notifications: { show: vi.fn(), clearScope: vi.fn() } }));
 vi.mock("../../src/features/notifications/share", () => ({ copySharedText: vi.fn() }));
+vi.mock("../../src/features/sharing/result-sharing", () => ({
+  resultSharing: { setResult: mocks.setResult, clear: mocks.clearResult },
+}));
+vi.mock("../../src/features/sharing/share-service", () => ({ setLiveContext: mocks.setLiveContext }));
 vi.mock("../../src/features/engagement/engagement-client", () => ({ recordWatchStarted: vi.fn() }));
 vi.mock("../../src/features/ranking/ranking-client", () => ({
   loadRankingWithNotice: async (_gameId: string, load: () => Promise<void>) => load(),
@@ -56,6 +67,7 @@ let selectors: Map<string, unknown>;
 
 beforeEach(() => {
   vi.clearAllMocks(); mocks.sessions.length = 0; mocks.renderers.length = 0; mocks.states.length = 0;
+  mocks.finishes.length = 0; mocks.messages.length = 0;
   lifetime = new GameLifetime(); frames = new Map(); let nextFrame = 1;
   const classList = { toggle: vi.fn(), add: vi.fn(), remove: vi.fn() };
   canvas = Object.assign(new EventTarget(), { width: 960, height: 640, getContext: () => ({}), getBoundingClientRect: () => ({ width: 960, height: 640 }) });
@@ -74,6 +86,59 @@ beforeEach(() => {
 afterEach(() => { lifetime.dispose(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe("深海サルベージのmount契約", () => {
+  it("registers zero-score completed runs without ranking and uses a new ID after continue", async () => {
+    const instance = mountGame({ game: DEEP_SEA_SALVAGE, lifetime });
+    await instance.play("start");
+    const state = mocks.states[0]!;
+    state.phase = "result"; state.elapsed = 0; state.finalScore = 0;
+    state.maxDepth = 123; state.discovered = new Set([SPECIES[0]!.id]);
+    mocks.finishes[0]!("Finished", 1);
+    const first = mocks.setResult.mock.calls[0]![0];
+    expect(first).toMatchObject({
+      gameId: DEEP_SEA_SALVAGE.id, elapsedTimeMs: 1, score: 0, cleared: false,
+      metrics: { maxDepth: 123, discoveredCount: 1, totalSpeciesCount: SPECIES.length, speciesIds: SPECIES[0]!.id },
+    });
+    mocks.clearResult.mockClear();
+    await instance.play("retry");
+    expect(mocks.clearResult).toHaveBeenCalledWith(DEEP_SEA_SALVAGE.id);
+    expect(mocks.clearResult.mock.invocationCallOrder[0]).toBeLessThan(mocks.continueRun.mock.invocationCallOrder[0]!);
+    state.phase = "result";
+    mocks.finishes[0]!("Finished again", 1);
+    expect(mocks.setResult.mock.calls[1]![0].id).not.toBe(first.id);
+    await instance.play("start");
+    expect(mocks.clearResult).toHaveBeenCalledWith(DEEP_SEA_SALVAGE.id);
+    instance.dispose();
+    expect(mocks.setLiveContext).toHaveBeenLastCalledWith(null);
+    mocks.finishes[0]!("Stale", 1);
+    expect(mocks.setResult).toHaveBeenCalledTimes(2);
+  });
+
+  it("clears on losing the seat and never attributes spectator state to the player", async () => {
+    const instance = mountGame({ game: DEEP_SEA_SALVAGE, lifetime });
+    await instance.play("start");
+    const state = mocks.states[0]!; state.phase = "result";
+    mocks.finishes[0]!("Finished", 1);
+    expect(mocks.setResult).toHaveBeenCalledTimes(1);
+    mocks.messages[0]!({ type: "roleChanged", role: "spectator" });
+    expect(mocks.clearResult).toHaveBeenCalledWith(DEEP_SEA_SALVAGE.id);
+    mocks.finishes[0]!("Spectator result", 1);
+    expect(mocks.setResult).toHaveBeenCalledTimes(1);
+  });
+
+  it("pauses before live sharing and suppresses game shortcuts inside the common share overlay", async () => {
+    const instance = mountGame({ game: DEEP_SEA_SALVAGE, lifetime });
+    await instance.play("start");
+    const state = mocks.states[0]!; state.phase = "dive"; state.paused = false;
+    windowTarget.dispatchEvent(new Event("before-live-share"));
+    expect(state.paused).toBe(true);
+    selectors.set(".share-overlay", {});
+    windowTarget.dispatchEvent(Object.assign(new Event("keydown"), { code: "KeyP" }));
+    expect(state.paused).toBe(true);
+    selectors.delete(".share-overlay");
+    windowTarget.dispatchEvent(Object.assign(new Event("keydown"), { code: "KeyP" }));
+    expect(state.paused).toBe(false);
+  });
+
   it("importでは起動せず、mount後のdisposeでRAF・エディタ・描画・通信を解放する", () => {
     expect(mocks.sessions).toHaveLength(0);
     const instance = mountGame({ game: DEEP_SEA_SALVAGE, lifetime });

@@ -13,6 +13,9 @@ import type { CanvasGameModule } from "../game-sdk/contracts";
 import { GameLifetime } from "../game-sdk/lifetime";
 import { gameHost } from "../game-sdk/game-host";
 import { navigate } from "../shared/navigation";
+import { SharedResultPage } from "../features/sharing/SharedResultPage";
+import { SharePanel } from "../features/sharing/ShareActions";
+import { sharePanel } from "../features/sharing/share-service";
 
 const ThreeBulletLab = lazy(async () => {
   const module = await import("../features/labs/ThreeBulletLab");
@@ -31,8 +34,14 @@ export function App() {
   const game = resolveGameDefinition(requested === "mochi-beat" || ["/labs/dot-wave", "/labs/mochi-duel"].includes(url.pathname) ? DOT_WAVE.id : requested ?? DEFAULT_GAME_ID);
   const isCabinet = /^\/cabinets\/[^/]+$/.test(url.pathname);
   const selection = requested !== null || url.pathname.startsWith("/labs/");
+  const resultMatch = /^\/results\/([^/]+)$/.exec(url.pathname);
+  useEffect(() => {
+    sharePanel.close();
+    if (!resultMatch) document.title = selection || isCabinet ? `${game.title}${url.searchParams.get("watch") === "1" ? "の観戦" : ""} | PULBASE` : `${BRAND.name} | ${BRAND.category}`;
+  }, [address]);
   const chooseGame = (gameId: string) => navigate("/?game=" + encodeURIComponent(gameId));
-  return <><NotificationCenter />{
+  return <><NotificationCenter /><SharePanel />{
+    resultMatch ? <SharedResultPage key={resultMatch[1]} resultId={resultMatch[1]!} /> :
     url.pathname === "/labs/buzz-barrier-three" ?
       <Suspense fallback={<Loading />}><ThreeBulletLab /></Suspense> :
     isCabinet ? <GameRoute key={game.id} game={game} /> :

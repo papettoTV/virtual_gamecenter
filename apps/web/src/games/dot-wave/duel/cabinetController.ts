@@ -1,5 +1,10 @@
 import { notifications } from "../../../features/notifications/notifications";
-import { copySharedText } from "../../../features/notifications/share";
+import { resultSharing } from "../../../features/sharing/result-sharing";
+import { setLiveContext, shareLive } from "../../../features/sharing/share-service";
+import type { SharedResultDraft } from "../../../domain/shared-result";
+import { DOT_WAVE } from "../../../domain/game";
+import { recordWatchStarted, recordPlayStartedFromWatch } from "../../../features/engagement/engagement-client";
+import type { Engine } from "./engine";
 import { createUuid } from "../../../shared/id";
 import type { CabinetClient } from "../../../realtime/cabinet-client";
 import { createCabinetSession } from "../../../game-sdk/cabinet-session";
@@ -27,7 +32,63 @@ export function createDotWaveCabinetController(
   let soloTimer: number | undefined;
   const audio = { current: null as DuelAudio | null };
   const clock = new ServerClock();
-  const render = () => { if (!disposed) onChange(); };
+  let localEngine: Engine | null = null;
+  let runId = createUuid();
+  let runStartedAt = 0;
+  let soloFinished = false;
+  let resultDraft: SharedResultDraft | null = null;
+  let liveContextKey = "";
+  let playAttributionRecorded = false;
+  function recordPlayStarted() {
+    if (playAttributionRecorded) return;
+    playAttributionRecorded = true;
+    recordPlayStartedFromWatch(DOT_WAVE.id, d.cabinetId);
+  }
+  function clearResult() {
+    resultDraft = null;
+    soloFinished = false;
+    resultSharing.clear(DOT_WAVE.id);
+  }
+  function recordResult(engine: Engine, side: 0 | 1, winner = engine.match.winner) {
+    if (disposed || resultDraft || !runStartedAt || winner === null) return;
+    resultDraft = {
+      id: runId, gameId: DOT_WAVE.id, gameVersion: DOT_WAVE.currentVersion,
+      elapsedTimeMs: Math.max(1, Math.round(engine.elapsedPlayMs ?? Math.max(0, clock.now() - runStartedAt))),
+      cleared: winner === side, score: engine.score?.total ?? 0,
+      metrics: { mode: engine.mode === "cpu" ? "solo" : "versus", outcome: winner === "draw" ? "draw" : winner === side ? "win" : "lose",
+        turns: engine.match.turn, remainingHp: engine.match.hp[side] },
+    };
+    resultSharing.setResult(resultDraft);
+    render();
+  }
+  function getLivePhase(): "ready" | "playing" | "paused" | "finished" {
+    const phase = (net.side === 0 ? localEngine : net.latest?.engine)?.phase;
+    if (d.result || phase === "finished") return "finished";
+    if (net.matchId && net.startsAt && !phase) return "playing";
+    return phase === "intro" || !phase ? "ready" : phase === "paused" ? "paused" : "playing";
+  }
+  function canShareLive() {
+    return net.connected && Boolean(d.cabinetId)
+      && !(net.matchId && net.side !== null && getLivePhase() === "playing");
+  }
+  async function pauseBeforeShare(event?: Event) {
+    if (net.side === null) return;
+    if (!canShareLive()) { event?.preventDefault(); return; }
+    if (!localEngine || net.matchId || !["playing", "countdown"].includes(localEngine.phase)) return;
+    localEngine.seconds = audio.current?.seconds ?? localEngine.seconds;
+    localEngine.phase = "paused";
+    render();
+    await audio.current?.pause();
+  }
+  function updateLiveContext() {
+    const context = d.cabinetId && net.connected ? {
+      gameId: DOT_WAVE.id, cabinetId: d.cabinetId,
+      role: net.side !== null ? "player" as const : "spectator" as const, phase: getLivePhase(),
+    } : null;
+    const key = JSON.stringify(context);
+    if (key !== liveContextKey) { liveContextKey = key; setLiveContext(context); }
+  }
+  const render = () => { if (!disposed) { updateLiveContext(); onChange(); } };
   const send = (message: ClientMessage | Record<string, unknown>) => !disposed && Boolean(client?.send(message));
   const assertActive = () => { if (disposed) throw new Error("cabinet_disposed"); };
   async function reservePlayCredit(...args: Parameters<typeof reserveCredit>) {
@@ -75,6 +136,7 @@ export function createDotWaveCabinetController(
         if (!started) throw new Error("disconnected");
         d.credit = true;
         net.startCost = 0;
+        clearResult(); runId = createUuid(); runStartedAt = clock.now();
         return true;
       } catch (error) {
         if (reservationId) await releasePlayCredit(reservationId).catch(() => {});
@@ -83,12 +145,21 @@ export function createDotWaveCabinetController(
       }
     },
     soloEnded: () => {
+      if (net.role === "player" && net.side === 0) soloFinished = true;
       d.credit = false;
       net.startCost = 1;
       send({ type: "stopSolo" });
       render();
     },
     publish: (engine, turnStartedAt) => {
+      if (disposed) return;
+      if (net.side !== null && engine.phase === "playing") recordPlayStarted();
+      if (net.side === 0) {
+        localEngine = engine;
+        if (resultDraft && !["finished", "impact"].includes(engine.phase)) clearResult();
+        if (soloFinished && !net.matchId && engine.phase === "finished" && net.role === "player") recordResult(engine, 0);
+      }
+      updateLiveContext();
       if (disposed || net.role !== "player" || !net.connected || performance.now() - d.lastPublish < 80) return;
       d.lastPublish = performance.now();
       const frame: DuelFrame = { engine, turnStartedAt, sentAt: clock.now(), matchId: net.matchId, seq: ++d.seq, streamId: d.streamId };
@@ -129,7 +200,7 @@ export function createDotWaveCabinetController(
     d.cabinetId = existing ?? createUuid();
     const watch = url.searchParams.get("watch") === "1";
     if (!existing) history.replaceState({}, "", `/cabinets/${d.cabinetId}?game=dot-wave`);
-    const resetGame = () => { net.latest = null; net.inputs = []; d.bestFrameSeq = -1; d.revision++; };
+    const resetGame = () => { clearResult(); playAttributionRecorded = false; localEngine = null; runStartedAt = 0; net.latest = null; net.inputs = []; d.bestFrameSeq = -1; d.revision++; };
     const handle = async (message: ServerMessage) => {
       if (disposed) return;
       if (message.type === "clockPong") clock.sample(message.sentAt, message.serverAt, Date.now());
@@ -144,6 +215,11 @@ export function createDotWaveCabinetController(
         if (frame.streamId !== d.viewerStream) { d.viewerStream = frame.streamId; d.bestFrameSeq = -1; }
         if (net.role === "player" || !frame.engine || frame.seq <= d.bestFrameSeq || (net.matchId && frame.matchId !== net.matchId)) return;
         d.bestFrameSeq = frame.seq; net.latest = frame;
+        if (net.side === null) recordWatchStarted(DOT_WAVE.id, d.cabinetId);
+        else if (frame.engine.phase === "playing") recordPlayStarted();
+        if (d.result && net.side !== null && d.seat && frame.engine.match.winner !== null) {
+          recordResult(frame.engine, net.side, d.result.winner === "draw" ? "draw" : d.result.winner === "host" ? 0 : 1);
+        }
       }
       if (message.type === "versusOpponentProgress" && message.matchId === net.matchId && net.side === 0 && message.progress.kind === "dotWaveTap") {
         net.inputs.push({ seq: message.seq, turn: message.progress.turn, seconds: message.progress.seconds, action: message.progress.action } as RemoteTap);
@@ -160,7 +236,7 @@ export function createDotWaveCabinetController(
       if (message.type === "challengeAccepted") {
         d.pending = false; d.applied = false; d.busy = false; d.result = null; d.resultPlayers = null; d.seat = message.seat; d.rematchPending = false; d.rematchRequested = false;
         net.matchId = message.matchId; net.side = message.seat === "host" ? 0 : 1; net.startsAt = null;
-        audio.current?.stop(); resetGame(); render();
+        audio.current?.stop(); resetGame(); runId = createUuid(); runStartedAt = clock.now(); render();
         try {
           if (message.reservationId) {
             if ((await capturePlayCredit(message.reservationId)).status !== "captured") throw new Error("credit_not_captured");
@@ -173,7 +249,13 @@ export function createDotWaveCabinetController(
       if (message.type === "rematchRequested") d.rematchPending = true;
       if (message.type === "rematchRejected") { d.rematchRequested = false; d.busy = false; if (d.reservation) await releasePlayCredit(d.reservation).catch(() => {}); d.reservation = null; walletChanged(); }
       if (message.type === "versusCountdown" && message.matchId === net.matchId) net.startsAt = message.startsAt;
-      if (message.type === "versusResult" && message.matchId === net.matchId) { d.result = message; d.resultAt = Date.now(); }
+      if (message.type === "versusResult" && message.matchId === net.matchId) {
+        d.result = message; d.resultAt = Date.now();
+        const engine = net.side === 0 ? localEngine : net.latest?.engine;
+        if (engine && engine.match.winner !== null && net.side !== null && d.seat) {
+          recordResult(engine, net.side, message.winner === "draw" ? "draw" : message.winner === "host" ? 0 : 1);
+        }
+      }
       if (message.type === "versusEnded") {
         const keepResult = message.nextRole === "player" && Boolean(d.result) && !d.returningToCpu;
         net.matchId = null; net.startsAt = null; net.role = message.nextRole;
@@ -205,6 +287,9 @@ export function createDotWaveCabinetController(
     // Establish the account cookie before the WebSocket so reservations are tied to its player.
     void fetchPlatformBootstrap().then(() => { if (!disposed) client?.join(d.cabinetId, "dot-wave", watch); }).catch(showError);
     const refreshProfile = () => send({ type: "refreshDotWaveProfile" });
+    const beforeShare = (event: Event) => { void pauseBeforeShare(event).catch(showError); };
+    window.addEventListener("before-live-share", beforeShare);
+    window.addEventListener("request-cabinet-share", beforeShare);
     window.addEventListener("platform-profile-changed", refreshProfile);
     const timer = window.setInterval(() => {
       if (net.connected) send({ type: "clockPing", sentAt: Date.now() });
@@ -214,6 +299,8 @@ export function createDotWaveCabinetController(
     cleanup = () => {
       d.soloReady?.(false);
       clearTimeout(soloTimer);
+      window.removeEventListener("before-live-share", beforeShare);
+      window.removeEventListener("request-cabinet-share", beforeShare);
       window.removeEventListener("platform-profile-changed", refreshProfile);
       notifications.clearScope("dot-wave");
       clearInterval(timer);
@@ -225,7 +312,7 @@ export function createDotWaveCabinetController(
     };
   }
 
-  function dispose() { if (disposed) return; disposed = true; cleanup(); }
+  function dispose() { if (disposed) return; clearResult(); setLiveContext(null); disposed = true; cleanup(); }
 
   async function requestChallenge() {
     if (disposed || d.busy || d.applied || net.role !== "spectator") return;
@@ -259,10 +346,13 @@ export function createDotWaveCabinetController(
     catch (error) { showError(error); }
   }
   async function share() {
-    const url = `${location.origin}/cabinets/${d.cabinetId}?game=dot-wave&watch=1`;
-    try { await copySharedText(url, "game-share", "dot-wave"); }
-    catch {}
-    render();
+    if (disposed || !canShareLive()) return;
+    try {
+      await pauseBeforeShare();
+      if (disposed) return;
+      await shareLive({ gameId: DOT_WAVE.id, cabinetId: d.cabinetId,
+        role: net.side !== null ? "player" : "spectator", phase: getLivePhase() });
+    } catch (error) { showError(error); }
   }
   function takeSeat() {
     if (disposed || !net.connected || d.room?.playerCount !== 0) return;
@@ -273,6 +363,7 @@ export function createDotWaveCabinetController(
   }
   function leaveResult() {
     if (disposed) return;
+    clearResult();
     if (net.matchId) {
       d.returningToCpu = d.result?.winner === d.seat || (d.result?.winner === "draw" && d.seat === "host");
       send({ type: "dotWaveReturn", matchId: net.matchId });
@@ -285,6 +376,8 @@ export function createDotWaveCabinetController(
   return {
     state: d, network: net, audio, start, dispose,
     requestChallenge, rematch, respondRematch, respond, share, takeSeat, leaveResult, showError,
+    getResultShareDraft: () => resultDraft,
+    getLivePhase, canShareLive,
     cancelChallenge: () => send({ type: "cancelChallenge" }),
   };
 }

@@ -1,4 +1,5 @@
 import { createUuid } from "../../shared/id";
+import { recordPlayStartedFromResult } from "../sharing/sharing-events";
 
 const WATCH_ATTRIBUTION_KEY = "vgc_watch_attribution";
 const WATCH_EVENT_PREFIX = "vgc_watch_recorded:";
@@ -24,16 +25,18 @@ export function createTrackedWatchUrl(url: string): { shareId: string; url: stri
 
 export function recordWatchStarted(gameId: string, cabinetId: string): void {
   const storageKey = `${WATCH_EVENT_PREFIX}${cabinetId}`;
-  const shareId = new URL(window.location.href).searchParams.get("shareId");
+  const shareId = new URL(location.href).searchParams.get("shareId");
   const attribution: WatchAttribution = {
     gameId,
     cabinetId,
     shareId,
     watchedAt: Date.now(),
   };
-  sessionStorage.setItem(WATCH_ATTRIBUTION_KEY, JSON.stringify(attribution));
-  if (sessionStorage.getItem(storageKey)) return;
-  sessionStorage.setItem(storageKey, "1");
+  try {
+    sessionStorage.setItem(WATCH_ATTRIBUTION_KEY, JSON.stringify(attribution));
+    if (sessionStorage.getItem(storageKey)) return;
+    sessionStorage.setItem(storageKey, "1");
+  } catch { return; }
   void postEngagementEvent("watch_started", gameId, cabinetId, shareId);
 }
 
@@ -42,10 +45,12 @@ export function recordShareCreated(gameId: string, cabinetId: string, shareId: s
 }
 
 export function recordPlayStartedFromWatch(gameId: string, cabinetId: string): void {
-  const rawAttribution = sessionStorage.getItem(WATCH_ATTRIBUTION_KEY);
+  recordPlayStartedFromResult(gameId);
+  let rawAttribution: string | null;
+  try { rawAttribution = sessionStorage.getItem(WATCH_ATTRIBUTION_KEY); } catch { return; }
   if (!rawAttribution) return;
-  sessionStorage.removeItem(WATCH_ATTRIBUTION_KEY);
   try {
+    sessionStorage.removeItem(WATCH_ATTRIBUTION_KEY);
     const attribution = JSON.parse(rawAttribution) as WatchAttribution;
     if (
       attribution.gameId !== gameId

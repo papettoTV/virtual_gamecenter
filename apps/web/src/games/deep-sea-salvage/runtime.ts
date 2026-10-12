@@ -1,5 +1,6 @@
 import { notifications } from "../../features/notifications/notifications";
-import { copySharedText } from "../../features/notifications/share";
+import { resultSharing } from "../../features/sharing/result-sharing";
+import { setLiveContext } from "../../features/sharing/share-service";
 import { createCabinetSession } from "../../game-sdk/cabinet-session";
 import { gameHost } from "../../game-sdk/game-host";
 import type { GameContext, GameInstance } from "../../game-sdk/contracts";
@@ -48,15 +49,7 @@ export function mountGame(context: GameContext): GameInstance {
   const rankingRetry = document.querySelector<HTMLButtonElement>("#ranking-retry");
   const touchPause = document.querySelector<HTMLButtonElement>("#touch-pause");
   const touchCollection = document.querySelector<HTMLButtonElement>("#touch-collection");
-  const shareResultButton = document.querySelector<HTMLButtonElement>("#salvage-share-result");
   const resultCollectionButton = document.querySelector<HTMLButtonElement>("#salvage-result-collection");
-  const shareMenu = document.querySelector<HTMLElement>("#salvage-share-menu");
-  const shareNativeButton = document.querySelector<HTMLButtonElement>("#salvage-share-native");
-  const shareXButton = document.querySelector<HTMLButtonElement>("#salvage-share-x");
-  const shareLineButton = document.querySelector<HTMLButtonElement>("#salvage-share-line");
-  const shareBlueskyButton = document.querySelector<HTMLButtonElement>("#salvage-share-bluesky");
-  const shareSaveButton = document.querySelector<HTMLButtonElement>("#salvage-share-save");
-  const shareCopyButton = document.querySelector<HTMLButtonElement>("#salvage-share-copy");
 
   const keys = new Set<string>();
   const pointer = { active: false, x: 0, y: 0 };
@@ -87,7 +80,7 @@ export function mountGame(context: GameContext): GameInstance {
   const { update, ensureChunks, startDive, setMessage } = simulation;
   const renderer = createRenderer(canvas, state, simulation, debugParams, () => watching);
   scope.own(() => renderer.dispose());
-  const { draw, drawOverlay, drawSpeciesPortrait } = renderer;
+  const { draw, drawOverlay } = renderer;
   const threeRendererEnabled = debugParams.get("renderer") !== "2d" && debugParams.get("threeGame") !== "0";
   if (threeRendererEnabled) {
     void import("./three-game-layer")
@@ -102,6 +95,8 @@ export function mountGame(context: GameContext): GameInstance {
   let cabinetId = window.location.pathname.match(/^\/cabinets\/([^/]+)/)?.[1] ?? null;
   let cabinetRole: CabinetRole = "visitor";
   let playing = false;
+  let liveShareScreen = false;
+  let liveShareContextKey = "";
   let watching = new URLSearchParams(window.location.search).get("watch") === "1";
   let autoWatch = true;
   let viewerHasState = false;
@@ -123,6 +118,7 @@ export function mountGame(context: GameContext): GameInstance {
   });
 
   function enterWatch() {
+    resultSharing.clear(DEEP_SEA_SALVAGE.id);
     watching = true;
     playing = false;
     keys.clear(); pointer.active = false;
@@ -197,6 +193,7 @@ export function mountGame(context: GameContext): GameInstance {
   }
 
   function showScreen(screen: "arcade" | "cabinet" | "game") {
+    liveShareScreen = screen === "game";
     if (screen === "arcade") notifications.clearScope(DEEP_SEA_SALVAGE.id);
     document.body.classList.toggle("is-game-screen", screen === "game");
     arcadeScreen?.classList.toggle("is-hidden", screen !== "arcade");
@@ -206,26 +203,33 @@ export function mountGame(context: GameContext): GameInstance {
     spectatorBanner?.classList.toggle("is-hidden", !watching || screen !== "game");
     document.querySelector("#challenge-request")?.classList.add("is-hidden");
     document.querySelector("#open-terrain-editor")?.classList.toggle("is-hidden", watching);
+    updateLiveShareContext();
   }
 
   function resetRun() {
+    resultSharing.clear(DEEP_SEA_SALVAGE.id);
     runId = createUuid(); lastWorldAt = -Infinity; lastStreamAt = 0;
     simulation.reset(loadTerrainCourse(), {
       startDepth: debugNumber("startDepth", 0), hull: debugNumber("hull", MAX_HULL),
       bossProgress: debugNumber("bossProgress", 0), terrainPreview: debugParams.get("terrainPreview") === "1",
     });
     rankingPanel?.classList.remove("is-visible", "is-submitted");
-    if (shareMenu) shareMenu.hidden = true;
-    shareResultButton?.setAttribute("aria-expanded", "false");
     ensureChunks(); setMessage("P / 画面下のボタンで潜航開始", 99); updateButtons();
     if (debugParams.get("terrainPreview") === "1") setMessage("地形確認（明るく表示） / Pで通常の潜航開始 / 岩壁エディタで編集へ戻る", 99);
   }
 
   function showResult(title: string, multiplier: number) {
+    if (scope.disposed) return;
+    if (playing && !watching && cabinetRole === "player" && state.phase === "result") {
+      resultSharing.setResult({
+        id: runId, gameId: DEEP_SEA_SALVAGE.id, gameVersion: DEEP_SEA_SALVAGE.currentVersion,
+        elapsedTimeMs: Math.max(1, Math.round(state.elapsed * 1000)), cleared: state.cleared, score: state.finalScore,
+        metrics: { maxDepth: Math.floor(state.maxDepth), discoveredCount: state.discovered.size,
+          totalSpeciesCount: SPECIES.length, speciesIds: [...state.discovered].sort().join(",") },
+      });
+    }
     const rareCount = [...state.discovered].filter((id) => speciesById.get(id)?.rare).length;
     if (rankingHeading) rankingHeading.textContent = "ランキング登録";
-    if (shareMenu) shareMenu.hidden = true;
-    shareResultButton?.setAttribute("aria-expanded", "false");
     if (rankingResult) rankingResult.textContent = `${title} / SCORE ${state.finalScore.toLocaleString()}（適用前 ${state.finalSubtotal.toLocaleString()}・倍率 ${(multiplier * 100).toFixed(0)}%） / 図鑑 ${state.discovered.size}/21 / レア ${rareCount}/5 / 最大 ${Math.floor(state.maxDepth).toLocaleString()}m`;
     rankingPanel?.classList.add("is-visible"); rankingPanel?.classList.remove("is-submitted");
     if (rankingSubmit) rankingSubmit.disabled = !rankingName?.value.trim() || state.finalScore <= 0;
@@ -233,6 +237,8 @@ export function mountGame(context: GameContext): GameInstance {
   }
 
   function retryFromResult() {
+    resultSharing.clear(DEEP_SEA_SALVAGE.id);
+    runId = createUuid();
     if (state.phase !== "result" || state.cleared) { resetRun(); startDive(); return; }
     simulation.continueRun();
     rankingPanel?.classList.remove("is-visible", "is-submitted");
@@ -259,7 +265,22 @@ export function mountGame(context: GameContext): GameInstance {
     updateButtons();
   }
 
+  function updateLiveShareContext() {
+    const context = cabinetId && liveShareScreen ? {
+        gameId: DEEP_SEA_SALVAGE.id, cabinetId,
+        role: playing && !watching && cabinetRole === "player" ? "player" as const : "spectator" as const,
+        phase: state.phase === "result" ? "finished" as const : state.phase === "ready" ? "ready" as const
+          : state.paused || state.collectionOpen ? "paused" as const : "playing" as const,
+    } : null;
+    const key = JSON.stringify(context);
+    if (key !== liveShareContextKey) {
+      liveShareContextKey = key;
+      setLiveContext(context);
+    }
+  }
+
   function updateButtons() {
+    updateLiveShareContext();
     if (touchPause) {
       touchPause.textContent = state.phase === "ready" ? "潜航開始" : state.phase === "boss-clear" ? "調査完了" : state.phase === "hull-break" ? "大破" : state.paused ? "再開" : "一時停止";
       touchPause.disabled = state.phase === "boss-clear" || state.phase === "hull-break";
@@ -269,88 +290,6 @@ export function mountGame(context: GameContext): GameInstance {
 
   function isCompactCanvas() { const rect = canvas.getBoundingClientRect(); return rect.height > rect.width * 1.2; }
   function horizontalBounds(): [number, number] { return isCompactCanvas() ? [325, 635] : [42, W - 42]; }
-
-  function shareText() {
-    return `深海サルベージで21種中${state.discovered.size}種を調査！最大${Math.floor(state.maxDepth).toLocaleString()}mまで潜航しました。\n#深海サルベージ #PULBASE`;
-  }
-
-  function shareUrl() {
-    const url = new URL(window.location.href);
-    for (const key of [...url.searchParams.keys()]) if (key !== "game") url.searchParams.delete(key);
-    url.searchParams.set("game", DEEP_SEA_SALVAGE.id);
-    return url.toString();
-  }
-
-  async function createShareFile() {
-    const shareCanvas = document.createElement("canvas"); shareCanvas.width = 1200; shareCanvas.height = 630;
-    const shareCtx = shareCanvas.getContext("2d")!; const gradient = shareCtx.createLinearGradient(0, 0, 1200, 630);
-    gradient.addColorStop(0, "#071d32"); gradient.addColorStop(1, "#01040b"); shareCtx.fillStyle = gradient; shareCtx.fillRect(0, 0, 1200, 630);
-    shareCtx.fillStyle = "#69f7ff"; shareCtx.font = "900 34px system-ui"; shareCtx.fillText("PULBASE / DEEP SEA SALVAGE", 64, 70);
-    shareCtx.fillStyle = "#f3ffff"; shareCtx.font = "900 72px system-ui"; shareCtx.fillText(`図鑑収集率 ${Math.round(state.discovered.size / 21 * 100)}%`, 64, 164);
-    shareCtx.font = "800 34px system-ui"; shareCtx.fillStyle = "#b8d4dc"; shareCtx.fillText(`${state.discovered.size} / 21 SPECIES　最大 ${Math.floor(state.maxDepth).toLocaleString()}m`, 68, 218);
-    SPECIES.forEach((species, index) => {
-      const x = 75 + index % 11 * 95; const y = 290 + Math.floor(index / 11) * 125; const known = state.discovered.has(species.id);
-      shareCtx.fillStyle = known ? "rgba(45,110,125,.65)" : "rgba(255,255,255,.06)"; shareCtx.fillRect(x, y, 76, 94);
-      drawSpeciesPortrait(shareCtx, species, known, x + 4, y + 4, 68, 62);
-      shareCtx.fillStyle = known ? "#f0ffff" : "#80909b"; shareCtx.textAlign = "center"; shareCtx.font = "800 18px system-ui"; shareCtx.fillText(known ? "✓" : "?", x + 38, y + 78);
-    });
-    shareCtx.textAlign = "left"; shareCtx.fillStyle = "#ffdb67"; shareCtx.font = "800 25px system-ui"; shareCtx.fillText(state.cleared ? "巨大深海魚の調査に成功！" : "今回の深海調査記録", 64, 570);
-    const blob = await new Promise<Blob | null>((resolve) => shareCanvas.toBlob(resolve, "image/png"));
-    return blob ? new File([blob], "deep-sea-salvage-result.png", { type: "image/png" }) : null;
-  }
-
-  function showShareMenu() {
-    if (!shareMenu) return;
-    shareMenu.hidden = false;
-    shareResultButton?.setAttribute("aria-expanded", "true");
-    shareMenu.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }
-
-  function setShareFeedback(text: string) {
-    if (scope.disposed) return;
-    notifications.show({ id: "game-share", scope: DEEP_SEA_SALVAGE.id, type: text.includes("できません") ? "error" : "success", message: text });
-  }
-
-  async function shareResult() {
-    if (state.phase !== "result") return;
-    showShareMenu();
-  }
-
-  async function shareWithDevice() {
-    const file = await createShareFile();
-    if (scope.disposed) return;
-    if (!file) { setShareFeedback("共有画像を作成できませんでした"); return; }
-    try {
-      if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
-        await navigator.share({ title: "深海サルベージ 調査記録", text: shareText(), url: shareUrl(), files: [file] });
-        return;
-      }
-      if (navigator.share) {
-        await navigator.share({ title: "深海サルベージ 調査記録", text: shareText(), url: shareUrl() });
-        return;
-      }
-      await copyShareText();
-      setShareFeedback("共有機能がないため文章をコピーしました");
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") return;
-      setShareFeedback("共有できませんでした");
-    }
-  }
-
-  async function saveShareImage() {
-    const file = await createShareFile();
-    if (!file || scope.disposed) return;
-    const objectUrl = URL.createObjectURL(file);
-    const link = document.createElement("a"); link.href = objectUrl; link.download = file.name; link.click();
-    const releaseUrl = scope.own(() => URL.revokeObjectURL(objectUrl));
-    scope.timeout(() => { URL.revokeObjectURL(objectUrl); releaseUrl(); }, 1_000);
-    setShareFeedback("シェア用画像を保存しました");
-  }
-
-  async function copyShareText() {
-    const text = `${shareText()}\n${shareUrl()}`;
-    await copySharedText(text, "game-share", DEEP_SEA_SALVAGE.id);
-  }
 
   async function submitScore() {
     if (!state.finalScore || !rankingSubmit || !rankingName?.value.trim()) return;
@@ -377,7 +316,7 @@ export function mountGame(context: GameContext): GameInstance {
   function escapeHtml(value: string) { const element = document.createElement("span"); element.textContent = value; return element.innerHTML; }
 
   scope.listen(window, "keydown", (event) => {
-    if (watching) return;
+    if (watching || document.querySelector(".share-overlay")) return;
     keys.add(event.code); if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(event.code)) event.preventDefault();
     if (event.code === "KeyP") togglePause();
     if (event.code === "KeyF") toggleCollection();
@@ -393,22 +332,25 @@ export function mountGame(context: GameContext): GameInstance {
   scope.listen(window, "pointerup", () => { pointer.active = false; });
   if (touchPause) scope.listen(touchPause, "click", togglePause);
   if (touchCollection) scope.listen(touchCollection, "click", () => toggleCollection());
-  if (shareResultButton) scope.listen(shareResultButton, "click", () => void shareResult());
   if (resultCollectionButton) scope.listen(resultCollectionButton, "click", () => toggleCollection(true));
-  if (shareNativeButton) scope.listen(shareNativeButton, "click", () => void shareWithDevice());
-  if (shareXButton) scope.listen(shareXButton, "click", () => window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(`${shareText()}\n${shareUrl()}`)}`, "_blank", "noopener,noreferrer"));
-  if (shareLineButton) scope.listen(shareLineButton, "click", () => window.open(`https://line.me/R/msg/text/?${encodeURIComponent(`${shareText()}\n${shareUrl()}`)}`, "_blank", "noopener,noreferrer"));
-  if (shareBlueskyButton) scope.listen(shareBlueskyButton, "click", () => window.open(`https://bsky.app/intent/compose?text=${encodeURIComponent(`${shareText()}\n${shareUrl()}`)}`, "_blank", "noopener,noreferrer"));
-  if (shareSaveButton) scope.listen(shareSaveButton, "click", () => void saveShareImage());
-  if (shareCopyButton) scope.listen(shareCopyButton, "click", () => void copyShareText().catch(() => {}));
   if (rankingName) scope.listen(rankingName, "input", () => { if (rankingSubmit) rankingSubmit.disabled = !rankingName.value.trim() || !state.finalScore; });
   if (rankingSubmit) scope.listen(rankingSubmit, "click", () => void submitScore());
   const spectatorBack = document.querySelector("#spectator-game-back");
   if (spectatorBack) scope.listen(spectatorBack, "click", () => {
     watching = false; autoWatch = false; showScreen("cabinet");
   });
+  const pauseBeforeShare = () => {
+    if (!playing || watching || state.phase !== "dive") return;
+    state.paused = true;
+    keys.clear(); pointer.active = false;
+    updateButtons();
+    publishLiveState(performance.now());
+  };
+  scope.listen(window, "before-live-share", pauseBeforeShare);
+  scope.listen(window, "request-cabinet-share", pauseBeforeShare);
   scope.listen(window, "pagehide", () => scope.dispose());
   scope.listen(window, "popstate", () => {
+    resultSharing.clear(DEEP_SEA_SALVAGE.id);
     actionGeneration += 1;
     cabinetClient.leave(); cabinetRole = "visitor"; playing = false;
     liveBuffer.clear(); viewerHasState = false;
@@ -437,6 +379,7 @@ export function mountGame(context: GameContext): GameInstance {
       } else { update(dt); draw(); }
     }
     publishLiveState(now);
+    updateLiveShareContext();
     scope.frame(loop);
   }
   scope.listen(document, "visibilitychange", () => { lastTime = performance.now(); });
@@ -503,6 +446,8 @@ export function mountGame(context: GameContext): GameInstance {
   }
 
   scope.own(() => {
+    resultSharing.clear(DEEP_SEA_SALVAGE.id);
+    setLiveContext(null);
     actionGeneration += 1; playing = watching = false;
     keys.clear(); pointer.active = false; liveBuffer.clear();
     notifications.clearScope(DEEP_SEA_SALVAGE.id);

@@ -1,0 +1,22 @@
+.share-overlay { position: fixed; inset: 0; z-index: 2000; background: #030610d9; display: grid; place-items: center; padding: 16px; overflow-y: auto; }
+.share-dialog { width: min(600px, 100%); max-height: calc(100dvh - 32px); overflow-y: auto; background: #111526; border: 1px solid #49647a; border-radius: 20px; padding: 24px; box-shadow: 0 20px 80px #0008; }
+.share-dialog button, .result-share-button, .shared-result-next button, .safe-live-share button { border: 1px solid #54617c; border-radius: 10px; background: #1b253a; color: #f3f5ff; padding: 10px 16px; font: inherit; cursor: pointer; }
+.share-dialog button:focus-visible, .result-share-button:focus-visible, .shared-result-next button:focus-visible, .safe-live-share button:focus-visible { outline: 2px solid #69f7ff; outline-offset: 3px; }
+.share-dialog button:hover, .result-share-button:hover, .shared-result-next button:hover { background: #273951; }
+.share-dialog .share-close { display: block; margin-left: auto; background: transparent; border: none; color: #b6c3da; }
+.share-dialog h2 { font-size: 1.5rem; }
+.share-dialog textarea { display: block; width: 100%; box-sizing: border-box; margin-top: 8px; padding: 12px; border-radius: 10px; border: 1px solid #4a516b; background: #090d1c; color: #f3f5ff; font: inherit; user-select: text; }
+.share-url { overflow-wrap: anywhere; font-size: .8rem; color: #a7b6cc; user-select: text; }
+.share-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+.share-actions button { font-size: .95rem; padding: 10px 14px; }
+.shared-result-card { padding: 22px; border: 2px solid; border-radius: 16px; background: linear-gradient(130deg, #10293a, #10101f); margin-bottom: 20px; }
+.shared-result-card h2 { font-size: clamp(1.6rem, 5vw, 3rem); margin: 12px 0; overflow-wrap: anywhere; }
+.shared-result-card p { margin: 8px 0; }
+.result-share-button { color: #69f7ff; border-color: #69f7ff80; margin: 12px 0; }
+.safe-live-share { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 4; }
+.safe-live-share button { font-size: .9rem; padding: 8px 16px; background: #0e1e30; }
+.shared-result-page { max-width: 760px; padding-top: 36px; }
+.shared-result-page h1 { font-size: clamp(1.4rem, 5vw, 2.2rem); }
+.shared-result-next { display: flex; flex-wrap: wrap; gap: 12px; margin: 20px 0; }
+.shared-result-next .platform-primary-button { border-color: #69f7ff; background: #245b6a; }
+@media (max-width: 600px) { .share-dialog { padding: 18px; } .shared-result-card { padding: 16px; } .share-actions button { flex-grow: 1; } }

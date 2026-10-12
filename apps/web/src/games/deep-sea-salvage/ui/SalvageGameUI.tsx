@@ -1,30 +1,8 @@
-export function SalvageResultShare() {
-  return (
-    <button id="salvage-share-result" className="ranking-result-share-button" type="button">
-      結果をシェア
-    </button>
-  );
-}
-
 export function SalvageResultCollection() {
   return (
     <button id="salvage-result-collection" className="ranking-result-collection-button" type="button">
       図鑑
     </button>
-  );
-}
-
-export function SalvageShareMenu() {
-  return (
-    <div id="salvage-share-menu" className="salvage-share-menu" hidden>
-      <p>投稿先を選んでください。端末の共有では結果画像も一緒に送れます。</p>
-      <button id="salvage-share-native" type="button">端末の共有メニュー</button>
-      <button id="salvage-share-x" type="button">Xで共有</button>
-      <button id="salvage-share-line" type="button">LINEで共有</button>
-      <button id="salvage-share-bluesky" type="button">Blueskyで共有</button>
-      <button id="salvage-share-save" type="button">シェア用画像を保存</button>
-      <button id="salvage-share-copy" type="button">文章をコピー</button>
-    </div>
   );
 }
 

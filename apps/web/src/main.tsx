@@ -26,5 +26,6 @@ function redirectLegacyLocalUrl(): boolean {
 if (!redirectLegacyLocalUrl()) {
   const root = document.querySelector("#root");
   if (!root) throw new Error("App root was not found.");
+  document.querySelector("#result-preview")?.remove();
   createRoot(root).render(<App />);
 }
