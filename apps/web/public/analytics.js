@@ -10,7 +10,7 @@
   let expiryTimer;
   let snapshot;
   const hostname = window.location.hostname.toLowerCase().replace(/\.$/, "");
-  const isLocal = window.location.protocol === "file:"
+  const isLocal = window.PULBASE_ANALYTICS_DISABLED === true || window.location.protocol === "file:"
     || hostname === "localhost"
     || hostname.endsWith(".localhost")
     || hostname === "[::1]"

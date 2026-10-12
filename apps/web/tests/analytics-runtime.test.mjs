@@ -7,7 +7,7 @@ const source = readFileSync(new URL("../public/analytics.js", import.meta.url), 
 const key = "pulbase.analytics-consent.v1";
 const lifetime = 180 * 86400000;
 
-function runtime({ url = "https://pulbase.example/cabinets/secret?token=private", choice, age = 0, blocked = false, framed = false } = {}) {
+function runtime({ url = "https://pulbase.example/cabinets/secret?token=private", choice, age = 0, blocked = false, framed = false, analyticsDisabled = false } = {}) {
   let now = Date.now();
   const storage = new Map();
   if (choice) storage.set(key, JSON.stringify({ version: 1, choice, updatedAt: now - age }));
@@ -17,6 +17,7 @@ function runtime({ url = "https://pulbase.example/cabinets/secret?token=private"
   const timers = new Map();
   let timerId = 0;
   const window = {
+    PULBASE_ANALYTICS_DISABLED: analyticsDisabled,
     location: new URL(url),
     localStorage: {
       getItem(name) { if (blocked) throw Error("blocked"); return storage.get(name) ?? null; },
@@ -143,4 +144,9 @@ test("同意済み規約iframeは親ページのGA Cookieを削除しない", ()
   const state = runtime({ choice: "accepted", framed: true });
   assert.equal(state.scripts.length, 0);
   assert.equal(state.cookies.get("_ga"), "tracking");
+});
+
+test("検証用PagesホストでもWorkerの指定でGoogleタグを停止する", () => {
+  const state = runtime({ url: "https://develop.virtual-gamecenter.pages.dev/", choice: "accepted", analyticsDisabled: true });
+  assert.equal(state.scripts.length, 0);
 });

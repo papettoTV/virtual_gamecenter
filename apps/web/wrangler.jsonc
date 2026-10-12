@@ -1,6 +1,7 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "virtual-gamecenter",
+  "account_id": "60e5472a284dc71bbafbbfac8aa2a940",
   "main": "src/worker/index.ts",
   "compatibility_date": "2026-07-26",
   "vars": {
@@ -54,7 +55,7 @@
       "d1_databases": [{
         "binding": "DB",
         "database_name": "pulbase-staging",
-        "database_id": "00000000-0000-0000-0000-000000000001",
+        "database_id": "c49b03c7-e616-4acb-96a8-2837ff62034f",
         "migrations_dir": "migrations"
       }],
       "r2_buckets": [{ "binding": "DELETION_AUDIT", "bucket_name": "pulbase-staging-deletion-audit" }],

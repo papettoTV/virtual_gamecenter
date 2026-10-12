@@ -24,6 +24,10 @@ const CABINET_SOCKET_PATH = /^\/api\/cabinets\/([a-zA-Z0-9-]+)\/ws$/;
 export default {
   async fetch(request, env): Promise<Response> {
     const url = new URL(request.url);
+    const gatewayEnvironment = request.headers.get("X-Pulbase-Gateway-Environment");
+    if (gatewayEnvironment && gatewayEnvironment !== env.APP_ENV) {
+      return Response.json({ error: "backend_environment_mismatch" }, { status: 403, headers: { "Cache-Control": "no-store" } });
+    }
     const liveImage = /^\/share\/live\/([^/]+)\/image\.png$/.exec(url.pathname);
     if (liveImage && request.method === "GET") {
       return getGameDefinition(liveImage[1]) ? renderLiveImage(liveImage[1]!) : Response.json({ error: "unknown_game" }, { status: 404 });
@@ -44,6 +48,15 @@ export default {
 
     const authorizationError = authorizeRequest(request, env);
     if (authorizationError) return authorizationError;
+    if (url.pathname === "/analytics.js" && request.method === "GET" && env.APP_ENV === "staging") {
+      const asset = await env.ASSETS.fetch(request);
+      if (!asset.ok) return asset;
+      const headers = new Headers(asset.headers);
+      headers.delete("content-length");
+      headers.delete("etag");
+      headers.set("Cache-Control", "no-store");
+      return new Response("window.PULBASE_ANALYTICS_DISABLED = true;\n" + await asset.text(), { headers });
+    }
     if (url.pathname === "/api/platform/dev/retention") {
       if (request.method !== "POST" || request.headers.get("Origin") !== url.origin || !isDeveloperAuthAvailable(url, env)) return Response.json({ error: "forbidden" }, { status: 403 });
       await runRetention(env.DB, env.CABINET_ROOMS, env.DELETION_AUDIT);

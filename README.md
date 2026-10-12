@@ -13,7 +13,7 @@
 
 基本方針は、ローカルで開発・確認し、まとまったタイミングでCloudflareへデプロイします。
 
-通常の開発・push先は `develop`（検証：`develop.virtual-gamecenter.pages.dev`）。Pages本番は `virtual-gamecenter.pages.dev` / `main` で、`pulbase.com` はそのカスタムドメインです。mainへのマージ・pushはリリース指示があるときだけ行います。Pagesから現行Workerへの接続は準備中です。
+通常の開発・push先は `develop`（検証：`develop.virtual-gamecenter.pages.dev`）。Pages本番は `virtual-gamecenter.pages.dev` / `main` で、`pulbase.com` はそのカスタムドメインです。mainへのマージ・pushはリリース指示があるときだけ行います。検証用のPages→Worker接続は実装・反映済みです。詳細は [`docs/pages-worker-gateway.md`](docs/pages-worker-gateway.md) を参照してください。
 
 ```bash
 cd apps/web

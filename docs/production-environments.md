@@ -1,6 +1,6 @@
 # 無料ベータの公開環境とリリース手順
 
-更新日：2026-10-13。今回の作業はリポジトリ内の準備のみ。Cloudflare上の作成・移行・Secret登録・デプロイ・一般公開は未実施。
+更新日：2026-10-13。検証用Cloudflareリソース・Secret・Pages→Worker接続まで反映済み。main/本番は未変更。最新の実測と残作業は [接続・検証記録](pages-worker-gateway.md) を参照。
 
 ## 確定した公開先とブランチ
 
@@ -9,11 +9,11 @@
 - GitHubにdevelopがなかったため、ローカルの未pushの10コミットを維持してmainからdevelopを作成した。origin/mainへは反映しない。
 - Workerの公開・リモート移行もブランチを確認する。本番はmain、検証はdevelop以外から拒否。ビルド・設定確認はレビュー用に両環境を実行できる。
 
-### PagesのURLを維持するための接続（未実装・未設定）
+### PagesのURLを維持するための接続
 
 現行アプリはWorkers Static Assets/API/Durable Objects/Cronを統合したWorker構成であり、静的ファイルをPagesへ置くだけではAPI・観戦・定期削除まで動かない。検証Workerをそのままpages.devへ割り当てる設定も今回追加していない。
 
-本番・検証とも、Pagesを入口に残し、Pages FunctionsのゲートウェイからService Bindingで各環境のWorkerへリクエストを転送する構成を準備する。ゲーム画面・API・観戦通信を同じ環境URLから使い、筐体DOと削除CronはWorker側に残す。PagesのProduction bindingはpulbase-production、Preview bindingはpulbase-stagingとし、DB/R2/認証を共有しない。ゲートウェイ、WebSocket/Origin/Google戻り先の検証、Pages側binding/ビルド設定は次の作業。
+本番・検証とも、Pages FunctionsのゲートウェイからService Bindingで各環境のWorkerへリクエストを転送する。検証のPreview binding（pulbase-staging）を反映し、実際の開始/観戦同期を確認済み。本番用のProduction binding（pulbase-production）は宣言のみで未反映。DOと削除CronはWorker側に置き、DB/R2/認証を共有しない。Googleサインイン完了・実機操作の確認は運営者と行う。
 
 Pagesの **Production branchはmainのまま**。developはPreview対象にする。標準のブランチエイリアス `develop.virtual-gamecenter.pages.dev` を使用し、stgブランチや追加のstgエイリアスは作成しない。Production branchをdevelopへ変えない。
 
@@ -32,8 +32,8 @@ GitHub Actionsはmain/developへのpushと、それらを対象とするPRでテ
 | 項目 | ローカル（ルート設定） | 検証 `staging` | 本番 `production` |
 | --- | --- | --- | --- |
 | Worker | 既存名のローカルエミュレーション | `pulbase-staging` | `pulbase-production` |
-| D1 | `.wrangler`内のローカルDB | `pulbase-staging`（未作成） | `pulbase-production`（未作成） |
-| R2 | ローカルエミュレーション | `pulbase-staging-deletion-audit`（未作成） | `pulbase-production-deletion-audit`（未作成） |
+| D1 | `.wrangler`内のローカルDB | `pulbase-staging`（作成・移行済み） | `pulbase-production`（未作成） |
+| R2 | ローカルエミュレーション | `pulbase-staging-deletion-audit`（非公開、作成済み） | `pulbase-production-deletion-audit`（未作成） |
 | Durable Objects | ローカル筐体 | 検証Workerの筐体 | 本番Workerの筐体 |
 | Google OAuth | 開発者ログイン/ローカル設定 | 専用のGoogle OAuth client | 本番用Google OAuth client |
 | 開発者ログイン | 有効 | 無効 | 無効 |
@@ -41,7 +41,7 @@ GitHub Actionsはmain/developへのpushと、それらを対象とするPRでテ
 | サイト閲覧 | localhost/LAN | Basic認証を維持 | 当面Basic認証を維持 |
 | 削除Cron | テスト/手動検証 | 毎時 | 毎時 |
 
-D1の環境別IDは意図的な仮値。リソースの存在を意味せず、公開用チェックは失敗する。この状態ではリリースやリモート移行を進めない。ローカルの保存場所・既存DB IDは変更していない。
+検証D1 IDは実際の値へ反映。本番D1 IDは意図的な仮値のままで、本番公開用チェックは失敗する。ローカルの保存場所・既存DB IDは変更していない。
 
 ## 今回用意した安全策
 

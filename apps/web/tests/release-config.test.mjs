@@ -36,8 +36,10 @@ test("Pagesの公開ドメインをWorkerで奪う設定を拒否する", () => 
 });
 
 test("未作成の仮D1 IDを公開先として扱わない", () => {
+  const placeholders = structuredClone(configured);
   for (const environment of ["staging", "production"]) {
-    assert.ok(checkReleaseConfig(configured, environment).some((error) => error.includes("仮ID")));
+    placeholders.env[environment].d1_databases[0].database_id = "00000000-0000-0000-0000-000000000000";
+    assert.ok(checkReleaseConfig(placeholders, environment).some((error) => error.includes("仮ID")));
   }
 });
 

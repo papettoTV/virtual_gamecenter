@@ -104,7 +104,7 @@ Cloudflare・Google・Stripeの管理画面上の本番設定は、この資料�
 
 | ID | 作業 | 完了条件 | 状態 | 担当 | 証跡・メモ |
 | --- | --- | --- | --- | --- | --- |
-| EN-01 | 本番と検証環境を分離する | DB、Stripeキー・Webhook、Google OAuth、環境変数を分離。テストデータが本番に混ざらない | 対応中 | — | Pages本番virtual-gamecenter.pages.dev/main＋pulbase.com、検証develop.virtual-gamecenter.pages.dev/developへ方針更新。CIの環境対応を明示し、Workerへのpulbase.com直接割当を撤回。実リソース・OAuth・SecretとPages→各Worker接続、カスタムドメイン/DNS確認は未完了。[環境・リリース手順](production-environments.md) |
+| EN-01 | 本番と検証環境を分離する | DB、Stripeキー・Webhook、Google OAuth、環境変数を分離。テストデータが本番に混ざらない | 対応中 | — | 検証専用Worker/D1/R2/DO/Secret/CronとPages Preview Service Bindingを作成・反映。実Pages経由の開始/ライブ同期を確認。本番側の作成・OAuthログイン完了・実機確認は残る。[接続・検証記録](pages-worker-gateway.md) |
 | EN-02 | 本番ドメイン・一般公開・ログインを設定する | HTTPS、Basic認証の公開切替、Google本番設定・戻り先を確認。開発者ログインを本番で無効化 | 未着手 | — | 現在は秘密情報を削除するだけでは一般公開できない構成 |
 | EN-03 | セキュリティレビューを実施する | プレイヤー・筐体の権限、残高・料金操作、CSRF・Origin、秘密情報・ログの扱いを確認し、重大問題を解消 | 未着手 | — | HTTP APIとWebSocketの両方を対象 |
 | EN-04 | 乱用・負荷・費用対策を用意する | API連打、無料特典乱用、大量筐体作成・観戦接続への制限と、費用通知を確認 | 未着手 | — | 無料公開でも必要 |
@@ -186,3 +186,4 @@ Cloudflare・Google・Stripeの管理画面上の本番設定は、この資料�
 | 2026-10-12 | GAの任意同意・拒否・撤回・180日保存を実装 | 規約版2026-10-12.3。全424テスト・ビルド・拒否時プレイ/ライブ観戦のローカル検証成功。本番GAの拡張計測設定・通信実測・法務確認は未完了 |
 | 2026-10-13 | 公開環境の棚卸し、環境別設定、誤公開/誤接続チェック、CIを準備 | EN-01/EN-09対応中。全433テストと3環境のビルド/生成設定照合に成功。クラウド作成・リモート移行・Secret登録・デプロイは未実施。ドメインと既存環境の扱いの判断待ち |
 | 2026-10-13 | 公開URLをPages本番main＋pulbase.com、標準developプレビューに統一 | GitHub CIに環境対応表検査・環境別ビルドを追加。Workerドメインの直接割当を撤回。Pagesゲートウェイ・Service Binding・カスタムドメインの実確認は残る |
+| 2026-10-13 | Pages→検証Workerを実装し専用D1/R2/DO/Secret/Cron・Preview bindingを反映 | 全448テスト・ビルド成功。実Pages経由の消費/開始/ライブ同期・Googleログイン画面を確認。本人によるGoogleサインイン完了と実機操作は確認待ち。本番は未変更 |

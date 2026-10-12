@@ -75,6 +75,8 @@ StripeのWebhook送信先には `https://<公開ドメイン>/api/platform/strip
 
 公開入口はCloudflare Pagesです。mainが`virtual-gamecenter.pages.dev`と`pulbase.com`、developが検証用`develop.virtual-gamecenter.pages.dev`に対応します。`npm run pages:target:check -- staging|production`でリポジトリ内の対応表を検査できます。`npm run deploy`は環境別バックエンドWorkerの操作であり、Pagesのデプロイ・カスタムドメイン設定・Service Binding接続も完了するコマンドではありません。
 
+Pagesゲートウェイはnpm run buildでdist/clientへ含めます。Workerの公開後に `npm run deploy:pages -- staging` でdevelopプレビューを更新できます。低レベルのPages CLIはViteのWorker用設定と衝突し、共有ビルド出力先を書き換える場合があるので専用スクリプトを使用します。設定・実測結果は [`../../docs/pages-worker-gateway.md`](../../docs/pages-worker-gateway.md) を参照してください。
+
 ## 構成
 
 - `src/app`: Reactの画面構成と起動
