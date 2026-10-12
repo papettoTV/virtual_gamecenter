@@ -27,18 +27,23 @@ export async function reconcileBetaCredits(
        FROM credit_wallets AS wallet
        WHERE wallet.player_id = ?
          AND wallet.free_balance + wallet.purchased_balance < 3
+         AND NOT EXISTS (SELECT 1 FROM retained_daily_refills
+           WHERE refill_date = ? AND (device_hash = ? OR registration_hash = (SELECT registration_hash FROM player_benefits WHERE player_id = wallet.player_id)))
          AND (
+           EXISTS (SELECT 1 FROM player_benefits WHERE player_id = wallet.player_id AND refill_eligible = 1)
+           OR
            EXISTS (SELECT 1 FROM device_benefits
                    WHERE device_hash = ? AND benefit_type = 'welcome-credit')
            OR EXISTS (SELECT 1 FROM credit_ledger_entries
                       WHERE player_id = wallet.player_id AND entry_type = 'free_granted')
          )`,
-    ).bind(claimId, deviceHash, refillDate, playerId, deviceHash),
+    ).bind(claimId, deviceHash, refillDate, playerId, refillDate, deviceHash, deviceHash),
     database.prepare("SELECT amount FROM beta_daily_refills WHERE id = ?").bind(claimId),
     database.prepare(
       `SELECT 1 AS used FROM beta_daily_refills
-       WHERE refill_date = ? AND (player_id = ? OR device_hash = ?) LIMIT 1`,
-    ).bind(refillDate, playerId, deviceHash),
+       WHERE refill_date = ? AND (player_id = ? OR device_hash = ?)
+       UNION ALL SELECT 1 FROM retained_daily_refills WHERE refill_date = ? AND (device_hash = ? OR registration_hash = (SELECT registration_hash FROM player_benefits WHERE player_id = ?)) LIMIT 1`,
+    ).bind(refillDate, playerId, deviceHash, refillDate, deviceHash, playerId),
   ]);
   return {
     purchasesEnabled,

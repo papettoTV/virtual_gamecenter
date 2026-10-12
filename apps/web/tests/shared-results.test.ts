@@ -13,8 +13,9 @@ const playerName = '<script>alert("owner")</script>&';
 beforeAll(async () => {
   await env.DB.batch([
     env.DB.prepare("CREATE TABLE accounts (id TEXT PRIMARY KEY, display_name TEXT, avatar_url TEXT)"),
-    env.DB.prepare("CREATE TABLE players (id TEXT PRIMARY KEY, guest_name TEXT, account_id TEXT)"),
+    env.DB.prepare("CREATE TABLE players (id TEXT PRIMARY KEY, guest_name TEXT, account_id TEXT, deletion_requested_at TEXT)"),
     env.DB.prepare("CREATE TABLE player_sessions (token_hash TEXT PRIMARY KEY, player_id TEXT, expires_at TEXT, last_seen_at TEXT)"),
+    env.DB.prepare("CREATE TABLE data_deletions (player_id TEXT, status TEXT)"),
     ...migration.trim().split(/;\s*(?=CREATE|$)/).filter(Boolean).map((statement) => env.DB.prepare(statement)),
   ]);
   const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
@@ -103,10 +104,12 @@ describe("shared result API", () => {
     const value = draft();
     await post(value);
     expect((await post({ ...value, score: 999 }))?.status).toBe(409);
+    await env.DB.prepare("INSERT INTO players (id, guest_name) VALUES ('other-owner', 'Other')").run();
     await env.DB.prepare("UPDATE player_sessions SET player_id = 'other-owner'").run();
     const conflict = await post(value);
     expect(conflict?.status).toBe(409);
     expect(await conflict!.json()).toEqual({ error: "result_id_conflict" });
+    await env.DB.prepare("UPDATE player_sessions SET player_id = ?").bind(ownerId).run();
     expect((await getSharedResult(env.DB, value.id))?.score).toBe(value.score);
   });
 

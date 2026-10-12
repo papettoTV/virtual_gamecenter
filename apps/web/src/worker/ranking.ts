@@ -43,13 +43,17 @@ async function getRanking(url: URL, db: D1Database): Promise<Response> {
     ? `SELECT player_name, clear_time_ms AS play_time_ms, cleared, score, max_level,
               defeated_boss_count, created_at
        FROM rankings
-       WHERE game_id = ? AND client_version = ?
+       WHERE game_id = ? AND client_version = ? AND owner_id IS NOT NULL
+         AND EXISTS (SELECT 1 FROM players WHERE id = rankings.owner_id AND deletion_requested_at IS NULL)
+         AND NOT EXISTS (SELECT 1 FROM data_deletions WHERE player_id = rankings.owner_id AND status = 'pending')
        ORDER BY ${orderBy}
        LIMIT ?`
     : `SELECT player_name, clear_time_ms AS play_time_ms, cleared, score, max_level,
               defeated_boss_count, created_at
        FROM rankings
-       WHERE game_id = ?
+       WHERE game_id = ? AND owner_id IS NOT NULL
+         AND EXISTS (SELECT 1 FROM players WHERE id = rankings.owner_id AND deletion_requested_at IS NULL)
+         AND NOT EXISTS (SELECT 1 FROM data_deletions WHERE player_id = rankings.owner_id AND status = 'pending')
        ORDER BY ${orderBy}
        LIMIT ?`;
   const statement = db.prepare(query);
@@ -90,8 +94,8 @@ async function postRanking(request: Request, db: D1Database): Promise<Response> 
     db
       .prepare(
         `INSERT INTO rankings (
-          game_id, player_name, clear_time_ms, cleared, score, max_level, defeated_boss_count, client_version
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          game_id, player_name, clear_time_ms, cleared, score, max_level, defeated_boss_count, client_version, owner_id, result_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         game.id,
@@ -102,6 +106,8 @@ async function postRanking(request: Request, db: D1Database): Promise<Response> 
         Math.round(maxLevel),
         Math.max(0, Math.round(defeatedBossCount)),
         clientVersion,
+        identity.playerId,
+        resultId,
       ),
     db
       .prepare(

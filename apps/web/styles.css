@@ -1502,6 +1502,48 @@ canvas {
   color: var(--muted);
 }
 
+.platform-data-actions {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.platform-data-actions button {
+  padding: 5px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.data-deletion-dialog {
+  position: relative;
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+}
+
+.data-deletion-dialog h2 {
+  padding-right: 60px;
+  font-size: 24px;
+}
+
+.data-deletion-dialog code {
+  overflow-wrap: anywhere;
+}
+
+.data-deletion-dialog .platform-danger-button {
+  border-color: #f88;
+  background: #712d3e;
+}
+
+.data-deletion-dialog button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .platform-account-register-button {
   margin-top: 7px;
   padding: 6px 8px;

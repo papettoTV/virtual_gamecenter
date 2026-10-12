@@ -46,6 +46,12 @@ npm run preview
 
 ## Cloudflare
 
+データ削除・保存期間の方針はリポジトリの`docs/data-retention-and-deletion.md`を参照してください。プロフィールから退会/ゲスト削除、公開記録だけの削除、受付状況の確認ができます。登録者は同一アカウントの再認証が必要です。
+
+定期削除は毎時のCron Triggerで実行します。ローカルでは`POST /api/platform/dev/retention`（同一Origin、開発者ログインが利用可能なホストのみ）で検証できます。実データに対する期限削除になるため、テスト用環境で使用してください。
+
+本番反映前に`0019`・`0020`のD1移行と、非公開R2バケット`pulbase-deletion-audit`の準備が必要です。`DELETION_AUDIT`はD1復元でも巻き戻さない独立の削除証跡で、1年以内に期限削除します。外部ログの設定・R2の費用監視・実際のTime Travel復元リハーサルはチェックリストで管理しています。今回のローカル実装では本番リソースを作成していません。
+
 フロントエンド、API、ランキング、筐体のリアルタイム通信を1つのCloudflare Workerへ統合しています。
 
 - 静的画面: Workers Static Assets

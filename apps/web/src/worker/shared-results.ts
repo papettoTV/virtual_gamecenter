@@ -71,7 +71,7 @@ function publicResult(row: ResultRow): SharedResult {
 
 export async function getSharedResult(db: D1Database, id: string): Promise<SharedResult | null> {
   if (!UUID.test(id)) return null;
-  const row = await db.prepare("SELECT * FROM shared_results WHERE id = ?").bind(id.toLowerCase()).first<ResultRow>();
+  const row = await db.prepare("SELECT * FROM shared_results WHERE id = ? AND EXISTS (SELECT 1 FROM players WHERE id = shared_results.owner_id AND deletion_requested_at IS NULL) AND NOT EXISTS (SELECT 1 FROM data_deletions WHERE player_id = shared_results.owner_id AND status = 'pending')").bind(id.toLowerCase()).first<ResultRow>();
   return row ? publicResult(row) : null;
 }
 

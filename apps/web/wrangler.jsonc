@@ -36,5 +36,7 @@
   ],
   "observability": {
     "enabled": true
-  }
+  },
+  "triggers": { "crons": ["0 * * * *"] },
+  "r2_buckets": [{ "binding": "DELETION_AUDIT", "bucket_name": "pulbase-deletion-audit" }]
 }

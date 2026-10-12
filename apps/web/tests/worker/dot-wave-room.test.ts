@@ -1,25 +1,9 @@
 import { env, exports } from "cloudflare:workers";
 import { beforeAll, afterEach, expect, it } from "vitest";
 import type { ClientMessage, ServerMessage } from "../../src/shared/protocol";
-import betaMigration from "../../migrations/0018_beta_daily_refills.sql?raw";
+import { migrateTestDatabase } from "../migrate-test-database";
 
-beforeAll(async () => {
-  const tables = [
-    "CREATE TABLE accounts (id TEXT PRIMARY KEY, display_name TEXT, avatar_url TEXT)",
-    "CREATE TABLE players (id TEXT PRIMARY KEY, display_name TEXT, guest_name TEXT UNIQUE, account_id TEXT UNIQUE, updated_at TEXT DEFAULT CURRENT_TIMESTAMP)",
-    "CREATE TABLE player_sessions (token_hash TEXT PRIMARY KEY, player_id TEXT, expires_at TEXT, last_seen_at TEXT)",
-    "CREATE TABLE consent_records (id TEXT PRIMARY KEY, player_id TEXT, policy_type TEXT, policy_version TEXT)",
-    "CREATE TABLE credit_wallets (player_id TEXT PRIMARY KEY, free_balance INTEGER DEFAULT 0, purchased_balance INTEGER DEFAULT 0, updated_at TEXT)",
-    "CREATE TABLE credit_ledger_entries (id TEXT PRIMARY KEY, player_id TEXT, balance_type TEXT, entry_type TEXT, amount INTEGER, reference_id TEXT, play_session_id TEXT)",
-    "CREATE TRIGGER apply_free AFTER INSERT ON credit_ledger_entries WHEN NEW.balance_type = 'free' BEGIN UPDATE credit_wallets SET free_balance = free_balance + NEW.amount WHERE player_id = NEW.player_id; END",
-    "CREATE TABLE device_benefits (device_hash TEXT, benefit_type TEXT, player_id TEXT, granted_at TEXT DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (device_hash, benefit_type))",
-    "CREATE TABLE play_sessions (id TEXT PRIMARY KEY, cabinet_id TEXT, game_id TEXT, mode TEXT, status TEXT, host_player_id TEXT, started_at TEXT, ended_at TEXT)",
-    "CREATE TABLE credit_reservations (id TEXT PRIMARY KEY, player_id TEXT, play_session_id TEXT, amount INTEGER, balance_type TEXT, status TEXT, expires_at TEXT, updated_at TEXT)",
-    "CREATE TABLE cabinet_directory (cabinet_id TEXT PRIMARY KEY, game_id TEXT, status TEXT, player_count INTEGER, spectator_count INTEGER, updated_at INTEGER)",
-  ];
-  await env.DB.batch(tables.map(sql => env.DB.prepare(sql)));
-  await env.DB.batch(betaMigration.split(/;\s*(?=CREATE)/).map((sql) => env.DB.prepare(sql)));
-});
+beforeAll(migrateTestDatabase);
 
 const sockets: WebSocket[] = [];
 afterEach(() => { for (const socket of sockets.splice(0)) socket.close(); });
@@ -62,6 +46,30 @@ async function connect(cookie: string, cabinet: string, watch = false, gameId = 
   await next("joinedCabinet");
   return { socket, send, next, messages };
 }
+
+it("deleting a player clears the live stream and closes only that player's connection", async () => {
+  const cabinet = crypto.randomUUID();
+  const hostCookie = await player();
+  const viewerCookie = await player();
+  const host = await connect(hostCookie, cabinet, false, "deep-sea-salvage");
+  const viewer = await connect(viewerCookie, cabinet, true, "deep-sea-salvage");
+  host.send({ type: "startSolo" });
+  await host.next("cabinetState", message => message.state.status === "soloPlaying");
+  host.send({ type: "gameKeyframe", seq: 1, snapshot: { gameId: "deep-sea-salvage", version: 1, state: { phase: "dive" }, world: {} } });
+  await viewer.next("viewerKeyframe");
+  const preview = await exports.default.fetch("http://localhost/api/platform/data-deletion/preview", { headers: { Cookie: hostCookie } });
+  const confirmation = await preview.json<{ confirmationToken: string }>();
+  const removed = await exports.default.fetch("http://localhost/api/platform/data-deletion/request", { method: "POST", headers: { Cookie: hostCookie, Origin: "http://localhost", "Content-Type": "application/json" }, body: JSON.stringify(confirmation) });
+  expect(removed.status).toBe(200);
+  await viewer.next("playerLeft");
+  viewer.send({ type: "clockPing", sentAt: 123 });
+  expect((await viewer.next("clockPong")).sentAt).toBe(123);
+  expect((await exports.default.fetch("http://localhost/api/platform/credits", { headers: { Cookie: viewerCookie } })).status).toBe(200);
+  const late = await connect(await player(), cabinet, true, "deep-sea-salvage");
+  late.send({ type: "clockPing", sentAt: 124 });
+  await late.next("clockPong");
+  expect(late.messages.some(message => message.type === "viewerKeyframe")).toBe(false);
+});
 
 it("streams salvage to free spectators, replays to late arrivals and clears on departure", async () => {
   const cabinet = crypto.randomUUID();

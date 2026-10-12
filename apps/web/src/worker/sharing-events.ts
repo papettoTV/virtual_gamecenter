@@ -1,4 +1,5 @@
 import { getGameDefinition } from "../domain/game";
+import { getPlayerIdentity } from "./platform";
 
 const EVENTS = new Set(["share_opened", "share_link_copied", "share_target_opened", "share_native_handoff", "share_image_saved", "result_viewed", "play_started_from_result"]);
 const CHANNELS = new Set(["facebook", "native", "x", "line", "bluesky", "clipboard", "download"]);
@@ -35,7 +36,8 @@ export async function handleSharingEvent(request: Request, db: D1Database): Prom
     || !["live", "result"].includes(String(body.kind))
     || (body.shareId !== undefined && body.shareId !== "" && (typeof body.shareId !== "string" || !SAFE_ID.test(body.shareId)))
     || (body.channel !== undefined && (typeof body.channel !== "string" || !CHANNELS.has(body.channel)))) return Response.json({ error: "invalid_event" }, { status: 400 });
-  await db.prepare("INSERT OR IGNORE INTO sharing_events (id, event_type, kind, game_id, target_id, share_id, channel) VALUES (?, ?, ?, ?, ?, ?, ?)")
-    .bind(body.eventId, body.eventType, body.kind, body.gameId, body.targetId, body.shareId || null, body.channel ?? null).run();
+  const identity = await getPlayerIdentity(request, db);
+  await db.prepare("INSERT OR IGNORE INTO sharing_events (id, event_type, kind, game_id, target_id, share_id, channel, actor_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+    .bind(body.eventId, body.eventType, body.kind, body.gameId, body.targetId, body.shareId || null, body.channel ?? null, identity?.playerId ?? null).run();
   return Response.json({ recorded: true });
 }

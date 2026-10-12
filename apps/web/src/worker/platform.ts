@@ -13,8 +13,8 @@ const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
 const DEVICE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365 * 5;
 const INITIAL_FREE_CREDITS = 5;
 const PLAY_CREDIT_COST = 1;
-const TERMS_VERSION = "2026-10-12";
-const PRIVACY_VERSION = "2026-10-12";
+const TERMS_VERSION = "2026-10-12.2";
+const PRIVACY_VERSION = "2026-10-12.2";
 const CREDIT_UNITS = new Set([1, 3, 5, 10]);
 const STRIPE_SIGNATURE_TOLERANCE_SECONDS = 300;
 
@@ -264,6 +264,7 @@ export async function handlePlatformRequest(
             (id, player_id, balance_type, entry_type, amount, reference_id)
            VALUES (?, ?, 'free', 'free_granted', ?, 'welcome-credit')`,
         ).bind(`device-welcome:${deviceHash}`, session.playerId, INITIAL_FREE_CREDITS),
+        database.prepare("INSERT INTO player_benefits (player_id, refill_eligible) VALUES (?, 1) ON CONFLICT(player_id) DO UPDATE SET refill_eligible = 1").bind(session.playerId),
       ]);
     }
     const response = Response.json({
@@ -576,8 +577,8 @@ async function hasDeviceWelcomeCredit(database: D1Database, deviceToken: string)
 
 async function hasDeviceWelcomeCreditByHash(database: D1Database, deviceHash: string): Promise<boolean> {
   const benefit = await database.prepare(
-    "SELECT 1 AS granted FROM device_benefits WHERE device_hash = ? AND benefit_type = 'welcome-credit'",
-  ).bind(deviceHash).first<{ granted: number }>();
+    "SELECT 1 AS granted FROM device_benefits WHERE device_hash = ? AND benefit_type = 'welcome-credit' UNION ALL SELECT 1 FROM retained_benefits WHERE claim_hash = ? AND benefit_type = 'welcome-credit' AND expires_at > CURRENT_TIMESTAMP LIMIT 1",
+  ).bind(deviceHash, deviceHash).first<{ granted: number }>();
   return Boolean(benefit);
 }
 
@@ -587,7 +588,10 @@ async function ensureDeviceWelcomeCreditState(
   playerId: string,
 ): Promise<boolean> {
   const deviceHash = await hashToken(deviceToken);
-  if (await hasDeviceWelcomeCreditByHash(database, deviceHash)) return true;
+  if (await hasDeviceWelcomeCreditByHash(database, deviceHash)) {
+    await database.prepare("INSERT INTO player_benefits (player_id, refill_eligible) VALUES (?, 1) ON CONFLICT(player_id) DO UPDATE SET refill_eligible = 1").bind(playerId).run();
+    return true;
+  }
   if (!await hasLegacyWelcomeCredit(database, playerId)) return false;
   await database.prepare(
     `INSERT OR IGNORE INTO device_benefits (device_hash, benefit_type, player_id)
@@ -814,7 +818,8 @@ async function getExistingPlayerSession(
   const session = await database.prepare(
     `SELECT player_id
      FROM player_sessions
-     WHERE token_hash = ? AND expires_at > CURRENT_TIMESTAMP`,
+     WHERE token_hash = ? AND expires_at > CURRENT_TIMESTAMP
+       AND EXISTS (SELECT 1 FROM players WHERE id = player_sessions.player_id AND deletion_requested_at IS NULL)`,
   ).bind(tokenHash).first<{ player_id: string }>();
   if (!session) return null;
 

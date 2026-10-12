@@ -13,6 +13,7 @@ import { executePlay } from "./play-service";
 import { notifications } from "../notifications/notifications";
 import { liveSharing, shareLive } from "../sharing/share-service";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { DataDeletionDialog } from "./DataDeletionDialog";
 import {
   acceptPolicies,
   claimWelcomeCredit,
@@ -264,6 +265,8 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
         requestUserRegistration={requestUserRegistration}
         standaloneCredits={standaloneCredits}
       />
+
+      <DataDeletionDialog />
 
       <AccountRegistrationDialog
         accountDialogOpen={accountDialogOpen}

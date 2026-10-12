@@ -8,6 +8,8 @@ import { renderLiveImage, renderResultImage } from "./result-image";
 import { handleSharingEvent } from "./sharing-events";
 import { rewriteLivePage } from "./live-metadata";
 import { getGameDefinition } from "../domain/game";
+import { handleDataLifecycleRequest, runRetention } from "./data-lifecycle";
+import { isDeveloperAuthAvailable } from "./google-auth";
 
 export { CabinetRoom };
 
@@ -42,6 +44,13 @@ export default {
 
     const authorizationError = authorizeRequest(request, env);
     if (authorizationError) return authorizationError;
+    if (url.pathname === "/api/platform/dev/retention") {
+      if (request.method !== "POST" || request.headers.get("Origin") !== url.origin || !isDeveloperAuthAvailable(url, env)) return Response.json({ error: "forbidden" }, { status: 403 });
+      await runRetention(env.DB, env.CABINET_ROOMS, env.DELETION_AUDIT);
+      return Response.json({ ok: true });
+    }
+    const lifecycleResponse = await handleDataLifecycleRequest(request, env.DB, env.CABINET_ROOMS, env.DELETION_AUDIT);
+    if (lifecycleResponse) return lifecycleResponse;
     const sharedResultResponse = await handleSharedResultsRequest(request, env.DB, env);
     if (sharedResultResponse) return sharedResultResponse;
 
@@ -72,5 +81,8 @@ export default {
     const assets = await env.ASSETS.fetch(request);
     if (request.method === "GET" && /^\/cabinets\/[^/]+$/.test(url.pathname) && assets.headers.get("content-type")?.includes("text/html")) return rewriteLivePage(assets, url);
     return assets;
+  },
+  async scheduled(_event, env, ctx): Promise<void> {
+    ctx.waitUntil(runRetention(env.DB, env.CABINET_ROOMS, env.DELETION_AUDIT));
   },
 } satisfies ExportedHandler<WorkerEnv>;

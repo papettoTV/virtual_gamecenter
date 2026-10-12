@@ -23,7 +23,7 @@ describe("free beta legal documents", () => {
   });
 
   it("discloses stored email, analytics and deletion limitations without inventing retention", () => {
-    for (const text of ["メールアドレスも取得・保存", "Google Analytics 4", "閲覧URL", "Cloudflare", "Stripe", "vgc_device", "最大5年", "自動削除する機能はありません", "ログアウトだけでは"]) {
+    for (const text of ["メールアドレスも取得・保存", "Google Analytics 4", "閲覧URL", "Cloudflare", "Stripe", "vgc_device", "最大5年", "削除から1年", "ログアウトだけでは"]) {
       expect(privacy).toContain(text);
     }
   });

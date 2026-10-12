@@ -61,6 +61,7 @@ interface StoredCabinetRoom {
   pendingChallenge: PendingChallenge | null;
   challengeQueue: ChallengeQueueEntry[];
   versusMatch: VersusMatch | null;
+  resultPlayerIds?: [string | null, string | null];
 }
 
 export class CabinetRoom extends DurableObject<Env> {
@@ -72,6 +73,7 @@ export class CabinetRoom extends DurableObject<Env> {
   private pendingChallenge: PendingChallenge | null = null;
   private challengeQueue: ChallengeQueueEntry[] = [];
   private versusMatch: VersusMatch | null = null;
+  private resultPlayerIds: [string | null, string | null] = [null, null];
   private readonly ready: Promise<void>;
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -85,6 +87,7 @@ export class CabinetRoom extends DurableObject<Env> {
         this.pendingChallenge = stored.pendingChallenge ?? null;
         this.challengeQueue = stored.challengeQueue ?? [];
         this.versusMatch = stored.versusMatch ?? null;
+        this.resultPlayerIds = stored.resultPlayerIds ?? [null, null];
         const missingChallenge = this.state.status === "challengePending" && !this.pendingChallenge;
         const missingMatch = ["versusReady", "versusPlaying", "result"].includes(this.state.status) && !this.versusMatch;
         if (missingChallenge || missingMatch) {
@@ -119,12 +122,14 @@ export class CabinetRoom extends DurableObject<Env> {
     const pair = new WebSocketPair();
     const client = pair[0];
     const server = pair[1];
-    const identity = requestedGame.id === "dot-wave" ? await getPlayerIdentity(request, this.env.DB) : null;
+    const identity = await getPlayerIdentity(request, this.env.DB);
+    if (identity) await this.env.DB.prepare("INSERT INTO player_cabinets (player_id, cabinet_id) VALUES (?, ?) ON CONFLICT(player_id, cabinet_id) DO UPDATE SET updated_at = CURRENT_TIMESTAMP").bind(identity.playerId, this.cabinetId).run();
     this.ctx.acceptWebSocket(server);
     const attachment: ConnectionAttachment = {
       clientId: crypto.randomUUID(),
       role: "visitor",
-      ...(requestedGame.id === "dot-wave" ? { playerId: identity?.playerId, dotWavePlayer: { name: identity?.playerName ?? "ゲスト", wins: 0 } } : {}),
+      playerId: identity?.playerId,
+      ...(requestedGame.id === "dot-wave" ? { dotWavePlayer: { name: identity?.playerName ?? "ゲスト", wins: 0 } } : {}),
     };
     server.serializeAttachment(attachment);
     this.send(server, { type: "connected", clientId: attachment.clientId });
@@ -661,7 +666,14 @@ export class CabinetRoom extends DurableObject<Env> {
         socket.serializeAttachment({...attachment, dotWavePlayer: {...player, wins: seat === winner ? player.wins + 1 : 0}});
       }
     }
-    if (this.state.gameId === "dot-wave") { this.syncDotWavePlayers(); this.state.dotWaveResultPlayers = this.state.dotWavePlayers; }
+    if (this.state.gameId === "dot-wave") {
+      this.syncDotWavePlayers();
+      this.state.dotWaveResultPlayers = this.state.dotWavePlayers;
+      this.resultPlayerIds = [match.hostClientId, match.challengerClientId].map(clientId => {
+        const socket = this.findSocketByClientId(clientId);
+        return socket ? this.attachment(socket).playerId ?? null : null;
+      }) as [string | null, string | null];
+    }
     match.winner = winner;
     match.resultReason = reason;
     this.state = reduceCabinetState(this.state, { type: "VERSUS_RESULT" });
@@ -980,6 +992,45 @@ export class CabinetRoom extends DurableObject<Env> {
     return socket.deserializeAttachment() as ConnectionAttachment;
   }
 
+  async removePlayerData(playerId: string): Promise<void> {
+    await this.ready;
+    if (!this.state.cabinetId && !this.ctx.getWebSockets().length) return;
+    for (const socket of this.ctx.getWebSockets()) {
+      if (this.attachment(socket).playerId !== playerId) continue;
+      await this.leave(socket);
+      socket.serializeAttachment({ clientId: this.attachment(socket).clientId, role: "visitor" });
+      socket.close(1000, "プレイヤーデータが削除されました。");
+    }
+    for (const index of [0, 1] as const) {
+      if (this.resultPlayerIds[index] !== playerId) continue;
+      this.resultPlayerIds[index] = null;
+      if (this.state.dotWaveResultPlayers) this.state.dotWaveResultPlayers[index] = null;
+    }
+    await this.persistState();
+    this.broadcastState();
+  }
+
+  async expireIdleData(cabinetId?: string): Promise<void> {
+    await this.ready;
+    if (this.ctx.getWebSockets().length || (this.state.cabinetId && this.state.updatedAt > Date.now() - 86400000)) return;
+    if (!this.cabinetId && cabinetId) this.cabinetId = cabinetId;
+    await this.env.DB.prepare("DELETE FROM cabinet_directory WHERE cabinet_id = ?").bind(this.cabinetId).run();
+    await this.env.DB.prepare("DELETE FROM player_cabinets WHERE cabinet_id = ?").bind(this.cabinetId).run();
+    await this.ctx.storage.deleteAll();
+    this.state = createCabinetState("");
+    this.latestKeyframe = null;
+    this.latestMotionFrame = null;
+    this.eventsSinceKeyframe = [];
+    this.pendingChallenge = null;
+    this.challengeQueue = [];
+    this.versusMatch = null;
+    this.resultPlayerIds = [null, null];
+  }
+
+  async alarm(): Promise<void> {
+    await this.expireIdleData();
+  }
+
   private async persistState(): Promise<void> {
     this.syncDotWavePlayers();
     await this.ctx.storage.put("cabinet", {
@@ -988,7 +1039,9 @@ export class CabinetRoom extends DurableObject<Env> {
       pendingChallenge: this.pendingChallenge,
       challengeQueue: this.challengeQueue,
       versusMatch: this.versusMatch,
+      resultPlayerIds: this.resultPlayerIds,
     } satisfies StoredCabinetRoom);
     await syncCabinetDirectory(this.env.DB, this.state);
+    await this.ctx.storage.setAlarm(Date.now() + 86400000);
   }
 }

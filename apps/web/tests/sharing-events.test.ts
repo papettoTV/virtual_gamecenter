@@ -4,7 +4,7 @@ import { handleSharingEvent } from "../src/worker/sharing-events";
 
 beforeEach(async () => {
   await env.DB.prepare("DROP TABLE IF EXISTS sharing_events").run();
-  await env.DB.prepare("CREATE TABLE sharing_events (id TEXT PRIMARY KEY, event_type TEXT, kind TEXT, game_id TEXT, target_id TEXT, share_id TEXT, channel TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)").run();
+  await env.DB.prepare("CREATE TABLE sharing_events (id TEXT PRIMARY KEY, event_type TEXT, kind TEXT, game_id TEXT, target_id TEXT, share_id TEXT, channel TEXT, actor_id TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)").run();
 });
 
 function post(body: unknown, origin = "http://localhost") {

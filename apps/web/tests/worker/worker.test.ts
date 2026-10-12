@@ -1,27 +1,9 @@
 import { env, exports } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerGoogleAccount } from "../../src/worker/google-auth";
-import betaMigration from "../../migrations/0018_beta_daily_refills.sql?raw";
+import { migrateTestDatabase } from "../migrate-test-database";
 
-beforeAll(async () => {
-  await env.DB.batch([
-    env.DB.prepare("CREATE TABLE accounts (id TEXT PRIMARY KEY, display_name TEXT NOT NULL, avatar_url TEXT, updated_at TEXT DEFAULT CURRENT_TIMESTAMP)"),
-    env.DB.prepare("CREATE TABLE account_identities (provider TEXT NOT NULL, provider_subject TEXT NOT NULL, account_id TEXT NOT NULL, email TEXT, PRIMARY KEY (provider, provider_subject))"),
-    env.DB.prepare("CREATE TABLE players (id TEXT PRIMARY KEY, display_name TEXT, guest_name TEXT UNIQUE, account_id TEXT UNIQUE, updated_at TEXT DEFAULT CURRENT_TIMESTAMP)"),
-    env.DB.prepare("CREATE TABLE player_sessions (token_hash TEXT PRIMARY KEY, player_id TEXT NOT NULL, expires_at TEXT NOT NULL, last_seen_at TEXT DEFAULT CURRENT_TIMESTAMP)"),
-    env.DB.prepare("CREATE TABLE consent_records (id TEXT PRIMARY KEY, player_id TEXT NOT NULL, policy_type TEXT NOT NULL, policy_version TEXT NOT NULL)"),
-    env.DB.prepare("CREATE TABLE credit_wallets (player_id TEXT PRIMARY KEY, free_balance INTEGER NOT NULL DEFAULT 0, purchased_balance INTEGER NOT NULL DEFAULT 0, updated_at TEXT DEFAULT CURRENT_TIMESTAMP)"),
-    env.DB.prepare("CREATE TABLE credit_ledger_entries (id TEXT PRIMARY KEY, player_id TEXT NOT NULL, balance_type TEXT NOT NULL, entry_type TEXT NOT NULL, amount INTEGER NOT NULL, reference_id TEXT)"),
-    env.DB.prepare("CREATE TABLE device_benefits (device_hash TEXT NOT NULL, benefit_type TEXT NOT NULL, player_id TEXT NOT NULL, granted_at TEXT DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (device_hash, benefit_type))"),
-    env.DB.prepare("CREATE TRIGGER credit_ledger_free AFTER INSERT ON credit_ledger_entries WHEN NEW.balance_type = 'free' BEGIN UPDATE credit_wallets SET free_balance = free_balance + NEW.amount WHERE player_id = NEW.player_id; END"),
-    env.DB.prepare("CREATE TABLE play_sessions (id TEXT PRIMARY KEY, cabinet_id TEXT NOT NULL, game_id TEXT NOT NULL, mode TEXT NOT NULL, status TEXT NOT NULL, host_player_id TEXT)"),
-    env.DB.prepare("CREATE TABLE credit_reservations (id TEXT PRIMARY KEY, player_id TEXT NOT NULL, play_session_id TEXT NOT NULL, amount INTEGER NOT NULL, balance_type TEXT NOT NULL, status TEXT NOT NULL, expires_at TEXT NOT NULL)"),
-    env.DB.prepare("CREATE TABLE rankings (id INTEGER PRIMARY KEY AUTOINCREMENT, game_id TEXT NOT NULL DEFAULT 'graze-duel', player_name TEXT NOT NULL, clear_time_ms INTEGER NOT NULL, cleared INTEGER NOT NULL DEFAULT 1, score INTEGER NOT NULL, max_level INTEGER NOT NULL, defeated_boss_count INTEGER NOT NULL DEFAULT 3, client_version TEXT NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP)"),
-    env.DB.prepare("CREATE TABLE game_results (id TEXT PRIMARY KEY, game_id TEXT NOT NULL, game_version TEXT NOT NULL, mode TEXT NOT NULL, player_id TEXT, player_name TEXT NOT NULL, cleared INTEGER NOT NULL, clear_time_ms INTEGER, score INTEGER NOT NULL, max_level INTEGER NOT NULL, defeated_boss_count INTEGER NOT NULL)"),
-    env.DB.prepare("CREATE TABLE live_engagement_events (id TEXT PRIMARY KEY, event_type TEXT NOT NULL, game_id TEXT NOT NULL, cabinet_id TEXT NOT NULL, source_cabinet_id TEXT, player_id TEXT, share_id TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)"),
-  ]);
-  await env.DB.batch(betaMigration.split(/;\s*(?=CREATE)/).map((sql) => env.DB.prepare(sql)));
-});
+beforeAll(migrateTestDatabase);
 
 describe("Cloudflare Worker", () => {
   it("serves the health endpoint locally", async () => {
@@ -118,7 +100,7 @@ describe("Cloudflare Worker", () => {
   it("requires the revised policy version without treating old consent as new consent", async () => {
     const response = await exports.default.fetch("http://localhost/api/platform/bootstrap");
     const initial = await response.json<{ playerId: string; consent: { termsVersion: string; privacyVersion: string } }>();
-    expect(initial.consent).toMatchObject({ termsVersion: "2026-10-12", privacyVersion: "2026-10-12" });
+    expect(initial.consent).toMatchObject({ termsVersion: "2026-10-12.2", privacyVersion: "2026-10-12.2" });
     const cookie = response.headers.get("set-cookie")?.split(";", 1)[0];
     await env.DB.batch(["terms", "privacy"].map(policyType => env.DB.prepare(
       "INSERT INTO consent_records (id, player_id, policy_type, policy_version) VALUES (?, ?, ?, ?)",

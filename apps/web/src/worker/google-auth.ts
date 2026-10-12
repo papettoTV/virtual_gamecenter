@@ -1,3 +1,5 @@
+import { hashIdentifier, registrationClaim } from "./identity-hash";
+
 const OAUTH_STATE_COOKIE = "vgc_oauth_state";
 const OAUTH_STATE_MAX_AGE_SECONDS = 10 * 60;
 const REGISTRATION_BONUS_CREDITS = 5;
@@ -31,6 +33,22 @@ export async function handleGoogleAuthRequest(
   hasPolicyConsent: (database: D1Database, playerId: string) => Promise<boolean>,
 ): Promise<Response | null> {
   const url = new URL(request.url);
+  if (url.pathname === "/api/platform/auth/reauth" && request.method === "GET") {
+    const session = await getExistingSession(request, database);
+    if (!session) return Response.json({ error: "player_session_required" }, { status: 401 });
+    const returnTo = sanitizeReturnPath(url.searchParams.get("returnTo"));
+    const identity = await database.prepare("SELECT provider FROM account_identities WHERE account_id = (SELECT account_id FROM players WHERE id = ?)").bind(session.playerId).first<{ provider: string }>();
+    if (identity?.provider === "developer" && isDeveloperAuthAvailable(url, env)) {
+      await markVerified(database, session);
+      return Response.redirect(new URL(returnTo, url.origin).href, 302);
+    }
+    if (identity?.provider !== "google" || !env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) return Response.json({ error: "reauth_unavailable" }, { status: 503 });
+    const state = createRandomToken();
+    const value = encodeURIComponent(JSON.stringify({ state, returnTo, reauthPlayerId: session.playerId }));
+    const authorizationUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+    authorizationUrl.search = new URLSearchParams({ client_id: env.GOOGLE_CLIENT_ID, redirect_uri: `${url.origin}/api/platform/auth/google/callback`, response_type: "code", scope: "openid profile email", state, prompt: "select_account" }).toString();
+    return new Response(null, { status: 302, headers: { Location: authorizationUrl.href, "Set-Cookie": oauthStateCookie(value, session.secureCookie) } });
+  }
   if (url.pathname === "/api/platform/auth/developer" && request.method === "GET") {
     const returnTo = sanitizeReturnPath(url.searchParams.get("returnTo"));
     const redirect = new URL(returnTo, url.origin);
@@ -106,7 +124,7 @@ export async function handleGoogleAuthRequest(
   };
 
   if (!session) return fail("session_expired");
-  if (!await hasPolicyConsent(database, session.playerId)) return fail("policy_consent_required");
+  if (!stateRecord?.reauthPlayerId && !await hasPolicyConsent(database, session.playerId)) return fail("policy_consent_required");
   if (!stateRecord || !url.searchParams.get("state") || stateRecord.state !== url.searchParams.get("state")) {
     return fail("invalid_state");
   }
@@ -119,8 +137,14 @@ export async function handleGoogleAuthRequest(
       GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID,
       GOOGLE_CLIENT_SECRET: env.GOOGLE_CLIENT_SECRET,
     });
-    await registerGoogleAccount(database, session, profile);
-    redirect.searchParams.set("account", "registered");
+    if (stateRecord.reauthPlayerId) {
+      const identity = await database.prepare("SELECT provider_subject FROM account_identities WHERE provider = 'google' AND account_id = (SELECT account_id FROM players WHERE id = ?)").bind(session.playerId).first<{ provider_subject: string }>();
+      if (stateRecord.reauthPlayerId !== session.playerId || identity?.provider_subject !== profile.sub) return fail("reauth_account_mismatch");
+      await markVerified(database, session);
+    } else {
+      await registerGoogleAccount(database, session, profile);
+      redirect.searchParams.set("account", "registered");
+    }
     return new Response(null, {
       status: 302,
       headers: { Location: redirect.toString(), "Set-Cookie": clearStateCookie },
@@ -184,19 +208,24 @@ async function registerAccount(
     const tokenHash = await hashToken(session.token);
     await database.prepare("UPDATE player_sessions SET player_id = ? WHERE token_hash = ?")
       .bind(registeredPlayer.id, tokenHash).run();
+    await markVerified(database, { ...session, playerId: registeredPlayer.id });
     return;
   }
 
   const player = await database.prepare(
     "SELECT account_id FROM players WHERE id = ?",
   ).bind(session.playerId).first<{ account_id: string | null }>();
-  if (player?.account_id) throw new Error("player_already_registered");
+  if (!player) throw new Error("player_session_required");
+  if (player.account_id) throw new Error("player_already_registered");
 
   const accountId = crypto.randomUUID();
+  const claimHash = await registrationClaim(provider, profile.sub);
   await database.batch([
+    database.prepare("DELETE FROM retained_benefits WHERE claim_hash = ? AND benefit_type = 'registration' AND expires_at <= CURRENT_TIMESTAMP").bind(claimHash),
+    database.prepare("INSERT OR IGNORE INTO retained_benefits (claim_hash, benefit_type, granted_at, expires_at, grant_id) VALUES (?, 'registration', CURRENT_TIMESTAMP, datetime('now', '+5 years'), ?)").bind(claimHash, accountId),
     database.prepare(
-      "INSERT INTO accounts (id, display_name, avatar_url) VALUES (?, ?, ?)",
-    ).bind(accountId, profile.name, profile.picture ?? null),
+      "INSERT INTO accounts (id, display_name, avatar_url) SELECT ?, ?, ? WHERE EXISTS (SELECT 1 FROM players WHERE id = ? AND deletion_requested_at IS NULL)",
+    ).bind(accountId, profile.name, profile.picture ?? null, session.playerId),
     database.prepare(
       `INSERT INTO account_identities (provider, provider_subject, account_id, email)
        VALUES (?, ?, ?, ?)`,
@@ -207,9 +236,17 @@ async function registerAccount(
     database.prepare(
       `INSERT OR IGNORE INTO credit_ledger_entries
         (id, player_id, balance_type, entry_type, amount, reference_id)
-       VALUES (?, ?, 'free', 'free_granted', ?, 'account-registration-bonus')`,
-    ).bind(`account-registration:${accountId}`, session.playerId, REGISTRATION_BONUS_CREDITS),
+       SELECT ?, ?, 'free', 'free_granted', ?, 'account-registration-bonus'
+       WHERE EXISTS (SELECT 1 FROM retained_benefits WHERE claim_hash = ? AND benefit_type = 'registration' AND grant_id = ?)`,
+    ).bind(`account-registration:${accountId}`, session.playerId, REGISTRATION_BONUS_CREDITS, claimHash, accountId),
+    database.prepare("INSERT INTO player_benefits (player_id, refill_eligible, registration_hash) VALUES (?, 1, ?) ON CONFLICT(player_id) DO UPDATE SET refill_eligible = 1, registration_hash = excluded.registration_hash").bind(session.playerId, claimHash),
   ]);
+  await markVerified(database, session);
+}
+
+async function markVerified(database: D1Database, session: PlayerSession): Promise<void> {
+  await database.prepare("INSERT INTO verified_sessions (token_hash, player_id, verified_at) VALUES (?, ?, CURRENT_TIMESTAMP) ON CONFLICT(token_hash) DO UPDATE SET player_id = excluded.player_id, verified_at = excluded.verified_at")
+    .bind(await hashIdentifier(session.token), session.playerId).run();
 }
 
 export function isDeveloperAuthAvailable(url: URL, env: GoogleAuthEnv): boolean {
@@ -235,14 +272,14 @@ export function sanitizeReturnPath(value: string | null): string {
   return value;
 }
 
-function readStateCookie(cookieHeader: string | null): { state: string; returnTo: string } | null {
+function readStateCookie(cookieHeader: string | null): { state: string; returnTo: string; reauthPlayerId?: string } | null {
   if (!cookieHeader) return null;
   const cookie = cookieHeader.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${OAUTH_STATE_COOKIE}=`));
   if (!cookie) return null;
   try {
-    const value = JSON.parse(decodeURIComponent(cookie.slice(OAUTH_STATE_COOKIE.length + 1))) as { state?: string; returnTo?: string };
+    const value = JSON.parse(decodeURIComponent(cookie.slice(OAUTH_STATE_COOKIE.length + 1))) as { state?: string; returnTo?: string; reauthPlayerId?: string };
     if (!value.state) return null;
-    return { state: value.state, returnTo: sanitizeReturnPath(value.returnTo ?? null) };
+    return { state: value.state, returnTo: sanitizeReturnPath(value.returnTo ?? null), ...(typeof value.reauthPlayerId === "string" ? { reauthPlayerId: value.reauthPlayerId } : {}) };
   } catch {
     return null;
   }

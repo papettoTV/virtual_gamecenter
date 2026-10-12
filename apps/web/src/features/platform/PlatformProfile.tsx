@@ -118,6 +118,20 @@ export function PlatformProfile({ platform, profileOpen, profileRef, setProfileO
               <small>次の日の開始：{new Date(platform.creditPolicy.nextRefillAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}</small>
             </div>}
             {standaloneCredits && platform?.creditPolicy?.purchasesEnabled && <button type="button" onClick={() => window.dispatchEvent(new Event("request-credit-topup"))}>クレジットを追加</button>}
+            {platform && <div className="platform-data-actions">
+              <button type="button" disabled={busy} onClick={() => {
+                setProfileOpen(false);
+                window.dispatchEvent(new CustomEvent("request-data-deletion", { detail: "public" }));
+              }}>ランキング・共有結果を削除</button>
+              <button type="button" disabled={busy} onClick={() => {
+                setProfileOpen(false);
+                window.dispatchEvent(new CustomEvent("request-data-deletion", { detail: "all" }));
+              }}>{platform.accountRegistered ? "退会・データ削除" : "ゲストデータを削除"}</button>
+              <button type="button" onClick={() => {
+                setProfileOpen(false);
+                window.dispatchEvent(new Event("request-deletion-status"));
+              }}>削除受付状況</button>
+            </div>}
             {platform?.accountRegistered && (
               <button
                 className="platform-logout-button"

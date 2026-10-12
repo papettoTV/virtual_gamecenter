@@ -81,6 +81,35 @@ export class PlatformApiError extends Error {
 }
 
 let bootstrapRequest: Promise<PlatformBootstrap> | null = null;
+export interface DeletionPreview {
+  playerName: string;
+  accountRegistered: boolean;
+  wallet: { free_balance: number; purchased_balance: number } | null;
+  scope: "all" | "public";
+  confirmationToken: string;
+  reauthRequired: boolean;
+}
+
+export interface DeletionReceipt {
+  id: string;
+  receipt: string;
+  scope: "all" | "public";
+  status: string;
+  dismissed?: boolean;
+}
+
+export function previewDataDeletion(scope: "all" | "public"): Promise<DeletionPreview> {
+  return requestJson(`/api/platform/data-deletion/preview?scope=${scope}`);
+}
+
+export function requestDataDeletion(confirmationToken: string): Promise<DeletionReceipt> {
+  return requestJson("/api/platform/data-deletion/request", { method: "POST", body: JSON.stringify({ confirmationToken }) });
+}
+
+export function fetchDataDeletionStatus(receipt: DeletionReceipt): Promise<{ status: string }> {
+  return requestJson(`/api/platform/data-deletion/${receipt.id}`, { headers: { "X-Deletion-Receipt": receipt.receipt } });
+}
+
 export function fetchPlatformBootstrap(): Promise<PlatformBootstrap> {
   // Concurrent consumers must share the first request that establishes the guest cookie.
   bootstrapRequest ??= requestJson<PlatformBootstrap>("/api/platform/bootstrap").finally(() => { bootstrapRequest = null; });
