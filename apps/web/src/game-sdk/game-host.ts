@@ -19,10 +19,10 @@ export class GameHost {
     for (const listener of this.listeners) listener(action);
   }
 
-  async play(action: PlayAction): Promise<boolean> {
+  async play(action: PlayAction, reservationId?: string): Promise<boolean> {
     const instance = this.instance;
     if (!instance) return false;
-    const started = await instance.play(action);
+    const started = await instance.play(action, reservationId);
     return this.instance === instance && started;
   }
 

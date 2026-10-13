@@ -30,7 +30,11 @@ vi.mock("../../src/realtime/cabinet-client", () => ({
       handlers.onMessage({ type: "cabinetState", state: { status: "occupied", spectatorCount: 0 } });
     },
     leave: mocks.leave,
-    send: mocks.send,
+    send(message: { type: string; reservationId?: string }) {
+      mocks.send(message);
+      if (message.type === "startSolo") handlers.onMessage({ type: "soloStarted", reservationId: message.reservationId });
+      return true;
+    },
     getBufferedAmount: () => 0,
   }),
 }));
@@ -92,7 +96,7 @@ describe("BUZZ BARRIER instance lifecycle", () => {
     const instance = mountGame({ game: BUZZ_BARRIER, lifetime });
     expect(mocks.send).not.toHaveBeenCalledWith({ type: "startSolo" });
     await instance.prepareSolo?.();
-    expect(await instance.play("start")).toBe(true);
+    expect(await instance.play("start", "reservation")).toBe(true);
     const joins = vi.mocked(history.pushState).mock.calls.length;
     await instance.prepareSolo?.();
     expect(vi.mocked(history.pushState).mock.calls.length).toBe(joins);
@@ -114,7 +118,7 @@ describe("BUZZ BARRIER instance lifecycle", () => {
     expect(bodyClasses.has("is-game-screen")).toBe(false);
     keyboard.dispatchEvent(keyEvent("KeyR"));
     expect(mocks.requestPlay).toHaveBeenCalledTimes(1);
-    expect(await instance.play("retry")).toBe(false);
+    expect(await instance.play("retry", "reservation")).toBe(false);
   });
 
   it("parent disposal prevents old input from reaching a remounted instance", async () => {
@@ -124,7 +128,7 @@ describe("BUZZ BARRIER instance lifecycle", () => {
     const lifetime = new GameLifetime();
     const instance = mountGame({ game: BUZZ_BARRIER, lifetime });
     await instance.prepareSolo?.();
-    await instance.play("start");
+    await instance.play("start", "reservation");
     keyboard.dispatchEvent(keyEvent("KeyR"));
     expect(mocks.requestPlay).toHaveBeenCalledTimes(1);
     instance.dispose();
@@ -134,7 +138,7 @@ describe("BUZZ BARRIER instance lifecycle", () => {
   it("records legitimate zero-score game over without ranking and clears on retry/disposal", async () => {
     const lifetime = new GameLifetime();
     const instance = mountGame({ game: BUZZ_BARRIER, lifetime });
-    await instance.prepareSolo?.(); await instance.play("start");
+    await instance.prepareSolo?.(); await instance.play("start", "reservation");
     expect(mocks.setResult).not.toHaveBeenCalled();
     keyboard.dispatchEvent(keyEvent("Space"));
     mocks.state!.players[0]!.lives = 0;
@@ -150,7 +154,7 @@ describe("BUZZ BARRIER instance lifecycle", () => {
     });
     expect(mocks.setResult.mock.calls[0]![0].elapsedTimeMs).toBeGreaterThan(0);
     mocks.clearResult.mockClear();
-    await instance.play("retry");
+    await instance.play("retry", "reservation");
     expect(mocks.clearResult).toHaveBeenCalledWith(BUZZ_BARRIER.id);
     instance.dispose();
     expect(mocks.clearResult).toHaveBeenCalledWith(BUZZ_BARRIER.id);
@@ -160,7 +164,7 @@ describe("BUZZ BARRIER instance lifecycle", () => {
   it("does not consume textarea spaces or retry shortcuts while sharing is open", async () => {
     const lifetime = new GameLifetime();
     const instance = mountGame({ game: BUZZ_BARRIER, lifetime });
-    await instance.prepareSolo?.(); await instance.play("start");
+    await instance.prepareSolo?.(); await instance.play("start", "reservation");
     mocks.overlay = true;
     const space = keyEvent("Space");
     keyboard.dispatchEvent(space); keyboard.dispatchEvent(keyEvent("KeyR"));

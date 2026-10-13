@@ -209,7 +209,7 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
         gameId,
         cabinetId,
         action: pendingAction,
-        start: () => gameHost.play(pendingAction),
+        start: (action, reservationId) => gameHost.play(action, reservationId),
         walletChanged: updateWallet,
       });
       if (!started) {
@@ -224,6 +224,8 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
       if (error instanceof PlatformApiError && error.code === "insufficient_credit") {
         if (error.wallet) updateWallet(error.wallet);
         setPlayDialog("insufficient");
+      } else if (error instanceof Error && error.message === "game_start_confirmation_pending") {
+        notifications.show({ id: "platform", type: "error", message: "開始確認がタイムアウトしました。クレジットは使用済みです。再読み込み前にゲーム画面を確認してください。" });
       } else {
         notifications.show({ id: "platform", type: "error", message: "ゲーム開始処理に失敗しました。もう一度お試しください。" });
       }

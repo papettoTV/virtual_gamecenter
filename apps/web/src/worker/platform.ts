@@ -1,3 +1,4 @@
+import { refundUnusedCapture } from "./credit-reservations";
 import {
   handleGoogleAuthRequest,
   isDeveloperAuthAvailable,
@@ -513,6 +514,11 @@ export async function handlePlatformRequest(
     if (!reservation) {
       return creditJson({ error: "reservation_not_found" }, { status: 404 });
     }
+    if (action === "release" && reservation.status === "captured") {
+      await refundUnusedCapture(database, reservationId);
+      const current = await database.prepare("SELECT status FROM credit_reservations WHERE id = ?").bind(reservationId).first<{ status: string }>();
+      return creditJson({ reservationId, status: current!.status, wallet: await getWalletSummary(database, session.playerId) });
+    }
     if (reservation.status !== "active") {
       return creditJson({
         reservationId,
@@ -526,7 +532,8 @@ export async function handlePlatformRequest(
         database.prepare(
           `INSERT OR IGNORE INTO credit_ledger_entries
             (id, player_id, balance_type, entry_type, amount, play_session_id, reference_id)
-           VALUES (?, ?, ?, 'consumed', ?, ?, ?)`,
+           SELECT ?, ?, ?, 'consumed', ?, ?, ? FROM credit_reservations
+           WHERE id = ? AND status = 'active' AND datetime(expires_at) > CURRENT_TIMESTAMP`,
         ).bind(
           `consume:${reservationId}`,
           session.playerId,
@@ -534,17 +541,18 @@ export async function handlePlatformRequest(
           -reservation.amount,
           reservation.play_session_id,
           reservationId,
+          reservationId,
         ),
         database.prepare(
           `UPDATE credit_reservations
            SET status = 'captured', updated_at = CURRENT_TIMESTAMP
-           WHERE id = ? AND status = 'active'`,
+           WHERE id = ? AND status = 'active' AND EXISTS (SELECT 1 FROM credit_ledger_entries WHERE id = 'consume:' || credit_reservations.id)`,
         ).bind(reservationId),
         database.prepare(
           `UPDATE play_sessions
            SET status = 'playing', started_at = CURRENT_TIMESTAMP
-           WHERE id = ?`,
-        ).bind(reservation.play_session_id),
+           WHERE id = ? AND EXISTS (SELECT 1 FROM credit_reservations WHERE id = ? AND status = 'captured')`,
+        ).bind(reservation.play_session_id, reservationId),
       ]);
     } else {
       await database.batch([
@@ -556,14 +564,16 @@ export async function handlePlatformRequest(
         database.prepare(
           `UPDATE play_sessions
            SET status = 'cancelled', ended_at = CURRENT_TIMESTAMP
-           WHERE id = ?`,
-        ).bind(reservation.play_session_id),
+           WHERE id = ? AND EXISTS (SELECT 1 FROM credit_reservations WHERE id = ? AND status = 'released')`,
+        ).bind(reservation.play_session_id, reservationId),
       ]);
     }
 
+    const current = await database.prepare("SELECT status FROM credit_reservations WHERE id = ?").bind(reservationId).first<{ status: string }>();
+    if (action === "capture" && current?.status !== "captured") return creditJson({ error: "reservation_not_captured" }, { status: 409 });
     return creditJson({
       reservationId,
-      status: action === "capture" ? "captured" : "released",
+      status: current!.status,
       wallet: await getWalletSummary(database, session.playerId),
     });
   }

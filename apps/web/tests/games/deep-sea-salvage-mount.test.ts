@@ -7,7 +7,7 @@ import type { createState } from "../../src/games/deep-sea-salvage/state";
 import { SPECIES } from "../../src/games/deep-sea-salvage/species";
 
 const mocks = vi.hoisted(() => ({
-  sessions: [] as Array<{ role: string; join: ReturnType<typeof vi.fn>; leave: ReturnType<typeof vi.fn>; send: ReturnType<typeof vi.fn>; waitForPlayer: ReturnType<typeof vi.fn> }>,
+  sessions: [] as Array<{ role: string; join: ReturnType<typeof vi.fn>; leave: ReturnType<typeof vi.fn>; send: ReturnType<typeof vi.fn>; startSolo: ReturnType<typeof vi.fn>; waitForPlayer: ReturnType<typeof vi.fn> }>,
   rendererDispose: vi.fn(), draw: vi.fn(), reset: vi.fn(), startDive: vi.fn(), continueRun: vi.fn(),
   editorCleanup: vi.fn(), renderers: [] as Array<{ dispose: ReturnType<typeof vi.fn>; setThreeLayer: ReturnType<typeof vi.fn> }>,
   createThreeLayer: vi.fn(), fetchRanking: vi.fn(async () => []),
@@ -21,6 +21,7 @@ vi.mock("../../src/game-sdk/cabinet-session", () => ({
   createCabinetSession: (options: { lifetime: GameLifetime; onMessage: (message: unknown) => void }) => {
     const session = {
       role: "visitor", join: vi.fn(), leave: vi.fn(), send: vi.fn(() => true), getBufferedAmount: () => 0,
+      startSolo: vi.fn(async () => true),
       waitForPlayer: vi.fn(async () => { session.role = "player"; options.onMessage({ type: "joinedCabinet", role: "player" }); return true; }),
     };
     mocks.messages.push(options.onMessage);
@@ -88,7 +89,7 @@ afterEach(() => { lifetime.dispose(); vi.restoreAllMocks(); vi.unstubAllGlobals(
 describe("深海サルベージのmount契約", () => {
   it("registers zero-score completed runs without ranking and uses a new ID after continue", async () => {
     const instance = mountGame({ game: DEEP_SEA_SALVAGE, lifetime });
-    await instance.play("start");
+    await instance.play("start", "reservation");
     const state = mocks.states[0]!;
     state.phase = "result"; state.elapsed = 0; state.finalScore = 0;
     state.maxDepth = 123; state.discovered = new Set([SPECIES[0]!.id]);
@@ -99,13 +100,13 @@ describe("深海サルベージのmount契約", () => {
       metrics: { maxDepth: 123, discoveredCount: 1, totalSpeciesCount: SPECIES.length, speciesIds: SPECIES[0]!.id },
     });
     mocks.clearResult.mockClear();
-    await instance.play("retry");
+    await instance.play("retry", "reservation");
     expect(mocks.clearResult).toHaveBeenCalledWith(DEEP_SEA_SALVAGE.id);
     expect(mocks.clearResult.mock.invocationCallOrder[0]).toBeLessThan(mocks.continueRun.mock.invocationCallOrder[0]!);
     state.phase = "result";
     mocks.finishes[0]!("Finished again", 1);
     expect(mocks.setResult.mock.calls[1]![0].id).not.toBe(first.id);
-    await instance.play("start");
+    await instance.play("start", "reservation");
     expect(mocks.clearResult).toHaveBeenCalledWith(DEEP_SEA_SALVAGE.id);
     instance.dispose();
     expect(mocks.setLiveContext).toHaveBeenLastCalledWith(null);
@@ -115,7 +116,7 @@ describe("深海サルベージのmount契約", () => {
 
   it("clears on losing the seat and never attributes spectator state to the player", async () => {
     const instance = mountGame({ game: DEEP_SEA_SALVAGE, lifetime });
-    await instance.play("start");
+    await instance.play("start", "reservation");
     const state = mocks.states[0]!; state.phase = "result";
     mocks.finishes[0]!("Finished", 1);
     expect(mocks.setResult).toHaveBeenCalledTimes(1);
@@ -127,7 +128,7 @@ describe("深海サルベージのmount契約", () => {
 
   it("pauses before live sharing and suppresses game shortcuts inside the common share overlay", async () => {
     const instance = mountGame({ game: DEEP_SEA_SALVAGE, lifetime });
-    await instance.play("start");
+    await instance.play("start", "reservation");
     const state = mocks.states[0]!; state.phase = "dive"; state.paused = false;
     windowTarget.dispatchEvent(new Event("before-live-share"));
     expect(state.paused).toBe(true);
@@ -154,16 +155,16 @@ describe("深海サルベージのmount契約", () => {
     const session = mocks.sessions[0]!; session.role = "player";
     await instance.prepareSolo?.(); await instance.prepareSolo?.();
     expect(session.join).toHaveBeenCalledTimes(1); expect(history.pushState).not.toHaveBeenCalled();
-    expect(await instance.play("start")).toBe(true); expect(session.send).toHaveBeenCalledWith({ type: "startSolo" });
+    expect(await instance.play("start", "reservation")).toBe(true); expect(session.startSolo).toHaveBeenCalledWith("reservation");
   });
 
   it("player確定前のdisposeはplayをfalseにしてゲームを開始しない", async () => {
     const instance = mountGame({ game: DEEP_SEA_SALVAGE, lifetime });
     let resolveReady!: (value: boolean) => void;
     mocks.sessions[0]!.waitForPlayer.mockImplementation(() => new Promise<boolean>(resolve => { resolveReady = resolve; }));
-    const pending = instance.play("start"); instance.dispose(); resolveReady(true);
+    const pending = instance.play("start", "reservation"); instance.dispose(); resolveReady(true);
     expect(await pending).toBe(false); expect(mocks.sessions[0]?.send).not.toHaveBeenCalled();
-    expect(await instance.play("retry")).toBe(false);
+    expect(await instance.play("retry", "reservation")).toBe(false);
   });
 
   it("旧ネイティブソロ・リトライイベントではゲームを開始しない", () => {
@@ -187,7 +188,7 @@ describe("深海サルベージのmount契約", () => {
     (windowTarget as unknown as { location: { pathname: string } }).location.pathname = "/";
     const instance = mountGame({ game: DEEP_SEA_SALVAGE, lifetime }); await instance.prepareSolo?.();
     expect(history.pushState).toHaveBeenCalledTimes(1); expect(mocks.sessions[0]?.join).toHaveBeenCalledTimes(1);
-    expect(await instance.play("start")).toBe(true); expect(mocks.sessions[0]?.join).toHaveBeenCalledTimes(1);
+    expect(await instance.play("start", "reservation")).toBe(true); expect(mocks.sessions[0]?.join).toHaveBeenCalledTimes(1);
   });
 
   it("dispose後の非同期Three.jsロード結果を解放する", async () => {

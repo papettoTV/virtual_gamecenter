@@ -426,7 +426,7 @@ export function mountGame(context: GameContext): GameInstance {
     try { return await preparePending; } finally { preparePending = null; }
   }
 
-  async function play(action: "start" | "retry"): Promise<boolean> {
+  async function play(action: "start" | "retry", reservationId?: string): Promise<boolean> {
     if (scope.disposed || playPending) return false;
     if (preparePending && !await preparePending) return false;
     if (!cabinetId && !await prepareSolo()) return false;
@@ -437,7 +437,7 @@ export function mountGame(context: GameContext): GameInstance {
     try {
       if (cabinetClient.role !== "player") cabinetClient.join(cabinetId, DEEP_SEA_SALVAGE.id);
       if (!await cabinetClient.waitForPlayer() || scope.disposed || generation !== actionGeneration) return false;
-      if (!cabinetClient.send({ type: "startSolo" })) return false;
+      if (!reservationId || !await cabinetClient.startSolo(reservationId) || scope.disposed || generation !== actionGeneration) return false;
       watching = false; playing = true;
       if (action === "retry") retryFromResult(); else resetRun();
       showScreen("game"); lastTime = performance.now();

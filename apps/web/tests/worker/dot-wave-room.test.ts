@@ -16,8 +16,8 @@ async function player() {
   await exports.default.fetch("http://localhost/api/platform/welcome-credit", { method: "POST", headers: { Cookie: cookie } });
   return cookie;
 }
-async function reserve(cookie: string, cabinetId: string, purpose: "solo" | "challenge" | "rematch") {
-  const response = await exports.default.fetch("http://localhost/api/platform/credit-reservations", { method: "POST", headers: { Cookie: cookie, "Content-Type": "application/json" }, body: JSON.stringify({ cabinetId, gameId: "dot-wave", purpose }) });
+async function reserve(cookie: string, cabinetId: string, purpose: "solo" | "challenge" | "rematch", gameId = "dot-wave") {
+  const response = await exports.default.fetch("http://localhost/api/platform/credit-reservations", { method: "POST", headers: { Cookie: cookie, "Content-Type": "application/json" }, body: JSON.stringify({ cabinetId, gameId, purpose }) });
   expect(response.status).toBe(200);
   return (await response.json<{ reservationId: string }>()).reservationId;
 }
@@ -114,7 +114,8 @@ it("deleting a player clears the live stream and closes only that player's conne
   const viewerCookie = await player();
   const host = await connect(hostCookie, cabinet, false, "deep-sea-salvage");
   const viewer = await connect(viewerCookie, cabinet, true, "deep-sea-salvage");
-  host.send({ type: "startSolo" });
+  const reservationId = await reserve(hostCookie, cabinet, "solo", "deep-sea-salvage"); await capture(hostCookie, reservationId);
+  host.send({ type: "startSolo", reservationId });
   await host.next("cabinetState", message => message.state.status === "soloPlaying");
   host.send({ type: "gameKeyframe", seq: 1, snapshot: { gameId: "deep-sea-salvage", version: 1, state: { phase: "dive" }, world: {} } });
   await viewer.next("viewerKeyframe");
@@ -137,8 +138,10 @@ it("streams salvage to free spectators, replays to late arrivals and clears on d
   const viewerCookie = await player();
   const viewer = await connect(viewerCookie, cabinet, true, "deep-sea-salvage");
   expect((await viewer.next("cabinetState", message => message.state.playerCount === 0)).state.playerCount).toBe(0);
-  const host = await connect(await player(), cabinet, false, "deep-sea-salvage");
-  host.send({ type: "startSolo" });
+  const hostCookie = await player();
+  const host = await connect(hostCookie, cabinet, false, "deep-sea-salvage");
+  const reservationId = await reserve(hostCookie, cabinet, "solo", "deep-sea-salvage"); await capture(hostCookie, reservationId);
+  host.send({ type: "startSolo", reservationId });
   await host.next("cabinetState", message => message.state.status === "soloPlaying");
   const snapshot = { gameId: "deep-sea-salvage", version: 1, state: { subX: 480, phase: "dive" }, world: { terrainCourse: {} } };
   host.send({ type: "gameKeyframe", seq: 1, snapshot });

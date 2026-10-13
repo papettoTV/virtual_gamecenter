@@ -4,7 +4,7 @@ import type { GameLifetime } from "./lifetime";
 export type PlayAction = "start" | "retry";
 export interface GameInstance {
   prepareSolo?(): void | Promise<void>;
-  play(action: PlayAction): boolean | Promise<boolean>;
+  play(action: PlayAction, reservationId?: string): boolean | Promise<boolean>;
   dispose(): void;
 }
 export interface GameContext {
