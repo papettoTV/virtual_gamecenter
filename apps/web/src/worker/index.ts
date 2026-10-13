@@ -10,6 +10,7 @@ import { rewriteLivePage } from "./live-metadata";
 import { getGameDefinition } from "../domain/game";
 import { handleDataLifecycleRequest, runRetention } from "./data-lifecycle";
 import { isDeveloperAuthAvailable } from "./google-auth";
+import { boundRequestBody, limitRequest, WEBHOOK_BODY_LIMIT } from "./request-protection";
 
 export { CabinetRoom };
 
@@ -22,7 +23,7 @@ interface WorkerEnv extends Env, BasicAuthEnv {
 const CABINET_SOCKET_PATH = /^\/api\/cabinets\/([a-zA-Z0-9-]+)\/ws$/;
 
 export default {
-  async fetch(request, env): Promise<Response> {
+  async fetch(request: Request, env: WorkerEnv): Promise<Response> {
     const url = new URL(request.url);
     const gatewayEnvironment = request.headers.get("X-Pulbase-Gateway-Environment");
     if (gatewayEnvironment && gatewayEnvironment !== env.APP_ENV) {
@@ -34,6 +35,13 @@ export default {
     const origin = request.headers.get("Origin");
     if (requiresOrigin && (origin ? origin !== url.origin : env.APP_ENV !== "local")) {
       return Response.json({ error: "invalid_origin" }, { status: 403, headers: { "Cache-Control": "no-store" } });
+    }
+    const protection = await limitRequest(request, env);
+    if (protection) return protection;
+    if (url.pathname.startsWith("/api/") && !["GET", "HEAD", "OPTIONS"].includes(request.method)) {
+      const bounded = await boundRequestBody(request, url.pathname === "/api/platform/stripe/webhook" ? WEBHOOK_BODY_LIMIT : undefined);
+      if (bounded instanceof Response) return bounded;
+      request = bounded;
     }
     const liveImage = /^\/share\/live\/([^/]+)\/image\.png$/.exec(url.pathname);
     if (liveImage && request.method === "GET") {

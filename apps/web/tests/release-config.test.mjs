@@ -24,6 +24,19 @@ test("環境未指定・未知環境では公開/移行できない", () => {
   }
 });
 
+test("乱用対策の欠落・namespace共用・成果物の取り違えを拒否", () => {
+  const missing = ready();
+  delete missing.env.staging.ratelimits;
+  assert.ok(checkReleaseConfig(missing, "staging").some(error => error.includes("乱用対策")));
+  const shared = ready();
+  shared.env.staging.ratelimits[0].namespace_id = shared.env.production.ratelimits[0].namespace_id;
+  assert.ok(checkReleaseConfig(shared, "staging").some(error => error.includes("namespace")));
+  const selected = ready().env.staging;
+  const built = structuredClone(selected);
+  built.ratelimits[0].simple.limit += 1;
+  assert.ok(checkBuildConfig(built, selected, "staging").some(error => error.includes("乱用対策")));
+});
+
 test("Pagesの公開ドメインをWorkerで奪う設定を拒否する", () => {
   for (const environment of ["staging", "production"]) {
     for (const field of ["routes", "workers_dev"]) {
@@ -93,7 +106,7 @@ test("認証を迂回する静的配信・別環境DO・定期削除/監視不�
 test("生成された別環境の成果物をデプロイしない", () => {
   const config = ready();
   assert.deepEqual(checkBuildConfig(config.env.production, config.env.production, "production"), []);
-  assert.equal(checkBuildConfig(config.env.staging, config.env.production, "production").length, 4);
+  assert.equal(checkBuildConfig(config.env.staging, config.env.production, "production").length, 5);
 });
 
 test("環境が欠落しても例外ではなく拒否理由を返す", () => {

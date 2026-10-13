@@ -25,6 +25,11 @@ export function createCabinetClient(handlers: CabinetClientHandlers = {}): Cabin
   let wantsCabinet = false;
   let watch = false;
   let reconnectTimer: number | null = null;
+  let reconnectAttempts = 0;
+  function scheduleReconnect() {
+    const delay = Math.min(1000 * 2 ** reconnectAttempts++, 30_000);
+    reconnectTimer = window.setTimeout(connect, delay);
+  }
 
   function connect() {
     if (!cabinetId || (socket && socket.readyState <= WebSocket.OPEN)) return;
@@ -37,21 +42,23 @@ export function createCabinetClient(handlers: CabinetClientHandlers = {}): Cabin
     } catch {
       socket = null;
       handlers.onConnectionChange?.(false);
-      reconnectTimer = window.setTimeout(connect, 1000);
+      scheduleReconnect();
       return;
     }
 
     const connection = socket;
     connection.addEventListener("open", () => {
       if (socket !== connection) return;
+      reconnectAttempts = 0;
       handlers.onConnectionChange?.(true);
       if (wantsCabinet && gameId) send({ type: "joinCabinet", gameId, watch });
     });
-    connection.addEventListener("close", () => {
+    connection.addEventListener("close", event => {
       if (socket !== connection) return;
       socket = null;
       handlers.onConnectionChange?.(false);
-      if (wantsCabinet) reconnectTimer = window.setTimeout(connect, 1000);
+      if ([1008, 1009, 1003].includes(event.code)) wantsCabinet = false;
+      if (wantsCabinet) scheduleReconnect();
     });
     connection.addEventListener("error", () => { if (socket === connection) handlers.onConnectionChange?.(false); });
     connection.addEventListener("message", (event) => {
