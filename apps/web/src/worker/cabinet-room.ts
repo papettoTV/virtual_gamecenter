@@ -24,12 +24,15 @@ import type {
   VersusTerminalReport,
 } from "../shared/protocol";
 import { getGameDefinition } from "../domain/game";
-import { getPlayerIdentity, getPlayerIdentityById } from "./platform";
+import { getPlayerConnectionIdentity, getPlayerIdentityById } from "./platform";
 
 interface ConnectionAttachment {
   clientId: string;
   role: CabinetRole;
   playerId?: string;
+  sessionHash?: string;
+  sessionCheckedAt?: number;
+  revoked?: boolean;
   dotWaveCredit?: boolean;
   dotWavePlayer?: DotWavePlayer;
 }
@@ -122,13 +125,15 @@ export class CabinetRoom extends DurableObject<Env> {
     const pair = new WebSocketPair();
     const client = pair[0];
     const server = pair[1];
-    const identity = await getPlayerIdentity(request, this.env.DB);
+    const identity = await getPlayerConnectionIdentity(request, this.env.DB);
     if (identity) await this.env.DB.prepare("INSERT INTO player_cabinets (player_id, cabinet_id) VALUES (?, ?) ON CONFLICT(player_id, cabinet_id) DO UPDATE SET updated_at = CURRENT_TIMESTAMP").bind(identity.playerId, this.cabinetId).run();
     this.ctx.acceptWebSocket(server);
     const attachment: ConnectionAttachment = {
       clientId: crypto.randomUUID(),
       role: "visitor",
       playerId: identity?.playerId,
+      sessionHash: identity?.sessionHash,
+      sessionCheckedAt: Date.now(),
       ...(requestedGame.id === "dot-wave" ? { dotWavePlayer: { name: identity?.playerName ?? "ゲスト", wins: 0 } } : {}),
     };
     server.serializeAttachment(attachment);
@@ -150,6 +155,26 @@ export class CabinetRoom extends DurableObject<Env> {
     } catch {
       this.send(socket, { type: "error", message: "メッセージを読み取れませんでした。" });
       return;
+    }
+
+    if (!message || typeof message !== "object" || typeof message.type !== "string") {
+      this.send(socket, { type: "error", message: "メッセージ形式が正しくありません。" });
+      return;
+    }
+    const current = this.attachment(socket);
+    if (current.revoked) return;
+    const streaming = ["gameKeyframe", "gameEvents", "gameMotionFrame", "versusProgress"].includes(message.type);
+    if (current.playerId && (!streaming || Date.now() - (current.sessionCheckedAt ?? 0) >= 5000)) {
+      const active = current.sessionHash && await this.env.DB.prepare(
+        `SELECT 1 AS active FROM player_sessions WHERE token_hash = ? AND player_id = ? AND datetime(expires_at) > CURRENT_TIMESTAMP
+         AND EXISTS (SELECT 1 FROM players WHERE id = player_sessions.player_id AND deletion_requested_at IS NULL)`,
+      ).bind(current.sessionHash, current.playerId).first();
+      if (!active) {
+        await this.disconnectRevokedSocket(socket);
+        return;
+      }
+      if (this.attachment(socket).revoked) return;
+      socket.serializeAttachment({ ...this.attachment(socket), sessionCheckedAt: Date.now() });
     }
 
     if (message.type === "joinCabinet") {
@@ -823,6 +848,10 @@ export class CabinetRoom extends DurableObject<Env> {
 
   private async join(socket: WebSocket, watch = false): Promise<void> {
     const current = this.attachment(socket);
+    if (!watch && !current.playerId) {
+      this.send(socket, { type: "error", message: "プレイするにはプレイヤー情報が必要です。" });
+      return;
+    }
     if (current.role !== "visitor") await this.leave(socket);
 
     const role = watch ? "spectator" : assignCabinetRole(this.state);
@@ -1008,6 +1037,22 @@ export class CabinetRoom extends DurableObject<Env> {
     }
     await this.persistState();
     this.broadcastState();
+  }
+
+  async revokeSession(playerId: string, sessionHash: string): Promise<void> {
+    await this.ready;
+    for (const socket of this.ctx.getWebSockets()) {
+      const attachment = this.attachment(socket);
+      if (attachment.playerId === playerId && (!attachment.sessionHash || attachment.sessionHash === sessionHash)) {
+        await this.disconnectRevokedSocket(socket);
+      }
+    }
+  }
+
+  private async disconnectRevokedSocket(socket: WebSocket): Promise<void> {
+    await this.leave(socket);
+    socket.serializeAttachment({ clientId: this.attachment(socket).clientId, role: "visitor", revoked: true } satisfies ConnectionAttachment);
+    socket.close(1008, "セッションが無効になりました。");
   }
 
   async expireIdleData(cabinetId?: string): Promise<void> {

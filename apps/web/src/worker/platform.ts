@@ -90,6 +90,7 @@ export async function handlePlatformRequest(
   request: Request,
   database: D1Database,
   paymentEnv: StripePaymentEnv & GoogleAuthEnv = {},
+  rooms?: { idFromName(name: string): DurableObjectId; get(id: DurableObjectId): { revokeSession(playerId: string, sessionHash: string): Promise<void> } },
 ): Promise<Response | null> {
   const url = new URL(request.url);
   if (!url.pathname.startsWith("/api/platform/")) return null;
@@ -194,6 +195,12 @@ export async function handlePlatformRequest(
     }
     await database.prepare("DELETE FROM player_sessions WHERE token_hash = ?")
       .bind(await hashToken(session.token)).run();
+    if (rooms) {
+      const cabinets = await database.prepare("SELECT cabinet_id FROM player_cabinets WHERE player_id = ?")
+        .bind(session.playerId).all<{ cabinet_id: string }>();
+      const sessionHash = await hashToken(session.token);
+      await Promise.all(cabinets.results.map(cabinet => rooms.get(rooms.idFromName(cabinet.cabinet_id)).revokeSession(session.playerId, sessionHash)));
+    }
     const guestSession = await getOrCreatePlayerSession(request, database);
     await database.batch([
       database.prepare(
@@ -781,6 +788,12 @@ export async function getPlayerIdentity(
   return getPlayerIdentityById(database, session.playerId);
 }
 
+export async function getPlayerConnectionIdentity(request: Request, database: D1Database) {
+  const session = await getExistingPlayerSession(request, database);
+  if (!session) return null;
+  return { ...await getPlayerIdentityById(database, session.playerId), sessionHash: await hashToken(session.token) };
+}
+
 export async function getPlayerIdentityById(
   database: D1Database,
   playerId: string,
@@ -818,7 +831,7 @@ async function getExistingPlayerSession(
   const session = await database.prepare(
     `SELECT player_id
      FROM player_sessions
-     WHERE token_hash = ? AND expires_at > CURRENT_TIMESTAMP
+     WHERE token_hash = ? AND datetime(expires_at) > CURRENT_TIMESTAMP
        AND EXISTS (SELECT 1 FROM players WHERE id = player_sessions.player_id AND deletion_requested_at IS NULL)`,
   ).bind(tokenHash).first<{ player_id: string }>();
   if (!session) return null;

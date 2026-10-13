@@ -2,6 +2,8 @@ import { env, exports } from "cloudflare:workers";
 import { beforeAll, afterEach, expect, it } from "vitest";
 import type { ClientMessage, ServerMessage } from "../../src/shared/protocol";
 import { migrateTestDatabase } from "../migrate-test-database";
+import { registerGoogleAccount } from "../../src/worker/google-auth";
+import { hashIdentifier } from "../../src/worker/identity-hash";
 
 beforeAll(migrateTestDatabase);
 
@@ -46,6 +48,65 @@ async function connect(cookie: string, cabinet: string, watch = false, gameId = 
   await next("joinedCabinet");
   return { socket, send, next, messages };
 }
+
+async function registered(cookie: string, subject: string) {
+  const response = await exports.default.fetch("http://localhost/api/platform/bootstrap", { headers: { Cookie: cookie } });
+  const identity = await response.json<{ playerId: string }>();
+  await registerGoogleAccount(env.DB, { playerId: identity.playerId, token: cookie.split("=")[1]!, secureCookie: false }, { sub: subject, name: "Session test" });
+}
+
+it("logout closes this session's cabinets but preserves spectators and another device", async () => {
+  const subject = crypto.randomUUID();
+  const hostCookie = await player();
+  await registered(hostCookie, subject);
+  const otherDeviceCookie = await player();
+  await registered(otherDeviceCookie, subject);
+  const cabinet = crypto.randomUUID();
+  const host = await connect(hostCookie, cabinet, false, "deep-sea-salvage");
+  const sameSession = await connect(hostCookie, crypto.randomUUID(), true, "deep-sea-salvage");
+  const viewer = await connect(await player(), cabinet, true, "deep-sea-salvage");
+  const otherDevice = await connect(otherDeviceCookie, cabinet, true, "deep-sea-salvage");
+  const closed = [host, sameSession].map(connection => new Promise<number>(resolve => connection.socket.addEventListener("close", event => resolve(event.code), { once: true })));
+  const logout = await exports.default.fetch("http://localhost/api/platform/auth/logout", { method: "POST", headers: { Cookie: hostCookie } });
+  expect(logout.status).toBe(200);
+  expect(await Promise.all(closed)).toEqual([1008, 1008]);
+  await viewer.next("playerLeft");
+  viewer.send({ type: "clockPing", sentAt: 11 });
+  expect((await viewer.next("clockPong")).sentAt).toBe(11);
+  otherDevice.send({ type: "clockPing", sentAt: 12 });
+  expect((await otherDevice.next("clockPong")).sentAt).toBe(12);
+  expect((await exports.default.fetch("http://localhost/api/platform/credits", { headers: { Cookie: otherDeviceCookie } })).status).toBe(200);
+});
+
+it("rejects invalid messages and closes connections after session revocation", async () => {
+  const cookie = await player();
+  const host = await connect(cookie, crypto.randomUUID(), false, "deep-sea-salvage");
+  host.socket.send("null");
+  expect((await host.next("error")).message).toContain("形式");
+  const closed = new Promise<number>(resolve => host.socket.addEventListener("close", event => resolve(event.code), { once: true }));
+  await env.DB.prepare("DELETE FROM player_sessions WHERE token_hash = ?").bind(await hashIdentifier(cookie.split("=")[1]!)).run();
+  host.send({ type: "clockPing", sentAt: 13 });
+  expect(await closed).toBe(1008);
+});
+
+it("honors ISO session expiry in both HTTP and existing WebSocket connections", async () => {
+  const cookie = await player();
+  const host = await connect(cookie, crypto.randomUUID(), false, "deep-sea-salvage");
+  const closed = new Promise<number>(resolve => host.socket.addEventListener("close", event => resolve(event.code), { once: true }));
+  await env.DB.prepare("UPDATE player_sessions SET expires_at = ? WHERE token_hash = ?")
+    .bind(new Date(Date.now() - 60_000).toISOString(), await hashIdentifier(cookie.split("=")[1]!)).run();
+  expect((await exports.default.fetch("http://localhost/api/platform/credits", { headers: { Cookie: cookie } })).status).toBe(401);
+  host.send({ type: "clockPing", sentAt: 15 });
+  expect(await closed).toBe(1008);
+});
+
+it("allows anonymous watching but not taking a player seat", async () => {
+  const viewer = await connect("", crypto.randomUUID(), true, "deep-sea-salvage");
+  viewer.send({ type: "joinCabinet", gameId: "deep-sea-salvage", watch: false });
+  expect((await viewer.next("error")).message).toContain("プレイヤー情報");
+  viewer.send({ type: "clockPing", sentAt: 14 });
+  expect((await viewer.next("clockPong")).sentAt).toBe(14);
+});
 
 it("deleting a player clears the live stream and closes only that player's connection", async () => {
   const cabinet = crypto.randomUUID();

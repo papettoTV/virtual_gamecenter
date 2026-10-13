@@ -91,7 +91,7 @@ export default {
     const cabinetDirectoryResponse = await handleCabinetDirectoryRequest(request, env.DB);
     if (cabinetDirectoryResponse) return cabinetDirectoryResponse;
 
-    const platformResponse = await handlePlatformRequest(request, env.DB, env);
+    const platformResponse = await handlePlatformRequest(request, env.DB, env, env.CABINET_ROOMS);
     if (platformResponse) return platformResponse;
 
     if (url.pathname === "/api/health") {
