@@ -20,7 +20,7 @@ Sun in Your Eyes / Alejandro Magaña (A. M.)。MixkitのSynthwaveカテゴリか
 ## 保存と利用条件
 無音版：../cut 。BGM版：この cut-bgm 。assetsの相対シンボリックリンクで映像素材だけを共用し、scene HTMLは別コピー。
 音源はこの動画制作のため .media/audio/bgm/ にローカル保存し、単体再配布を避けるためGit対象外。取得先とSHA256はbgm-provenance.json。提供元のStock Music Free LicenseはSNS動画・オンライン広告を許可。条件の確認記録はlicenses/。動画内へのクレジット追加なし。BGMはゲームアプリ本体に組み込まない。
-比較用プレビューとして制作。新しいMP4はまだ書き出さない。
+比較用プレビューを承認後、2026-10-14にユーザーの明示依頼でMP4へ書き出し。BGM・ざわめき入りと同一映像の無音版を別ファイルで保存。
 
 
 ## 2026-10-14 筐体アップのプレビュー修正と人のざわめき

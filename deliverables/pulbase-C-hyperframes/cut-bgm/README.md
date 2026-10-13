@@ -6,3 +6,11 @@
 - 曲：Sun in Your Eyes — Alejandro Magaña (A. M.) / Mixkit。
 - 音量エンベロープは `index.html` の `bgm-sun-in-your-eyes`。無音版のHTMLへは追加していない。
 - `npx hyperframes preview --background --no-open --port 3020` で比較版を開く。
+
+## 承認済みMP4（2026-10-14）
+
+- 音あり：`PULBASE-C-30s-BGM-crowd-v1.mp4`（BGM全編＋人のざわめき0–6秒）。
+- 無音：`../cut/PULBASE-C-30s-silent-v1.mp4`。上記の映像ストリームを再圧縮せずコピーし、音声トラックだけ除去。
+- 両方とも30秒、1080×1920、30fps、900フレーム、H.264 / yuv420p / faststart。音あり版はAAC / stereo / 48kHz。
+- 音源単体は配布しない。無音の旧プロジェクトソースと既存MP4も保持。
+- 最終検証：`verification-C-delivery-MP4.json`、`quality-C-final-MP4-contact.jpg`。

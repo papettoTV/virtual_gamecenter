@@ -1,0 +1,87 @@
+{
+  "soundFile": "PULBASE-C-30s-BGM-crowd-v1.mp4",
+  "silentFile": "../cut/PULBASE-C-30s-silent-v1.mp4",
+  "soundBytes": 25207032,
+  "silentBytes": 24449379,
+  "soundSha256": "8197ad476ed36640e085458f06575c2ac4a78c62d5d881c2969a24ac0fe52d99",
+  "silentSha256": "4ec08793fda216c41e9819524da7572ba588923e086c8da4d4137e25ed2daca2",
+  "durationSeconds": 30,
+  "resolution": [
+    1080,
+    1920
+  ],
+  "fps": 30,
+  "videoFrames": 900,
+  "videoCodec": "h264",
+  "pixelFormat": "yuv420p",
+  "audioCodec": "aac",
+  "audioSampleRate": 48000,
+  "audioChannels": 2,
+  "silentHasAudioStream": false,
+  "videoPacketHash": "SHA256=e1bf7511b9a0072b79abc0d3c6de7f9b541cfa1ebbc1c0e1c66c7aa0b289c6e5",
+  "silentVideoPacketHash": "SHA256=e1bf7511b9a0072b79abc0d3c6de7f9b541cfa1ebbc1c0e1c66c7aa0b289c6e5",
+  "identicalVideoPackets": true,
+  "fullDecodeSucceeded": true,
+  "renderedAudioIntegratedLufs": -22.6,
+  "renderedAudioTruePeakDbfs": -10.3,
+  "audioComparison": [
+    {
+      "rangeSeconds": [
+        0.5,
+        5
+      ],
+      "correlationToAuthoredBgmCrowdMix": 0.998085822907363,
+      "relativeRmsError": 0.06199275540155746,
+      "renderedRmsDbfs": -25.983413268618794
+    },
+    {
+      "rangeSeconds": [
+        7,
+        12
+      ],
+      "correlationToAuthoredBgmCrowdMix": 0.998461243178839,
+      "relativeRmsError": 0.05557588623037274,
+      "renderedRmsDbfs": -23.868987718007592
+    },
+    {
+      "rangeSeconds": [
+        24,
+        27
+      ],
+      "correlationToAuthoredBgmCrowdMix": 0.9990087961409609,
+      "relativeRmsError": 0.04470295012157784,
+      "renderedRmsDbfs": -22.02063961430825
+    },
+    {
+      "rangeSeconds": [
+        29,
+        30
+      ],
+      "correlationToAuthoredBgmCrowdMix": 0.9955094569321129,
+      "relativeRmsError": 0.09469517592234748,
+      "renderedRmsDbfs": -32.6818928730273
+    }
+  ],
+  "contactSheetTimesSeconds": [
+    1.5,
+    3.6,
+    8.5,
+    14,
+    19,
+    22.5,
+    24.5,
+    26.5,
+    29.9
+  ],
+  "visualReview": "Opening, cabinet closeup, X post, moving gameplay, challenge acceptance, split battle and final main title verified on rendered MP4 frames",
+  "sourceSilentIndexSha256": "c86b1858a97d3270bf71a453b674eb1a8fcc25f84904a49871fd5f7f40c58dc9",
+  "renderSummary": {
+    "version": "0.8.154",
+    "quality": "delivery",
+    "capture": "screenshot",
+    "gpu": "hardware",
+    "seconds": 73,
+    "workers": 2
+  },
+  "renderWarnings": "Sparse source keyframes reported. Render extracted all source frames with coverage ratio 1; rendered moving game frames verified."
+}
