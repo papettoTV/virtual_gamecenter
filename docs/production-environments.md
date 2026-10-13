@@ -13,7 +13,7 @@
 
 現行アプリはWorkers Static Assets/API/Durable Objects/Cronを統合したWorker構成であり、静的ファイルをPagesへ置くだけではAPI・観戦・定期削除まで動かない。検証Workerをそのままpages.devへ割り当てる設定も今回追加していない。
 
-本番・検証とも、Pages FunctionsのゲートウェイからService Bindingで各環境のWorkerへリクエストを転送する。検証のPreview binding（pulbase-staging）を反映し、実際の開始/観戦同期を確認済み。本番用のProduction binding（pulbase-production）は宣言のみで未反映。DOと削除CronはWorker側に置き、DB/R2/認証を共有しない。Googleサインイン完了・実機操作の確認は運営者と行う。
+本番・検証とも、Pages FunctionsのゲートウェイからService Bindingで各環境のWorkerへリクエストを転送する。検証のPreview binding（pulbase-staging）を反映し、実際の開始/観戦同期を確認済み。本番用のProduction binding（pulbase-production）は宣言のみで未反映。DOと削除CronはWorker側に置き、DB/R2/認証を共有しない。検証環境のGoogleログイン成功は運営者の報告と検証DBの連携レコード保存で確認済み。プロフィール/残高・各端末の実機操作の確認は運営者と行う。
 
 Pagesの **Production branchはmainのまま**。developはPreview対象にする。標準のブランチエイリアス `develop.virtual-gamecenter.pages.dev` を使用し、stgブランチや追加のstgエイリアスは作成しない。Production branchをdevelopへ変えない。
 
