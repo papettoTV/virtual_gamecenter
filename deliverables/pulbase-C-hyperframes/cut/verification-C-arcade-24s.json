@@ -1,0 +1,16 @@
+{
+  "duration": 24,
+  "resolution": [
+    1080,
+    1920
+  ],
+  "fps": 30,
+  "frames": 720,
+  "silent": true,
+  "decodeErrors": 0,
+  "background": "AI-generated fictional arcade",
+  "copy": "すぐ遊べる。観戦から、対戦も。",
+  "checkErrors": 0,
+  "checkWarnings": 0,
+  "hyperframesVersion": "0.8.152"
+}
