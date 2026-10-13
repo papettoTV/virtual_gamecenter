@@ -23,8 +23,11 @@ export function usePlatformAccount({ platform, setPlatform, setBusy, loadPlatfor
     const url = new URL(window.location.href);
     const result = url.searchParams.get("account");
     if (!result) return;
-    if (result === "registered") {
-      notifications.show({ id: "platform-account", type: "success", message: "ユーザー登録が完了し、5クレジットを追加しました。" });
+    if (["registered", "registered_without_bonus", "logged_in"].includes(result)) {
+      const message = result === "logged_in" ? "ログインしました。"
+        : result === "registered_without_bonus" ? "ユーザー登録が完了しました。"
+        : "ユーザー登録が完了し、5クレジットを追加しました。";
+      notifications.show({ id: "platform-account", type: "success", message });
       void loadPlatform();
       window.dispatchEvent(new Event("restore-ranking-registration"));
     } else {

@@ -3,6 +3,7 @@ import { hashIdentifier, registrationClaim } from "./identity-hash";
 const OAUTH_STATE_COOKIE = "vgc_oauth_state";
 const OAUTH_STATE_MAX_AGE_SECONDS = 10 * 60;
 const REGISTRATION_BONUS_CREDITS = 5;
+type AccountAuthResult = "registered" | "registered_without_bonus" | "logged_in";
 
 export interface GoogleAuthEnv {
   GOOGLE_CLIENT_ID?: string;
@@ -66,11 +67,11 @@ export async function handleGoogleAuthRequest(
       if (session.setCookie) headers.append("Set-Cookie", sessionCookie(session));
       return new Response(null, { status: 302, headers });
     }
-    await registerAccount(database, session, {
+    const result = await registerAccount(database, session, {
       sub: "local-developer",
       name: "開発者ユーザー",
     }, "developer");
-    redirect.searchParams.set("account", "registered");
+    redirect.searchParams.set("account", result);
     const headers = new Headers({ Location: redirect.toString() });
     if (session.setCookie) headers.append("Set-Cookie", sessionCookie(session));
     return new Response(null, { status: 302, headers });
@@ -142,8 +143,8 @@ export async function handleGoogleAuthRequest(
       if (stateRecord.reauthPlayerId !== session.playerId || identity?.provider_subject !== profile.sub) return fail("reauth_account_mismatch");
       await markVerified(database, session);
     } else {
-      await registerGoogleAccount(database, session, profile);
-      redirect.searchParams.set("account", "registered");
+      const result = await registerGoogleAccount(database, session, profile);
+      redirect.searchParams.set("account", result);
     }
     return new Response(null, {
       status: 302,
@@ -186,7 +187,7 @@ export async function registerGoogleAccount(
   database: D1Database,
   session: PlayerSession,
   profile: GoogleProfile,
-): Promise<void> {
+): Promise<AccountAuthResult> {
   return registerAccount(database, session, profile, "google");
 }
 
@@ -195,7 +196,7 @@ async function registerAccount(
   session: PlayerSession,
   profile: GoogleProfile,
   provider: "google" | "developer",
-): Promise<void> {
+): Promise<AccountAuthResult> {
   const existingIdentity = await database.prepare(
     "SELECT account_id FROM account_identities WHERE provider = ? AND provider_subject = ?",
   ).bind(provider, profile.sub).first<{ account_id: string }>();
@@ -209,7 +210,7 @@ async function registerAccount(
     await database.prepare("UPDATE player_sessions SET player_id = ? WHERE token_hash = ?")
       .bind(registeredPlayer.id, tokenHash).run();
     await markVerified(database, { ...session, playerId: registeredPlayer.id });
-    return;
+    return "logged_in";
   }
 
   const player = await database.prepare(
@@ -220,7 +221,7 @@ async function registerAccount(
 
   const accountId = crypto.randomUUID();
   const claimHash = await registrationClaim(provider, profile.sub);
-  await database.batch([
+  const results = await database.batch([
     database.prepare("DELETE FROM retained_benefits WHERE claim_hash = ? AND benefit_type = 'registration' AND expires_at <= CURRENT_TIMESTAMP").bind(claimHash),
     database.prepare("INSERT OR IGNORE INTO retained_benefits (claim_hash, benefit_type, granted_at, expires_at, grant_id) VALUES (?, 'registration', CURRENT_TIMESTAMP, datetime('now', '+5 years'), ?)").bind(claimHash, accountId),
     database.prepare(
@@ -242,6 +243,7 @@ async function registerAccount(
     database.prepare("INSERT INTO player_benefits (player_id, refill_eligible, registration_hash) VALUES (?, 1, ?) ON CONFLICT(player_id) DO UPDATE SET refill_eligible = 1, registration_hash = excluded.registration_hash").bind(session.playerId, claimHash),
   ]);
   await markVerified(database, session);
+  return results[5]!.meta.changes > 0 ? "registered" : "registered_without_bonus";
 }
 
 async function markVerified(database: D1Database, session: PlayerSession): Promise<void> {

@@ -221,11 +221,16 @@ describe("platform account and purchase logic", () => {
     expect(account.accountDialogOpen).toBe(false);
   });
 
-  it("restores ranking registration after returning from signup", async () => {
-    window.location.href = "https://example.test/cabinets/test?game=dot-wave&account=registered#ranking";
+  it.each([
+    ["registered", "ユーザー登録が完了し、5クレジットを追加しました。"],
+    ["registered_without_bonus", "ユーザー登録が完了しました。"],
+    ["logged_in", "ログインしました。"],
+  ])("restores ranking registration after %s with the correct notice", async (result, message) => {
+    window.location.href = `https://example.test/cabinets/test?game=dot-wave&account=${result}#ranking`;
     const options = { platform, setPlatform: vi.fn(), setBusy: vi.fn(), loadPlatform: vi.fn() };
     usePlatformAccount(options);
     runtime.effects[0]?.();
+    expect(notifications.show).toHaveBeenCalledWith(expect.objectContaining({ message }));
     expect(options.loadPlatform).toHaveBeenCalledOnce();
     expect(dispatchEvent).toHaveBeenCalledWith(expect.objectContaining({ type: "restore-ranking-registration" }));
     expect(replaceState).toHaveBeenCalledWith({}, "", "/cabinets/test?game=dot-wave#ranking");

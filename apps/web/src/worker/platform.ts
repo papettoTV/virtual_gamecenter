@@ -907,7 +907,7 @@ function platformJson(
   session: PlayerSession,
   cookies: string[] = [],
 ): Response {
-  const headers = new Headers({ "Content-Type": "application/json" });
+  const headers = new Headers({ "Content-Type": "application/json", "Cache-Control": "private, no-store" });
   if (session.setCookie) {
     headers.append(
       "Set-Cookie",

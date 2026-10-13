@@ -33,6 +33,25 @@ function nextMessage(socket: WebSocket, predicate: (message: ServerMessage) => b
 }
 
 describe("Pages to Worker gateway", () => {
+  it.each([undefined, "null", "https://untrusted.example", "https://virtual-gamecenter.pages.dev"])(
+    "rejects unsafe API and WebSocket origins: %s", async unsafeOrigin => {
+      const headers: Record<string, string> = unsafeOrigin ? { Origin: unsafeOrigin } : {};
+      const mutation = await forwarded("/api/platform/auth/logout", { method: "POST", headers });
+      expect(mutation.status).toBe(403);
+      expect(await mutation.json()).toEqual({ error: "invalid_origin" });
+      const socket = await forwarded(`/api/cabinets/${crypto.randomUUID()}/ws?gameId=graze-duel`, { headers: { ...headers, Upgrade: "websocket" } });
+      expect(socket.status).toBe(403);
+      expect(await socket.json()).toEqual({ error: "invalid_origin" });
+    },
+  );
+
+  it("does not cache personal balances and keeps signed webhook authentication separate", async () => {
+    expect((await forwarded("/api/platform/bootstrap")).headers.get("cache-control")).toBe("private, no-store");
+    const webhook = await forwarded("/api/platform/stripe/webhook", { method: "POST", body: "{}" });
+    expect(webhook.status).not.toBe(200);
+    expect(await webhook.json()).not.toEqual({ error: "invalid_origin" });
+  });
+
   it("preserves origin, query, authorization, body and cookies", async () => {
     let captured: Request | undefined;
     const response = await gateway.fetch(new Request(origin + "/api/test?game=dot-wave", {
@@ -103,10 +122,11 @@ describe("Pages to Worker gateway", () => {
     await forwarded("/api/platform/welcome-credit", { method: "POST", headers: { Cookie: cookie, Origin: origin }, body: "{}" });
     const state = crypto.randomUUID();
     const stateCookie = "vgc_oauth_state=" + encodeURIComponent(JSON.stringify({ state, returnTo: "/cabinets/callback-test" }));
+    const subject = crypto.randomUUID();
     const upstream = vi.spyOn(globalThis, "fetch").mockImplementation(async input => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       if (url === "https://oauth2.googleapis.com/token") return Response.json({ access_token: "test-token" });
-      if (url === "https://openidconnect.googleapis.com/v1/userinfo") return Response.json({ sub: crypto.randomUUID(), name: "Callback test", email: "callback@example.invalid" });
+      if (url === "https://openidconnect.googleapis.com/v1/userinfo") return Response.json({ sub: subject, name: "Callback test", email: "callback@example.invalid" });
       throw Error("unexpected upstream");
     });
     try {
@@ -115,6 +135,17 @@ describe("Pages to Worker gateway", () => {
       expect(callback.headers.get("location")).toBe(origin + "/cabinets/callback-test?account=registered");
       const profile = await (await forwarded("/api/platform/bootstrap", { headers: { Cookie: cookie } })).json();
       expect(profile).toMatchObject({ accountRegistered: true, playerName: "Callback test", wallet: { availableTotal: 10 } });
+      const logout = await forwarded("/api/platform/auth/logout", { method: "POST", headers: { Cookie: cookie, Origin: origin } });
+      expect(logout.status).toBe(200);
+      expect(await logout.json()).toMatchObject({ accountRegistered: false, welcomeCreditGranted: true, consent: { accepted: true }, wallet: { availableTotal: 0 } });
+      expect(logout.headers.get("set-cookie")).toContain("Secure");
+      const guestCookie = logout.headers.get("set-cookie")!.split(";", 1)[0]!;
+      const oldSession = await forwarded("/api/platform/profile", { method: "PATCH", headers: { Cookie: cookie, Origin: origin, "Content-Type": "application/json" }, body: JSON.stringify({ playerName: "Not allowed" }) });
+      expect(oldSession.status).toBe(401);
+      const relogin = await forwarded(`/api/platform/auth/google/callback?state=${state}&code=test-code`, { headers: { Cookie: guestCookie + "; " + stateCookie } });
+      expect(relogin.headers.get("location")).toBe(origin + "/cabinets/callback-test?account=logged_in");
+      const restored = await (await forwarded("/api/platform/bootstrap", { headers: { Cookie: guestCookie } })).json();
+      expect(restored).toMatchObject({ accountRegistered: true, playerName: "Callback test", wallet: { availableTotal: 10 } });
     } finally { upstream.mockRestore(); }
   });
 

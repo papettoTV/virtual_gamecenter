@@ -28,6 +28,13 @@ export default {
     if (gatewayEnvironment && gatewayEnvironment !== env.APP_ENV) {
       return Response.json({ error: "backend_environment_mismatch" }, { status: 403, headers: { "Cache-Control": "no-store" } });
     }
+    const requiresOrigin = url.pathname.startsWith("/api/")
+      && (request.headers.get("Upgrade")?.toLowerCase() === "websocket" || !["GET", "HEAD", "OPTIONS"].includes(request.method))
+      && url.pathname !== "/api/platform/stripe/webhook";
+    const origin = request.headers.get("Origin");
+    if (requiresOrigin && (origin ? origin !== url.origin : env.APP_ENV !== "local")) {
+      return Response.json({ error: "invalid_origin" }, { status: 403, headers: { "Cache-Control": "no-store" } });
+    }
     const liveImage = /^\/share\/live\/([^/]+)\/image\.png$/.exec(url.pathname);
     if (liveImage && request.method === "GET") {
       return getGameDefinition(liveImage[1]) ? renderLiveImage(liveImage[1]!) : Response.json({ error: "unknown_game" }, { status: 404 });
