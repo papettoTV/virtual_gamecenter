@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8"><title>C案30秒 — あの頃の熱気を、手のひらへ</title><script src="assets/gsap.min.js"></script>
+<style>
+@font-face{font-family:CutJP;src:url('assets/Japanese.ttc') format('truetype');font-weight:600 900;font-display:block}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:#090b13}#root{position:relative;width:100%;height:100%;overflow:hidden}#world{position:absolute;inset:0;width:720px;height:1280px;transform:scale(1.5);transform-origin:0 0;background:#090b13}#screen{position:absolute;inset:0 0 195px;overflow:hidden}#game{display:block;width:100%;height:100%;object-fit:cover;object-position:center}#caption{position:absolute;left:40px;top:565px;width:640px;height:150px;z-index:10}.state{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:18px 24px;font:800 58px CutJP,sans-serif;color:#fff8ee;letter-spacing:.01em;background:rgba(25,21,31,.94);border-left:12px solid #28cee0;border-bottom:5px solid #100d14;box-shadow:8px 9px 0 rgba(0,0,0,.18);opacity:0;white-space:nowrap;will-change:transform}#s0{font-size:64px}#s2{border-left-color:#ed62a8;font-size:50px}#closing{font-size:64px;border-left-color:#ed62a8}#dock{position:absolute;left:0;right:0;bottom:0;height:195px;background:#10121e;border-top:2px solid #2c3348;z-index:11}#accept{position:absolute;top:12px;left:70px;width:580px;height:32px;font:800 24px CutJP,sans-serif;color:#56deed;text-align:center;opacity:0}#action{position:absolute;left:70px;top:51px;width:580px;height:94px;border:3px solid #40cfde;border-radius:15px;background:#f1eadf;box-shadow:0 6px 0 #303448;color:#201e28;transform-origin:center}#action .button-state{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:800 38px CutJP,sans-serif;opacity:0}#action #challenge{opacity:1}#ripple{position:absolute;left:292px;top:46px;width:136px;height:104px;border:4px solid #ed62a8;border-radius:50%;opacity:0;pointer-events:none}#start-text{position:absolute;left:70px;top:51px;width:580px;height:94px;display:flex;align-items:center;justify-content:center;font:800 60px CutJP,sans-serif;letter-spacing:.08em;color:#56deed;opacity:0}#note{position:absolute;left:70px;bottom:14px;width:580px;font:600 15px CutJP,sans-serif;color:#c8d0df;text-align:center;z-index:12}
+
+#duel{position:absolute;inset:0;opacity:0;background:#0b0d19;z-index:2}.duel-panel{position:absolute;left:0;width:720px;height:640px;overflow:hidden;background:#101421}.opponent{top:0;border-bottom:3px solid #465067}.self{top:640px;background:#151225}.duel-panel video{position:absolute;left:150px;width:420px;height:570px;object-fit:contain;display:block}.opponent video{top:32px}.self video{top:64px}.role{position:absolute;left:36px;top:26px;z-index:3;font:800 38px CutJP,sans-serif;color:#fff8ee;border-left:7px solid #56deed;padding-left:13px}.self .role{top:90px;border-color:#ed62a8}#battle-heading{position:absolute;top:12px;left:215px;width:290px;height:54px;display:flex;align-items:center;justify-content:center;font:800 36px CutJP,sans-serif;letter-spacing:.06em;color:#56deed;background:#101421;z-index:4}#duel-note{position:absolute;left:40px;bottom:4px;width:640px;text-align:center;font:600 15px CutJP,sans-serif;color:#d3dae8;z-index:4}
+
+#screen{z-index:1}#screen-visual{width:100%;height:100%}#dock{opacity:0}#duel{background:transparent}.duel-panel{background:transparent}
+#color-field{position:absolute;inset:0;width:720px;height:1280px;pointer-events:none}#color-wave{opacity:0}
+#invite{position:absolute;inset:0;background:#e5e0d6;z-index:20;overflow:hidden;color:#28272c}#context{position:absolute;left:48px;top:90px;width:624px;height:72px;display:flex;align-items:center;font:800 34px CutJP,sans-serif;letter-spacing:.015em}#message{position:absolute;left:48px;top:220px;width:624px;height:228px;padding:26px 30px;border:3px solid #747277;border-radius:20px;background:#fff8ee;opacity:0}#sender{font:800 25px CutJP,sans-serif;color:#57515c;margin-bottom:17px}#message-copy{font:800 40px/1.4 CutJP,sans-serif}#message-copy span{display:block}
+#url-card{position:absolute;left:48px;top:480px;width:624px;height:550px;border:3px solid #57515c;border-radius:20px;background:#111521;color:#fff8ee;opacity:0;overflow:hidden;transform-origin:center}#card-top{position:absolute;left:24px;top:17px;width:572px;height:40px;display:flex;align-items:center;justify-content:space-between;font:800 25px CutJP,sans-serif}#card-top .url-kind{color:#c5c5ca;font-size:23px}#url-thumb{position:absolute;left:24px;top:70px;width:572px;height:302px;object-fit:cover;object-position:center;border:2px solid #626372;border-radius:8px}#card-title{position:absolute;left:24px;top:396px;width:572px;font:800 34px CutJP,sans-serif}#url{position:absolute;left:24px;top:449px;width:572px;font:600 25px CutJP,sans-serif;color:#56deed;text-decoration:underline;text-underline-offset:6px}#open-link{position:absolute;left:24px;top:494px;width:572px;height:40px;font:800 27px CutJP,sans-serif;color:#fff8ee}#open-ripple{position:absolute;left:293px;top:946px;width:134px;height:90px;border:5px solid #56deed;border-radius:50%;opacity:0;pointer-events:none}#intro-note{position:absolute;left:48px;bottom:64px;width:624px;font:600 18px CutJP,sans-serif;color:#57515c;text-align:center}
+#brand{position:absolute;left:40px;top:565px;width:640px;height:158px;background:#171322;border-left:12px solid #ed62a8;z-index:12;opacity:0;padding:6px 18px;display:flex;flex-direction:column;justify-content:center;align-items:center}#brand-name{font:800 60px/1 CutJP,sans-serif;letter-spacing:.055em;color:#fff8ee}#brand-cta{font:800 28px/1.35 CutJP,sans-serif;color:#fff8ee;margin-top:5px}#brand-url{font:800 28px/1.1 CutJP,sans-serif;color:#56deed;margin-top:3px}
+
+#invite{background:#201519;opacity:0}#arcade-bg{position:absolute;inset:0;width:720px;height:1280px;object-fit:cover;transform-origin:center}#context{color:#fff8ee;background:#171322;border-radius:10px;padding:0 20px}#intro-note{color:#fff8ee;background:#171322;border-radius:8px;padding:10px 12px;bottom:52px}
+
+</style></head><body>
+<div data-hf-id="hf-nqgq" id="root" data-composition-id="c-cut" data-start="0" data-duration="30" data-width="1080" data-height="1920">
+<div data-hf-id="hf-j427" id="world">
+<div data-hf-id="hf-cxiz" id="c-memory" class="clip" data-composition-id="c-memory" data-composition-src="compositions/c-memory.html" data-start="0" data-duration="6" data-track-index="4" data-width="720" data-height="1280" style="position:absolute;inset:0;z-index:30"></div>
+<svg data-hf-id="hf-ggco" id="color-field" viewBox="0 0 720 1280" aria-hidden="true"><circle data-hf-id="hf-e218" id="color-wave" data-layout-allow-overflow="true" cx="360" cy="1160" r="44" fill="#281528" /></svg>
+<div data-hf-id="hf-3dty" id="invite">
+<img data-hf-id="hf-p6uq" id="arcade-bg" data-layout-allow-overflow="true" src="assets/arcade-opening-v1.png" alt="古き良きゲームセンターをイメージした演出画像">
+<div data-hf-id="hf-qzg7" id="context">休憩中に、友だちから。</div>
+<div data-hf-id="hf-90iq" id="message"><div data-hf-id="hf-x1ht" id="sender">友だち · いま</div><div data-hf-id="hf-jso8" id="message-copy"><span data-hf-id="hf-fo3a">いまプレイ中！</span><span data-hf-id="hf-8ffr">挑戦者募集してます！</span></div></div>
+<div data-hf-id="hf-k4cj" id="url-card"><div data-hf-id="hf-xcr1" id="card-top"><span data-hf-id="hf-a5uv">PULBASE</span><span data-hf-id="hf-izk3" class="url-kind">観戦用URL</span></div><img data-hf-id="hf-1g7u" id="url-thumb" src="assets/buzz-url-thumbnail.jpg" alt="BUZZ BARRIERの実録画像"><div data-hf-id="hf-68l8" id="card-title">BUZZ BARRIER</div><div data-hf-id="hf-rpni" id="url">pulbase.com/cabinets/…?watch=1</div><div data-hf-id="hf-nt0l" id="open-link">観戦リンクを開く →</div></div>
+<div data-hf-id="hf-po00" id="open-ripple"></div><div data-hf-id="hf-ls6v" id="intro-note">背景・メッセージ：演出／ゲーム画像：実録</div>
+</div>
+<div data-hf-id="hf-ccvt" id="screen"><div data-hf-id="hf-9lua" id="screen-visual"><video data-hf-id="hf-dd35" id="game" class="clip" src="assets/buzz-barrage-12s.mp4" data-start="11.5" data-duration="12" data-track-index="1" muted playsinline></video></div></div>
+<div data-hf-id="hf-a4hr" id="duel">
+<div data-hf-id="hf-r1de" class="duel-panel opponent"><video data-hf-id="hf-yjhf" id="opponent-game" class="clip" src="assets/buzz-duel-opponent-6p5s.mp4" data-start="23.5" data-duration="6.5" data-track-index="2" muted playsinline></video><div data-hf-id="hf-1mfl" class="role">相手</div></div>
+<div data-hf-id="hf-py6j" class="duel-panel self"><video data-hf-id="hf-ikis" id="self-game" class="clip" src="assets/buzz-duel-self-6p5s.mp4" data-start="23.5" data-duration="6.5" data-track-index="3" muted playsinline></video><div data-hf-id="hf-hs8g" class="role">自分</div></div>
+<div data-hf-id="hf-zesk" id="battle-heading">対戦開始</div><div data-hf-id="hf-byhs" id="duel-note">BUZZ BARRIER：実対戦の収録／上下分割・説明：演出</div>
+</div>
+<div data-hf-id="hf-8af1" id="caption">
+<div data-hf-id="hf-ge39" id="s0" class="state" data-layout-allow-overflow="true">プレイを観戦</div>
+<div data-hf-id="hf-f1nr" id="s2" class="state" data-layout-allow-overflow="true">自分も、挑んでみたい。</div>
+<div data-hf-id="hf-2o99" id="closing" class="state" data-layout-allow-overflow="true">いざ、対戦！</div>
+</div>
+<div data-hf-id="hf-3m2w" id="dock">
+<div data-hf-id="hf-i3kb" id="accept">相手が承認しました</div>
+<div data-hf-id="hf-6kmv" id="action"><div data-hf-id="hf-bhai" id="challenge" class="button-state">挑戦する</div><div data-hf-id="hf-x9g0" id="waiting" class="button-state">対戦を申し込みました</div></div>
+<div data-hf-id="hf-l3gf" id="ripple"></div>
+<div data-hf-id="hf-rf0r" id="start-text">対戦開始</div>
+<div data-hf-id="hf-btvu" id="note">BUZZ BARRIER：実録／ボタン・説明：演出</div>
+</div>
+<div data-hf-id="hf-nv54" id="brand"><div data-hf-id="hf-fgc8" id="brand-name">PULBASE</div><div data-hf-id="hf-hpiw" id="brand-cta">すぐ遊べる。観戦から、対戦も。</div><div data-hf-id="hf-z9z3" id="brand-url">pulbase.com</div></div>
+</div></div>
+<script>
+const story=gsap.timeline();
+story.fromTo('#arcade-bg',{scale:1.04},{scale:1.10,duration:5.82,ease:'none'},0);
+story.fromTo('#message',{x:75,opacity:0},{x:0,opacity:1,duration:.5,ease:'power2.out'},.12);
+story.fromTo('#url-card',{y:24,opacity:0},{y:0,opacity:1,duration:.48,ease:'power2.out'},.45);
+// Hold the invitation, then open its URL with a clear tactile reaction.
+story.to('#url-card',{scale:.96,duration:.18,ease:'power1.in'},4.72);
+story.to('#url-card',{scale:1,duration:.42,ease:'back.out(1.4)'},4.90);
+story.fromTo('#open-ripple',{scale:.5,opacity:0},{scale:1.3,opacity:.8,duration:.18,ease:'power2.out'},4.74);
+story.to('#open-ripple',{scale:1.8,opacity:0,duration:.38,ease:'power2.out'},4.92);
+story.to('#open-link',{color:'#56deed',duration:.18},4.90);
+story.to('#intro-note',{opacity:0,duration:.2},5.25);
+story.fromTo('#invite',{opacity:1},{opacity:0,duration:.32,ease:'power2.in',immediateRender:false},5.5);
+story.fromTo('#screen-visual',{clipPath:'inset(35% 7% 15% 7% round 20px)'},{clipPath:'inset(0% 0% 0% 0% round 0px)',duration:.55,ease:'power2.out'},5.5);
+story.to('#dock',{opacity:1,duration:.32},5.55);
+// Slow central right-to-left captions; actual gameplay continues underneath.
+const beats=[['#s0',5.75,3.9],['#s2',10.25,5.45],['#closing',17.58,4.12]];
+beats.forEach(([target,start,span])=>{const enter=.50,exit=.50,center=span-enter-exit;
+ story.fromTo(target,{x:760,opacity:1},{x:75,opacity:1,duration:enter,ease:'power2.out'},start);
+ story.to(target,{x:-75,duration:center,ease:'none'},start+enter);
+ story.to(target,{x:-760,duration:exit,ease:'power2.in'},start+enter+center);
+});
+story.to('#action',{scale:.94,duration:.16,ease:'power1.in'},13.25);
+story.to('#action',{scale:1,duration:.40,ease:'back.out(1.4)'},13.41);
+story.fromTo('#ripple',{scale:.5,opacity:0},{scale:1.3,opacity:.8,duration:.18,ease:'power2.out'},13.25);
+story.to('#ripple',{scale:1.8,opacity:0,duration:.34,ease:'power2.out'},13.43);
+story.to('#challenge',{opacity:0,duration:.12},13.45);
+story.to('#waiting',{opacity:1,duration:.12},13.57);
+story.to('#action',{backgroundColor:'#303446',borderColor:'#ed62a8',color:'#fff8ee',duration:.25},13.45);
+story.to('#dock',{backgroundColor:'#211424',duration:1.2,ease:'power2.out'},13.45);
+story.to('#accept',{opacity:1,duration:.25},16.18);
+story.to('#action',{borderColor:'#56deed',duration:.25},16.18);
+// Only the authored surroundings gain color; game pixels remain authentic.
+story.fromTo('#color-wave',{svgOrigin:'360 1160',scale:.2,opacity:0},{svgOrigin:'360 1160',scale:29,opacity:1,duration:1.45,ease:'power2.out'},16.18);
+story.to('#duel',{opacity:1,duration:.18},17.5);
+story.to('#screen',{opacity:0,duration:.18},17.5);
+story.to('#dock',{opacity:0,duration:.18},17.5);
+story.fromTo('#brand',{y:12,opacity:0},{y:0,opacity:1,duration:.28,ease:'power2.out'},21.72);
+const tl=gsap.timeline({paused:true});
+// The approved 24-second section is shifted intact; framework media starts match it.
+tl.add(story,6);
+tl.fromTo('#invite',{opacity:0},{opacity:1,duration:.35,ease:'power2.out'},5.65);
+window.__timelines=window.__timelines||{};window.__timelines['c-cut']=tl;
+</script></body></html>

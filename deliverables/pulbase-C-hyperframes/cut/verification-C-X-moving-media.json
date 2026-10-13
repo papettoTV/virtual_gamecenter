@@ -1,0 +1,53 @@
+{
+  "decodeErrors": 0,
+  "clips": {
+    "buzz-moving-play-12s-v1.mp4": {
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "codec_type": "video",
+          "width": 392,
+          "height": 536,
+          "r_frame_rate": "30/1",
+          "nb_read_frames": "360"
+        }
+      ],
+      "format": {
+        "duration": "12.000000"
+      }
+    },
+    "buzz-moving-duel-opponent-6p5s-v1.mp4": {
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "codec_type": "video",
+          "width": 392,
+          "height": 536,
+          "r_frame_rate": "30/1",
+          "nb_read_frames": "195"
+        }
+      ],
+      "format": {
+        "duration": "6.500000"
+      }
+    },
+    "buzz-moving-duel-self-6p5s-v1.mp4": {
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "codec_type": "video",
+          "width": 392,
+          "height": 536,
+          "r_frame_rate": "30/1",
+          "nb_read_frames": "195"
+        }
+      ],
+      "format": {
+        "duration": "6.500000"
+      }
+    }
+  }
+}

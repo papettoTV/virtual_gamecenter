@@ -1,0 +1,46 @@
+{
+  "date": "2026-10-14",
+  "sourceRevision": "5d14484",
+  "environment": "isolated local copy on localhost:5175; canonical local port changed only in copy",
+  "rendering": "native game Canvas2D captured with captureStream(30), MediaRecorder VP9; converted to H264 30fps, no speed change or motion interpolation",
+  "input": "real ArrowLeft/Right/Up/Down + ShiftLeft keyboard events; host and challenger operated separately",
+  "recordingControls": {
+    "hostBulletDensity": 8,
+    "challengerBulletDensity": 2,
+    "playerCollision": false
+  },
+  "solo": {
+    "source": "solo-source.webm",
+    "startSeconds": 4,
+    "durationSeconds": 12,
+    "crop": [
+      44,
+      74,
+      392,
+      536
+    ],
+    "file": "buzz-moving-play-12s-v1.mp4",
+    "frameCount": 360
+  },
+  "duel": {
+    "source": "duel-source.webm",
+    "cabinet": "0daa286c-bff6-4621-8b7f-17383633ef21",
+    "sameRealMatch": true,
+    "startSeconds": 3,
+    "durationSeconds": 6.5,
+    "upperOpponentCrop": [
+      44,
+      74,
+      392,
+      536
+    ],
+    "lowerSelfCrop": [
+      524,
+      74,
+      392,
+      536
+    ],
+    "frameCountEach": 195
+  },
+  "notUsed": "earlier READY screen test recording excluded"
+}
