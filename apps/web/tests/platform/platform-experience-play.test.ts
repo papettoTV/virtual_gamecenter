@@ -221,7 +221,7 @@ describe("typed platform play integration", () => {
   it.each(["start", "retry"] as const)("holds %s until confirmation and delegates to executePlay", async action => {
     vi.mocked(executePlay).mockImplementation(async transaction => {
       transaction.walletChanged({ ...platform.wallet, availableTotal: 4 });
-      return transaction.start(transaction.action);
+      return transaction.start(transaction.action, "reservation");
     });
     mount();
     await vi.waitFor(() => expect(runtime.states[0]).toBe(bootstrapPlatform));
@@ -235,7 +235,7 @@ describe("typed platform play integration", () => {
       gameId: "deep-sea-salvage", cabinetId: "test-cabinet", action,
       start: expect.any(Function), walletChanged: expect.any(Function),
     });
-    expect(play).toHaveBeenCalledWith(action);
+    expect(play).toHaveBeenCalledWith(action, "reservation");
     expect((runtime.states[0] as PlatformBootstrap).wallet.availableTotal).toBe(4);
     expect(runtime.states[2]).toBe(null);
     expect(runtime.states[3]).toBe(null);

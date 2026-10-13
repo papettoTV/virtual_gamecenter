@@ -5,25 +5,26 @@ export interface PlayTransaction {
   cabinetId: string;
   gameId: string;
   action: PlayAction;
-  start: (action: PlayAction) => Promise<boolean>;
+  start: (action: PlayAction, reservationId: string) => Promise<boolean>;
   walletChanged: (wallet: WalletSummary) => void;
 }
 
 export async function executePlay(transaction: PlayTransaction): Promise<boolean> {
   const reservation = await reservePlayCredit(transaction.cabinetId, transaction.gameId);
-  let captured = false;
+  let started = false;
   try {
     transaction.walletChanged(reservation.wallet);
-    if (!await transaction.start(transaction.action)) return false;
     const result = await capturePlayCredit(reservation.reservationId);
     if (result.status !== "captured") throw new Error("credit_not_captured");
-    captured = true;
     transaction.walletChanged(result.wallet);
+    started = await transaction.start(transaction.action, reservation.reservationId);
+    if (!started) return false;
     return true;
   } finally {
-    if (!captured) {
+    if (!started) {
       const result = await releasePlayCredit(reservation.reservationId);
       transaction.walletChanged(result.wallet);
+      if (result.status === "captured") throw new Error("game_start_confirmation_pending");
     }
   }
 }

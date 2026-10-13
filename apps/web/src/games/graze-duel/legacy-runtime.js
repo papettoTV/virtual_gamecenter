@@ -769,16 +769,20 @@ export function mountGame(context) {
     if (challengeReservationId === reservationId) challengeReservationId = null;
   }
 
+  let versusCreditReady = Promise.resolve(true);
   async function captureVersusReservation(reservationId) {
-    if (!reservationId) return;
+    if (!reservationId) return true;
     try {
-      await capturePlayCredit(reservationId);
+      const result = await capturePlayCredit(reservationId);
+      if (result.status !== "captured") throw new Error("credit_not_captured");
       window.dispatchEvent(new Event("platform-wallet-changed"));
     } catch {
       if (scope.disposed) return;
       notifications.show({ id: "game-credit", scope: GAME_ID, type: "error", message: "クレジットを確定できませんでした。再読み込みしてください。" });
+      return false;
     }
     if (challengeReservationId === reservationId) challengeReservationId = null;
+    return true;
   }
 
   function handleVersusUiAction(action) {
@@ -807,7 +811,10 @@ export function mountGame(context) {
       return;
     }
     if (versusUiMode === "ready" && action === "primary" && versusMatchId) {
-      cabinetClient.send({ type: "versusReady", matchId: versusMatchId });
+      const matchId = versusMatchId;
+      void versusCreditReady.then(ready => {
+        if (ready && !scope.disposed && versusMatchId === matchId) cabinetClient.send({ type: "versusReady", matchId });
+      });
       showVersusOverlay("Ready", "相手のOKを待っています。", "waiting");
       return;
     }
@@ -945,7 +952,7 @@ export function mountGame(context) {
     cabinetClient.join(cabinetId, GAME_ID);
   }
 
-  function startSoloPlay() {
+  function startSoloPlay(reservationId, authorized = false) {
     if (scope.disposed || !currentCabinetId) return false;
     if (!cabinetConnected) {
       cabinetRole = "joining";
@@ -965,7 +972,7 @@ export function mountGame(context) {
     document.body.classList.remove("is-spectator");
     spectatorBanner?.classList.add("is-hidden");
     resetHostSyncState();
-    cabinetClient.send({ type: "startSolo" });
+    if (!authorized) cabinetClient.send({ type: "startSolo", reservationId });
     broadcastGameKeyframe(true);
     lastTime = performance.now();
     showScreen("game");
@@ -1134,7 +1141,7 @@ export function mountGame(context) {
         status: "matched",
       };
       versusStatus?.classList.add("is-hidden");
-      if (message.reservationId) void captureVersusReservation(message.reservationId);
+      versusCreditReady = message.reservationId ? captureVersusReservation(message.reservationId) : Promise.resolve(true);
       showVersusOverlay("対戦承諾", "2秒後にReady確認へ進みます。", "waiting");
       scope.timeout(() => prepareVersusReady(message.matchId), 2000);
       return;
@@ -3549,13 +3556,14 @@ export function mountGame(context) {
       if (scope.disposed) return;
       if (!ready) throw new Error("Solo cabinet could not be prepared.");
     },
-    async play(action) {
+    async play(action, reservationId) {
       if (scope.disposed || !currentCabinetId) return false;
       if (action !== "start" && action !== "retry") return false;
       if (isVersusParticipant()) return false;
       const ready = await cabinetClient.waitForPlayer();
       if (scope.disposed || !ready) return false;
-      const started = startSoloPlay();
+      if (!reservationId || !await cabinetClient.startSolo(reservationId) || scope.disposed) return false;
+      const started = startSoloPlay(reservationId, true);
       if (started && action === "retry") rankingSubmitPanel?.classList.remove("is-visible");
       return started;
     },

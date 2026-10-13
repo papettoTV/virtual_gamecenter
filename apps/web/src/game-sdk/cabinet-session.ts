@@ -15,6 +15,7 @@ export interface CabinetSession extends CabinetClient {
   readonly state: CabinetState | null;
   readonly connected: boolean;
   waitForPlayer(timeoutMs?: number): Promise<boolean>;
+  startSolo(reservationId: string): Promise<boolean>;
 }
 
 export function createCabinetSession(options: SessionOptions, createClient: (handlers: CabinetClientHandlers) => CabinetClient = createCabinetClient): CabinetSession {
@@ -22,14 +23,17 @@ export function createCabinetSession(options: SessionOptions, createClient: (han
   let state: CabinetState | null = null;
   let connected = false;
   const waiters = new Set<(ready: boolean) => void>();
+  let soloPending: { reservationId: string; resolve: (ready: boolean) => void } | null = null;
   const finishWaiting = (ready: boolean) => { for (const resolve of [...waiters]) resolve(ready); };
   const client = createClient({
     onConnectionChange(value) {
       connected = value;
-      if (!value) { role = "visitor"; finishWaiting(false); }
+      if (!value) { role = "visitor"; finishWaiting(false); soloPending?.resolve(false); }
       options.onConnectionChange?.(value);
     },
     onMessage(message) {
+      if (message.type === "soloStarted" && message.reservationId === soloPending?.reservationId) soloPending?.resolve(true);
+      if (message.type === "error") soloPending?.resolve(false);
       if (message.type === "joinedCabinet" || message.type === "roleChanged") {
         role = message.role; finishWaiting(role === "player");
       }
@@ -49,9 +53,18 @@ export function createCabinetSession(options: SessionOptions, createClient: (han
       connected = false;
       client.join(cabinetId, gameId, watch);
     },
-    leave() { role = "visitor"; state = null; connected = false; finishWaiting(false); client.leave(); },
+    leave() { role = "visitor"; state = null; connected = false; finishWaiting(false); soloPending?.resolve(false); client.leave(); },
     send: client.send,
     getBufferedAmount: client.getBufferedAmount,
+    startSolo(reservationId) {
+      if (soloPending || role !== "player") return Promise.resolve(false);
+      return new Promise(resolve => {
+        const timer = window.setTimeout(() => complete(false), 5000);
+        const complete = (ready: boolean) => { window.clearTimeout(timer); soloPending = null; resolve(ready); };
+        soloPending = { reservationId, resolve: complete };
+        if (!client.send({ type: "startSolo", reservationId })) complete(false);
+      });
+    },
     waitForPlayer(timeoutMs = 5000) {
       if (role === "player") return Promise.resolve(true);
       return new Promise(resolve => {

@@ -15,11 +15,12 @@ describe("play credit transaction", () => {
     vi.mocked(releasePlayCredit).mockResolvedValue({ status: "released", wallet } as Awaited<ReturnType<typeof releasePlayCredit>>);
     return { cabinetId: "cabinet", gameId: "deep-sea-salvage", action: "start" as const, start: vi.fn().mockResolvedValue(true), walletChanged: vi.fn() };
   }
-  it("captures exactly once after the game acknowledges a successful start", async () => {
+  it("captures exactly once before requesting an authorized game start", async () => {
     const transaction = setup();
     await expect(executePlay(transaction)).resolves.toBe(true);
     expect(reservePlayCredit).toHaveBeenCalledWith("cabinet", "deep-sea-salvage");
-    expect(transaction.start).toHaveBeenCalledWith("start");
+    expect(transaction.start).toHaveBeenCalledWith("start", "reservation");
+    expect(vi.mocked(capturePlayCredit).mock.invocationCallOrder[0]).toBeLessThan(transaction.start.mock.invocationCallOrder[0]!);
     expect(capturePlayCredit).toHaveBeenCalledOnce();
     expect(releasePlayCredit).not.toHaveBeenCalled();
     expect(transaction.walletChanged).toHaveBeenCalledTimes(2);
@@ -27,7 +28,7 @@ describe("play credit transaction", () => {
   it("releases the reservation when the game was detached before starting", async () => {
     const transaction = setup(); transaction.start.mockResolvedValue(false);
     await expect(executePlay(transaction)).resolves.toBe(false);
-    expect(capturePlayCredit).not.toHaveBeenCalled();
+    expect(capturePlayCredit).toHaveBeenCalledOnce();
     expect(releasePlayCredit).toHaveBeenCalledWith("reservation");
   });
   it("releases the reservation after a start error", async () => {
@@ -45,5 +46,10 @@ describe("play credit transaction", () => {
     vi.mocked(capturePlayCredit).mockResolvedValue({ status: "released", wallet: { freeBalance: 4, purchasedBalance: 0, reservedFree: 0, reservedPurchased: 0, availableFree: 4, availablePurchased: 0, availableTotal: 4 } });
     await expect(executePlay(transaction)).rejects.toThrow("credit_not_captured");
     expect(releasePlayCredit).toHaveBeenCalledWith("reservation");
+  });
+  it("does not claim a refund after an authorized start whose response was lost", async () => {
+    const transaction = setup(); transaction.start.mockResolvedValue(false);
+    vi.mocked(releasePlayCredit).mockResolvedValue({ status: "captured", wallet: {} } as Awaited<ReturnType<typeof releasePlayCredit>>);
+    await expect(executePlay(transaction)).rejects.toThrow("game_start_confirmation_pending");
   });
 });

@@ -40,6 +40,7 @@ export type ClientMessage =
   | { type: "declineRematch"; matchId: string };
 
 export type ServerMessage =
+  | { type: "soloStarted"; reservationId: string | null }
   | { type: "dotWaveSoloStarted" }
   | { type: "clockPong"; sentAt: number; serverAt: number }
   | { type: "connected"; clientId: string }
