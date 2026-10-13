@@ -1,0 +1,41 @@
+{
+  "type": "AI-generated fictional arcade and adult player, with actual game still composited in HTML",
+  "generator": "built-in image_gen",
+  "mode": "new image using original arcade as style reference",
+  "reference": "arcade-opening-v1.png",
+  "output": "arcade-over-shoulder-v1.png",
+  "source": "exec-3ebdc101-4218-4465-899d-c3a4da4aeeb6.png",
+  "prompt": "Use case: ads-marketing / photorealistic-natural. Create ONE new portrait 9:16 background illustration for an existing Japanese online arcade promo video. Input reference image is STYLE / LOCATION reference only: match its warm amber lamps, worn cream-colored arcade cabinets, stools, dark wood floor, cyan-magenta CRT reflections and cinematic photographic realism. New composition: close over-the-shoulder REAR view of one fictional adult player sitting on a low arcade stool and actively playing an arcade cabinet in the same nostalgic Japanese game center. Show ONLY the back of the player's short dark hair, shoulders, plain dark jacket, arms and a hint of hands resting naturally at the controls. No visible face, profile, eyes, or facial expression. Camera positioned just behind and slightly to the player's left, looking past the shoulders to the cabinet. The cabinet and its large portrait CRT monitor are the main focus, filling most of upper right and center frame. Crucial compositing requirement: the entire monitor's active screen is a clean uniformly near-black EMPTY rectangle, no game graphics or reflections on the active screen. We will put an actual BUZZ BARRIER screenshot there later. Keep screen almost front-facing with only a very slight realistic perspective and all four corners clearly visible; approximately from x=34% to 91% of frame and y=13% to 57% of frame. It is a vertically oriented 3:4 display, like a tate arcade monitor. Cabinet's cream bezel and controls surround it, not a modern television or laptop. The seated player's head and back occupy lower-left foreground, below and left of the screen, never cover any of the active screen. The player's posture leans slightly forward with both hands at the joystick and buttons, credible seated gameplay. Other arcade cabinets and amber lamps in the background, softly out of focus. Comfortable lower middle area for the existing video caption overlay, do not generate any captions. No readable writing, no logos, no watermark, no extra people, no fake game graphics. Maintain rich natural textures and warm nostalgic atmosphere. Image must clearly read as a player sitting at and playing a physical arcade machine, viewed from behind, with its screen large and legible.",
+  "screen": {
+    "source": "buzz-moving-play-12s-v1.mp4",
+    "sourceTimeSeconds": 7.5,
+    "file": "buzz-cabinet-still-v1.png",
+    "operation": "ffmpeg frame extraction, then perspective mapping in c-memory.html",
+    "plateSize": [
+      941,
+      1672
+    ],
+    "cornersPixels": [
+      [
+        460,
+        284
+      ],
+      [
+        868,
+        257
+      ],
+      [
+        829,
+        835
+      ],
+      [
+        389,
+        806
+      ]
+    ],
+    "cssMatrix3d": "0.6391069881,-0.099318005,0,-0.0002367961,-0.1463071939,0.6523607551,0,-0.0001510352,0,0,1,0,351.9659936238,217.4162679426,0,1"
+  },
+  "treatment": "No color effects; whole image group receives slow geometric push-in. No player animation.",
+  "actualVenue": false,
+  "visibleFace": false
+}
