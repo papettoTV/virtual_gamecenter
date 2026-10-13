@@ -1,0 +1,58 @@
+{
+  "id": "sfx_arcade_crowd",
+  "type": "sfx",
+  "path": ".media/audio/sfx/crowd-talking-loop.mp3",
+  "description": "Big crowd talking loop; layered indoor conversation ambience for fictional arcade, 0–6s",
+  "source": "retrieved",
+  "provenance": {
+    "provider": "Mixkit",
+    "title": "Big crowd talking loop",
+    "itemId": 364,
+    "url": "https://assets.mixkit.co/active_storage/sfx/364/364-preview.mp3",
+    "page": "https://mixkit.co/free-sound-effects/public-places/",
+    "license": "https://mixkit.co/license/modal/sfxFree/",
+    "verifiedAt": "2026-10-14",
+    "sha256": "a8e9d737d38aba57bca7f67ce6dd147e2bffd6574f780e691200615c06a2c65e"
+  },
+  "sourceRangeSeconds": [
+    8,
+    14
+  ],
+  "timelineSeconds": [
+    0,
+    6
+  ],
+  "automation": {
+    "version": 1,
+    "lanes": [
+      {
+        "target": "volume",
+        "points": [
+          {
+            "t": 0,
+            "v": 0
+          },
+          {
+            "t": 0.35,
+            "v": 0.35
+          },
+          {
+            "t": 3,
+            "v": 0.32
+          },
+          {
+            "t": 5.05,
+            "v": 0.3
+          },
+          {
+            "t": 6,
+            "v": 0
+          }
+        ]
+      }
+    ]
+  },
+  "sourceIntegratedLufs": -15.2,
+  "sourceTruePeakDbfs": -3.2,
+  "notes": "Generic crowd recording used as a sound-design layer, not an actual arcade recording; no source standalone redistribution, source MP3 ignored by Git."
+}
