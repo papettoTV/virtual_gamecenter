@@ -16,6 +16,12 @@ export function checkReleaseConfig(config, environment) {
   const selected = config.env?.[environment];
   if (!selected) return [`${environment} の設定がありません。`];
   const errors = [];
+  const rateNames = ["API_READ_LIMITER", "API_WRITE_LIMITER", "BOOTSTRAP_LIMITER", "BENEFIT_LIMITER", "SOCKET_LIMITER", "AUTH_LIMITER"];
+  for (const name of rateNames) {
+    const limiter = selected.ratelimits?.find(item => item.name === name);
+    if (!limiter || !/^\d+$/.test(limiter.namespace_id) || limiter.simple?.period !== 60 || !Number.isInteger(limiter.simple?.limit) || limiter.simple.limit < 1) errors.push(`乱用対策${name}の設定が不足または不正です。`);
+  }
+  if (new Set(selected.ratelimits?.map(item => item.namespace_id)).size !== selected.ratelimits?.length) errors.push("乱用対策namespaceが重複しています。");
   if (selected.workers_dev !== false || selected.routes?.length) errors.push("公開URLはPagesで管理します。バックエンドWorkerのworkers.devと公開routesを無効にしてください。");
   if (selected.vars?.APP_ENV !== environment) errors.push("APP_ENVが選択した環境と一致しません。");
   if (selected.vars?.DEVELOPER_AUTH_ENABLED !== "false") errors.push("公開先の開発者ログインはfalseが必要です。");
@@ -39,6 +45,7 @@ export function checkReleaseConfig(config, environment) {
   }
   const others = [config, ...releaseEnvironments.filter((name) => name !== environment).map((name) => config.env?.[name]).filter(Boolean)];
   for (const other of others) {
+    if (selected.ratelimits?.some(item => other.ratelimits?.some(otherItem => otherItem.namespace_id === item.namespace_id))) errors.push("乱用対策namespaceが別環境と共用されています。");
     if (!selected.name || selected.name === other.name) errors.push("Worker名が別環境と重複しています。");
     const otherDatabase = binding(other, "DB", "d1_databases");
     if (database && otherDatabase && (database.database_id === otherDatabase.database_id || database.database_name === otherDatabase.database_name)) errors.push("D1が別環境と共用されています。");
@@ -49,6 +56,7 @@ export function checkReleaseConfig(config, environment) {
 
 export function checkBuildConfig(config, selected, environment) {
   const errors = [];
+  if (JSON.stringify(config.ratelimits) !== JSON.stringify(selected.ratelimits)) errors.push("成果物の乱用対策が選択した環境と一致しません。");
   if (config.name !== selected.name) errors.push("成果物のWorker名が選択した環境と一致しません。");
   if (config.vars?.APP_ENV !== environment || config.vars?.DEVELOPER_AUTH_ENABLED !== "false" || config.vars?.CREDIT_PURCHASES_ENABLED !== "false") errors.push("成果物の環境・認証・購入設定が不正です。");
   if (binding(config, "DB", "d1_databases")?.database_id !== binding(selected, "DB", "d1_databases")?.database_id) errors.push("成果物のD1が選択した環境と一致しません。");

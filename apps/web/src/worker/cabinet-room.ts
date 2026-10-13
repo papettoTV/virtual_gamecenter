@@ -25,6 +25,7 @@ import type {
 } from "../shared/protocol";
 import { getGameDefinition } from "../domain/game";
 import { getPlayerConnectionIdentity, getPlayerIdentityById } from "./platform";
+import { CABINET_CONNECTION_LIMIT, CABINET_IP_CONNECTION_LIMIT, clientAddressKey, protectionError, WS_MESSAGE_LIMIT } from "./request-protection";
 
 interface ConnectionAttachment {
   clientId: string;
@@ -36,6 +37,9 @@ interface ConnectionAttachment {
   dotWaveCredit?: boolean;
   continuationCredit?: boolean;
   streamAuthorized?: boolean;
+  clientAddressKey?: string;
+  traffic?: { since: number; messages: number; bytes: number; controls: number };
+  controlTraffic?: { since: number; count: number };
   dotWavePlayer?: DotWavePlayer;
 }
 
@@ -76,6 +80,7 @@ export class CabinetRoom extends DurableObject<Env> {
   private latestKeyframe: Extract<ServerMessage, { type: "viewerKeyframe" }> | null = null;
   private latestMotionFrame: Extract<ServerMessage, { type: "viewerMotionFrame" }> | null = null;
   private eventsSinceKeyframe: Array<Extract<ServerMessage, { type: "viewerEvents" }>> = [];
+  private eventBufferBytes = 0;
   private pendingChallenge: PendingChallenge | null = null;
   private challengeQueue: ChallengeQueueEntry[] = [];
   private versusMatch: VersusMatch | null = null;
@@ -119,6 +124,9 @@ export class CabinetRoom extends DurableObject<Env> {
     this.cabinetId = url.pathname.split("/").at(-2) ?? this.cabinetId;
     const requestedGame = getGameDefinition(url.searchParams.get("gameId"));
     if (!requestedGame) return Response.json({ error: "unknown_game" }, { status: 404 });
+    const addressKey = await clientAddressKey(request, this.env.APP_ENV);
+    const connections = this.ctx.getWebSockets().filter(socket => socket.readyState === WebSocket.OPEN);
+    if (connections.length >= CABINET_CONNECTION_LIMIT || (addressKey && connections.filter(socket => this.attachment(socket).clientAddressKey === addressKey).length >= CABINET_IP_CONNECTION_LIMIT)) return protectionError("cabinet_connections_limited", 429);
     if (this.state.cabinetId && this.state.gameId !== requestedGame.id) {
       return Response.json({ error: "cabinet_game_mismatch" }, { status: 409 });
     }
@@ -131,7 +139,11 @@ export class CabinetRoom extends DurableObject<Env> {
     const client = pair[0];
     const server = pair[1];
     const identity = await getPlayerConnectionIdentity(request, this.env.DB);
+    if (identity && this.ctx.getWebSockets().filter(socket => this.attachment(socket).sessionHash === identity.sessionHash && socket.readyState === WebSocket.OPEN).length >= 4) return protectionError("session_connections_limited", 429);
     if (identity) await this.env.DB.prepare("INSERT INTO player_cabinets (player_id, cabinet_id) VALUES (?, ?) ON CONFLICT(player_id, cabinet_id) DO UPDATE SET updated_at = CURRENT_TIMESTAMP").bind(identity.playerId, this.cabinetId).run();
+    const accepting = this.ctx.getWebSockets().filter(socket => socket.readyState === WebSocket.OPEN);
+    if (accepting.length >= CABINET_CONNECTION_LIMIT || (addressKey && accepting.filter(socket => this.attachment(socket).clientAddressKey === addressKey).length >= CABINET_IP_CONNECTION_LIMIT)) return protectionError("cabinet_connections_limited", 429);
+    if (identity && accepting.filter(socket => this.attachment(socket).sessionHash === identity.sessionHash).length >= 4) return protectionError("session_connections_limited", 429);
     this.ctx.acceptWebSocket(server);
     const attachment: ConnectionAttachment = {
       clientId: crypto.randomUUID(),
@@ -139,6 +151,7 @@ export class CabinetRoom extends DurableObject<Env> {
       playerId: identity?.playerId,
       sessionHash: identity?.sessionHash,
       sessionCheckedAt: Date.now(),
+      clientAddressKey: addressKey,
       ...(requestedGame.id === "dot-wave" ? { dotWavePlayer: { name: identity?.playerName ?? "ゲスト", wins: 0 } } : {}),
     };
     server.serializeAttachment(attachment);
@@ -150,7 +163,20 @@ export class CabinetRoom extends DurableObject<Env> {
   async webSocketMessage(socket: WebSocket, rawMessage: string | ArrayBuffer): Promise<void> {
     await this.ready;
     if (typeof rawMessage !== "string") {
-      this.send(socket, { type: "error", message: "テキストメッセージのみ利用できます。" });
+      await this.closeLimitedSocket(socket, 1003, "テキストメッセージのみ利用できます。");
+      return;
+    }
+
+    const attachmentBefore = this.attachment(socket);
+    if (attachmentBefore.revoked) return;
+    const messageLimit = attachmentBefore.role === "player" || this.getMatchSeat(attachmentBefore.clientId) ? WS_MESSAGE_LIMIT : 16 * 1024;
+    const bytes = rawMessage.length > messageLimit ? messageLimit + 1 : new TextEncoder().encode(rawMessage).byteLength;
+    const now = Date.now();
+    const traffic = attachmentBefore.traffic && now - attachmentBefore.traffic.since < 1000 ? attachmentBefore.traffic : { since: now, messages: 0, bytes: 0, controls: 0 };
+    traffic.messages += 1; traffic.bytes += bytes;
+    socket.serializeAttachment({ ...attachmentBefore, traffic });
+    if (bytes > messageLimit || traffic.messages > 120 || traffic.bytes > 1024 * 1024) {
+      await this.closeLimitedSocket(socket, bytes > messageLimit ? 1009 : 1008, "メッセージのサイズまたは頻度が上限を超えました。");
       return;
     }
 
@@ -166,6 +192,17 @@ export class CabinetRoom extends DurableObject<Env> {
       this.send(socket, { type: "error", message: "メッセージ形式が正しくありません。" });
       return;
     }
+    if (!["gameKeyframe", "gameMotionFrame", "gameEvents", "versusProgress"].includes(message.type)) {
+      const previous = this.attachment(socket).controlTraffic;
+      const controlTraffic = previous && now - previous.since < 10_000 ? previous : { since: now, count: 0 };
+      controlTraffic.count += 1;
+      socket.serializeAttachment({ ...this.attachment(socket), controlTraffic });
+      if (controlTraffic.count > 30) {
+        await this.closeLimitedSocket(socket, 1008, "操作の頻度が上限を超えました。");
+        return;
+      }
+    }
+    socket.serializeAttachment({ ...this.attachment(socket), traffic });
     const current = this.attachment(socket);
     if (current.revoked) return;
     const streaming = ["gameKeyframe", "gameEvents", "gameMotionFrame", "versusProgress"].includes(message.type);
@@ -307,6 +344,7 @@ export class CabinetRoom extends DurableObject<Env> {
         seq: message.seq,
       };
       this.eventsSinceKeyframe = [];
+      this.eventBufferBytes = 0;
       this.broadcast(this.latestKeyframe, "spectator");
       return;
     }
@@ -317,8 +355,16 @@ export class CabinetRoom extends DurableObject<Env> {
         events: message.events as GameEvent[],
         seq: message.seq,
       };
-      this.eventsSinceKeyframe.push(viewerEvents);
-      if (this.eventsSinceKeyframe.length > 100) this.eventsSinceKeyframe.shift();
+      if (this.latestKeyframe) {
+        this.eventsSinceKeyframe.push(viewerEvents);
+        this.eventBufferBytes += new TextEncoder().encode(JSON.stringify(viewerEvents)).byteLength;
+        if (this.eventsSinceKeyframe.length > 100 || this.eventBufferBytes > 2 * 1024 * 1024) {
+          this.latestKeyframe = null;
+          this.latestMotionFrame = null;
+          this.eventsSinceKeyframe = [];
+          this.eventBufferBytes = 0;
+        }
+      }
       this.broadcast(viewerEvents, "spectator");
       return;
     }
@@ -766,6 +812,7 @@ export class CabinetRoom extends DurableObject<Env> {
     this.latestKeyframe = null;
     this.latestMotionFrame = null;
     this.eventsSinceKeyframe = [];
+    this.eventBufferBytes = 0;
     await this.promoteNextChallenge();
     await this.persistState();
     this.broadcastState();
@@ -929,6 +976,7 @@ export class CabinetRoom extends DurableObject<Env> {
       this.latestKeyframe = null;
       this.latestMotionFrame = null;
       this.eventsSinceKeyframe = [];
+      this.eventBufferBytes = 0;
       this.broadcast({ type: "playerLeft" }, "spectator");
     } else {
       this.state = reduceCabinetState(this.state, { type: "SPECTATOR_LEFT" });
@@ -940,6 +988,7 @@ export class CabinetRoom extends DurableObject<Env> {
   }
 
   private replayCurrentGame(socket: WebSocket): void {
+    if (!this.latestKeyframe) return;
     const messages = [
       this.latestKeyframe,
       ...this.eventsSinceKeyframe,
@@ -1067,6 +1116,16 @@ export class CabinetRoom extends DurableObject<Env> {
     socket.close(1008, "セッションが無効になりました。");
   }
 
+  private async closeLimitedSocket(socket: WebSocket, code: number, reason: string): Promise<void> {
+    const attachment = this.attachment(socket);
+    if (attachment.revoked) return;
+    socket.serializeAttachment({ ...attachment, revoked: true });
+    if (attachment.role === "player") this.soloRun = null;
+    await this.leave(socket);
+    socket.serializeAttachment({ clientId: attachment.clientId, role: "visitor", revoked: true });
+    socket.close(code, reason);
+  }
+
   async expireIdleData(cabinetId?: string): Promise<void> {
     await this.ready;
     if (this.ctx.getWebSockets().length || (this.state.cabinetId && this.state.updatedAt > Date.now() - 86400000)) return;
@@ -1078,6 +1137,7 @@ export class CabinetRoom extends DurableObject<Env> {
     this.latestKeyframe = null;
     this.latestMotionFrame = null;
     this.eventsSinceKeyframe = [];
+    this.eventBufferBytes = 0;
     this.pendingChallenge = null;
     this.challengeQueue = [];
     this.versusMatch = null;
