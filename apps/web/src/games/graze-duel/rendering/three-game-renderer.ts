@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { drawPlayerShip } from "./player-ship";
-import { BOSS_AIRCRAFT_DESIGNS, getBossAircraftDesign } from "./boss-aircraft";
+import { BOSS_AIRCRAFT_DESIGNS, createBossAircraftSprites, getBossAircraftDesign } from "./boss-aircraft";
 import type {
   BossRenderState,
   BulletRenderState,
@@ -49,11 +49,15 @@ export function createThreeGameRenderer(width: number, height: number): GameScen
   mesh.frustumCulled = false;
   mesh.renderOrder = 2;
   const playerVisuals = [createPlayerVisual(), createPlayerVisual()];
-  const textureLoader = new THREE.TextureLoader();
-  const bossTextures = BOSS_AIRCRAFT_DESIGNS.map(design => {
-    const texture = textureLoader.load(design.source);
+  const bossTextures = BOSS_AIRCRAFT_DESIGNS.map(() => {
+    const texture = new THREE.Texture();
     texture.colorSpace = THREE.SRGBColorSpace;
     return texture;
+  });
+  const bossSprites = createBossAircraftSprites((index, sprite) => {
+    const texture = bossTextures[index]!;
+    texture.image = sprite;
+    texture.needsUpdate = true;
   });
   const bossVisuals = [createBossVisual(bossTextures), createBossVisual(bossTextures)];
   const particleVisual = createParticleVisual();
@@ -164,6 +168,7 @@ export function createThreeGameRenderer(width: number, height: number): GameScen
       geometry.dispose();
       material.dispose();
       disposeVisuals(playerVisuals, bossVisuals, particleVisual);
+      bossSprites.dispose();
       for (const texture of bossTextures) texture.dispose();
       renderer.dispose();
       canvas.remove();
