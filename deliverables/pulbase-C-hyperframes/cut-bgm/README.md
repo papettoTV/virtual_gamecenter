@@ -14,3 +14,11 @@
 - 両方とも30秒、1080×1920、30fps、900フレーム、H.264 / yuv420p / faststart。音あり版はAAC / stereo / 48kHz。
 - 音源単体は配布しない。無音の旧プロジェクトソースと既存MP4も保持。
 - 最終検証：`verification-C-delivery-MP4.json`、`quality-C-final-MP4-contact.jpg`。
+
+## 最新 v2（2026-10-14）
+
+- 音あり：`PULBASE-C-30s-BGM-crowd-v2.mp4`。
+- 同じ修正を含む無音：`../cut/PULBASE-C-30s-silent-v2.mp4`。
+- 上部見出しを削除し、投稿画像の自機を表示。心の声のみ “自分も、挑んでみたい。”。
+- 音声はv1と同一。旧v1 MP4も保存。
+- 最終検証：`verification-C-v2-delivery.json`。

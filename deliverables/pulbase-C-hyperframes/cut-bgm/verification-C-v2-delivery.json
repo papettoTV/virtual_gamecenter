@@ -1,0 +1,47 @@
+{
+  "files": {
+    "sound": "PULBASE-C-30s-BGM-crowd-v2.mp4",
+    "silent": "../cut/PULBASE-C-30s-silent-v2.mp4"
+  },
+  "durationSeconds": 30.0,
+  "resolution": [
+    1080,
+    1920
+  ],
+  "fps": "30/1",
+  "frames": 900,
+  "videoCodec": "h264",
+  "audioCodec": "aac",
+  "audioSampleRate": "48000",
+  "audioChannels": 2,
+  "soundBytes": 24725456,
+  "silentBytes": 23967779,
+  "identicalSoundAndSilentVideo": true,
+  "silentAudioStreams": 0,
+  "authoredAudioUnchanged": true,
+  "encodedAudioPacketHashUnchangedFromV1": true,
+  "audioPacketSha256": "SHA256=3c945a83591a2484c83f3d019b1c939dfd1ada5afbaf0d94b1650ae84ae8106f",
+  "previousAudioPacketSha256": "SHA256=3c945a83591a2484c83f3d019b1c939dfd1ada5afbaf0d94b1650ae84ae8106f",
+  "soundSha256": "7ded5b4562a4ba0aa0e07c3b33396263861e1bfad82cd471e2327438681dd32b",
+  "silentSha256": "3c40d1e2606b72c91b954face4e61330b993d70357ccf59abea793b6df7cdf62",
+  "fullDecodeSucceeded": true,
+  "versionUpgrade": [
+    "0.8.154",
+    "0.8.157"
+  ],
+  "strictCheckPassed": true,
+  "previewPostShipVisible": true,
+  "priorV1FilesPreserved": true,
+  "sceneReviewTimesSeconds": [
+    1.5,
+    3.6,
+    8.5,
+    18.7,
+    20.6,
+    29.6
+  ],
+  "renderCapture": "screenshot / hardware GPU / 2 workers / delivery",
+  "renderElapsedSeconds": 68.9,
+  "audioIntegratedLufs": -22.6,
+  "audioTruePeakDbfs": -10.3
+}
