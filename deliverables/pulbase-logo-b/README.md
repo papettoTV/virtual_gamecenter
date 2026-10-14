@@ -1,5 +1,17 @@
 # PULBASE B — 単色SVG・サイズ検証
 
+## 採用版（2026-10-14）
+
+ユーザーが採用したのは「少し細い版」。線幅を揃えた版との比較で、前の版のバランスを優先。
+
+- 白：`pulbase-b-slim-white.svg`
+- 黒：`pulbase-b-slim-black.svg`
+- favicon：`favicon-slim-dark-16.png` / `favicon-slim-dark-32.png`
+- 比較：`preview-slim.html`
+
+縦線52、上36、下・右40（SVG座標）を維持。`uniform`版は比較用で採用しない。サイトへの適用・カラー検討・公開は未実施。
+
+
 採用した「B / SLIM」を数値で再構成したレビュー用の初稿。サイト本体には未適用。
 
 - `pulbase-b-white.svg` / `pulbase-b-black.svg`: 256×256 viewBox、透明背景、白・黒の単色シンボル。左右の頭の抜きは同じ半径18。稲妻の周囲は幅10の抜き。
