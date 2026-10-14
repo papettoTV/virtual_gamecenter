@@ -60,3 +60,11 @@
 `preview-font-headers.html` / `comparison-font-headers.png`：PC文字72px/シンボル72px、スマホ文字36px/シンボル40pxの静的ヘッダー比較。採用シンボルの形・配色を維持。現在のsystem-uiはmacOS撮影環境の書体で、他OSとは異なることがある。サイト本体は未変更。
 
 フォントはGoogle Fonts公式リポジトリ `https://github.com/google/fonts/tree/main/ofl/` のspacegrotesk、chakrapetch、sora、rajdhaniから取得し、fonts/にOFLライセンスを同梱。Space Grotesk・Soraは可変TTF、他2つは指定ウェイトのTTF。再生成は `node build-fonts.cjs`。各ウェイトの実際のFontFace読み込みとSVG画像のdecodeを確認し、比較画像を目視確認。
+
+## 文字ロゴの加工比較（2026-10-15）
+
+`preview-wordmarks.html` / `comparison-wordmarks.png`：Chakra Petch SemiBoldの加工前、文字のPへ稲妻を統合する③、P/Bの上辺へ2つの切り欠きを入れる④。各案は大サイズ・小サイズ・シンボル併用ヘッダー・360px幅の文字単体を比較。シンボル併用は③で稲妻が重複することも確認するための参考。
+
+`wordmark-chakra-{base,bolt,cuts}.svg`は実フォントのアウトラインを使用し、フォントの読み込みに依存しない。文字の字間は各案共通（1000UPMで30単位追加）、個別カーニングはまだ未調整。加工案は検討段階、サイトへ未適用。
+
+SVG再生成：fontToolsを用意して `python3 build-wordmarks.py`。比較画像：`node build-wordmarks.cjs`。全SVG読み込みと比較画像を目視確認。元書体のOFLはfonts/chakrapetch-OFL.txtを参照。
