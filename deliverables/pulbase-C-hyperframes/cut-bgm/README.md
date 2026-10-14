@@ -1,7 +1,7 @@
-# PULBASE C — 完成版 v2
+# PULBASE C — 完成版 v3
 
 
-2026-10-14：ユーザーがv2を完成版として承認。完成動画は [PULBASE-C-30s-BGM-crowd-v2.mp4](PULBASE-C-30s-BGM-crowd-v2.mp4)（BGM・ざわめき入り）。無音版は [PULBASE-C-30s-silent-v2.mp4](../cut/PULBASE-C-30s-silent-v2.mp4)。30秒、1080×1920、30fps。
+2026-10-14：承認済みv2から、ユーザーの追加指示により全シーンの下部にあった素材説明を削除。完成動画は [PULBASE-C-30s-BGM-crowd-v3.mp4](PULBASE-C-30s-BGM-crowd-v3.mp4)（BGM・ざわめき入り）。無音版は [PULBASE-C-30s-silent-v3.mp4](../cut/PULBASE-C-30s-silent-v3.mp4)。30秒、1080×1920、30fps。旧v1・v2も保持。
 
 - 無音版は `../cut`、BGM版はこの `cut-bgm`。
 - `assets` は `../cut/assets` を参照する相対シンボリックリンク。両フォルダを一緒に保持。
@@ -25,3 +25,7 @@
 - 上部見出しを削除し、投稿画像の自機を表示。心の声のみ “自分も、挑んでみたい。”。
 - 音声はv1と同一。旧v1 MP4も保存。
 - 最終検証：`verification-C-v2-delivery.json`。
+
+## 完成版 v3：下部の素材説明を削除（2026-10-14）
+
+冒頭・筐体・SNS投稿・観戦・対戦・エンドタイトルに表示されていた素材や演出についての注記をすべて削除。中央のメッセージ・SNS投稿本文・PULBASEタイトル・BGM・ざわめき・尺は維持。出典はプロジェクト内の記録に保持。最終検証は `verification-C-v3-delivery.json`。

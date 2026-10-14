@@ -35,4 +35,8 @@ Sun in Your Eyes / Alejandro Magaña (A. M.)。MixkitのSynthwaveカテゴリか
 
 
 ## 完成承認（2026-10-14）
-ユーザーの「このv2を完成版にします。」により、PULBASE-C-30s-BGM-crowd-v2.mp4（BGM・ざわめき入り）を完成版として確定。無音版 ../cut/PULBASE-C-30s-silent-v2.mp4 と旧v1も保持。承認済み映像への追加変更・再書き出しなし。最終検証は verification-C-v2-delivery.json。
+ユーザーの「このv2を完成版にします。」により、PULBASE-C-30s-BGM-crowd-v2.mp4（BGM・ざわめき入り）を完成版として確定。無音版 ../cut/PULBASE-C-30s-silent-v2.mp4 と旧v1も保持。最終検証は verification-C-v2-delivery.json。
+
+## 2026-10-14 v3：下部の素材説明を削除
+
+ユーザーの「動画の下に背景の説明メッセージが含まれてない？これはいらないので消してほしい」に対応。全シーンから下部の制作・素材説明（生成画像、演出、実録等）を削除。物語を伝える中央コピーやSNS本文、サービス名・URLは維持。音量・タイミング・素材映像は変更せず、BGM・ざわめき入りと無音の完成MP4をv3として保存。旧v1・v2も保持。

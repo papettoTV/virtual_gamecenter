@@ -31,3 +31,9 @@ CLIスナップショットでは筐体アップが見える一方、Studioの3.
 CLIは0.8.154→0.8.157へ更新。更新後のstrict checkでlint/runtime/layout/contrastのエラー・警告・infoは全て0。新しいCLIでプレビューを再起動。render実行中だけStudioが作業用HTMLを検査して一時的なエラーを出したが、書き出し後は作業用フォルダー自動削除とStudio lint 0を確認。
 更新MP4：PULBASE-C-30s-BGM-crowd-v2.mp4、同一の映像パケットから音声を外した../cut/PULBASE-C-30s-silent-v2.mp4。30秒、1080×1920、30fps、900フレーム、H.264 / yuv420p。音ありはAAC stereo 48kHz。フルデコード成功。v1音声パケットのSHA256と完全一致し、BGM・ざわめき・音量とフェードを維持。実AAC音量 -22.6 LUFS / true peak -10.3 dBFS。旧v1 MP4と旧無音プロジェクトは保持。
 実MP4の1.5・3.6・8.5・18.7・20.6・29.6秒を目視確認。最終検証verification-C-v2-delivery.jsonとコンタクトシートquality-C-v2-final-MP4-contact.jpg。delivery、screenshot capture / hardware GPU / 2 workers、68.9秒で書き出し。
+
+## 2026-10-14 完成版v3：下部の素材説明を削除
+
+全シーンの下部にある制作・素材説明を5要素から削除し、関連CSSとGSAP参照も除去。物語の中央コピー・投稿本文・自機・筐体アップ・対戦・エンドタイトルを維持。HyperFrames 0.8.157 の strict check（15点、3 HTML）でエラー・警告・info 0。7点の静止画と書き出しMP4のコンタクトシートを目視確認。
+
+BGM・ざわめき入りv3 MP4をdelivery品質で出力し、映像ストリームの再圧縮なしで無音v3を作成。両方30秒・1080×1920・30fps・900フレーム。全編デコード成功。映像ストリームは両版で同一、無音版は音声ストリーム0。音声パケットのSHA256はv2と完全一致（BGM・ざわめきの変更なし）、-22.6 LUFS／true peak -10.3 dBFS。旧v1・v2を保持。検証記録は verification-C-v3-delivery.json、quality-C-v3-final-MP4-contact.jpg。
