@@ -30,7 +30,7 @@
 
 #invite{background:#000}#invite,#message,#url-card{opacity:1}
 </style>
-<div data-hf-id="hf-social-root" id="c-social-post" data-composition-id="c-social-post" data-duration="2" data-width="720" data-height="1280">
+<div data-hf-id="hf-social-root" id="c-social-post" data-composition-id="c-social-post" data-duration="2.3" data-width="720" data-height="1280">
 <div data-hf-id="hf-3dty" id="invite">
 <img data-hf-id="hf-p6uq" id="arcade-bg" data-layout-allow-overflow="true" src="../assets/arcade-opening-v1.png" alt="古き良きゲームセンターをイメージした演出画像">
 <div data-hf-id="hf-90iq" id="message">
@@ -54,7 +54,7 @@
 </div>
 <script>
 const tl=gsap.timeline({paused:true});
-// The complete SNS post is visible from local 0 to 2 seconds.
+// The complete SNS post is visible from local 0 to 2.3 seconds; tap timings stay unchanged.
 tl.to('#url-card',{scale:.96,duration:.08,ease:'power1.in'},1.62);
 tl.to('#url-card',{scale:1,duration:.12,ease:'power2.out'},1.7);
 tl.fromTo('#open-ripple',{scale:.5,opacity:0},{scale:1.3,opacity:.8,duration:.08,ease:'power2.out'},1.64);

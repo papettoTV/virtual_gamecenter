@@ -1,7 +1,7 @@
-# PULBASE C — SNS表示調整版 v7
+# PULBASE C — タップ後の余韻調整版 v8
 
 
-2026-10-14：SNS投稿をv6の1秒から2秒へ延長した24.8秒版。動画は [PULBASE-C-24p8s-BGM-crowd-v7.mp4](PULBASE-C-24p8s-BGM-crowd-v7.mp4)（BGM・ざわめき入り）、無音版は [PULBASE-C-24p8s-silent-v7.mp4](../cut/PULBASE-C-24p8s-silent-v7.mp4)。1080×1920、30fps。旧v1〜v6も保持。
+2026-10-14：SNS投稿のタップ後をv7より0.3秒延ばした25.1秒版。動画は [PULBASE-C-25p1s-BGM-crowd-v8.mp4](PULBASE-C-25p1s-BGM-crowd-v8.mp4)（BGM・ざわめき入り）、無音版は [PULBASE-C-25p1s-silent-v8.mp4](../cut/PULBASE-C-25p1s-silent-v8.mp4)。1080×1920、30fps。旧v1〜v7も保持。
 
 - 無音版は `../cut`、BGM版はこの `cut-bgm`。
 - `assets` は `../cut/assets` を参照する相対シンボリックリンク。両フォルダを一緒に保持。
@@ -45,3 +45,7 @@
 ## v7：SNS投稿を2秒へ延長（2026-10-14）
 
 SNSは6.8–8.8秒の2秒間。末尾のリンク操作も1秒後ろへ移動。以降はすべて1秒後ろへ移動し、観戦8.8–12.8秒、心の声と申し込み12.8–19.3秒、対戦19.3–23.02秒、エンド23.02–24.8秒。各後続シーンの長さ・ゲーム速度・冒頭の背景の連続性を維持。BGMの音量変化を移動、ざわめき0–6.8秒を維持。検証は `verification-C-v7-delivery.json`。
+
+## v8：SNSタップ後を0.3秒延長（2026-10-14）
+
+タップ開始8.42秒、反応の終了8.72秒はv7と同じ。SNSの切り替えを8.8秒から9.1秒へ遅らせ、反応終了後のホールドを0.08秒から0.38秒へ延長。SNS全体は6.8–9.1秒の2.3秒間。後続シーンとBGMの音量変化を0.3秒後ろへ移動し、全体25.1秒。検証は `verification-C-v8-delivery.json`。
