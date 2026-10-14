@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { drawPlayerShip } from "./player-ship";
+import { BOSS_AIRCRAFT_DESIGNS, getBossAircraftDesign } from "./boss-aircraft";
 import type {
   BossRenderState,
   BulletRenderState,
@@ -36,6 +37,7 @@ export function createThreeGameRenderer(width: number, height: number): GameScen
   renderer.setSize(width, height, false);
   renderer.setClearColor(0x000000, 0);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.localClippingEnabled = true;
 
   const scene = new THREE.Scene();
   const camera = new THREE.OrthographicCamera(-width / 2, width / 2, height / 2, -height / 2, 0.1, 10);
@@ -47,7 +49,13 @@ export function createThreeGameRenderer(width: number, height: number): GameScen
   mesh.frustumCulled = false;
   mesh.renderOrder = 2;
   const playerVisuals = [createPlayerVisual(), createPlayerVisual()];
-  const bossVisuals = [createBossVisual(), createBossVisual()];
+  const textureLoader = new THREE.TextureLoader();
+  const bossTextures = BOSS_AIRCRAFT_DESIGNS.map(design => {
+    const texture = textureLoader.load(design.source);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
+  });
+  const bossVisuals = [createBossVisual(bossTextures), createBossVisual(bossTextures)];
   const particleVisual = createParticleVisual();
   scene.add(mesh, particleVisual.points, ...playerVisuals.map((visual) => visual.root), ...bossVisuals.map((visual) => visual.root));
 
@@ -131,8 +139,8 @@ export function createThreeGameRenderer(width: number, height: number): GameScen
       }
       elapsedUniform.value = elapsed;
       updatePlayerVisuals(playerVisuals, players, elapsed, transform, options);
-      updateBossVisual(bossVisuals[0]!, frame.boss, 0, elapsed, transform, options, width, height);
-      updateBossVisual(bossVisuals[1]!, frame.opponentBoss, 1, elapsed, transform, options, width, height);
+      updateBossVisual(bossVisuals[0]!, frame.boss, 0, players[0]?.fieldX ?? 0, transform, options, width, height);
+      updateBossVisual(bossVisuals[1]!, frame.opponentBoss, 1, players[1]?.fieldX ?? 0, transform, options, width, height);
       updateParticleVisual(particleVisual, frame.particles, transform, width, height, colorCache);
       renderer.clear();
       renderer.render(scene, camera);
@@ -156,6 +164,7 @@ export function createThreeGameRenderer(width: number, height: number): GameScen
       geometry.dispose();
       material.dispose();
       disposeVisuals(playerVisuals, bossVisuals, particleVisual);
+      for (const texture of bossTextures) texture.dispose();
       renderer.dispose();
       canvas.remove();
     },
@@ -172,10 +181,9 @@ type PlayerVisual = {
 
 type BossVisual = {
   root: THREE.Group;
-  shapes: Array<THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>>;
-  aura: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
-  eye: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
-  pupil: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
+  ship: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
+  textures: THREE.Texture[];
+  clippingPlanes: THREE.Plane[];
 };
 
 type ParticleVisual = {
@@ -221,32 +229,22 @@ function createPlayerShipTexture(color: string): THREE.CanvasTexture {
   return texture;
 }
 
-function createBossVisual(): BossVisual {
+function createBossVisual(textures: THREE.Texture[]): BossVisual {
   const root = new THREE.Group();
-  const material = () => new THREE.MeshBasicMaterial({ color: 0x18051f, transparent: true, depthTest: false });
-  const shapes = [
-    new THREE.Mesh(new THREE.CircleGeometry(1, 64), material()),
-    new THREE.Mesh(createPolygonGeometry(3, Math.PI / 2), material()),
-    new THREE.Mesh(createStarGeometry(5, 0.46), material()),
+  const clippingPlanes = [
+    new THREE.Plane(new THREE.Vector3(1, 0, 0)),
+    new THREE.Plane(new THREE.Vector3(-1, 0, 0)),
+    new THREE.Plane(new THREE.Vector3(0, -1, 0)),
+    new THREE.Plane(new THREE.Vector3(0, 1, 0)),
   ];
-  const aura = new THREE.Mesh(
-    new THREE.CircleGeometry(1, 64),
-    new THREE.MeshBasicMaterial({ color: 0xff3355, transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending, depthTest: false }),
+  const ship = new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ map: textures[0], transparent: true, depthTest: false, depthWrite: false, clippingPlanes }),
   );
-  const eye = new THREE.Mesh(
-    new THREE.CircleGeometry(1, 32),
-    new THREE.MeshBasicMaterial({ color: 0xfff4f6, transparent: true, depthTest: false }),
-  );
-  const pupil = new THREE.Mesh(
-    new THREE.CircleGeometry(1, 24),
-    new THREE.MeshBasicMaterial({ color: 0x180008, transparent: true, depthTest: false }),
-  );
-  aura.renderOrder = 0;
-  shapes.forEach((shape) => { shape.renderOrder = 1; root.add(shape); });
-  eye.renderOrder = 3;
-  pupil.renderOrder = 4;
-  root.add(aura, eye, pupil);
-  return { root, shapes, aura, eye, pupil };
+  root.renderOrder = 1;
+  ship.renderOrder = 1;
+  root.add(ship);
+  return { root, ship, textures, clippingPlanes };
 }
 
 function createParticleVisual(): ParticleVisual {
@@ -303,7 +301,7 @@ function updateBossVisual(
   visual: BossVisual,
   boss: BossRenderState,
   playerIndex: number,
-  elapsed: number,
+  fieldX: number,
   transform: ViewTransform,
   options: RenderOptions,
   width: number,
@@ -316,19 +314,17 @@ function updateBossVisual(
   visual.root.position.set(point.x - width / 2, height / 2 - point.y, 0);
   const entering = boss.encounterState === "entering";
   const progress = entering ? boss.arrivalProgress : 1;
-  const radius = boss.radius * (0.68 + progress * 0.32) + (0.5 + Math.sin(elapsed * 3.2) * 0.16) * 5;
+  const radius = boss.radius * getBossAircraftDesign(boss.phaseIndex).scale * (0.68 + progress * 0.32);
   visual.root.scale.setScalar(transform.scale);
-  visual.root.rotation.z = boss.phaseIndex === 2 ? elapsed * 0.08 : 0;
-  visual.root.children.forEach((child) => { child.visible = true; });
-  visual.shapes.forEach((shape, index) => { shape.visible = index === Math.min(2, boss.phaseIndex); });
-  const body = visual.shapes[Math.min(2, boss.phaseIndex)]!;
-  body.scale.setScalar(radius);
-  body.material.color.set(boss.flash > 0 ? 0xffffff : [0x18051f, 0x071722, 0x1c0628][boss.phaseIndex] ?? 0x18051f);
-  body.material.opacity = entering ? 0.08 + progress * 0.92 : 1;
-  visual.aura.scale.setScalar(radius * (1.35 + Math.sin(elapsed * 4) * 0.08));
-  visual.aura.material.opacity = entering ? progress * 0.12 : 0.2;
-  visual.eye.scale.set(radius * 0.34, radius * 0.09, 1);
-  visual.pupil.scale.set(radius * 0.07, radius * 0.1, 1);
+  visual.ship.scale.setScalar(radius);
+  visual.ship.material.map = visual.textures[boss.phaseIndex] ?? visual.textures[0]!;
+  visual.ship.material.color.setScalar(boss.flash > 0 ? 1.8 : 0.25 + progress * 0.75);
+  visual.ship.material.opacity = entering ? 0.08 + progress * 0.92 : 1;
+  const field = transformField(fieldX, options, transform);
+  visual.clippingPlanes[0]!.constant = width / 2 - field.left;
+  visual.clippingPlanes[1]!.constant = field.right - width / 2;
+  visual.clippingPlanes[2]!.constant = height / 2 - field.top;
+  visual.clippingPlanes[3]!.constant = field.bottom - height / 2;
 }
 
 function updateParticleVisual(
@@ -351,33 +347,6 @@ function updateParticleVisual(
   visual.points.material.size = 6 * transform.scale;
   visual.positions.needsUpdate = true;
   visual.colors.needsUpdate = true;
-}
-
-function createPolygonGeometry(sides: number, rotation: number) {
-  const shape = new THREE.Shape();
-  for (let index = 0; index < sides; index += 1) {
-    const angle = rotation + Math.PI * 2 * index / sides;
-    const x = Math.cos(angle);
-    const y = Math.sin(angle);
-    if (index === 0) shape.moveTo(x, y);
-    else shape.lineTo(x, y);
-  }
-  shape.closePath();
-  return new THREE.ShapeGeometry(shape);
-}
-
-function createStarGeometry(points: number, innerRadius: number) {
-  const shape = new THREE.Shape();
-  for (let index = 0; index < points * 2; index += 1) {
-    const angle = Math.PI / 2 + Math.PI * index / points;
-    const radius = index % 2 === 0 ? 1 : innerRadius;
-    const x = Math.cos(angle) * radius;
-    const y = Math.sin(angle) * radius;
-    if (index === 0) shape.moveTo(x, y);
-    else shape.lineTo(x, y);
-  }
-  shape.closePath();
-  return new THREE.ShapeGeometry(shape);
 }
 
 function disposeVisuals(playerVisuals: PlayerVisual[], bossVisuals: BossVisual[], particleVisual: ParticleVisual) {

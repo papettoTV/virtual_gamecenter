@@ -1,5 +1,6 @@
 import { createCyberCanyonBackground } from "./cyber-canyon-background";
 import { drawPlayerShip } from "./player-ship";
+import { createBossAircraftSprites } from "./boss-aircraft";
 
 export function createCanvasRenderer(options) {
   let { context, getAttackCost, randomRange, createLightningBolt } = options;
@@ -22,6 +23,7 @@ export function createCanvasRenderer(options) {
     HIT_MARKER_RADIUS,
   } = options.settings;
   const canyonBackground = createCyberCanyonBackground(FIELD_WIDTH, FIELD_HEIGHT);
+  const bossAircraft = createBossAircraftSprites();
   let frame = null;
 
   return {
@@ -36,6 +38,7 @@ export function createCanvasRenderer(options) {
     },
     dispose() {
       canyonBackground.dispose();
+      bossAircraft.dispose();
       context = null;
       frame = null;
       getAttackCost = null;
@@ -107,117 +110,23 @@ export function createCanvasRenderer(options) {
   }
 
   function drawBoss() {
-    if (!frame.boss.active || frame.boss.hp <= 0) return;
-    if (frame.sceneRendered) {
-      drawBossGauge(frame.boss, LEFT_X + FIELD_WIDTH / 2);
-      return;
-    }
-    context.save();
-    const phase = BOSS_PHASES[frame.boss.phaseIndex];
-    const entering = frame.boss.encounterState === "entering";
-    const entranceProgress = entering ? frame.boss.arrivalProgress : 1;
-    const visualRadius = frame.boss.radius * (0.68 + entranceProgress * 0.32);
-    const pulse = 0.5 + Math.sin(frame.elapsedRound * 3.2) * 0.16;
-    const flash = frame.boss.flash > 0 ? 1 : 0;
-
-    if (entering) drawBossArrivalShadow(entranceProgress);
-    context.globalAlpha = entering ? 0.08 + entranceProgress * 0.92 : 1;
-
-    context.strokeStyle = "rgba(255, 51, 85, 0.38)";
-    context.lineWidth = 2;
-    context.shadowBlur = 22;
-    context.shadowColor = "#ff3355";
-    for (let index = 0; index < 10; index += 1) {
-      const angle = frame.elapsedRound * 0.18 + (Math.PI * 2 * index) / 10;
-      const innerRadius = visualRadius + 9 + pulse * 4;
-      const outerRadius = visualRadius + 22;
-      context.beginPath();
-      context.moveTo(frame.boss.x + Math.cos(angle) * innerRadius, frame.boss.y + Math.sin(angle) * innerRadius);
-      context.lineTo(frame.boss.x + Math.cos(angle) * outerRadius, frame.boss.y + Math.sin(angle) * outerRadius);
-      context.stroke();
-    }
-
-    context.shadowBlur = 34 + flash * 28;
-    context.shadowColor = flash ? "#ffffff" : "#ff3355";
-    context.fillStyle = flash ? "#ffffff" : phase.color;
-    context.strokeStyle = "#8f1739";
-    context.lineWidth = 5;
-    drawBossShape(phase.shape, frame.boss.x, frame.boss.y, visualRadius + pulse * 5);
-
-    context.shadowBlur = 0;
-    const coreGradient = context.createRadialGradient(frame.boss.x, frame.boss.y, 1, frame.boss.x, frame.boss.y, visualRadius * 0.52);
-    coreGradient.addColorStop(0, flash ? "#ffffff" : "#ffeff3");
-    coreGradient.addColorStop(0.18, "#ff3355");
-    coreGradient.addColorStop(0.56, "#5d071d");
-    coreGradient.addColorStop(1, "rgba(20, 0, 8, 0)");
-    context.fillStyle = coreGradient;
-    context.beginPath();
-    context.arc(frame.boss.x, frame.boss.y, visualRadius * 0.54, 0, Math.PI * 2);
-    context.fill();
-
-    context.fillStyle = "#fff4f6";
-    context.shadowBlur = 16;
-    context.shadowColor = "#ff3355";
-    context.beginPath();
-    context.ellipse(frame.boss.x, frame.boss.y, visualRadius * 0.34, visualRadius * 0.09, 0, 0, Math.PI * 2);
-    context.fill();
-    context.fillStyle = "#180008";
-    context.beginPath();
-    context.ellipse(frame.boss.x, frame.boss.y, visualRadius * 0.07, visualRadius * 0.1, 0, 0, Math.PI * 2);
-    context.fill();
-    context.shadowBlur = 0;
-
-    if (frame.boss.encounterState !== "active") {
-      context.restore();
-      return;
-    }
-
-    drawBossGauge(frame.boss, LEFT_X + FIELD_WIDTH / 2);
-    context.restore();
+    drawAircraftBoss(frame.boss, LEFT_X);
   }
 
   function drawOpponentBoss() {
-    if (!frame.opponentBoss.active || frame.opponentBoss.hp <= 0) return;
-    if (frame.sceneRendered) {
-      drawBossGauge(frame.opponentBoss, RIGHT_X + FIELD_WIDTH / 2);
-      return;
+    drawAircraftBoss(frame.opponentBoss, RIGHT_X);
+  }
+
+  function drawAircraftBoss(targetBoss, fieldX) {
+    if (!targetBoss.active || targetBoss.hp <= 0) return;
+    if (!frame.sceneRendered) {
+      context.save();
+      roundRect(fieldX, FIELD_TOP, FIELD_WIDTH, FIELD_HEIGHT, 18);
+      context.clip();
+      bossAircraft.draw(context, targetBoss);
+      context.restore();
     }
-    const phase = BOSS_PHASES[frame.opponentBoss.phaseIndex] ?? BOSS_PHASES[0];
-    const entering = frame.opponentBoss.encounterState === "entering";
-    const entranceProgress = entering ? frame.opponentBoss.arrivalProgress : 1;
-    const visualRadius = frame.opponentBoss.radius * (0.68 + entranceProgress * 0.32);
-    const pulse = 0.5 + Math.sin(frame.elapsedRound * 3.2) * 0.16;
-    const flash = frame.opponentBoss.flash > 0 ? 1 : 0;
-
-    context.save();
-    context.globalAlpha = entering ? 0.08 + entranceProgress * 0.92 : 1;
-    context.shadowBlur = 28 + flash * 22;
-    context.shadowColor = flash ? "#ffffff" : "#ff3355";
-    context.fillStyle = flash ? "#ffffff" : phase.color;
-    context.strokeStyle = "#8f1739";
-    context.lineWidth = 5;
-    drawBossShape(phase.shape, frame.opponentBoss.x, frame.opponentBoss.y, visualRadius + pulse * 5);
-
-    context.shadowBlur = 0;
-    const coreGradient = context.createRadialGradient(
-      frame.opponentBoss.x,
-      frame.opponentBoss.y,
-      1,
-      frame.opponentBoss.x,
-      frame.opponentBoss.y,
-      visualRadius * 0.52,
-    );
-    coreGradient.addColorStop(0, flash ? "#ffffff" : "#ffeff3");
-    coreGradient.addColorStop(0.18, "#ff3355");
-    coreGradient.addColorStop(0.56, "#5d071d");
-    coreGradient.addColorStop(1, "rgba(20, 0, 8, 0)");
-    context.fillStyle = coreGradient;
-    context.beginPath();
-    context.arc(frame.opponentBoss.x, frame.opponentBoss.y, visualRadius * 0.54, 0, Math.PI * 2);
-    context.fill();
-
-    drawBossGauge(frame.opponentBoss, RIGHT_X + FIELD_WIDTH / 2);
-    context.restore();
+    drawBossGauge(targetBoss, fieldX + FIELD_WIDTH / 2);
   }
 
   function drawBossGauge(targetBoss, labelX) {
@@ -239,29 +148,6 @@ export function createCanvasRenderer(options) {
     context.textAlign = "left";
   }
 
-  function drawBossArrivalShadow(progress) {
-    context.save();
-    const shadowRadius = frame.boss.radius * (2.25 - progress * 0.65);
-    const shadowGradient = context.createRadialGradient(
-      frame.boss.x,
-      frame.boss.y,
-      frame.boss.radius * (0.2 + progress * 0.28),
-      frame.boss.x,
-      frame.boss.y,
-      shadowRadius,
-    );
-    shadowGradient.addColorStop(0, `rgba(0, 0, 0, ${0.96 - progress * 0.46})`);
-    shadowGradient.addColorStop(0.5, `rgba(10, 0, 14, ${0.9 - progress * 0.55})`);
-    shadowGradient.addColorStop(1, "rgba(0, 0, 0, 0)");
-    context.fillStyle = shadowGradient;
-    context.shadowBlur = 46;
-    context.shadowColor = "#000000";
-    context.beginPath();
-    context.arc(frame.boss.x, frame.boss.y, shadowRadius, 0, Math.PI * 2);
-    context.fill();
-    context.restore();
-  }
-
   function drawBossSpawnHint() {
     if (frame.bossEncounterInProgress || frame.clearGame || frame.boss.phaseIndex >= BOSS_PHASES.length) return;
     const nextPhase = BOSS_PHASES[frame.boss.phaseIndex];
@@ -280,35 +166,6 @@ export function createCanvasRenderer(options) {
     context.textAlign = "center";
     context.fillText(label, labelX, FIELD_TOP + 32);
     context.restore();
-  }
-
-  function drawBossShape(shape, x, y, radius) {
-    context.beginPath();
-    if (shape === "triangle" || shape === "invertedTriangle") {
-      for (let index = 0; index < 3; index += 1) {
-        const baseAngle = shape === "invertedTriangle" ? Math.PI / 2 : -Math.PI / 2;
-        const angle = baseAngle + (Math.PI * 2 * index) / 3;
-        const pointX = x + Math.cos(angle) * radius;
-        const pointY = y + Math.sin(angle) * radius;
-        if (index === 0) context.moveTo(pointX, pointY);
-        else context.lineTo(pointX, pointY);
-      }
-      context.closePath();
-    } else if (shape === "star") {
-      for (let index = 0; index < 10; index += 1) {
-        const angle = -Math.PI / 2 + (Math.PI * 2 * index) / 10;
-        const pointRadius = index % 2 === 0 ? radius : radius * 0.46;
-        const pointX = x + Math.cos(angle) * pointRadius;
-        const pointY = y + Math.sin(angle) * pointRadius;
-        if (index === 0) context.moveTo(pointX, pointY);
-        else context.lineTo(pointX, pointY);
-      }
-      context.closePath();
-    } else {
-      context.arc(x, y, radius, 0, Math.PI * 2);
-    }
-    context.fill();
-    context.stroke();
   }
 
   function drawBackground() {

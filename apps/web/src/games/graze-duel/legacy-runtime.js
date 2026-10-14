@@ -575,13 +575,15 @@ export function mountGame(context) {
     paused = false;
     waitingForStart = false;
     playerHitboxEnabled = false;
-    players[0].level = 17;
+    const requestedBoss = Number(new URLSearchParams(window.location.search).get("promoBoss"));
+    const previewPhaseIndex = [1, 2, 3].includes(requestedBoss) ? requestedBoss - 1 : 0;
+    players[0].level = 17 + previewPhaseIndex * 10;
     players[0].score = 18_420;
     players[0].gauge = getAttackCost(players[0]) - 70;
     players[0].invincible = 0;
     players[1].level = 13;
     players[1].score = 12_660;
-    scheduleBossPhase(0);
+    scheduleBossPhase(previewPhaseIndex);
     startBossEntrance();
     boss.arrivalTimer = 0;
     boss.arrivalProgress = 1;

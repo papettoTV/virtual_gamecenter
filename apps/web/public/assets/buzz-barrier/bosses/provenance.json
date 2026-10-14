@@ -1,0 +1,26 @@
+{
+  "createdOn": "2026-10-15",
+  "provider": "OpenAI built-in image_gen",
+  "mode": "background-extraction with transparent_background=true",
+  "selection": "User approved heavy interceptor A, stealth flying boat, and aerial fortress. Twin-fuselage proposal was not selected.",
+  "assets": [
+    {
+      "file": "heavy-interceptor.png",
+      "approvedConcept": "exec-b20256c0-2d49-4d91-9108-10550e4f78f3.png",
+      "generatedCutout": "exec-5cf43584-eb49-468e-941a-9aea07a064b3.png",
+      "prompt": "Use case: background-extraction. Make a clean transparent game sprite cutout of this approved heavy interceptor aircraft. Remove ONLY the navy background, replace it with genuine alpha transparency including all empty spaces outside and between wings; retain the entire aircraft silhouette, panel detail, twin engines and amber exhausts, cockpit, red indicator lines, and long nose gun, with the nose pointing down. Do not redesign or rotate the craft. Lift dark armor midtones slightly so it remains readable at small size over a nearly black gameplay background, but preserve graphite material and restrained military appearance. Perfectly overhead view. Aircraft fully visible with at least 5% transparent padding on every edge, exhaust tips not cropped. No backdrop, no floor, no text, no checkerboard painted into pixels, no shadow rectangle. This is the first of three game-ready sprites."
+    },
+    {
+      "file": "stealth-flying-boat.png",
+      "approvedConcept": "exec-63871017-595d-4ce7-afc8-3878b996a7a3.png",
+      "generatedCutout": "exec-de6e5855-991e-4ef1-bdd4-c41503409ecd.png",
+      "prompt": "Use case: background-extraction. Make a clean transparent game sprite cutout of this approved INVERTED TRIANGLE STEALTH FLYING BOAT aircraft. Remove ONLY the dark blue background, replace it with genuine alpha transparency everywhere outside the aircraft including concave wing edges and engine gaps. Preserve the exact broad inverted triangular planform, gray armored surfaces, long central pointed bow facing DOWN, cockpit, four rear engine nacelles and amber glow facing up, two gun bays and small red lights. Do not redesign or change camera angle. Lift dark armor midtones slightly for readability at small game scale over a nearly black background, preserving understated graphite material. Full aircraft centered with minimum 5% transparent padding around outer wing tips and nose, no cropped parts. No background, no floor, no text, no painted checkerboard or shadow rectangle. Crisp 2D top-down sprite, matching the supplied design precisely."
+    },
+    {
+      "file": "aerial-fortress.png",
+      "approvedConcept": "exec-4ac79a17-5347-4610-b79f-d23a707bd762.png",
+      "generatedCutout": "exec-0a0d23de-b580-4e50-ab91-b88715a71300.png",
+      "prompt": "Use case: background-extraction. Extract the supplied approved GIANT AERIAL FORTRESS into a genuine transparent PNG game sprite. Preserve the exact overhead design: central layered battleship hull and bridge, broad upper wings and shorter lower pair, six amber rear engines at top, multiple gun turrets, missile bays, pointed nose at bottom, charcoal gray armor, subtle red seams. Remove ONLY the dark navy background to actual alpha, including negative space between engines and wings. No redesign, no rotation, no new eye or reactor, no added guns. Lift dark armor midtones slightly for readability over nearly black gameplay background while retaining graphite metallic appearance. Fit the entire aircraft fully inside canvas with minimum 5% transparent padding on all four edges; especially preserve upper exhaust flames and outer wing tips which must not touch the image edge. No floor, no shadow rectangle, no labels, no typography, no painted checkerboard. One centered clean cutout matching the approved image."
+    }
+  ]
+}
