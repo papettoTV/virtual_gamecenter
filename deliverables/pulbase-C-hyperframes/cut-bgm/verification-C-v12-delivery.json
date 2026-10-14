@@ -1,0 +1,83 @@
+{
+  "files": {
+    "sound": "PULBASE-C-25p1s-BGM-crowd-v12.mp4",
+    "silent": "../cut/PULBASE-C-25p1s-silent-v12.mp4"
+  },
+  "durationSeconds": 25.1,
+  "resolution": [
+    1080,
+    1920
+  ],
+  "fps": "30/1",
+  "frames": 753,
+  "videoCodec": "h264",
+  "audioCodec": "aac",
+  "soundBytes": 25550108,
+  "silentBytes": 24917234,
+  "identicalSoundAndSilentVideo": true,
+  "silentAudioStreams": 0,
+  "cabinetVisibleSeconds": [
+    1.8,
+    6.8
+  ],
+  "pastMessageCueSeconds": [
+    1.8,
+    4.3
+  ],
+  "heatMessageCueSeconds": [
+    4.3,
+    6.8
+  ],
+  "cabinetCamera": {
+    "scale": [
+      1,
+      1.07
+    ],
+    "seconds": [
+      1.8,
+      6.8
+    ],
+    "ease": "power1.in",
+    "singleUninterruptedTween": true,
+    "screenStillSharesCameraWrapper": true
+  },
+  "openingTitleSeconds": [
+    0,
+    1.8
+  ],
+  "openingTitleStaticFromFirstFrame": true,
+  "snsSeconds": [
+    6.8,
+    9.1
+  ],
+  "postTapHoldSeconds": 0.38,
+  "watchStatusSeconds": [
+    9.1,
+    19.6
+  ],
+  "crowdEndsSeconds": 6.8,
+  "allV11GameplayAssetsSha256Unchanged": true,
+  "endingBackgroundUnchanged": true,
+  "cliVersion": "0.8.158",
+  "audioPacketSha256": "SHA256=a54713632142a89dc9f3549e8ca80abb65a675302d0812476f73404c47ae309a",
+  "encodedAudioUnchangedFromV11": true,
+  "soundSha256": "d77f5405c20c392e833b1a201a92874de7cbaadc02c3580355f269bfb37abf92",
+  "silentSha256": "a6b864fac3e2863368a5d51532c2e7f47fa19d9cc88c56ac6eb322d1290fbc8e",
+  "fullDecodeSucceeded": true,
+  "strictCheckPassed": true,
+  "strictCheckSamples": 19,
+  "sceneReviewTimesSeconds": [
+    0,
+    3.05,
+    5.55,
+    8.9,
+    11.1,
+    14.8,
+    21.1,
+    24.5
+  ],
+  "renderCapture": "screenshot / hardware GPU / 2 workers / delivery",
+  "audioIntegratedLufs": -22.8,
+  "audioTruePeakDbfs": -10.5,
+  "priorV1ThroughV11FilesPreserved": true
+}

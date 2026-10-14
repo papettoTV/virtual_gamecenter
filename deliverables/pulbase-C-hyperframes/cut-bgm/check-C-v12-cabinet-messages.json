@@ -1,0 +1,101 @@
+{
+  "ok": true,
+  "strict": true,
+  "browserSkipped": false,
+  "lint": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "filesScanned": 5
+  },
+  "runtime": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": []
+  },
+  "layout": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "duration": 25.1,
+    "samples": [
+      0.661,
+      1.982,
+      3.303,
+      4.624,
+      5.945,
+      7.266,
+      8.587,
+      9.908,
+      11.229,
+      12.55,
+      13.871,
+      15.192,
+      16.513,
+      17.834,
+      19.155,
+      20.476,
+      21.797,
+      23.118,
+      24.439
+    ],
+    "transitionSamples": [],
+    "transitionSamplesDropped": 0,
+    "tolerance": 2,
+    "totalIssueCount": 0,
+    "truncated": false
+  },
+  "motion": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "enabled": false,
+    "samples": 0
+  },
+  "contrast": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "enabled": true,
+    "samples": [
+      0.661,
+      5.945,
+      12.55,
+      17.834,
+      24.439
+    ],
+    "checked": 15,
+    "passed": 15
+  },
+  "hdr": {
+    "autoPromotion": null,
+    "inspection": "available"
+  },
+  "snapshots": {
+    "enabled": false,
+    "files": [],
+    "times": [],
+    "findingFiles": []
+  },
+  "saved": {
+    "id": "96471e37-11a3-43bd-b1e7-3a74f1551273",
+    "revision": "85d8fe1f-743b-48fd-a99f-b88cc08e2aef",
+    "report": "/Users/eijiyokota/Documents/バーチャルゲーセン/deliverables/pulbase-C-hyperframes/cut-bgm/.hyperframes/artifacts/checks/96471e37-11a3-43bd-b1e7-3a74f1551273.json",
+    "attribution": "recorded-revision"
+  },
+  "_meta": {
+    "version": "0.8.158",
+    "latestVersion": "0.8.158",
+    "updateAvailable": false
+  }
+}
