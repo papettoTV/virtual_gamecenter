@@ -20,3 +20,8 @@
 
 `preview-slim.html` / `comparison-slim.png` に現行と細い版を並べた。
 `pulbase-b-slim-{white,black}.svg` は稲妻・外形・頭の半径を維持し、内側の抜きを上下左右に4単位拡大。上下の線40→36、縦線56→52。16・32px PNGも生成し、読み込みと寸法を検証。再生成は `node build-slim.cjs`。現行SVGとサイト本体は維持。
+
+## 線幅を揃えた版
+
+`preview-uniform.html` / `comparison-uniform.png` は細い版と線幅統一版の比較。
+`pulbase-b-uniform-{white,black}.svg` は直線部分を36単位に統一：縦線52→36、上36を維持、下・右40→36。頭の抜き半径18と稲妻は維持。丸い抜きのある部分・角丸は一定線幅とは異なる。16・32px PNGの寸法と画像読み込みを検証し、比較画像を目視確認。再生成は `node build-uniform.cjs`。
