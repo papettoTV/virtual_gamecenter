@@ -9,7 +9,7 @@
 - favicon：`favicon-slim-dark-16.png` / `favicon-slim-dark-32.png`
 - 比較：`preview-slim.html`
 
-縦線52、上36、下・右40（SVG座標）を維持。`uniform`版は比較用で採用しない。サイトへの適用・カラー検討・公開は未実施。
+縦線52、上36、下・右40（SVG座標）を維持。`uniform`版は比較用で採用しない。サイトへの適用・公開は未実施。配色は下記の採用配色を参照。
 
 
 採用した「B / SLIM」を数値で再構成したレビュー用の初稿。サイト本体には未適用。
@@ -43,3 +43,12 @@
 `preview-colors.html` / `comparison-colors.png`：採用したslim版の形を変えず、シアン#69F7FF、アンバー#FFBD45、ライム#BAFF39を比較。各色につき全体単色（文字も同色）と白いP＋稲妻だけ着色（文字は白）の2案、計6案。背景はサイトの#090B18。
 
 各SVGは `pulbase-b-slim-{cyan,amber,lime}-{mono,bolt}.svg`。SVGの読み込みと比較画像を目視確認。再生成は `node build-colors.cjs`。色の最終選択・サイト適用・公開は未実施。
+
+
+## 採用配色（2026-10-15）
+
+白いP（#FFFFFF）＋シアンの稲妻（#69F7FF）、`pulbase-b-slim-cyan-bolt.svg`を採用。形はslim版を維持。
+
+`preview-cyan.html` / `comparison-cyan.png` / `comparison-cyan-mobile.png`で16・32px favicon、明暗タブ、PC・360pxスマホのヘッダー仮組みを比較。`favicon-cyan-{16,32}.png`は背景#090B18を含み、明るいタブでも白いPを識別できる。2つのPNGの寸法、全画像の読み込み、390px幅で横方向にはみ出さないことを検証。比較画像を目視確認。再生成：`node build-cyan.cjs`。
+
+32pxとヘッダーでは白いPとシアンの稲妻を識別できる。16pxは稲妻の色が分かる一方、頭や細い隙間の意味は読み取りにくい。サイト本体への適用・push・公開は未実施。
