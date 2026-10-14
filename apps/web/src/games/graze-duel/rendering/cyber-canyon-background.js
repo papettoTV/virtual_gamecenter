@@ -4,21 +4,23 @@ export function createCyberCanyonBackground(width, height) {
   tile.height = height * 2;
   const tileContext = tile.getContext("2d");
   if (tileContext) {
-    tileContext.lineWidth = 0.75;
+    tileContext.lineWidth = 1;
     for (const side of [-1, 1]) {
       for (let contour = 0; contour < 24; contour += 1) {
         const depth = contour / 23;
-        tileContext.strokeStyle = `rgba(64, 183, 209, ${0.035 + depth * 0.065})`;
+        tileContext.strokeStyle = `rgba(72, 187, 217, ${0.18 + depth * 0.1})`;
         tileContext.beginPath();
         for (let sample = 0; sample <= 256; sample += 1) {
           const progress = sample / 256;
           const phase = progress * Math.PI * 2;
-          const bank = 0.29 + depth * 0.27;
-          const ridge = Math.sin(phase * 3 + side * 1.2 + depth * 2) * 0.035
-            + Math.sin(phase * 7 + depth * 3.1) * 0.017
-            + Math.sin(phase + depth * 0.8) * 0.035;
-          const terrace = Math.tanh(Math.sin(phase * 4 + depth * 1.7 + side)) * 0.016;
-          const horizontal = width * (0.5 + side * (bank + ridge + terrace));
+          const bank = 0.28 + depth * 0.28;
+          const ridge = Math.sin(phase * 3 + side * 1.2 + depth * 2) * 0.05
+            + Math.sin(phase * 7 + depth * 3.1) * 0.027
+            + Math.sin(phase + depth * 0.8) * 0.04
+            + Math.sin(phase * 19 + depth * 2.4 + side) * 0.006;
+          const terrace = Math.tanh(Math.sin(phase * 4 + depth * 1.7 + side) * 2) * 0.025;
+          const bankDistance = Math.max(0.24 + depth * 0.15, bank + ridge + terrace);
+          const horizontal = width * (0.5 + side * bankDistance);
           const vertical = progress * tile.height;
           if (sample === 0) tileContext.moveTo(horizontal, vertical);
           else tileContext.lineTo(horizontal, vertical);
@@ -36,7 +38,7 @@ export function createCyberCanyonBackground(width, height) {
       context.drawImage(tile, 0, offset - tile.height);
       context.drawImage(tile, 0, offset);
 
-      context.lineWidth = 0.7;
+      context.lineWidth = 0.9;
       for (const side of [-1, 1]) {
         for (let index = 0; index < 12; index += 1) {
           const phase = (elapsed * (0.3 + index % 3 * 0.025) + index * 0.618) % 1;
@@ -45,7 +47,7 @@ export function createCyberCanyonBackground(width, height) {
           const horizontal = width * (0.5 + side * lateral * (0.72 + distance * 0.28));
           const vertical = distance * (height + 48) - 24;
           const length = 5 + distance * (18 + index % 3 * 6);
-          context.strokeStyle = `rgba(83, 196, 218, ${0.045 + distance * 0.075})`;
+          context.strokeStyle = `rgba(83, 196, 218, ${0.1 + distance * 0.12})`;
           context.beginPath();
           context.moveTo(horizontal, vertical - length);
           context.lineTo(horizontal, vertical);
