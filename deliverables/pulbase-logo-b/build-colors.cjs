@@ -1,0 +1,4 @@
+const path=require('node:path');const {pathToFileURL}=require('node:url');
+const deps='/Users/eijiyokota/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules';
+const sharp=require(require.resolve('sharp',{paths:[deps]}));const {chromium}=require(require.resolve('playwright',{paths:[deps]}));
+(async()=>{const browser=await chromium.launch({headless:true,channel:'chrome'});try{const page=await browser.newPage({viewport:{width:1200,height:1400},deviceScaleFactor:1});await page.goto(pathToFileURL(path.join(__dirname,'preview-colors.html')).href);await page.evaluate(()=>Promise.all(Array.from(document.images).map(i=>i.decode())));await page.screenshot({path:path.join(__dirname,'comparison-colors.png'),fullPage:true});console.log('All six colored SVGs loaded and rendered.');}finally{await browser.close()}})().catch(e=>{console.error(e);process.exit(1)});

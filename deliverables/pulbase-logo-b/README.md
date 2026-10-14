@@ -37,3 +37,9 @@
 
 `preview-uniform.html` / `comparison-uniform.png` は細い版と線幅統一版の比較。
 `pulbase-b-uniform-{white,black}.svg` は直線部分を36単位に統一：縦線52→36、上36を維持、下・右40→36。頭の抜き半径18と稲妻は維持。丸い抜きのある部分・角丸は一定線幅とは異なる。16・32px PNGの寸法と画像読み込みを検証し、比較画像を目視確認。再生成は `node build-uniform.cjs`。
+
+## カラー比較
+
+`preview-colors.html` / `comparison-colors.png`：採用したslim版の形を変えず、シアン#69F7FF、アンバー#FFBD45、ライム#BAFF39を比較。各色につき全体単色（文字も同色）と白いP＋稲妻だけ着色（文字は白）の2案、計6案。背景はサイトの#090B18。
+
+各SVGは `pulbase-b-slim-{cyan,amber,lime}-{mono,bolt}.svg`。SVGの読み込みと比較画像を目視確認。再生成は `node build-colors.cjs`。色の最終選択・サイト適用・公開は未実施。
