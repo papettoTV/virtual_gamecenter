@@ -70,6 +70,18 @@ body {
   margin-bottom: 18px;
 }
 
+.brand-heading {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.brand-symbol {
+  width: clamp(40px, 7vw, 72px);
+  height: clamp(40px, 7vw, 72px);
+  flex: none;
+}
+
 .brand-category {
   letter-spacing: 0.2em;
 }
@@ -2041,6 +2053,10 @@ canvas {
   .shell {
     width: min(100vw - 12px, 1040px);
     padding-top: 14px;
+  }
+
+  .brand-heading {
+    gap: 10px;
   }
 
   .intro p {

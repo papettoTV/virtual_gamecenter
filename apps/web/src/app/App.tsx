@@ -49,7 +49,7 @@ export function App() {
       <main className="shell">
         {!selection && <section className="intro">
           <p className="eyebrow brand-category">{BRAND.category}</p>
-          <h1>{BRAND.name}</h1>
+          <h1 className="brand-heading"><img className="brand-symbol" src="/brand/pulbase-logo.svg" alt="" width="72" height="72" />{BRAND.name}</h1>
           <p className="brand-tagline">{BRAND.tagline}</p>
         </section>}
         {selection ? <CabinetSelection game={game} /> : <ArcadeScreen onSelectGame={chooseGame} />}
