@@ -9,5 +9,12 @@
   "media": {
     "autoProxy": true
   },
-  "authoringSkill": "general-video"
+  "authoringSkill": "general-video",
+  "registryItems": [
+    {
+      "name": "beat-pulse-background",
+      "type": "hyperframes:component",
+      "target": "references/beat-pulse-background-source.html.txt"
+    }
+  ]
 }
