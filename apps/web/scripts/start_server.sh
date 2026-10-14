@@ -9,6 +9,7 @@ HEALTH_URL="http://127.0.0.1:${PORT}/api/health"
 cd "$PROJECT_ROOT"
 
 if curl -fsS "$HEALTH_URL" >/dev/null 2>&1; then
+  npm run db:migrate:local
   echo "Virtual Game Center server is already healthy."
   echo "Local:   http://localhost:${PORT}/"
   LAN_IP="$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || true)"

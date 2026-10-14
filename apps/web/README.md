@@ -15,11 +15,10 @@
 
 ## ローカル開発
 
-初回のみ依存パッケージとローカルD1を準備します。
+初回のみ依存パッケージを準備します。`npm run dev` / `npm start`では、起動前にローカルD1の未適用マイグレーションを自動適用します。
 
 ```bash
 npm install
-npm run db:migrate:local
 npm run dev
 ```
 
