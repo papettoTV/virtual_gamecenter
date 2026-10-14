@@ -16,6 +16,8 @@ export function checkReleaseConfig(config, environment) {
   const selected = config.env?.[environment];
   if (!selected) return [`${environment} の設定がありません。`];
   const errors = [];
+  if (!selected.durable_objects?.bindings?.some(item => item.name === "ABUSE_GUARDS" && item.class_name === "AbuseGuard" && !item.script_name)) errors.push("分散乱用対策は環境専用のAbuseGuardが必要です。");
+  if (!config.migrations?.some(item => item.new_sqlite_classes?.includes("AbuseGuard"))) errors.push("分散乱用対策のSQLite移行が必要です。");
   if (selected.vars?.USAGE_MONITOR_ENABLED === "true") {
     if (environment !== "staging" || config.env?.production?.vars?.USAGE_MONITOR_ENABLED === "true") errors.push("アカウント監視は検証Workerの一箇所だけで実行してください。");
     if (selected.vars?.METRICS_ACCOUNT_ID !== config.account_id || !selected.secrets?.required?.includes("CLOUDFLARE_METRICS_TOKEN") || !selected.analytics_engine_datasets?.some(item => item.binding === "USAGE_METRICS" && item.dataset === "pulbase_account_usage") || !selected.triggers?.crons?.includes("0,15,30,45 * * * *")) errors.push("利用量監視の設定・Secret・15分Cronが不足しています。");
@@ -60,6 +62,7 @@ export function checkReleaseConfig(config, environment) {
 
 export function checkBuildConfig(config, selected, environment) {
   const errors = [];
+  if (JSON.stringify(config.durable_objects) !== JSON.stringify(selected.durable_objects)) errors.push("成果物の分散乱用対策が選択した環境と一致しません。");
   if (config.vars?.USAGE_MONITOR_ENABLED !== selected.vars?.USAGE_MONITOR_ENABLED || config.vars?.METRICS_ACCOUNT_ID !== selected.vars?.METRICS_ACCOUNT_ID || JSON.stringify(config.analytics_engine_datasets) !== JSON.stringify(selected.analytics_engine_datasets)) errors.push("成果物の利用量監視が選択した環境と一致しません。");
   if (JSON.stringify(config.ratelimits) !== JSON.stringify(selected.ratelimits)) errors.push("成果物の乱用対策が選択した環境と一致しません。");
   if (config.name !== selected.name) errors.push("成果物のWorker名が選択した環境と一致しません。");

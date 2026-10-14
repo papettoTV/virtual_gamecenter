@@ -100,7 +100,7 @@ describe("Cloudflare Worker", () => {
   it("requires the revised policy version without treating old consent as new consent", async () => {
     const response = await exports.default.fetch("http://localhost/api/platform/bootstrap");
     const initial = await response.json<{ playerId: string; consent: { termsVersion: string; privacyVersion: string } }>();
-    expect(initial.consent).toMatchObject({ termsVersion: "2026-10-12.3", privacyVersion: "2026-10-12.3" });
+    expect(initial.consent).toMatchObject({ termsVersion: "2026-10-12.3", privacyVersion: "2026-10-14.1" });
     const cookie = response.headers.get("set-cookie")?.split(";", 1)[0];
     await env.DB.batch(["terms", "privacy"].map(policyType => env.DB.prepare(
       "INSERT INTO consent_records (id, player_id, policy_type, policy_version) VALUES (?, ?, ?, ?)",

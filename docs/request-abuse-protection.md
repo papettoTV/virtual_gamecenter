@@ -31,7 +31,7 @@ IPのキーは環境名とIPから、セッションのキーはCookieからハ�
 
 local・staging・productionのnamespaceは分離する。検証・本番でbindingが欠ける場合や制限サービスのエラー時は503で業務処理を停止する。ローカルCLIでCF-Connecting-IPがない場合だけネイティブ頻度検査を省略し、本文・筐体・メッセージ上限は維持する。静的アセットと軽量health確認は対象外。
 
-この制限はCloudflare拠点ごとの近似的な制限であり、全世界で厳密に共有される予算でも費用の上限でもない。共有回線・NATでは複数の正規利用者がIP予算を共有するため、実際の429発生状況を見て調整する。[公式仕様](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)
+ネイティブ制限はCloudflare拠点ごとの近似的な制限である。この後段に、固定16シャードの共有API予算と全筐体の接続・割当枠を追加した。詳細は[分散アクセス対策](distributed-abuse-protection.md)を参照。共有回線・NATでは複数の正規利用者がIP予算を共有するため、実際の429発生状況を見て調整する。どちらも絶対的な費用上限ではない。[公式仕様](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)
 
 ## WebSocket
 
@@ -64,7 +64,7 @@ local・staging・productionのnamespaceは分離する。検証・本番でbind
 
 ## 公開前に残す課題
 
-- EN-04は対応中。分散IP・複数拠点からの攻撃、全筐体を横断する絶対的な費用・作成数の制限は未解決。必要に応じてTurnstile・WAF等を追加する。
-- Cloudflare予算・R2利用量のメール通知は6件設定済み。条件・対応手順・着信確認待ちは[費用通知](cloudflare-cost-alerts.md)を参照。Workers/D1/DO利用量、429・切断数・障害の自動監視は残る。ネイティブ制限やメール通知を費用上限の代替にしない。
+- EN-04は対応中。分散アクセスの共有予算・全筐体の接続枠と直近24時間の割当上限は実装済み。大規模な地理分散負荷、入口のDDoS対策、絶対的な支払い上限は別課題。必要に応じてTurnstile・WAF等を追加する。
+- Cloudflare予算・R2利用量のメール通知6件、Workers/Pages・D1・DOの利用量監視4通知は設定済み。[利用量監視・検証記録](cloudflare-usage-monitor.md)を参照。メール実着信、429・切断数の継続観測は残る。制限やメール通知を費用上限の代替にしない。
 - 実利用規模・共有回線・PC/iPhone/Androidで、通常プレイ・観戦を誤って制限しないか確認する。
 - 全メッセージの詳細なスキーマ・権限点検、外部ログの保持・マスキング、結果申告の不正対策はEN-03/EN-05で継続する。

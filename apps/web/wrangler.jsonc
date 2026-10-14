@@ -18,6 +18,7 @@
   },
   "durable_objects": {
     "bindings": [
+      { "name": "ABUSE_GUARDS", "class_name": "AbuseGuard" },
       {
         "name": "CABINET_ROOMS",
         "class_name": "CabinetRoom"
@@ -28,7 +29,8 @@
     {
       "tag": "v1",
       "new_sqlite_classes": ["CabinetRoom"]
-    }
+    },
+    { "tag": "v2", "new_sqlite_classes": ["AbuseGuard"] }
   ],
   "d1_databases": [
     {
@@ -58,7 +60,7 @@
       },
       "secrets": { "required": ["BASIC_AUTH_USERNAME", "BASIC_AUTH_PASSWORD", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "CLOUDFLARE_METRICS_TOKEN"] },
       "analytics_engine_datasets": [{ "binding": "USAGE_METRICS", "dataset": "pulbase_account_usage" }],
-      "durable_objects": { "bindings": [{ "name": "CABINET_ROOMS", "class_name": "CabinetRoom" }] },
+      "durable_objects": { "bindings": [{ "name": "CABINET_ROOMS", "class_name": "CabinetRoom" }, { "name": "ABUSE_GUARDS", "class_name": "AbuseGuard" }] },
       "d1_databases": [{
         "binding": "DB",
         "database_name": "pulbase-staging",
@@ -80,7 +82,7 @@
         "CREDIT_PURCHASES_ENABLED": "false"
       },
       "secrets": { "required": ["BASIC_AUTH_USERNAME", "BASIC_AUTH_PASSWORD", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"] },
-      "durable_objects": { "bindings": [{ "name": "CABINET_ROOMS", "class_name": "CabinetRoom" }] },
+      "durable_objects": { "bindings": [{ "name": "CABINET_ROOMS", "class_name": "CabinetRoom" }, { "name": "ABUSE_GUARDS", "class_name": "AbuseGuard" }] },
       "d1_databases": [{
         "binding": "DB",
         "database_name": "pulbase-production",
