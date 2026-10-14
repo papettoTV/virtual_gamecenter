@@ -4,7 +4,7 @@
 #c-opening-title{position:absolute;inset:0;width:100%;height:100%;overflow:hidden;background:transparent;color:#fff8ee}
 #opening-title-lockup{position:absolute;left:36px;top:390px;width:648px;text-align:center;display:flex;flex-direction:column;align-items:center}
 #opening-title-category{font:800 22px/1.4 CutJP,sans-serif;letter-spacing:.14em;color:#fff8ee;margin-bottom:30px;text-shadow:0 3px 12px #171322}
-#opening-title-wordmark{width:648px;font:900 106px/1.1 CutJP,sans-serif;letter-spacing:.025em;color:#fff8ee;text-shadow:0 4px 0 #171322,0 10px 35px #171322;transform-origin:50% 50%;will-change:transform}
+#opening-title-wordmark{width:648px;font:900 106px/1.1 CutJP,sans-serif;letter-spacing:.025em;color:#fff8ee;text-shadow:0 4px 0 #171322,0 10px 35px #171322;transform-origin:50% 50%}
 #opening-title-rule{width:390px;height:5px;margin:27px 0 24px;background:#56deed;transform-origin:50% 50%}
 #opening-title-copy{width:624px;font:800 31px/1.6 CutJP,sans-serif;color:#fff8ee;text-shadow:0 3px 10px #171322}
 #opening-title-url{margin-top:35px;font:800 43px/1.3 CutJP,sans-serif;letter-spacing:.035em;color:#fff8ee;text-shadow:0 3px 12px #171322}
@@ -22,13 +22,7 @@
 </div>
 <script>
 const tl=gsap.timeline({paused:true});
-// Motion: spring-pop-entrance (calm settle, no overshoot) + viewport-change.
-tl.fromTo('#opening-title-wordmark',{scale:.78,opacity:0},{scale:1,opacity:1,duration:.46,ease:'power3.out'},.04);
-tl.fromTo('#opening-title-category',{opacity:0},{opacity:1,duration:.24,ease:'power2.out'},.08);
-tl.fromTo('#opening-title-rule',{scaleX:0},{scaleX:1,duration:.34,ease:'power3.out'},.28);
-tl.fromTo('#opening-title-copy',{y:12,opacity:0},{y:0,opacity:1,duration:.28,ease:'power2.out'},.36);
-tl.fromTo('#opening-title-url',{y:8,opacity:0},{y:0,opacity:1,duration:.28,ease:'power2.out'},.50);
-tl.to('#opening-title-lockup',{opacity:0,duration:.15,ease:'power1.in'},1.65);
+// Static title: all text and the accent rule stay visible for the full 1.8 seconds.
 window.__timelines=window.__timelines||{};window.__timelines['c-opening-title']=tl;
 </script>
 </template>
