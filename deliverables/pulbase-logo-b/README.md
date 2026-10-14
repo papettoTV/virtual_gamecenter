@@ -52,3 +52,11 @@
 `preview-cyan.html` / `comparison-cyan.png` / `comparison-cyan-mobile.png`で16・32px favicon、明暗タブ、PC・360pxスマホのヘッダー仮組みを比較。`favicon-cyan-{16,32}.png`は背景#090B18を含み、明るいタブでも白いPを識別できる。2つのPNGの寸法、全画像の読み込み、390px幅で横方向にはみ出さないことを検証。比較画像を目視確認。再生成：`node build-cyan.cjs`。
 
 32pxとヘッダーでは白いPとシアンの稲妻を識別できる。16pxは稲妻の色が分かる一方、頭や細い隙間の意味は読み取りにくい。サイト本体への適用・push・公開は未実施。
+
+## 書体比較（2026-10-15）
+
+`preview-fonts.html` / `comparison-fonts.png`：現在のsystem-ui 700、Space Grotesk 500・600、Chakra Petch 600、Sora 600、Rajdhani 700の6案。候補の字間は0.03em、現在は0。48px・30pxで比較。
+
+`preview-font-headers.html` / `comparison-font-headers.png`：PC文字72px/シンボル72px、スマホ文字36px/シンボル40pxの静的ヘッダー比較。採用シンボルの形・配色を維持。現在のsystem-uiはmacOS撮影環境の書体で、他OSとは異なることがある。サイト本体は未変更。
+
+フォントはGoogle Fonts公式リポジトリ `https://github.com/google/fonts/tree/main/ofl/` のspacegrotesk、chakrapetch、sora、rajdhaniから取得し、fonts/にOFLライセンスを同梱。Space Grotesk・Soraは可変TTF、他2つは指定ウェイトのTTF。再生成は `node build-fonts.cjs`。各ウェイトの実際のFontFace読み込みとSVG画像のdecodeを確認し、比較画像を目視確認。
