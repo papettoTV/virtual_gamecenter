@@ -16,6 +16,10 @@ export function checkReleaseConfig(config, environment) {
   const selected = config.env?.[environment];
   if (!selected) return [`${environment} の設定がありません。`];
   const errors = [];
+  if (selected.vars?.USAGE_MONITOR_ENABLED === "true") {
+    if (environment !== "staging" || config.env?.production?.vars?.USAGE_MONITOR_ENABLED === "true") errors.push("アカウント監視は検証Workerの一箇所だけで実行してください。");
+    if (selected.vars?.METRICS_ACCOUNT_ID !== config.account_id || !selected.secrets?.required?.includes("CLOUDFLARE_METRICS_TOKEN") || !selected.analytics_engine_datasets?.some(item => item.binding === "USAGE_METRICS" && item.dataset === "pulbase_account_usage") || !selected.triggers?.crons?.includes("0,15,30,45 * * * *")) errors.push("利用量監視の設定・Secret・15分Cronが不足しています。");
+  }
   const rateNames = ["API_READ_LIMITER", "API_WRITE_LIMITER", "BOOTSTRAP_LIMITER", "BENEFIT_LIMITER", "SOCKET_LIMITER", "AUTH_LIMITER"];
   for (const name of rateNames) {
     const limiter = selected.ratelimits?.find(item => item.name === name);
@@ -56,6 +60,7 @@ export function checkReleaseConfig(config, environment) {
 
 export function checkBuildConfig(config, selected, environment) {
   const errors = [];
+  if (config.vars?.USAGE_MONITOR_ENABLED !== selected.vars?.USAGE_MONITOR_ENABLED || config.vars?.METRICS_ACCOUNT_ID !== selected.vars?.METRICS_ACCOUNT_ID || JSON.stringify(config.analytics_engine_datasets) !== JSON.stringify(selected.analytics_engine_datasets)) errors.push("成果物の利用量監視が選択した環境と一致しません。");
   if (JSON.stringify(config.ratelimits) !== JSON.stringify(selected.ratelimits)) errors.push("成果物の乱用対策が選択した環境と一致しません。");
   if (config.name !== selected.name) errors.push("成果物のWorker名が選択した環境と一致しません。");
   if (config.vars?.APP_ENV !== environment || config.vars?.DEVELOPER_AUTH_ENABLED !== "false" || config.vars?.CREDIT_PURCHASES_ENABLED !== "false") errors.push("成果物の環境・認証・購入設定が不正です。");

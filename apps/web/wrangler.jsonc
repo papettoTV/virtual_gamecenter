@@ -6,6 +6,8 @@
   "compatibility_date": "2026-07-26",
   "vars": {
     "APP_ENV": "local",
+    "USAGE_MONITOR_ENABLED": "false",
+    "METRICS_ACCOUNT_ID": "60e5472a284dc71bbafbbfac8aa2a940",
     "DEVELOPER_AUTH_ENABLED": "true",
     "CREDIT_PURCHASES_ENABLED": "false"
   },
@@ -49,10 +51,13 @@
       "workers_dev": false,
       "vars": {
         "APP_ENV": "staging",
+        "USAGE_MONITOR_ENABLED": "true",
+        "METRICS_ACCOUNT_ID": "60e5472a284dc71bbafbbfac8aa2a940",
         "DEVELOPER_AUTH_ENABLED": "false",
         "CREDIT_PURCHASES_ENABLED": "false"
       },
-      "secrets": { "required": ["BASIC_AUTH_USERNAME", "BASIC_AUTH_PASSWORD", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"] },
+      "secrets": { "required": ["BASIC_AUTH_USERNAME", "BASIC_AUTH_PASSWORD", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "CLOUDFLARE_METRICS_TOKEN"] },
+      "analytics_engine_datasets": [{ "binding": "USAGE_METRICS", "dataset": "pulbase_account_usage" }],
       "durable_objects": { "bindings": [{ "name": "CABINET_ROOMS", "class_name": "CabinetRoom" }] },
       "d1_databases": [{
         "binding": "DB",
@@ -61,7 +66,7 @@
         "migrations_dir": "migrations"
       }],
       "r2_buckets": [{ "binding": "DELETION_AUDIT", "bucket_name": "pulbase-staging-deletion-audit" }],
-      "triggers": { "crons": ["0 * * * *"] }
+      "triggers": { "crons": ["0 * * * *", "0,15,30,45 * * * *"] }
     },
     "production": {
       "name": "pulbase-production",
@@ -69,6 +74,8 @@
       "workers_dev": false,
       "vars": {
         "APP_ENV": "production",
+        "USAGE_MONITOR_ENABLED": "false",
+        "METRICS_ACCOUNT_ID": "60e5472a284dc71bbafbbfac8aa2a940",
         "DEVELOPER_AUTH_ENABLED": "false",
         "CREDIT_PURCHASES_ENABLED": "false"
       },
