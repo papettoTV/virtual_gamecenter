@@ -1,0 +1,47 @@
+{
+  "files": {
+    "sound": "PULBASE-C-32p3s-BGM-crowd-v4.mp4",
+    "silent": "../cut/PULBASE-C-32p3s-silent-v4.mp4"
+  },
+  "durationSeconds": 32.3,
+  "resolution": [
+    1080,
+    1920
+  ],
+  "fps": "30/1",
+  "frames": 969,
+  "videoCodec": "h264",
+  "audioCodec": "aac",
+  "soundBytes": 27549650,
+  "silentBytes": 26737526,
+  "identicalSoundAndSilentVideo": true,
+  "silentAudioStreams": 0,
+  "openingTitleAddedSeconds": 2.3,
+  "existingSceneOffsetSeconds": 2.3,
+  "crowdEndsSeconds": 8.3,
+  "audioPacketSha256": "SHA256=b909c2ffdf399c97d023c39da30c82ff588722c03db58a72c31980ac80096472",
+  "soundSha256": "63fcce3ecf0f24003cb3427cd669a5b798e95d2d54e911cc1753c9d0ac2564bd",
+  "silentSha256": "0451f279841c5e3613c07bab9d80cfdfe0d4345080ee59e42734dd2a63321b9c",
+  "fullDecodeSucceeded": true,
+  "strictCheckPassed": true,
+  "productionNotesRemoved": [
+    "memory-note",
+    "intro-note",
+    "note",
+    "duel-note",
+    "end-title-note"
+  ],
+  "sceneReviewTimesSeconds": [
+    0.8,
+    3.8,
+    5.9,
+    10.8,
+    21,
+    26.8,
+    31.9
+  ],
+  "renderCapture": "screenshot / hardware GPU / 2 workers / delivery",
+  "audioIntegratedLufs": -22.6,
+  "audioTruePeakDbfs": -10.3,
+  "priorV1V2V3FilesPreserved": true
+}
