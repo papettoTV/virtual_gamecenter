@@ -1,7 +1,7 @@
-# PULBASE C — にぎわい・観戦表示追加版 v10
+# PULBASE C — BUZZ BARRIERゲーム画面更新版 v11
 
 
-2026-10-15：冒頭のゲーセン背景を人のいるにぎやかな版に変更し、観戦中の表示を加えた25.1秒版。動画は [PULBASE-C-25p1s-BGM-crowd-v10.mp4](PULBASE-C-25p1s-BGM-crowd-v10.mp4)（BGM・ざわめき入り）、無音版は [PULBASE-C-25p1s-silent-v10.mp4](../cut/PULBASE-C-25p1s-silent-v10.mp4)。1080×1920、30fps。旧v1〜v9も保持。
+2026-10-15：新しい渓谷背景を含むBUZZ BARRIERを再収録した25.1秒のv11。動画は [PULBASE-C-25p1s-BGM-crowd-v11.mp4](PULBASE-C-25p1s-BGM-crowd-v11.mp4)（BGM・ざわめき入り）、無音版は [PULBASE-C-25p1s-silent-v11.mp4](../cut/PULBASE-C-25p1s-silent-v11.mp4)。1080×1920、30fps。完成承認済みv10と旧v1〜v9も保持。
 
 - 無音版は `../cut`、BGM版はこの `cut-bgm`。
 - `assets` は `../cut/assets` を参照する相対シンボリックリンク。両フォルダを一緒に保持。
@@ -57,3 +57,9 @@ SNSは6.8–8.8秒の2秒間。末尾のリンク操作も1秒後ろへ移動。
 ## v10：冒頭のにぎわいと観戦中表示（2026-10-15）
 
 冒頭0–4.3秒の背景だけを `../cut/assets/arcade-opening-crowded-v1.png` へ変更。元の背景をOpenAI組み込みImageGenで編集し、プレイヤーと観戦する友達を追加。最後23.32–25.1秒の背景は元の `arcade-opening-v1.png` を保持。生成指示・出典は `image-prompt-crowded-opening-v10.md` と `image-provenance-crowded-opening-v10.json`。観戦映像9.1–19.6秒は上部左に小さな「観戦中」を常時表示し、対戦開始時に非表示。尺・音声・その他のシーンを維持。HyperFramesは0.8.157→0.8.158へ更新し検証。検証は `verification-C-v10-delivery.json`。
+
+## v11：現在のゲーム画面を再収録（2026-10-15）
+
+現在のゲームソースを撮影専用のローカルコピーで起動し、通常のソロプレイと実際の通信対戦を収録。移動する自機・弾幕と新しい渓谷背景を含む。Canvas描画をMediaRecorderで30fps収録し、H.264へ等速変換。観戦動画12秒、同じ対戦の両側を各6.5秒の素材として保存し、v10と同じ位置・長さで使用。SNS画像は自機と背景の見える下部を切り出し、筐体用は画面全体を使用。
+
+新素材は `../cut/assets/buzz-background-*-v11.*`、元録画・撮影設定・SHA256は `../cut/assets/updated-capture-v11/`。ゲーム本体のリポジトリのコードや本番環境は変更していない。
