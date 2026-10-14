@@ -12,12 +12,12 @@
 #memory-copy-now{border-left-color:#56deed}
 
 </style>
-<div data-hf-id="hf-u5v8" id="c-memory" data-composition-id="c-memory" data-duration="5" data-width="720" data-height="1280" style="width:100%;height:100%">
+<div data-hf-id="hf-u5v8" id="c-memory" data-composition-id="c-memory" data-duration="6.8" data-width="720" data-height="1280" style="width:100%;height:100%">
 <div data-hf-id="hf-0ndl" id="memory-visual">
 <img data-hf-id="hf-nau8" id="memory-wide" class="memory-photo" data-layout-allow-overflow="true" src="../assets/arcade-opening-v1.png" alt="古き良きゲームセンターの演出画像">
 <div data-hf-id="hf-mpr6" id="memory-cabinet" data-layout-allow-overflow="true">
-<img data-hf-id="hf-r1s3" id="memory-cabinet-photo" class="memory-photo clip" data-start="2.5" data-duration="2.5" data-track-index="7" src="../assets/arcade-over-shoulder-v1.png" alt="ゲームセンターで筐体をプレイする人を背中越しに見た演出画像">
-<img data-hf-id="hf-hlr8" id="memory-cabinet-game" class="clip" data-start="2.5" data-duration="2.5" data-track-index="8" src="../assets/buzz-cabinet-still-v1.png" alt="筐体画面に表示したBUZZ BARRIERの実録静止画">
+<img data-hf-id="hf-r1s3" id="memory-cabinet-photo" class="memory-photo clip" data-start="4.3" data-duration="2.5" data-track-index="7" src="../assets/arcade-over-shoulder-v1.png" alt="ゲームセンターで筐体をプレイする人を背中越しに見た演出画像">
+<img data-hf-id="hf-hlr8" id="memory-cabinet-game" class="clip" data-start="4.3" data-duration="2.5" data-track-index="8" src="../assets/buzz-cabinet-still-v1.png" alt="筐体画面に表示したBUZZ BARRIERの実録静止画">
 </div>
 <div data-hf-id="hf-bprt" id="memory-copy-past" class="memory-copy"><span data-hf-id="hf-2d95">あの頃、</span><span data-hf-id="hf-wy3f">つい見入った。</span></div>
 <div data-hf-id="hf-7tpf" id="memory-copy-now" class="memory-copy"><span data-hf-id="hf-9hnz">その熱気を、</span><span data-hf-id="hf-ut1j">手のひらへ。</span></div>
@@ -25,13 +25,13 @@
 </div></div><script>
 const tl=gsap.timeline({paused:true});
 // Motion citation: viewport-change (continuous camera move); GSAP fromTo for readable copy holds.
-tl.fromTo('#memory-wide',{scale:1.02},{scale:1.12,duration:2.5,ease:'none'},0);
-tl.fromTo('#memory-copy-past',{y:16,opacity:0},{y:0,opacity:1,duration:.3,ease:'power2.out'},.1);
-tl.to('#memory-copy-past',{opacity:0,duration:.18},2.32);
-tl.set('#memory-cabinet',{opacity:1},2.5);
-tl.fromTo('#memory-cabinet',{scale:1},{scale:1.025,duration:2.5,ease:'none'},2.5);
-tl.fromTo('#memory-copy-now',{y:16,opacity:0},{y:0,opacity:1,duration:.3,ease:'power2.out'},2.58);
-tl.to('#memory-copy-now',{opacity:0,duration:.25},4.35);
-tl.to('#memory-visual',{opacity:0,duration:.35,ease:'power2.in'},4.65);
+tl.fromTo('#memory-wide',{scale:1.04},{scale:1.12,duration:4.3,ease:'none'},0);
+tl.fromTo('#memory-copy-past',{y:16,opacity:0},{y:0,opacity:1,duration:.3,ease:'power2.out'},1.9);
+tl.to('#memory-copy-past',{opacity:0,duration:.18},4.12);
+tl.set('#memory-cabinet',{opacity:1},4.3);
+tl.fromTo('#memory-cabinet',{scale:1},{scale:1.025,duration:2.5,ease:'none'},4.3);
+tl.fromTo('#memory-copy-now',{y:16,opacity:0},{y:0,opacity:1,duration:.3,ease:'power2.out'},4.38);
+tl.to('#memory-copy-now',{opacity:0,duration:.25},6.15);
+// Hard cut to the one-second SNS post at 6.8s; no partial pre-roll.
 window.__timelines=window.__timelines||{};window.__timelines['c-memory']=tl;
 </script></template>
