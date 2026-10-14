@@ -1,4 +1,7 @@
-# PULBASE C — BGM比較版
+# PULBASE C — 完成版 v2
+
+
+2026-10-14：ユーザーがv2を完成版として承認。完成動画は [PULBASE-C-30s-BGM-crowd-v2.mp4](PULBASE-C-30s-BGM-crowd-v2.mp4)（BGM・ざわめき入り）。無音版は [PULBASE-C-30s-silent-v2.mp4](../cut/PULBASE-C-30s-silent-v2.mp4)。30秒、1080×1920、30fps。
 
 - 無音版は `../cut`、BGM版はこの `cut-bgm`。
 - `assets` は `../cut/assets` を参照する相対シンボリックリンク。両フォルダを一緒に保持。
@@ -15,7 +18,7 @@
 - 音源単体は配布しない。無音の旧プロジェクトソースと既存MP4も保持。
 - 最終検証：`verification-C-delivery-MP4.json`、`quality-C-final-MP4-contact.jpg`。
 
-## 最新 v2（2026-10-14）
+## 完成版 v2（2026-10-14承認）
 
 - 音あり：`PULBASE-C-30s-BGM-crowd-v2.mp4`。
 - 同じ修正を含む無音：`../cut/PULBASE-C-30s-silent-v2.mp4`。
