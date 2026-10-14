@@ -34,14 +34,15 @@ export function createCyberCanyonBackground(width, height) {
     draw(context, fieldX, fieldTop, elapsed) {
       context.save();
       context.translate(fieldX, fieldTop);
-      const offset = (elapsed * 46) % tile.height;
+      const scrollTime = elapsed * 2.5;
+      const offset = (scrollTime * 46) % tile.height;
       context.drawImage(tile, 0, offset - tile.height);
       context.drawImage(tile, 0, offset);
 
       context.lineWidth = 0.9;
       for (const side of [-1, 1]) {
         for (let index = 0; index < 12; index += 1) {
-          const phase = (elapsed * (0.3 + index % 3 * 0.025) + index * 0.618) % 1;
+          const phase = (scrollTime * (0.3 + index % 3 * 0.025) + index * 0.618) % 1;
           const distance = Math.pow(phase, 1.55);
           const lateral = 0.33 + (index % 4) * 0.045;
           const horizontal = width * (0.5 + side * lateral * (0.72 + distance * 0.28));
