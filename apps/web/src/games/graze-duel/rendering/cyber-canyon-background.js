@@ -8,7 +8,9 @@ export function createCyberCanyonBackground(width, height) {
     for (const side of [-1, 1]) {
       for (let contour = 0; contour < 24; contour += 1) {
         const depth = contour / 23;
-        tileContext.strokeStyle = `rgba(72, 187, 217, ${0.18 + depth * 0.1})`;
+        const elevation = Math.min(1, depth / 0.75);
+        const brightness = elevation * elevation * (3 - 2 * elevation);
+        tileContext.strokeStyle = `rgba(72, 187, 217, ${brightness * 0.28})`;
         tileContext.beginPath();
         for (let sample = 0; sample <= 256; sample += 1) {
           const progress = sample / 256;
