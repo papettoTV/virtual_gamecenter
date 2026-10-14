@@ -68,3 +68,10 @@
 `wordmark-chakra-{base,bolt,cuts}.svg`は実フォントのアウトラインを使用し、フォントの読み込みに依存しない。文字の字間は各案共通（1000UPMで30単位追加）、個別カーニングはまだ未調整。加工案は検討段階、サイトへ未適用。
 
 SVG再生成：fontToolsを用意して `python3 build-wordmarks.py`。比較画像：`node build-wordmarks.cjs`。全SVG読み込みと比較画像を目視確認。元書体のOFLはfonts/chakrapetch-OFL.txtを参照。
+
+
+## 採用文字ロゴ（2026-10-15）
+
+ユーザーが③「Pにシアンの稲妻を組み込む」を採用。文字ロゴの正本は `wordmark-chakra-bolt.svg`。Chakra Petch SemiBoldのアウトラインを土台とし、先頭Pにシアン#69F7FFの稲妻を統合。④と加工前は比較用に保持。
+
+favicon等のシンボルは引き続き `pulbase-b-slim-cyan-bolt.svg`。文字ロゴ単体では独立シンボルを添えず、稲妻の重複を避ける構成を基本とする。サイトの文字部分への適用・push・公開はまだ行っていない。
