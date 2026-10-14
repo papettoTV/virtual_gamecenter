@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { drawPlayerShip } from "./player-ship";
 import type {
   BossRenderState,
   BulletRenderState,
@@ -164,6 +165,7 @@ export function createThreeGameRenderer(width: number, height: number): GameScen
 type PlayerVisual = {
   root: THREE.Group;
   ship: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
+  shipColor: string;
   shield: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
   hitMarker: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
 };
@@ -185,15 +187,10 @@ type ParticleVisual = {
 function createPlayerVisual(): PlayerVisual {
   const root = new THREE.Group();
   root.renderOrder = 4;
+  const shipColor = "#69f7ff";
   const ship = new THREE.Mesh(
-    new THREE.BufferGeometry().setAttribute("position", new THREE.Float32BufferAttribute([
-      0, 18, 0, -5, 8, 0, -17, -10, 0,
-      0, 18, 0, -17, -10, 0, -7, -6, 0,
-      0, 18, 0, -7, -6, 0, 0, -10, 0,
-      0, 18, 0, 0, -10, 0, 7, -6, 0,
-      0, 18, 0, 7, -6, 0, 17, -10, 0,
-    ], 3)),
-    new THREE.MeshBasicMaterial({ color: 0x69f7ff, transparent: true }),
+    new THREE.PlaneGeometry(80, 80),
+    new THREE.MeshBasicMaterial({ map: createPlayerShipTexture(shipColor), transparent: true, depthTest: false, depthWrite: false }),
   );
   const shield = new THREE.Mesh(
     new THREE.CircleGeometry(1, 48),
@@ -207,7 +204,21 @@ function createPlayerVisual(): PlayerVisual {
   ship.renderOrder = 4;
   hitMarker.renderOrder = 5;
   root.add(shield, ship, hitMarker);
-  return { root, ship, shield, hitMarker };
+  return { root, ship, shipColor, shield, hitMarker };
+}
+
+function createPlayerShipTexture(color: string): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 320;
+  canvas.height = 320;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Unable to create player ship texture");
+  context.scale(4, 4);
+  context.translate(40, 40);
+  drawPlayerShip(context, color, 4);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
 }
 
 function createBossVisual(): BossVisual {
@@ -270,7 +281,11 @@ function updatePlayerVisuals(
     visual.root.scale.setScalar(transform.scale);
     visual.ship.scale.x = 1 - Math.min(0.48, Math.abs(player.tilt) * 0.48);
     visual.ship.position.x = player.tilt * 4;
-    visual.ship.material.color.set(player.color);
+    if (visual.shipColor !== player.color) {
+      visual.ship.material.map?.dispose();
+      visual.ship.material.map = createPlayerShipTexture(player.color);
+      visual.shipColor = player.color;
+    }
     const levelInvincible = player.levelUpInvincible > 0;
     const hitInvincible = player.invincible > 0 && !levelInvincible;
     const warning = levelInvincible && player.levelUpInvincible <= 0.5;
@@ -366,7 +381,10 @@ function createStarGeometry(points: number, innerRadius: number) {
 }
 
 function disposeVisuals(playerVisuals: PlayerVisual[], bossVisuals: BossVisual[], particleVisual: ParticleVisual) {
-  for (const visual of playerVisuals) disposeObject(visual.root);
+  for (const visual of playerVisuals) {
+    visual.ship.material.map?.dispose();
+    disposeObject(visual.root);
+  }
   for (const visual of bossVisuals) disposeObject(visual.root);
   particleVisual.points.geometry.dispose();
   particleVisual.points.material.dispose();
