@@ -1,3 +1,5 @@
+import { createCyberCanyonBackground } from "./cyber-canyon-background";
+
 export function createCanvasRenderer(options) {
   let { context, getAttackCost, randomRange, createLightningBolt } = options;
   const {
@@ -18,6 +20,7 @@ export function createCanvasRenderer(options) {
     INVINCIBLE_RING_INNER_SCALE,
     HIT_MARKER_RADIUS,
   } = options.settings;
+  const canyonBackground = createCyberCanyonBackground(FIELD_WIDTH, FIELD_HEIGHT);
   let frame = null;
 
   return {
@@ -31,6 +34,7 @@ export function createCanvasRenderer(options) {
       }
     },
     dispose() {
+      canyonBackground.dispose();
       context = null;
       frame = null;
       getAttackCost = null;
@@ -308,8 +312,8 @@ export function createCanvasRenderer(options) {
 
   function drawBackground() {
     const gradient = context.createLinearGradient(0, 0, 0, HEIGHT);
-    gradient.addColorStop(0, "#070a19");
-    gradient.addColorStop(1, "#101327");
+    gradient.addColorStop(0, "#040b16");
+    gradient.addColorStop(1, "#071322");
     context.fillStyle = gradient;
     context.fillRect(0, 0, WIDTH, HEIGHT);
 
@@ -324,28 +328,18 @@ export function createCanvasRenderer(options) {
       context.fillRect(0, 0, WIDTH, HEIGHT);
     }
 
-    context.strokeStyle = "rgba(255,255,255,0.045)";
-    for (let y = (frame.elapsedRound * 40) % 32; y < HEIGHT; y += 32) {
-      context.beginPath();
-      context.moveTo(0, y);
-      context.lineTo(WIDTH, y);
-      context.stroke();
-    }
   }
 
   function drawField(player) {
     context.save();
-    context.fillStyle = "rgba(255,255,255,0.035)";
+    context.fillStyle = "rgba(0, 5, 15, 0.16)";
     context.strokeStyle = player.attackFlash > 0 ? player.color : "rgba(255,255,255,0.18)";
     context.lineWidth = player.attackFlash > 0 ? 4 : 2;
     roundRect(player.fieldX, FIELD_TOP, FIELD_WIDTH, FIELD_HEIGHT, 18);
     context.fill();
     context.stroke();
-
-    context.fillStyle = "rgba(255,255,255,0.055)";
-    for (let y = FIELD_TOP + ((frame.elapsedRound * 70) % 48); y < FIELD_BOTTOM; y += 48) {
-      context.fillRect(player.fieldX + 18, y, FIELD_WIDTH - 36, 1);
-    }
+    context.clip();
+    canyonBackground.draw(context, player.fieldX, FIELD_TOP, frame.elapsedRound);
     context.restore();
   }
 
