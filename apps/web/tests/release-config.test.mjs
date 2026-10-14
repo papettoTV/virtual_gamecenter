@@ -18,6 +18,16 @@ function ready() {
   return config;
 }
 
+test("分散対策のbinding・移行・成果物の環境取り違えを拒否", () => {
+  const missing = ready(); missing.env.staging.durable_objects.bindings = [];
+  assert.ok(checkReleaseConfig(missing, "staging").some(error => error.includes("分散乱用")));
+  const migration = ready(); migration.migrations = [];
+  assert.ok(checkReleaseConfig(migration, "staging").some(error => error.includes("SQLite移行")));
+  const selected = ready().env.staging, built = structuredClone(selected);
+  built.durable_objects.bindings[1].script_name = "other-environment";
+  assert.ok(checkBuildConfig(built, selected, "staging").some(error => error.includes("分散乱用")));
+});
+
 test("環境未指定・未知環境では公開/移行できない", () => {
   for (const environment of [undefined, "", "local", "prod"]) {
     assert.ok(checkReleaseConfig(ready(), environment).length > 0);

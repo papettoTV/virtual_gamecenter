@@ -26,8 +26,10 @@ import type {
 import { getGameDefinition } from "../domain/game";
 import { getPlayerConnectionIdentity, getPlayerIdentityById } from "./platform";
 import { CABINET_CONNECTION_LIMIT, CABINET_IP_CONNECTION_LIMIT, clientAddressKey, protectionError, WS_MESSAGE_LIMIT } from "./request-protection";
+import { hashIdentifier } from "./identity-hash";
 
 interface ConnectionAttachment {
+  admissionId?: string;
   clientId: string;
   role: CabinetRole;
   playerId?: string;
@@ -111,6 +113,20 @@ export class CabinetRoom extends DurableObject<Env> {
           };
         }
       }
+    }).then(async () => {
+      if (env.APP_ENV === "local") return;
+      for (const socket of this.ctx.getWebSockets()) {
+        const attachment = this.attachment(socket);
+        if (attachment.admissionId || attachment.revoked || socket.readyState !== WebSocket.OPEN) continue;
+        try {
+          const id = crypto.randomUUID();
+          const ip = attachment.clientAddressKey ?? await hashIdentifier(`${env.APP_ENV}:legacy:unknown`);
+          const player = attachment.playerId ? await hashIdentifier(`${env.APP_ENV}:player:${attachment.playerId}`) : undefined;
+          const decision = await env.ABUSE_GUARDS.getByName("admission").admit(id, this.cabinetId, ip, player);
+          if (decision.success) socket.serializeAttachment({ ...this.attachment(socket), admissionId: id });
+          else await this.closeLimitedSocket(socket, 1008, "全筐体の接続上限を超えました。");
+        } catch { await this.closeLimitedSocket(socket, 1013, "接続制限の確認に失敗しました。"); }
+      }
     });
   }
 
@@ -146,6 +162,7 @@ export class CabinetRoom extends DurableObject<Env> {
     if (identity && accepting.filter(socket => this.attachment(socket).sessionHash === identity.sessionHash).length >= 4) return protectionError("session_connections_limited", 429);
     this.ctx.acceptWebSocket(server);
     const attachment: ConnectionAttachment = {
+      admissionId: request.headers.get("X-Pulbase-Admission") ?? undefined,
       clientId: crypto.randomUUID(),
       role: "visitor",
       playerId: identity?.playerId,
@@ -382,11 +399,13 @@ export class CabinetRoom extends DurableObject<Env> {
   async webSocketClose(socket: WebSocket): Promise<void> {
     await this.ready;
     await this.leave(socket);
+    await this.releaseAdmission(socket);
   }
 
   async webSocketError(socket: WebSocket): Promise<void> {
     await this.ready;
     await this.leave(socket);
+    await this.releaseAdmission(socket);
   }
 
   private async requestChallenge(
@@ -1087,6 +1106,7 @@ export class CabinetRoom extends DurableObject<Env> {
     for (const socket of this.ctx.getWebSockets()) {
       if (this.attachment(socket).playerId !== playerId) continue;
       await this.leave(socket);
+      await this.releaseAdmission(socket);
       socket.serializeAttachment({ clientId: this.attachment(socket).clientId, role: "visitor" });
       socket.close(1000, "プレイヤーデータが削除されました。");
     }
@@ -1110,6 +1130,7 @@ export class CabinetRoom extends DurableObject<Env> {
   }
 
   private async disconnectRevokedSocket(socket: WebSocket): Promise<void> {
+    await this.releaseAdmission(socket);
     if (this.attachment(socket).role === "player") this.soloRun = null;
     await this.leave(socket);
     socket.serializeAttachment({ clientId: this.attachment(socket).clientId, role: "visitor", revoked: true } satisfies ConnectionAttachment);
@@ -1120,6 +1141,7 @@ export class CabinetRoom extends DurableObject<Env> {
     const attachment = this.attachment(socket);
     if (attachment.revoked) return;
     socket.serializeAttachment({ ...attachment, revoked: true });
+    await this.releaseAdmission(socket);
     if (attachment.role === "player") this.soloRun = null;
     await this.leave(socket);
     socket.serializeAttachment({ clientId: attachment.clientId, role: "visitor", revoked: true });
@@ -1147,6 +1169,19 @@ export class CabinetRoom extends DurableObject<Env> {
 
   async alarm(): Promise<void> {
     await this.expireIdleData();
+  }
+
+  async activeAdmissionIds(): Promise<string[]> {
+    await this.ready;
+    return this.ctx.getWebSockets().filter(socket => socket.readyState === WebSocket.OPEN && !this.attachment(socket).revoked)
+      .map(socket => this.attachment(socket).admissionId).filter((id): id is string => Boolean(id));
+  }
+
+  private async releaseAdmission(socket: WebSocket): Promise<void> {
+    const id = this.attachment(socket).admissionId;
+    if (id && this.env.ABUSE_GUARDS) {
+      try { await this.env.ABUSE_GUARDS.getByName("admission").release(id, this.cabinetId); } catch { }
+    }
   }
 
   private async persistState(): Promise<void> {

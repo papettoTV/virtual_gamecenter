@@ -1,11 +1,17 @@
 import { env } from "cloudflare:workers";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import gateway from "../../src/pages/gateway.mjs";
 import worker from "../../src/worker/index";
 import { migrateTestDatabase } from "../migrate-test-database";
 import type { ServerMessage } from "../../src/shared/protocol";
+import { hashIdentifier } from "../../src/worker/identity-hash";
 
 beforeAll(migrateTestDatabase);
+afterAll(async () => {
+  const ip = await hashIdentifier("staging:ip:192.0.2.90");
+  await vi.waitFor(async () => { expect(await env.ABUSE_GUARDS.getByName("admission").admissionCount(ip)).toBe(0); });
+  await new Promise(resolve => setTimeout(resolve, 200));
+});
 
 const origin = "https://develop.virtual-gamecenter.pages.dev";
 const authorization = "Basic " + btoa("test:test");
@@ -15,7 +21,7 @@ const backend = {
   },
 };
 const forwarded = (path: string, init?: RequestInit) => gateway.fetch(new Request(origin + path, {
-  ...init, headers: { Authorization: authorization, ...Object.fromEntries(new Headers(init?.headers)) },
+  ...init, headers: { Authorization: authorization, "CF-Connecting-IP": "192.0.2.90", ...Object.fromEntries(new Headers(init?.headers)) },
 }), { APP_ENV: "staging", BACKEND: backend });
 
 function nextMessage(socket: WebSocket, predicate: (message: ServerMessage) => boolean) {

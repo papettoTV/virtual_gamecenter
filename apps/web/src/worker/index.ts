@@ -1,7 +1,7 @@
 import { authorizeRequest, type BasicAuthEnv } from "./auth";
 import { handleCabinetDirectoryRequest } from "./cabinet-directory";
 import { CabinetRoom } from "./cabinet-room";
-import { handlePlatformRequest } from "./platform";
+import { getPlayerConnectionIdentity, handlePlatformRequest } from "./platform";
 import { handleRankingRequest } from "./ranking";
 import { getSharedResult, handleSharedResultsRequest } from "./shared-results";
 import { renderLiveImage, renderResultImage } from "./result-image";
@@ -10,10 +10,13 @@ import { rewriteLivePage } from "./live-metadata";
 import { getGameDefinition } from "../domain/game";
 import { handleDataLifecycleRequest, runRetention } from "./data-lifecycle";
 import { isDeveloperAuthAvailable } from "./google-auth";
-import { boundRequestBody, limitRequest, WEBHOOK_BODY_LIMIT } from "./request-protection";
+import { boundRequestBody, clientAddressKey, limitRequest, WEBHOOK_BODY_LIMIT } from "./request-protection";
 import { recordUsage } from "./usage-monitor";
+import { AbuseGuard } from "./abuse-guard";
+import { distributedBudget, distributedError } from "./distributed-protection";
+import { hashIdentifier } from "./identity-hash";
 
-export { CabinetRoom };
+export { CabinetRoom, AbuseGuard };
 
 interface WorkerEnv extends Env, BasicAuthEnv {
   ASSETS: Fetcher;
@@ -44,6 +47,8 @@ export default {
       if (bounded instanceof Response) return bounded;
       request = bounded;
     }
+    const distributed = await distributedBudget(request, env);
+    if (distributed) return distributed;
     const liveImage = /^\/share\/live\/([^/]+)\/image\.png$/.exec(url.pathname);
     if (liveImage && request.method === "GET") {
       return getGameDefinition(liveImage[1]) ? renderLiveImage(liveImage[1]!) : Response.json({ error: "unknown_game" }, { status: 404 });
@@ -89,8 +94,32 @@ export default {
         return new Response("Expected WebSocket upgrade", { status: 426 });
       }
       const cabinetId = cabinetMatch[1]!;
+      if (env.APP_ENV !== "local" && !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(cabinetId)) return Response.json({ error: "invalid_cabinet_id" }, { status: 400 });
+      if (!getGameDefinition(url.searchParams.get("gameId"))) return Response.json({ error: "unknown_game" }, { status: 404 });
+      const headers = new Headers(request.headers);
+      headers.delete("X-Pulbase-Admission");
+      const ip = await clientAddressKey(request, env.APP_ENV);
+      let admission: string | undefined;
+      if (env.APP_ENV !== "local" || ip) {
+        try {
+          if (!env.ABUSE_GUARDS || !ip) return distributedError();
+          const identity = await getPlayerConnectionIdentity(request, env.DB);
+          const player = identity ? await hashIdentifier(`${env.APP_ENV}:player:${identity.playerId}`) : undefined;
+          admission = crypto.randomUUID();
+          const decision = await env.ABUSE_GUARDS.getByName("admission").admit(admission, cabinetId, ip, player);
+          if (!decision.success) return distributedError(decision);
+          headers.set("X-Pulbase-Admission", admission);
+        } catch { return distributedError(); }
+      }
       const roomId = env.CABINET_ROOMS.idFromName(cabinetId);
-      return env.CABINET_ROOMS.get(roomId).fetch(request);
+      try {
+        const response = await env.CABINET_ROOMS.get(roomId).fetch(new Request(request, { headers }));
+        if (response.status !== 101 && admission) await env.ABUSE_GUARDS.getByName("admission").release(admission, cabinetId);
+        return response;
+      } catch {
+        if (admission) await env.ABUSE_GUARDS.getByName("admission").release(admission, cabinetId).catch(() => {});
+        return distributedError();
+      }
     }
 
     if (url.pathname === "/api/ranking") {

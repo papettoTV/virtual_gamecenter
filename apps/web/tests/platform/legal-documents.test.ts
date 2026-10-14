@@ -9,7 +9,7 @@ import { AnalyticsConsentView } from "../../src/features/analytics/AnalyticsCons
 describe("free beta legal documents", () => {
   it.each([terms, privacy])("publishes the beta version and the operator's real contact route", document => {
     expect(document).toContain("無料ベータ版");
-    expect(document).toContain("2026-10-12");
+    expect(document).toMatch(/2026-10-(12\.3|14\.1)/);
     expect(document).toContain("papettoTV");
     expect(document).toContain("https://x.com/papettoTV");
     expect(document).not.toContain("プロトタイプ版");
@@ -56,7 +56,7 @@ describe("free beta legal documents", () => {
 
   it("documents independent analytics consent and withdrawal limitations", () => {
     expect(terms).toContain("2026-10-12.3");
-    expect(privacy).toContain("2026-10-12.3");
+    expect(privacy).toContain("2026-10-14.1");
     expect(privacy).toContain("180日間保存");
     expect(privacy).toContain("Cookieを使わない計測信号も送信しません");
     expect(privacy).toContain("すでに送信済み・送信中");
