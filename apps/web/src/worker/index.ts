@@ -11,6 +11,7 @@ import { getGameDefinition } from "../domain/game";
 import { handleDataLifecycleRequest, runRetention } from "./data-lifecycle";
 import { isDeveloperAuthAvailable } from "./google-auth";
 import { boundRequestBody, limitRequest, WEBHOOK_BODY_LIMIT } from "./request-protection";
+import { recordUsage } from "./usage-monitor";
 
 export { CabinetRoom };
 
@@ -110,7 +111,13 @@ export default {
     if (request.method === "GET" && /^\/cabinets\/[^/]+$/.test(url.pathname) && assets.headers.get("content-type")?.includes("text/html")) return rewriteLivePage(assets, url);
     return assets;
   },
-  async scheduled(_event, env, ctx): Promise<void> {
-    ctx.waitUntil(runRetention(env.DB, env.CABINET_ROOMS, env.DELETION_AUDIT));
+  async scheduled(event: ScheduledController, env: WorkerEnv, ctx: Pick<ExecutionContext, "waitUntil">): Promise<void> {
+    if (event.cron === "0,15,30,45 * * * *") {
+      if (env.USAGE_MONITOR_ENABLED === "true" && env.USAGE_METRICS) {
+        ctx.waitUntil(recordUsage(env.METRICS_ACCOUNT_ID, env.CLOUDFLARE_METRICS_TOKEN ?? "", env.USAGE_METRICS));
+      }
+      return;
+    }
+    if (event.cron === "0 * * * *") ctx.waitUntil(runRetention(env.DB, env.CABINET_ROOMS, env.DELETION_AUDIT));
   },
 } satisfies ExportedHandler<WorkerEnv>;

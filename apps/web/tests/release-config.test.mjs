@@ -37,6 +37,22 @@ test("乱用対策の欠落・namespace共用・成果物の取り違えを拒�
   assert.ok(checkBuildConfig(built, selected, "staging").some(error => error.includes("乱用対策")));
 });
 
+test("利用量監視の不足・重複実行・成果物の取り違えを拒否", () => {
+  for (const field of ["account", "secret", "dataset", "cron", "duplicate"]) {
+    const config = ready();
+    if (field === "account") config.env.staging.vars.METRICS_ACCOUNT_ID = "other";
+    if (field === "secret") config.env.staging.secrets.required = [];
+    if (field === "dataset") config.env.staging.analytics_engine_datasets = [];
+    if (field === "cron") config.env.staging.triggers.crons = ["0 * * * *"];
+    if (field === "duplicate") config.env.production.vars.USAGE_MONITOR_ENABLED = "true";
+    assert.ok(checkReleaseConfig(config, "staging").length);
+  }
+  const selected = ready().env.staging;
+  const built = structuredClone(selected);
+  delete built.analytics_engine_datasets;
+  assert.ok(checkBuildConfig(built, selected, "staging").some(error => error.includes("利用量監視")));
+});
+
 test("Pagesの公開ドメインをWorkerで奪う設定を拒否する", () => {
   for (const environment of ["staging", "production"]) {
     for (const field of ["routes", "workers_dev"]) {
@@ -106,7 +122,7 @@ test("認証を迂回する静的配信・別環境DO・定期削除/監視不�
 test("生成された別環境の成果物をデプロイしない", () => {
   const config = ready();
   assert.deepEqual(checkBuildConfig(config.env.production, config.env.production, "production"), []);
-  assert.equal(checkBuildConfig(config.env.staging, config.env.production, "production").length, 5);
+  assert.equal(checkBuildConfig(config.env.staging, config.env.production, "production").length, 6);
 });
 
 test("環境が欠落しても例外ではなく拒否理由を返す", () => {
