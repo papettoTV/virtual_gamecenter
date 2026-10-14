@@ -76,11 +76,13 @@ body {
   gap: 16px;
 }
 
-.brand-symbol {
-  width: clamp(40px, 7vw, 72px);
-  height: clamp(40px, 7vw, 72px);
-  flex: none;
+.brand-wordmark {
+  display: block;
+  width: clamp(260px, 42vw, 470px);
+  max-width: 100%;
+  height: auto;
 }
+
 
 .brand-category {
   letter-spacing: 0.2em;
