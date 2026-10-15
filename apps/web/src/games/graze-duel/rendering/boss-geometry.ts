@@ -9,7 +9,7 @@ export type BossModel = {
 };
 
 export const BOSS_APPEARANCES = [
-  { name: "球体", scale: 1.02, color: [255, 105, 64], edgeColor: [255, 157, 105] },
+  { name: "球体", scale: 1.02, color: [240, 54, 83], edgeColor: [255, 100, 128] },
   { name: "幾何学飛行体", scale: 1.06, color: [226, 66, 116], edgeColor: [255, 105, 148] },
   { name: "トゲのある結晶体", scale: 1.1, color: [193, 100, 255], edgeColor: [255, 100, 139] },
 ] as const;
