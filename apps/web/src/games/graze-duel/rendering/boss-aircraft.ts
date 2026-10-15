@@ -6,6 +6,35 @@ export const BOSS_AIRCRAFT_DESIGNS = [
   { name: "巨大空中要塞", source: "/assets/buzz-barrier/bosses/aerial-fortress.png", scale: 1.45, color: [193, 144, 255] },
 ] as const;
 
+type StructureStroke = ReadonlyArray<readonly [number, number]>;
+
+const BOSS_STRUCTURE_STROKES: ReadonlyArray<ReadonlyArray<StructureStroke>> = [
+  [
+    [[0.5, 0.18], [0.46, 0.3], [0.44, 0.59], [0.5, 0.82], [0.56, 0.59], [0.54, 0.3], [0.5, 0.18]],
+    [[0.5, 0.61], [0.475, 0.67], [0.5, 0.75], [0.525, 0.67], [0.5, 0.61]],
+    [[0.075, 0.4], [0.44, 0.59]],
+    [[0.925, 0.4], [0.56, 0.59]],
+    [[0.32, 0.17], [0.31, 0.23], [0.33, 0.32], [0.39, 0.32], [0.4, 0.23], [0.38, 0.17]],
+    [[0.68, 0.17], [0.69, 0.23], [0.67, 0.32], [0.61, 0.32], [0.6, 0.23], [0.62, 0.17]],
+  ],
+  [
+    [[0.5, 0.15], [0.46, 0.27], [0.43, 0.59], [0.5, 0.89], [0.57, 0.59], [0.54, 0.27], [0.5, 0.15]],
+    [[0.5, 0.63], [0.475, 0.69], [0.5, 0.77], [0.525, 0.69], [0.5, 0.63]],
+    [[0.08, 0.2], [0.43, 0.59]],
+    [[0.92, 0.2], [0.57, 0.59]],
+    [[0.32, 0.15], [0.31, 0.2], [0.32, 0.26], [0.39, 0.26], [0.4, 0.2], [0.39, 0.15]],
+    [[0.68, 0.15], [0.69, 0.2], [0.68, 0.26], [0.61, 0.26], [0.6, 0.2], [0.61, 0.15]],
+  ],
+  [
+    [[0.5, 0.12], [0.46, 0.22], [0.45, 0.45], [0.43, 0.63], [0.5, 0.91], [0.57, 0.63], [0.55, 0.45], [0.54, 0.22], [0.5, 0.12]],
+    [[0.5, 0.68], [0.475, 0.74], [0.5, 0.82], [0.525, 0.74], [0.5, 0.68]],
+    [[0.065, 0.28], [0.45, 0.45]],
+    [[0.935, 0.28], [0.55, 0.45]],
+    [[0.16, 0.59], [0.43, 0.63]],
+    [[0.84, 0.59], [0.57, 0.63]],
+  ],
+];
+
 export function getBossAircraftDesign(phaseIndex: number) {
   return BOSS_AIRCRAFT_DESIGNS[phaseIndex] ?? BOSS_AIRCRAFT_DESIGNS[0];
 }
@@ -17,7 +46,7 @@ export function createBossAircraftSprites(onReady?: (index: number, sprite: HTML
     const image = new Image();
     image.onload = () => {
       if (disposed) return;
-      const sprite = createCyberBossSprite(image, design.color);
+      const sprite = createCyberBossSprite(image, design.color, index);
       sprites[index] = sprite;
       onReady?.(index, sprite);
     };
@@ -47,7 +76,7 @@ export function createBossAircraftSprites(onReady?: (index: number, sprite: HTML
   };
 }
 
-function createCyberBossSprite(image: HTMLImageElement, color: readonly number[]): HTMLCanvasElement {
+function createCyberBossSprite(image: HTMLImageElement, color: readonly number[], phaseIndex: number): HTMLCanvasElement {
   const size = 512;
   const source = document.createElement("canvas");
   source.width = size;
@@ -56,14 +85,6 @@ function createCyberBossSprite(image: HTMLImageElement, color: readonly number[]
   if (!sourceContext) throw new Error("Unable to create boss outline texture");
   sourceContext.drawImage(image, 0, 0, size, size);
   const pixels = sourceContext.getImageData(0, 0, size, size);
-  const luminance = new Float32Array(size * size);
-  for (let index = 0; index < luminance.length; index += 1) {
-    const pixelIndex = index * 4;
-    luminance[index] = (pixels.data[pixelIndex]! * 0.2126
-      + pixels.data[pixelIndex + 1]! * 0.7152
-      + pixels.data[pixelIndex + 2]! * 0.0722) / 255;
-  }
-
   const outline = sourceContext.createImageData(size, size);
   const neighbors = [-size * 3, size * 3, -3, 3, -size * 2 - 2, -size * 2 + 2, size * 2 - 2, size * 2 + 2];
   for (let vertical = 3; vertical < size - 3; vertical += 1) {
@@ -73,19 +94,13 @@ function createCyberBossSprite(image: HTMLImageElement, color: readonly number[]
       const alpha = pixels.data[pixelIndex + 3]! / 255;
       let minAlpha = alpha;
       let maxAlpha = alpha;
-      let contrast = 0;
       for (const offset of neighbors) {
         const neighborAlpha = pixels.data[(index + offset) * 4 + 3]! / 255;
         minAlpha = Math.min(minAlpha, neighborAlpha);
         maxAlpha = Math.max(maxAlpha, neighborAlpha);
-        if (alpha > 0.8 && neighborAlpha > 0.8) {
-          contrast = Math.max(contrast, Math.abs(luminance[index]! - luminance[index + offset]!));
-        }
       }
       const edge = Math.min(1, Math.max(0, (maxAlpha - minAlpha - 0.15) / 0.6));
-      const panel = Math.min(1, Math.max(0, (contrast - 0.09) / 0.16));
-      const scanline = vertical % 24 === 0 ? alpha * 0.06 : 0;
-      const opacity = Math.min(1, edge * 0.95 + panel * 0.3 + alpha * 0.025 + scanline);
+      const opacity = Math.min(1, edge * 0.95 + alpha * 0.018);
       const highlight = edge * 0.22;
       outline.data[pixelIndex] = color[0]! + (255 - color[0]!) * highlight;
       outline.data[pixelIndex + 1] = color[1]! + (255 - color[1]!) * highlight;
@@ -94,6 +109,25 @@ function createCyberBossSprite(image: HTMLImageElement, color: readonly number[]
     }
   }
   sourceContext.putImageData(outline, 0, 0);
+  const structure = document.createElement("canvas");
+  structure.width = size;
+  structure.height = size;
+  const structureContext = structure.getContext("2d");
+  if (!structureContext) throw new Error("Unable to create boss structure texture");
+  structureContext.strokeStyle = `rgba(${color.join(",")}, 0.7)`;
+  structureContext.lineWidth = 2.8;
+  structureContext.lineJoin = "miter";
+  for (const stroke of BOSS_STRUCTURE_STROKES[phaseIndex] ?? BOSS_STRUCTURE_STROKES[0]!) {
+    structureContext.beginPath();
+    stroke.forEach(([horizontal, vertical], index) => {
+      if (index === 0) structureContext.moveTo(horizontal * size, vertical * size);
+      else structureContext.lineTo(horizontal * size, vertical * size);
+    });
+    structureContext.stroke();
+  }
+  structureContext.globalCompositeOperation = "destination-in";
+  structureContext.drawImage(image, 0, 0, size, size);
+  sourceContext.drawImage(structure, 0, 0);
   const sprite = document.createElement("canvas");
   sprite.width = size;
   sprite.height = size;
