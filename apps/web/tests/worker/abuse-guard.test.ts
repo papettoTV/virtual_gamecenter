@@ -1,7 +1,7 @@
 import { env, exports } from "cloudflare:workers";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { migrateTestDatabase } from "../migrate-test-database";
-import { GLOBAL_CABINET_LIMIT, GLOBAL_CONNECTION_LIMIT } from "../../src/worker/abuse-guard";
+import { GLOBAL_CABINET_LIMIT, GLOBAL_CONNECTION_LIMIT, GLOBAL_IP_CONNECTION_LIMIT } from "../../src/worker/abuse-guard";
 import { hashIdentifier } from "../../src/worker/identity-hash";
 
 beforeAll(migrateTestDatabase);
@@ -14,15 +14,15 @@ describe("distributed abuse guard", () => {
   it("shares actor budgets across request sources and persists decisions", async () => {
     const name = `test:${crypto.randomUUID()}`;
     const first = env.ABUSE_GUARDS.getByName(name);
-    const results = await Promise.all(Array.from({ length: 12 }, () => first.consume("bootstrap", key(1))));
+    const results = await Promise.all(Array.from({ length: 12 }, () => first.consume("bootstrap", key(1), key(1), false)));
     expect(results.filter(result => result.success)).toHaveLength(10);
-    expect((await env.ABUSE_GUARDS.getByName(name).consume("bootstrap", key(1))).success).toBe(false);
-    expect((await first.consume("bootstrap", key(2))).success).toBe(true);
+    expect((await env.ABUSE_GUARDS.getByName(name).consume("bootstrap", key(1), key(1), false)).success).toBe(false);
+    expect((await first.consume("bootstrap", key(2), key(2), false)).success).toBe(true);
   });
   it("bounds distributed anonymous traffic with the shared shard budget", async () => {
     const instance = guard();
-    const results = await Promise.all(Array.from({ length: 40 }, (_, index) => instance.consume("bootstrap", key(index + 1))));
-    expect(results.filter(result => result.success)).toHaveLength(30);
+    const results = await Promise.all(Array.from({ length: 64 }, (_, index) => instance.consume("bootstrap", key(index + 1))));
+    expect(results.filter(result => result.success)).toHaveLength(60);
     expect(results.filter(result => !result.success).every(result => result.retryAfter > 0)).toBe(true);
   });
   it("shares a verified player budget independently of IP and does not double-charge the shard", async () => {
@@ -42,7 +42,7 @@ describe("distributed abuse guard", () => {
     await instance.release(...ids[0]!); await instance.release(...ids[0]!);
     expect((await instance.admit(crypto.randomUUID(), crypto.randomUUID(), key(20), key(999))).success).toBe(true);
     const ipOnly = guard();
-    for (let index = 0; index < 16; index += 1) expect((await ipOnly.admit(crypto.randomUUID(), crypto.randomUUID(), key(1))).success).toBe(true);
+    for (let index = 0; index < GLOBAL_IP_CONNECTION_LIMIT; index += 1) expect((await ipOnly.admit(crypto.randomUUID(), crypto.randomUUID(), key(1))).success).toBe(true);
     expect((await ipOnly.admit(crypto.randomUUID(), crypto.randomUUID(), key(1))).success).toBe(false);
   });
   it("atomically caps all cabinet connections under parallel distributed admission", async () => {
@@ -69,25 +69,25 @@ describe("distributed abuse guard", () => {
     expect((await instance.admit(old, cabinet, key(1))).success).toBe(true);
     await instance.reconcileConnections();
     expect((await instance.admit(old, crypto.randomUUID(), key(1))).success).toBe(false);
-    for (let index = 0; index < 10; index += 1) await instance.consume("bootstrap", key(1));
-    expect((await instance.consume("bootstrap", key(1))).success).toBe(false);
+    for (let index = 0; index < 10; index += 1) await instance.consume("bootstrap", key(1), key(1), false);
+    expect((await instance.consume("bootstrap", key(1), key(1), false)).success).toBe(false);
     clock.mockReturnValue(start + 120_000);
     await instance.reconcileConnections();
     expect((await instance.admit(old, crypto.randomUUID(), key(1))).success).toBe(true);
-    expect((await instance.consume("bootstrap", key(1))).success).toBe(true);
+    expect((await instance.consume("bootstrap", key(1), key(1), false)).success).toBe(true);
   });
   it("keeps the daily benefit ceiling after a minute reset and recovers on the next UTC day", async () => {
-    const instance = guard(); const start = Date.parse("2026-10-14T04:00:00Z"); const clock = vi.spyOn(Date, "now").mockReturnValue(start);
+    const instance = guard(); const start = Math.ceil(Date.now() / 86_400_000) * 86_400_000; const clock = vi.spyOn(Date, "now").mockReturnValue(start);
     for (let minute = 0; minute < 2; minute += 1) {
       clock.mockReturnValue(start + minute * 60_000);
-      const decisions = await Promise.all(Array.from({ length: 10 }, () => instance.consume("benefit", key(1))));
+      const decisions = await Promise.all(Array.from({ length: 10 }, () => instance.consume("benefit", key(1), key(1), false)));
       expect(decisions.every(result => result.success)).toBe(true);
     }
     clock.mockReturnValue(start + 120_000);
-    const denied = await instance.consume("benefit", key(1));
+    const denied = await instance.consume("benefit", key(1), key(1), false);
     expect(denied.success).toBe(false); expect(denied.retryAfter).toBeGreaterThan(60);
     clock.mockReturnValue(start + 86_400_000);
-    expect((await instance.consume("benefit", key(1))).success).toBe(true);
+    expect((await instance.consume("benefit", key(1), key(1), false)).success).toBe(true);
   });
   it("returns the admission immediately when player data is deleted", async () => {
     const bootstrap = await exports.default.fetch("http://localhost/api/platform/bootstrap");
@@ -108,10 +108,10 @@ describe("distributed abuse guard", () => {
   it("enforces the all-cabinet address cap through Worker routing and ignores forged admission headers", async () => {
     const sockets: WebSocket[] = [];
     try {
-      for (let index = 0; index < 17; index += 1) {
+      for (let index = 0; index <= GLOBAL_IP_CONNECTION_LIMIT; index += 1) {
         const cabinet = crypto.randomUUID(), forged = crypto.randomUUID();
         const response = await exports.default.fetch(`http://localhost/api/cabinets/${cabinet}/ws?gameId=deep-sea-salvage`, { headers: { Upgrade: "websocket", "CF-Connecting-IP": "192.0.2.189", "X-Pulbase-Admission": forged } });
-        expect(response.status).toBe(index < 16 ? 101 : 429);
+        expect(response.status).toBe(index < GLOBAL_IP_CONNECTION_LIMIT ? 101 : 429);
         if (response.webSocket) {
           response.webSocket.accept(); sockets.push(response.webSocket);
           expect(await env.CABINET_ROOMS.getByName(cabinet).activeAdmissionIds()).not.toContain(forged);

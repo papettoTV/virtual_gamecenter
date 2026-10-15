@@ -1,9 +1,10 @@
 import { env, exports } from "cloudflare:workers";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { migrateTestDatabase } from "../migrate-test-database";
-import { CABINET_CONNECTION_LIMIT, WS_MESSAGE_LIMIT } from "../../src/worker/request-protection";
+import { CABINET_CONNECTION_LIMIT, CABINET_IP_CONNECTION_LIMIT, WS_MESSAGE_LIMIT } from "../../src/worker/request-protection";
 
 beforeAll(migrateTestDatabase);
+afterAll(async () => { await new Promise(resolve => setTimeout(resolve, 200)); });
 const sockets: WebSocket[] = [];
 afterEach(() => { for (const socket of sockets.splice(0)) socket.close(); vi.restoreAllMocks(); });
 async function upgrade(cabinet: string, headers: Record<string, string> = {}) {
@@ -24,8 +25,8 @@ describe("WebSocket protection", () => {
   });
   it("limits concurrent connections per address without blocking another address", async () => {
     const cabinet = crypto.randomUUID();
-    const responses = await Promise.all(Array.from({ length: 9 }, () => upgrade(cabinet, { "CF-Connecting-IP": "192.0.2.11" })));
-    expect(responses.filter(response => response.status === 101)).toHaveLength(8);
+    const responses = await Promise.all(Array.from({ length: CABINET_IP_CONNECTION_LIMIT + 1 }, () => upgrade(cabinet, { "CF-Connecting-IP": "192.0.2.11" })));
+    expect(responses.filter(response => response.status === 101)).toHaveLength(CABINET_IP_CONNECTION_LIMIT);
     expect(responses.filter(response => response.status === 429)).toHaveLength(1);
     expect((await upgrade(cabinet, { "CF-Connecting-IP": "192.0.2.12" })).status).toBe(101);
   });

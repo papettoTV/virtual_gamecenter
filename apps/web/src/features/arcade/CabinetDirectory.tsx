@@ -11,7 +11,7 @@ interface CabinetEntry {
 }
 
 const POPULAR_SPECTATOR_COUNT = 3;
-const REFRESH_INTERVAL_MS = 3000;
+const REFRESH_INTERVAL_MS = 10000;
 const CABINET_PREVIEW_LIMIT = 4;
 const PLAYING_STATUSES = new Set([
   "soloPlaying",
@@ -24,6 +24,7 @@ function useCabinets(gameId: string) {
   const [loading, setLoading] = useState(true);
 
   const loadCabinets = useCallback(async () => {
+    if (document.visibilityState === "hidden") return;
     try {
       const response = await fetch(`/api/cabinets?gameId=${encodeURIComponent(gameId)}`, {
         headers: { Accept: "application/json" },
@@ -40,9 +41,11 @@ function useCabinets(gameId: string) {
     void loadCabinets();
     const refreshTimer = window.setInterval(() => void loadCabinets(), REFRESH_INTERVAL_MS);
     window.addEventListener("popstate", loadCabinets);
+    document.addEventListener("visibilitychange", loadCabinets);
     return () => {
       window.clearInterval(refreshTimer);
       window.removeEventListener("popstate", loadCabinets);
+      document.removeEventListener("visibilitychange", loadCabinets);
     };
   }, [loadCabinets]);
 

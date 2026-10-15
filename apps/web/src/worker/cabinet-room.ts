@@ -351,7 +351,7 @@ export class CabinetRoom extends DurableObject<Env> {
     }
     if (message.type === "gameKeyframe") {
       if (!attachment.streamAuthorized && !attachment.dotWaveCredit) return;
-      if (["dot-wave", "deep-sea-salvage"].includes(this.state.gameId) && Date.now() - this.state.updatedAt > 5000) {
+      if (Date.now() - this.state.updatedAt > 5000) {
         this.state = { ...this.state, updatedAt: Date.now() };
         await syncCabinetDirectory(this.env.DB, this.state);
       }

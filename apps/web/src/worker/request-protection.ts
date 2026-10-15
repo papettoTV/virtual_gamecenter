@@ -4,7 +4,7 @@ export const API_BODY_LIMIT = 64 * 1024;
 export const WEBHOOK_BODY_LIMIT = 256 * 1024;
 export const WS_MESSAGE_LIMIT = 512 * 1024;
 export const CABINET_CONNECTION_LIMIT = 64;
-export const CABINET_IP_CONNECTION_LIMIT = 8;
+export const CABINET_IP_CONNECTION_LIMIT = 32;
 
 interface Limiter { limit(options: { key: string }): Promise<{ success: boolean }> }
 export interface ProtectionEnv {

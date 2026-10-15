@@ -1,5 +1,5 @@
 import { env, exports } from "cloudflare:workers";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { getActiveGames } from "../../src/domain/game";
 import { validatePlayReservation } from "../../src/worker/credit-reservations";
 import { migrateTestDatabase } from "../migrate-test-database";
@@ -21,6 +21,30 @@ async function fixture(gameId: string, purpose = "solo") {
 }
 
 describe.each(getActiveGames())("$id play reservations", game => {
+  it("keeps a streaming solo cabinet visible after the directory freshness window", async () => {
+    const test = await fixture(game.id);
+    await test.api(`credit-reservations/${test.reservationId}/capture`);
+    const upgrade = await exports.default.fetch(`http://localhost/api/cabinets/${test.cabinetId}/ws?gameId=${game.id}`, { headers: { Cookie: test.cookie, Upgrade: "websocket" } });
+    const socket = upgrade.webSocket!; socket.accept();
+    const messages: Array<{ type: string }> = [];
+    socket.addEventListener("message", event => messages.push(JSON.parse(event.data as string)));
+    let restoreClock: (() => void) | undefined;
+    try {
+      socket.send(JSON.stringify({ type: "joinCabinet", gameId: game.id }));
+      await expect.poll(() => messages.some(message => message.type === "joinedCabinet")).toBe(true);
+      socket.send(JSON.stringify({ type: "startSolo", reservationId: test.reservationId }));
+      await expect.poll(() => messages.some(message => message.type === "soloStarted")).toBe(true);
+      const later = Date.now() + 20_000;
+      const clock = vi.spyOn(Date, "now").mockReturnValue(later);
+      restoreClock = () => { clock.mockRestore(); };
+      socket.send(JSON.stringify({ type: "gameKeyframe", seq: 1, snapshot: { gameId: game.id } }));
+      await expect.poll(async () => {
+        const response = await exports.default.fetch(`http://localhost/api/cabinets?gameId=${game.id}`);
+        const directory = await response.json<{ cabinets: Array<{ cabinetId: string }> }>();
+        return directory.cabinets.some(cabinet => cabinet.cabinetId === test.cabinetId);
+      }).toBe(true);
+    } finally { restoreClock?.(); socket.close(); }
+  });
   it("requires a paid reservation on the actual WebSocket start and rejects round replay", async () => {
     const test = await fixture(game.id);
     const upgrade = await exports.default.fetch(`http://localhost/api/cabinets/${test.cabinetId}/ws?gameId=${game.id}`, { headers: { Cookie: test.cookie, Upgrade: "websocket" } });
