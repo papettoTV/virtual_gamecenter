@@ -19,7 +19,7 @@ export function getBossAppearance(phaseIndex: number) {
 }
 
 export function getBossRotation(phaseIndex: number, elapsed: number): BossPoint {
-  if (phaseIndex === 0) return [0.32, elapsed * 0.35, 0.12];
+  if (phaseIndex === 0) return [0.32, elapsed * 0.5, 0.12];
   if (phaseIndex === 1) return [0.28 + Math.sin(elapsed * 0.4) * 0.1, Math.sin(elapsed * 0.3) * 0.22, Math.sin(elapsed * 0.25) * 0.08];
   return [0.48 + elapsed * 0.11, 0.42 + elapsed * 0.17, elapsed * 0.07];
 }

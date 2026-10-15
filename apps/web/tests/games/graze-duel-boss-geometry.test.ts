@@ -4,7 +4,7 @@ import { createBossModels, getBossRotation, getCrystalTipLength, rotateBossPoint
 
 describe("geometric bosses", () => {
   it("rotates the stationary sphere faster without changing its tilt", () => {
-    expect(getBossRotation(0, 10)).toEqual([0.32, 3.5, 0.12]);
+    expect(getBossRotation(0, 10)).toEqual([0.32, 5, 0.12]);
   });
 
   it("pulses all crystal tips smoothly every 2.4 seconds within the original size", () => {
