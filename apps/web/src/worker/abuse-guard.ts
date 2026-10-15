@@ -3,13 +3,16 @@ import { DurableObject } from "cloudflare:workers";
 export type BudgetKind = "read" | "write" | "bootstrap" | "benefit" | "auth" | "socket";
 export const BUDGET_SHARDS = 16;
 export const SHARD_LIMITS: Record<BudgetKind, [number, number]> = {
-  read: [120, 2000], write: [60, 1000], bootstrap: [30, 500], benefit: [20, 200], auth: [30, 200], socket: [60, 1000],
+  read: [600, 30000], write: [180, 6000], bootstrap: [60, 1000], benefit: [30, 300], auth: [60, 1000], socket: [120, 2000],
+};
+export const IP_LIMITS: Record<BudgetKind, [number, number]> = {
+  read: [600, 30000], write: [120, 3000], bootstrap: [60, 1000], benefit: [30, 100], auth: [60, 300], socket: [90, 1000],
 };
 const ACTOR_LIMITS: Record<BudgetKind, [number, number]> = {
   read: [120, 2000], write: [60, 500], bootstrap: [10, 100], benefit: [10, 20], auth: [10, 100], socket: [30, 500],
 };
 export const GLOBAL_CONNECTION_LIMIT = 256;
-export const GLOBAL_IP_CONNECTION_LIMIT = 16;
+export const GLOBAL_IP_CONNECTION_LIMIT = 64;
 export const GLOBAL_PLAYER_CONNECTION_LIMIT = 8;
 export const GLOBAL_CABINET_LIMIT = 200;
 export interface Decision { success: boolean; retryAfter: number }
@@ -32,7 +35,7 @@ export class AbuseGuard extends DurableObject<Env> {
     const decision = this.ctx.storage.transactionSync(() => {
       this.ctx.storage.sql.exec("DELETE FROM budgets WHERE expires <= ?", now);
       const budgets = [...(shared ? ["shared"] : []), ...(player ? [`player:${player}`] : [`ip:${ip}`])].flatMap(actor => {
-        const limits = actor === "shared" ? SHARD_LIMITS[kind] : ACTOR_LIMITS[kind];
+        const limits = actor === "shared" ? SHARD_LIMITS[kind] : player ? ACTOR_LIMITS[kind] : IP_LIMITS[kind];
         return [60_000, 86_400_000].map((period, index) => ({ key: `${kind}:${actor}:${period}:${Math.floor(now / period)}`, limit: limits[index]!, expires: (Math.floor(now / period) + 1) * period }));
       });
       let retryAfter = 0;
