@@ -19,9 +19,25 @@ export function getBossAppearance(phaseIndex: number) {
 }
 
 export function getBossRotation(phaseIndex: number, elapsed: number): BossPoint {
-  if (phaseIndex === 0) return [0.32, elapsed * 0.22, 0.12];
+  if (phaseIndex === 0) return [0.32, elapsed * 0.35, 0.12];
   if (phaseIndex === 1) return [0.28 + Math.sin(elapsed * 0.4) * 0.1, Math.sin(elapsed * 0.3) * 0.22, Math.sin(elapsed * 0.25) * 0.08];
   return [0.48 + elapsed * 0.11, 0.42 + elapsed * 0.17, elapsed * 0.07];
+}
+
+export function getCrystalTipLength(elapsed: number) {
+  return 0.81 + 0.19 * Math.cos(elapsed * Math.PI * 2 / 2.4);
+}
+
+export function writeBossPositions(model: BossModel, indices: readonly number[], phaseIndex: number, elapsed: number, target: Float32Array) {
+  const tipLength = phaseIndex === 2 ? getCrystalTipLength(elapsed) : 1;
+  for (let index = 0; index < indices.length; index += 1) {
+    const vertexIndex = indices[index]!;
+    const point = model.vertices[vertexIndex]!;
+    const scale = phaseIndex === 2 && vertexIndex >= 8 ? tipLength : 1;
+    target[index * 3] = point[0] * scale;
+    target[index * 3 + 1] = point[1] * scale;
+    target[index * 3 + 2] = point[2] * scale;
+  }
 }
 
 export function rotateBossPoint(point: BossPoint, rotation: BossPoint): BossPoint {
@@ -143,7 +159,11 @@ export function createCanvasBossRenderer() {
       if (!model) return;
       const appearance = getBossAppearance(boss.phaseIndex);
       const rotation = getBossRotation(boss.phaseIndex, elapsed);
-      const vertices = model.vertices.map(point => rotateBossPoint(point, rotation));
+      const tipLength = boss.phaseIndex === 2 ? getCrystalTipLength(elapsed) : 1;
+      const vertices = model.vertices.map((point, index) => rotateBossPoint(
+        boss.phaseIndex === 2 && index >= 8 ? [point[0] * tipLength, point[1] * tipLength, point[2] * tipLength] : point,
+        rotation,
+      ));
       const progress = boss.encounterState === "entering" ? boss.arrivalProgress : 1;
       const radius = boss.radius * appearance.scale * (0.68 + progress * 0.32);
       const color = appearance.color.join(",");

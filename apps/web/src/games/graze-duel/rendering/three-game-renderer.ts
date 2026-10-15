@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { drawPlayerShip } from "./player-ship";
-import { createBossModels, getBossAppearance, getBossRotation, type BossModel } from "./boss-geometry";
+import { createBossModels, getBossAppearance, getBossRotation, writeBossPositions, type BossModel } from "./boss-geometry";
 import type {
   BossRenderState,
   BulletRenderState,
@@ -183,6 +183,9 @@ type BossVisual = {
     surface: THREE.Mesh<THREE.BufferGeometry, THREE.MeshPhongMaterial>;
     lines: THREE.LineSegments<THREE.BufferGeometry, THREE.LineBasicMaterial>;
     depthRadius: { value: number };
+    source: BossModel;
+    faceIndices: number[];
+    edgeIndices: number[];
   }>;
   rim: THREE.LineLoop<THREE.BufferGeometry, THREE.LineBasicMaterial>;
   clippingPlanes: THREE.Plane[];
@@ -265,6 +268,11 @@ function createBossVisual(models: BossModel[]): BossVisual {
     const edgePositions = model.edges.flatMap(edge => edge.flatMap(index => [...model.vertices[index]!]));
     const edgeGeometry = new THREE.BufferGeometry();
     edgeGeometry.setAttribute("position", new THREE.Float32BufferAttribute(edgePositions, 3));
+    if (phaseIndex === 2) {
+      (surfaceGeometry.getAttribute("position") as THREE.BufferAttribute).setUsage(THREE.DynamicDrawUsage);
+      (surfaceGeometry.getAttribute("normal") as THREE.BufferAttribute).setUsage(THREE.DynamicDrawUsage);
+      (edgeGeometry.getAttribute("position") as THREE.BufferAttribute).setUsage(THREE.DynamicDrawUsage);
+    }
     const lines = new THREE.LineSegments(edgeGeometry, new THREE.LineBasicMaterial({
       color, transparent: true, opacity: 0.65, depthTest: false, depthWrite: false, clippingPlanes,
     }));
@@ -284,7 +292,7 @@ function createBossVisual(models: BossModel[]): BossVisual {
     lines.renderOrder = 1;
     modelRoot.add(surface, lines);
     root.add(modelRoot);
-    return { root: modelRoot, surface, lines, depthRadius };
+    return { root: modelRoot, surface, lines, depthRadius, source: model, faceIndices: model.faces.flat(), edgeIndices: model.edges.flat() };
   });
   const ringPoints = Array.from({ length: 64 }, (_, index) => {
     const angle = index * Math.PI * 2 / 64;
@@ -376,6 +384,15 @@ function updateBossVisual(
     const model = visual.models[index]!;
     model.root.visible = index === boss.phaseIndex;
     if (!model.root.visible) continue;
+    if (index === 2) {
+      const surfacePositions = model.surface.geometry.getAttribute("position") as THREE.BufferAttribute;
+      const edgePositions = model.lines.geometry.getAttribute("position") as THREE.BufferAttribute;
+      writeBossPositions(model.source, model.faceIndices, index, elapsed, surfacePositions.array as Float32Array);
+      writeBossPositions(model.source, model.edgeIndices, index, elapsed, edgePositions.array as Float32Array);
+      surfacePositions.needsUpdate = true;
+      edgePositions.needsUpdate = true;
+      model.surface.geometry.computeVertexNormals();
+    }
     model.root.rotation.set(rotation[0], rotation[1], rotation[2], "ZXY");
     model.surface.material.opacity = (index === 0 ? 0.14 : 0.17) * fade;
     model.lines.material.opacity = 0.65 * fade;
