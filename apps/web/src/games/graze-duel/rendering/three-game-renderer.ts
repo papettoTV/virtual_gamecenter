@@ -274,7 +274,7 @@ function createBossVisual(models: BossModel[]): BossVisual {
       (edgeGeometry.getAttribute("position") as THREE.BufferAttribute).setUsage(THREE.DynamicDrawUsage);
     }
     const lines = new THREE.LineSegments(edgeGeometry, new THREE.LineBasicMaterial({
-      color, transparent: true, opacity: 0.65, depthTest: false, depthWrite: false, clippingPlanes,
+      color: new THREE.Color(`rgb(${appearance.edgeColor.join(",")})`), transparent: true, opacity: 0.95, depthTest: false, depthWrite: false, clippingPlanes,
     }));
     const depthRadius = { value: 1 };
     lines.material.onBeforeCompile = shader => {
@@ -300,7 +300,7 @@ function createBossVisual(models: BossModel[]): BossVisual {
   });
   const rim = new THREE.LineLoop(
     new THREE.BufferGeometry().setFromPoints(ringPoints),
-    new THREE.LineBasicMaterial({ color: 0x59daef, transparent: true, opacity: 0.9, depthTest: false, depthWrite: false, clippingPlanes }),
+    new THREE.LineBasicMaterial({ color: new THREE.Color(`rgb(${getBossAppearance(0).edgeColor.join(",")})`), transparent: true, opacity: 1, depthTest: false, depthWrite: false, clippingPlanes }),
   );
   rim.renderOrder = 1;
   root.add(rim);
@@ -395,13 +395,13 @@ function updateBossVisual(
     }
     model.root.rotation.set(rotation[0], rotation[1], rotation[2], "ZXY");
     model.surface.material.opacity = (index === 0 ? 0.14 : 0.17) * fade;
-    model.lines.material.opacity = 0.65 * fade;
+    model.lines.material.opacity = 0.95 * fade;
     model.depthRadius.value = radius * transform.scale;
-    model.lines.material.color.set(boss.flash > 0 ? "#f4faff" : `rgb(${appearance.color.join(",")})`);
+    model.lines.material.color.set(boss.flash > 0 ? "#f4faff" : `rgb(${appearance.edgeColor.join(",")})`);
   }
   visual.rim.visible = boss.phaseIndex === 0;
-  visual.rim.material.opacity = 0.9 * fade;
-  visual.rim.material.color.set(boss.flash > 0 ? "#f4faff" : "#59daef");
+  visual.rim.material.opacity = fade;
+  visual.rim.material.color.set(boss.flash > 0 ? "#f4faff" : `rgb(${appearance.edgeColor.join(",")})`);
   const field = transformField(fieldX, options, transform);
   visual.clippingPlanes[0]!.constant = width / 2 - field.left;
   visual.clippingPlanes[1]!.constant = field.right - width / 2;

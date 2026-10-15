@@ -9,9 +9,9 @@ export type BossModel = {
 };
 
 export const BOSS_APPEARANCES = [
-  { name: "球体", scale: 1.02, color: [89, 218, 239] },
-  { name: "幾何学飛行体", scale: 1.06, color: [112, 177, 255] },
-  { name: "トゲのある結晶体", scale: 1.1, color: [193, 144, 255] },
+  { name: "球体", scale: 1.02, color: [255, 105, 64], edgeColor: [255, 157, 105] },
+  { name: "幾何学飛行体", scale: 1.06, color: [226, 66, 116], edgeColor: [255, 105, 148] },
+  { name: "トゲのある結晶体", scale: 1.1, color: [193, 100, 255], edgeColor: [255, 100, 139] },
 ] as const;
 
 export function getBossAppearance(phaseIndex: number) {
@@ -167,6 +167,7 @@ export function createCanvasBossRenderer() {
       const progress = boss.encounterState === "entering" ? boss.arrivalProgress : 1;
       const radius = boss.radius * appearance.scale * (0.68 + progress * 0.32);
       const color = appearance.color.join(",");
+      const edgeColor = appearance.edgeColor.join(",");
       context.save();
       context.translate(boss.x, boss.y);
       context.globalAlpha *= 0.08 + progress * 0.92;
@@ -202,7 +203,7 @@ export function createCanvasBossRenderer() {
       }
       context.lineWidth = 1;
       context.shadowBlur = 6;
-      context.shadowColor = `rgb(${color})`;
+      context.shadowColor = `rgb(${edgeColor})`;
       const edgeBands: Array<Array<readonly [number, number]>> = [[], [], [], []];
       for (const edge of model.edges) {
         const [first, second] = edge;
@@ -212,8 +213,8 @@ export function createCanvasBossRenderer() {
         edgeBands[Math.round(smoothDepth * 3)]!.push(edge);
       }
       for (let band = 0; band < edgeBands.length; band += 1) {
-        const opacity = 0.65 * (0.16 + band / 3 * 0.84);
-        context.strokeStyle = boss.flash > 0 ? `rgba(244,250,255,${opacity})` : `rgba(${color},${opacity})`;
+        const opacity = 0.95 * (0.16 + band / 3 * 0.84);
+        context.strokeStyle = boss.flash > 0 ? `rgba(244,250,255,${opacity})` : `rgba(${edgeColor},${opacity})`;
         context.beginPath();
         for (const [first, second] of edgeBands[band]!) {
           context.moveTo(vertices[first]![0] * radius, -vertices[first]![1] * radius);
@@ -222,7 +223,7 @@ export function createCanvasBossRenderer() {
         context.stroke();
       }
       if (boss.phaseIndex === 0) {
-        context.strokeStyle = boss.flash > 0 ? "rgba(244,250,255,0.95)" : `rgba(${color},0.9)`;
+        context.strokeStyle = boss.flash > 0 ? "rgba(244,250,255,0.95)" : `rgba(${edgeColor},1)`;
         context.beginPath();
         context.arc(0, 0, radius, 0, Math.PI * 2);
         context.stroke();
