@@ -1,0 +1,316 @@
+{
+  "tool": "HyperFrames 0.8.162",
+  "strict": true,
+  "layouts": [
+    {
+      "id": "ogp",
+      "passed": true,
+      "htmlSha256": "b79b3b3f86d2067a434965848ff83a46cca0252884867eb454e244e58f4c685e",
+      "audits": {
+        "lint": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "runtime": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "layout": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "motion": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "contrast": {
+          "errors": 0,
+          "warnings": 0
+        }
+      },
+      "contrastChecks": 20
+    },
+    {
+      "id": "social-wide",
+      "passed": true,
+      "htmlSha256": "b3f903bb48687dcb81a2184ae187323bbc17bf43a7fcb895a4b5caeb1468fd73",
+      "audits": {
+        "lint": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "runtime": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "layout": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "motion": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "contrast": {
+          "errors": 0,
+          "warnings": 0
+        }
+      },
+      "contrastChecks": 20
+    },
+    {
+      "id": "social-square",
+      "passed": true,
+      "htmlSha256": "773370d3fd6b2eac1ab9df23606cb5179960fcb5d653558f0a7bb4dd4579417a",
+      "audits": {
+        "lint": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "runtime": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "layout": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "motion": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "contrast": {
+          "errors": 0,
+          "warnings": 0
+        }
+      },
+      "contrastChecks": 20
+    },
+    {
+      "id": "social-portrait",
+      "passed": true,
+      "htmlSha256": "1eee3be334b76520017d0cf094b1d8934d83f4a628e926fd230ac0aa31b7c138",
+      "audits": {
+        "lint": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "runtime": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "layout": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "motion": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "contrast": {
+          "errors": 0,
+          "warnings": 0
+        }
+      },
+      "contrastChecks": 20
+    },
+    {
+      "id": "story",
+      "passed": true,
+      "htmlSha256": "70bd3363ef9ec54278a1d315026c1ab492dcd2d10c360e84865d281652275ca0",
+      "audits": {
+        "lint": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "runtime": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "layout": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "motion": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "contrast": {
+          "errors": 0,
+          "warnings": 0
+        }
+      },
+      "contrastChecks": 20
+    },
+    {
+      "id": "web-hero",
+      "passed": true,
+      "htmlSha256": "7b1e702d372779a7ca708324c2bddd617698f5c67ac26292197414635cd601ea",
+      "audits": {
+        "lint": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "runtime": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "layout": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "motion": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "contrast": {
+          "errors": 0,
+          "warnings": 0
+        }
+      },
+      "contrastChecks": 20
+    },
+    {
+      "id": "web-banner",
+      "passed": true,
+      "htmlSha256": "2728d8fe08a8dacdafe675886c983b387bb9a881bc4aac014d34daa16fdfb4b0",
+      "audits": {
+        "lint": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "runtime": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "layout": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "motion": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "contrast": {
+          "errors": 0,
+          "warnings": 0
+        }
+      },
+      "contrastChecks": 20
+    },
+    {
+      "id": "x-header",
+      "passed": true,
+      "htmlSha256": "ca95f0fc8131d3d00a4a0f6960a494d745e18e72853d450212c531a7cef67a76",
+      "audits": {
+        "lint": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "runtime": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "layout": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "motion": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "contrast": {
+          "errors": 0,
+          "warnings": 0
+        }
+      },
+      "contrastChecks": 20
+    },
+    {
+      "id": "ad-rectangle",
+      "passed": true,
+      "htmlSha256": "6f39d36a0407501d7fdb14b15d25eb4b57a72ab31b54f0d53c2da63f7aa86564",
+      "audits": {
+        "lint": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "runtime": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "layout": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "motion": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "contrast": {
+          "errors": 0,
+          "warnings": 0
+        }
+      },
+      "contrastChecks": 20
+    },
+    {
+      "id": "ad-leaderboard",
+      "passed": true,
+      "htmlSha256": "8f6a407269cc1e971f8688da46880bff44fd7ab3f4cd1a1bd06cb55a0647f6d0",
+      "audits": {
+        "lint": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "runtime": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "layout": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "motion": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "contrast": {
+          "errors": 0,
+          "warnings": 0
+        }
+      },
+      "contrastChecks": 15
+    },
+    {
+      "id": "ad-mobile",
+      "passed": true,
+      "htmlSha256": "4cc6cc9b94f7bf5b27b0c90a477c8086b005ffb17dd79324e8494e94b07aceb2",
+      "audits": {
+        "lint": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "runtime": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "layout": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "motion": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "contrast": {
+          "errors": 0,
+          "warnings": 0
+        }
+      },
+      "contrastChecks": 15
+    }
+  ],
+  "visualReview": "All layouts in contact sheet; three small ads also inspected at native size",
+  "exportChecks": "Pillow verify, exact pixel dimensions, ad PNG/JPEG <= 150000 bytes"
+}

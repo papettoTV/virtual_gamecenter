@@ -1,0 +1,320 @@
+{
+  "title": "PULBASE promotional images v1",
+  "created": "2026-10-16",
+  "sourcePhoto": "../pulbase-C-hyperframes/cut/assets/arcade-opening-crowded-v1.png",
+  "sourcePhotoSha256": "030c49ad0a6615da99e5187e1fba03fb4ebf89d94edebe5e1bb6cfcf26f83feb",
+  "layouts": [
+    {
+      "id": "ogp",
+      "use": "OGP・リンク共有",
+      "width": 1200,
+      "height": 630,
+      "files": [
+        {
+          "path": "png/pulbase-ogp-1200x630.png",
+          "format": "png",
+          "width": 1200,
+          "height": 630,
+          "bytes": 532873,
+          "sha256": "061ef922ad4a9544b61ec47725835869a0448cc03756ad24fe7693a4804a468b"
+        },
+        {
+          "path": "jpg/pulbase-ogp-1200x630.jpg",
+          "format": "jpg",
+          "width": 1200,
+          "height": 630,
+          "bytes": 162864,
+          "sha256": "595b10451dd57e78c0fd19488cea0315b439ca697350030300810f9f946daf1f"
+        },
+        {
+          "path": "webp/pulbase-ogp-1200x630.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 630,
+          "bytes": 73852,
+          "sha256": "5d5ff62cec3339cae27f3545ac74e60c67257da7212ba19b354ddad21d0353d8"
+        }
+      ]
+    },
+    {
+      "id": "social-wide",
+      "use": "SNS横長投稿",
+      "width": 1200,
+      "height": 675,
+      "files": [
+        {
+          "path": "png/pulbase-social-wide-1200x675.png",
+          "format": "png",
+          "width": 1200,
+          "height": 675,
+          "bytes": 569749,
+          "sha256": "8927760e3e287132acd985db9e316e7a9111e260a6d19302c4e264e27eef7f7b"
+        },
+        {
+          "path": "jpg/pulbase-social-wide-1200x675.jpg",
+          "format": "jpg",
+          "width": 1200,
+          "height": 675,
+          "bytes": 170215,
+          "sha256": "c2734b10ffcf146e17229abf9fdb9b6c07164e4debafaedf1ba4edb57fd60945"
+        }
+      ]
+    },
+    {
+      "id": "social-square",
+      "use": "SNS正方形投稿",
+      "width": 1080,
+      "height": 1080,
+      "files": [
+        {
+          "path": "png/pulbase-social-square-1080x1080.png",
+          "format": "png",
+          "width": 1080,
+          "height": 1080,
+          "bytes": 962022,
+          "sha256": "2313279da3304988992b856f1b9a4231a0938f40177c5e3bf298fb8830695369"
+        },
+        {
+          "path": "jpg/pulbase-social-square-1080x1080.jpg",
+          "format": "jpg",
+          "width": 1080,
+          "height": 1080,
+          "bytes": 231311,
+          "sha256": "a4c99cd5379e2ffd05c7444cdf4f8b0c73101750326862cb188ff32cdc3297aa"
+        }
+      ]
+    },
+    {
+      "id": "social-portrait",
+      "use": "SNS縦長投稿（4:5）",
+      "width": 1080,
+      "height": 1350,
+      "files": [
+        {
+          "path": "png/pulbase-social-portrait-1080x1350.png",
+          "format": "png",
+          "width": 1080,
+          "height": 1350,
+          "bytes": 1202892,
+          "sha256": "b0749c60625049d81e89a248bfce23ac2ed01a66d7f3749782d540ec882338a4"
+        },
+        {
+          "path": "jpg/pulbase-social-portrait-1080x1350.jpg",
+          "format": "jpg",
+          "width": 1080,
+          "height": 1350,
+          "bytes": 280623,
+          "sha256": "295186c3751a6cdc36d38c32c79f3c71f6c6c0d65c14648a855a90b7fbc748e9"
+        }
+      ]
+    },
+    {
+      "id": "story",
+      "use": "ストーリー・縦長告知",
+      "width": 1080,
+      "height": 1920,
+      "files": [
+        {
+          "path": "png/pulbase-story-1080x1920.png",
+          "format": "png",
+          "width": 1080,
+          "height": 1920,
+          "bytes": 1781781,
+          "sha256": "6a04921b51d0216e6c2e389bfcb3ac09fdf8d4e941f871ffa9eb876bacb58530"
+        },
+        {
+          "path": "jpg/pulbase-story-1080x1920.jpg",
+          "format": "jpg",
+          "width": 1080,
+          "height": 1920,
+          "bytes": 396887,
+          "sha256": "a066f329842e0b3fe764c03fdf520c0f52c34892512c77dcda2d5e43e8a0fd54"
+        }
+      ]
+    },
+    {
+      "id": "web-hero",
+      "use": "サイトのメイン画像・16:9告知",
+      "width": 1920,
+      "height": 1080,
+      "files": [
+        {
+          "path": "png/pulbase-web-hero-1920x1080.png",
+          "format": "png",
+          "width": 1920,
+          "height": 1080,
+          "bytes": 1234786,
+          "sha256": "dffc24da0e72e07d05e6adb192bd0a34e0031f9d50dc33ad2a12f8a3f08d026a"
+        },
+        {
+          "path": "jpg/pulbase-web-hero-1920x1080.jpg",
+          "format": "jpg",
+          "width": 1920,
+          "height": 1080,
+          "bytes": 332728,
+          "sha256": "5239ec2bface997fc05023648811519626197d1ae5f28e1207055e9495d4657b"
+        },
+        {
+          "path": "webp/pulbase-web-hero-1920x1080.webp",
+          "format": "webp",
+          "width": 1920,
+          "height": 1080,
+          "bytes": 140014,
+          "sha256": "b160ab3c92f8a26cd784c1a3a046dae83ca2442ba195230239749c128808c7bd"
+        }
+      ]
+    },
+    {
+      "id": "web-banner",
+      "use": "サイト横長バナー",
+      "width": 1920,
+      "height": 640,
+      "files": [
+        {
+          "path": "png/pulbase-web-banner-1920x640.png",
+          "format": "png",
+          "width": 1920,
+          "height": 640,
+          "bytes": 680940,
+          "sha256": "179927fc9533a73f5157432feaf3377262976cd8593a1a22f5ae6efddc042cde"
+        },
+        {
+          "path": "jpg/pulbase-web-banner-1920x640.jpg",
+          "format": "jpg",
+          "width": 1920,
+          "height": 640,
+          "bytes": 197241,
+          "sha256": "451b5825ac53685168085b2b302a26c41fdb42a078c8dc9435aa2a62d9325f02"
+        },
+        {
+          "path": "webp/pulbase-web-banner-1920x640.webp",
+          "format": "webp",
+          "width": 1920,
+          "height": 640,
+          "bytes": 82632,
+          "sha256": "52b91f4e2f7d6edcc9b0a159e992bb5250165b8bd98bfd5a1560f7a2588d92eb"
+        }
+      ]
+    },
+    {
+      "id": "x-header",
+      "use": "Xプロフィールヘッダー",
+      "width": 1500,
+      "height": 500,
+      "files": [
+        {
+          "path": "png/pulbase-x-header-1500x500.png",
+          "format": "png",
+          "width": 1500,
+          "height": 500,
+          "bytes": 410653,
+          "sha256": "49a91b34d894567b10cef26f0fc3d25d07e07ea430f50baad1eac9ba1eeaa599"
+        },
+        {
+          "path": "jpg/pulbase-x-header-1500x500.jpg",
+          "format": "jpg",
+          "width": 1500,
+          "height": 500,
+          "bytes": 132388,
+          "sha256": "307e6d5f425a7839024ad685516de5978fc42d7c371daafe7187d069b9d39fd8"
+        }
+      ]
+    },
+    {
+      "id": "ad-rectangle",
+      "use": "レクタングル広告",
+      "width": 300,
+      "height": 250,
+      "files": [
+        {
+          "path": "png/pulbase-ad-rectangle-300x250.png",
+          "format": "png",
+          "width": 300,
+          "height": 250,
+          "bytes": 72675,
+          "sha256": "48fe049f6fcfd8d91bb4e60ed1c9af0c55b5c5bf3c0ccfdb662433594c730032"
+        },
+        {
+          "path": "jpg/pulbase-ad-rectangle-300x250.jpg",
+          "format": "jpg",
+          "width": 300,
+          "height": 250,
+          "bytes": 22757,
+          "sha256": "d3cd9ec358c2095f59d804b0c9625bc008cc13fb9a035082b39afd6b45a0af5e"
+        },
+        {
+          "path": "webp/pulbase-ad-rectangle-300x250.webp",
+          "format": "webp",
+          "width": 300,
+          "height": 250,
+          "bytes": 11264,
+          "sha256": "ec65732a9fc5f60b2a8ce09290a07935fd3e16922711047fcc0d32635cb8e6ff"
+        }
+      ]
+    },
+    {
+      "id": "ad-leaderboard",
+      "use": "横長広告",
+      "width": 728,
+      "height": 90,
+      "files": [
+        {
+          "path": "png/pulbase-ad-leaderboard-728x90.png",
+          "format": "png",
+          "width": 728,
+          "height": 90,
+          "bytes": 43988,
+          "sha256": "b4c39477e47b75b96d6c87d2959e617900b2d77cda314388ec73be1ef5f8200a"
+        },
+        {
+          "path": "jpg/pulbase-ad-leaderboard-728x90.jpg",
+          "format": "jpg",
+          "width": 728,
+          "height": 90,
+          "bytes": 22274,
+          "sha256": "6b2371b5837e4d88c3095b9444f2385f7cdd5e83c4a98d864c402760551b7105"
+        },
+        {
+          "path": "webp/pulbase-ad-leaderboard-728x90.webp",
+          "format": "webp",
+          "width": 728,
+          "height": 90,
+          "bytes": 11840,
+          "sha256": "589baefc8785960489cbf88e0b2a549033868e651adebd556e393831716e64b4"
+        }
+      ]
+    },
+    {
+      "id": "ad-mobile",
+      "use": "モバイル広告",
+      "width": 320,
+      "height": 100,
+      "files": [
+        {
+          "path": "png/pulbase-ad-mobile-320x100.png",
+          "format": "png",
+          "width": 320,
+          "height": 100,
+          "bytes": 29834,
+          "sha256": "1b36ce92684aab93fc5656fecaf27a99b31ab95bd0e0dcfdd01a0f20718a27f5"
+        },
+        {
+          "path": "jpg/pulbase-ad-mobile-320x100.jpg",
+          "format": "jpg",
+          "width": 320,
+          "height": 100,
+          "bytes": 15005,
+          "sha256": "c3c342a66de4ca9c3b6b5119c8b3bf291fdaf991ef34ee5a7ac8d08adee5d43b"
+        },
+        {
+          "path": "webp/pulbase-ad-mobile-320x100.webp",
+          "format": "webp",
+          "width": 320,
+          "height": 100,
+          "bytes": 8360,
+          "sha256": "38f1b15d5c3c621d9d4ba2ea88935a1cce210d2737706c03b3f1e4078e3a40ce"
+        }
+      ]
+    }
+  ]
+}
