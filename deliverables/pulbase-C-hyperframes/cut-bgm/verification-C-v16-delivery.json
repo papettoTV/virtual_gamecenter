@@ -1,0 +1,67 @@
+{
+  "file": "PULBASE-C-25p1s-BGM-crowd-v16-logo.mp4",
+  "durationSeconds": 25.1,
+  "resolution": [
+    1080,
+    1920
+  ],
+  "fps": "30/1",
+  "frames": 753,
+  "videoCodec": "h264",
+  "audioCodec": "aac",
+  "audioSampleRate": "48000",
+  "bytes": 25326527,
+  "sha256": "3746758e5ef3b76c1a3d120ca9a24640fe01b8b6c1898e90f47583a25fd96247",
+  "fullDecodeSucceeded": true,
+  "strictCheckPassed": true,
+  "strictCheckSamples": 22,
+  "audioStreamCopiedFromV15": true,
+  "audioAdtsSha256": "8cabf50822b23c02296dc302ffaf04fa17c0c3a18cd9977a0ee2f198ec1ff3b5",
+  "priorV15Sha256": "466d21dcd8a8e564fb3a2e797c912e44ca510e50ce5950f06540f54c8d390ffb",
+  "priorV15HashUnchanged": true,
+  "priorV15SourceArchived": "versions/v15",
+  "onlyTitleScenesChangedInSource": true,
+  "otherSceneFrameComparisons": [
+    {
+      "seconds": 3.05,
+      "meanAbsoluteRgbDifference": 0.0
+    },
+    {
+      "seconds": 8.9,
+      "meanAbsoluteRgbDifference": 0.0
+    },
+    {
+      "seconds": 15.2,
+      "meanAbsoluteRgbDifference": 0.0
+    },
+    {
+      "seconds": 16.6,
+      "meanAbsoluteRgbDifference": 0.0
+    },
+    {
+      "seconds": 21.1,
+      "meanAbsoluteRgbDifference": 0.1783
+    }
+  ],
+  "logoSource": "brand/pulbase-wordmark.svg",
+  "logoSha256": "c98a5f7a139d83e70afe285a80cc21503dd3cd3b46a752288feb39ae8d6b5c82",
+  "sceneReviewTimesSeconds": [
+    0,
+    1.766,
+    3.05,
+    5.55,
+    8.9,
+    13.9,
+    15.2,
+    15.8,
+    16.6,
+    21.1,
+    23.34,
+    23.8,
+    24.5,
+    25
+  ],
+  "silentV16Created": false,
+  "cliVersion": "0.8.162",
+  "renderCapture": "screenshot / hardware GPU / 2 workers / delivery"
+}
