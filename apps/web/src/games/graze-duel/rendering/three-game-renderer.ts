@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { drawPlayerShip } from "./player-ship";
-import { BOSS_AIRCRAFT_DESIGNS, createBossAircraftSprites, getBossAircraftDesign } from "./boss-aircraft";
+import { createBossModels, getBossAppearance, getBossRotation, type BossModel } from "./boss-geometry";
 import type {
   BossRenderState,
   BulletRenderState,
@@ -40,8 +40,11 @@ export function createThreeGameRenderer(width: number, height: number): GameScen
   renderer.localClippingEnabled = true;
 
   const scene = new THREE.Scene();
-  const camera = new THREE.OrthographicCamera(-width / 2, width / 2, height / 2, -height / 2, 0.1, 10);
-  camera.position.z = 2;
+  const camera = new THREE.OrthographicCamera(-width / 2, width / 2, height / 2, -height / 2, 0.1, 2000);
+  camera.position.z = 1000;
+  const keyLight = new THREE.DirectionalLight(0xe9fcff, 1.8);
+  keyLight.position.set(-100, 180, 300);
+  scene.add(new THREE.AmbientLight(0x8cb5df, 0.65), keyLight);
 
   const { geometry, attributes } = createGeometry();
   const { material, elapsedUniform } = createMaterial(width, height);
@@ -49,17 +52,8 @@ export function createThreeGameRenderer(width: number, height: number): GameScen
   mesh.frustumCulled = false;
   mesh.renderOrder = 2;
   const playerVisuals = [createPlayerVisual(), createPlayerVisual()];
-  const bossTextures = BOSS_AIRCRAFT_DESIGNS.map(() => {
-    const texture = new THREE.Texture();
-    texture.colorSpace = THREE.SRGBColorSpace;
-    return texture;
-  });
-  const bossSprites = createBossAircraftSprites((index, sprite) => {
-    const texture = bossTextures[index]!;
-    texture.image = sprite;
-    texture.needsUpdate = true;
-  });
-  const bossVisuals = [createBossVisual(bossTextures), createBossVisual(bossTextures)];
+  const bossModels = createBossModels();
+  const bossVisuals = [createBossVisual(bossModels), createBossVisual(bossModels)];
   const particleVisual = createParticleVisual();
   scene.add(mesh, particleVisual.points, ...playerVisuals.map((visual) => visual.root), ...bossVisuals.map((visual) => visual.root));
 
@@ -143,8 +137,8 @@ export function createThreeGameRenderer(width: number, height: number): GameScen
       }
       elapsedUniform.value = elapsed;
       updatePlayerVisuals(playerVisuals, players, elapsed, transform, options);
-      updateBossVisual(bossVisuals[0]!, frame.boss, 0, players[0]?.fieldX ?? 0, transform, options, width, height);
-      updateBossVisual(bossVisuals[1]!, frame.opponentBoss, 1, players[1]?.fieldX ?? 0, transform, options, width, height);
+      updateBossVisual(bossVisuals[0]!, frame.boss, 0, players[0]?.fieldX ?? 0, elapsed, transform, options, width, height);
+      updateBossVisual(bossVisuals[1]!, frame.opponentBoss, 1, players[1]?.fieldX ?? 0, elapsed, transform, options, width, height);
       updateParticleVisual(particleVisual, frame.particles, transform, width, height, colorCache);
       renderer.clear();
       renderer.render(scene, camera);
@@ -168,8 +162,6 @@ export function createThreeGameRenderer(width: number, height: number): GameScen
       geometry.dispose();
       material.dispose();
       disposeVisuals(playerVisuals, bossVisuals, particleVisual);
-      bossSprites.dispose();
-      for (const texture of bossTextures) texture.dispose();
       renderer.dispose();
       canvas.remove();
     },
@@ -186,8 +178,13 @@ type PlayerVisual = {
 
 type BossVisual = {
   root: THREE.Group;
-  ship: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
-  textures: THREE.Texture[];
+  models: Array<{
+    root: THREE.Group;
+    surface: THREE.Mesh<THREE.BufferGeometry, THREE.MeshPhongMaterial>;
+    lines: THREE.LineSegments<THREE.BufferGeometry, THREE.LineBasicMaterial>;
+    depthRadius: { value: number };
+  }>;
+  rim: THREE.LineLoop<THREE.BufferGeometry, THREE.LineBasicMaterial>;
   clippingPlanes: THREE.Plane[];
 };
 
@@ -234,7 +231,7 @@ function createPlayerShipTexture(color: string): THREE.CanvasTexture {
   return texture;
 }
 
-function createBossVisual(textures: THREE.Texture[]): BossVisual {
+function createBossVisual(models: BossModel[]): BossVisual {
   const root = new THREE.Group();
   const clippingPlanes = [
     new THREE.Plane(new THREE.Vector3(1, 0, 0)),
@@ -242,14 +239,64 @@ function createBossVisual(textures: THREE.Texture[]): BossVisual {
     new THREE.Plane(new THREE.Vector3(0, -1, 0)),
     new THREE.Plane(new THREE.Vector3(0, 1, 0)),
   ];
-  const ship = new THREE.Mesh(
-    new THREE.PlaneGeometry(2, 2),
-    new THREE.MeshBasicMaterial({ map: textures[0], transparent: true, depthTest: false, depthWrite: false, clippingPlanes }),
+  const modelVisuals = models.map((model, phaseIndex) => {
+    const modelRoot = new THREE.Group();
+    const appearance = getBossAppearance(phaseIndex);
+    const color = new THREE.Color(`rgb(${appearance.color.join(",")})`);
+    const positions = model.faces.flatMap(face => face.flatMap(index => [...model.vertices[index]!]));
+    const surfaceGeometry = new THREE.BufferGeometry();
+    surfaceGeometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    if (phaseIndex === 0) {
+      surfaceGeometry.setAttribute("normal", new THREE.Float32BufferAttribute(positions, 3));
+    } else surfaceGeometry.computeVertexNormals();
+    const surface = new THREE.Mesh(surfaceGeometry, new THREE.MeshPhongMaterial({
+      color,
+      emissive: color.clone().multiplyScalar(0.12),
+      specular: 0xcceeff,
+      shininess: 100,
+      transparent: true,
+      opacity: phaseIndex === 0 ? 0.14 : 0.17,
+      side: THREE.DoubleSide,
+      depthTest: false,
+      depthWrite: false,
+      flatShading: phaseIndex !== 0,
+      clippingPlanes,
+    }));
+    const edgePositions = model.edges.flatMap(edge => edge.flatMap(index => [...model.vertices[index]!]));
+    const edgeGeometry = new THREE.BufferGeometry();
+    edgeGeometry.setAttribute("position", new THREE.Float32BufferAttribute(edgePositions, 3));
+    const lines = new THREE.LineSegments(edgeGeometry, new THREE.LineBasicMaterial({
+      color, transparent: true, opacity: 0.65, depthTest: false, depthWrite: false, clippingPlanes,
+    }));
+    const depthRadius = { value: 1 };
+    lines.material.onBeforeCompile = shader => {
+      shader.uniforms.bossDepthRadius = depthRadius;
+      shader.vertexShader = `varying float vBossDepth;\n${shader.vertexShader}`.replace(
+        "#include <begin_vertex>",
+        "#include <begin_vertex>\nvBossDepth = (modelMatrix * vec4(position, 1.0)).z;",
+      );
+      shader.fragmentShader = `uniform float bossDepthRadius;\nvarying float vBossDepth;\n${shader.fragmentShader}`.replace(
+        "#include <color_fragment>",
+        "#include <color_fragment>\ndiffuseColor.a *= mix(0.16, 1.0, smoothstep(-0.45, 0.6, vBossDepth / max(0.001, bossDepthRadius)));",
+      );
+    };
+    surface.renderOrder = 0;
+    lines.renderOrder = 1;
+    modelRoot.add(surface, lines);
+    root.add(modelRoot);
+    return { root: modelRoot, surface, lines, depthRadius };
+  });
+  const ringPoints = Array.from({ length: 64 }, (_, index) => {
+    const angle = index * Math.PI * 2 / 64;
+    return new THREE.Vector3(Math.cos(angle), Math.sin(angle), 0);
+  });
+  const rim = new THREE.LineLoop(
+    new THREE.BufferGeometry().setFromPoints(ringPoints),
+    new THREE.LineBasicMaterial({ color: 0x59daef, transparent: true, opacity: 0.9, depthTest: false, depthWrite: false, clippingPlanes }),
   );
-  root.renderOrder = 1;
-  ship.renderOrder = 1;
-  root.add(ship);
-  return { root, ship, textures, clippingPlanes };
+  rim.renderOrder = 1;
+  root.add(rim);
+  return { root, models: modelVisuals, rim, clippingPlanes };
 }
 
 function createParticleVisual(): ParticleVisual {
@@ -307,6 +354,7 @@ function updateBossVisual(
   boss: BossRenderState,
   playerIndex: number,
   fieldX: number,
+  elapsed: number,
   transform: ViewTransform,
   options: RenderOptions,
   width: number,
@@ -319,12 +367,24 @@ function updateBossVisual(
   visual.root.position.set(point.x - width / 2, height / 2 - point.y, 0);
   const entering = boss.encounterState === "entering";
   const progress = entering ? boss.arrivalProgress : 1;
-  const radius = boss.radius * getBossAircraftDesign(boss.phaseIndex).scale * (0.68 + progress * 0.32);
-  visual.root.scale.setScalar(transform.scale);
-  visual.ship.scale.setScalar(radius);
-  visual.ship.material.map = visual.textures[boss.phaseIndex] ?? visual.textures[0]!;
-  visual.ship.material.color.setScalar(boss.flash > 0 ? 1.8 : 0.25 + progress * 0.75);
-  visual.ship.material.opacity = entering ? 0.08 + progress * 0.92 : 1;
+  const appearance = getBossAppearance(boss.phaseIndex);
+  const radius = boss.radius * appearance.scale * (0.68 + progress * 0.32);
+  visual.root.scale.setScalar(transform.scale * radius);
+  const rotation = getBossRotation(boss.phaseIndex, elapsed);
+  const fade = 0.08 + progress * 0.92;
+  for (let index = 0; index < visual.models.length; index += 1) {
+    const model = visual.models[index]!;
+    model.root.visible = index === boss.phaseIndex;
+    if (!model.root.visible) continue;
+    model.root.rotation.set(rotation[0], rotation[1], rotation[2], "ZXY");
+    model.surface.material.opacity = (index === 0 ? 0.14 : 0.17) * fade;
+    model.lines.material.opacity = 0.65 * fade;
+    model.depthRadius.value = radius * transform.scale;
+    model.lines.material.color.set(boss.flash > 0 ? "#f4faff" : `rgb(${appearance.color.join(",")})`);
+  }
+  visual.rim.visible = boss.phaseIndex === 0;
+  visual.rim.material.opacity = 0.9 * fade;
+  visual.rim.material.color.set(boss.flash > 0 ? "#f4faff" : "#59daef");
   const field = transformField(fieldX, options, transform);
   visual.clippingPlanes[0]!.constant = width / 2 - field.left;
   visual.clippingPlanes[1]!.constant = field.right - width / 2;
@@ -366,9 +426,10 @@ function disposeVisuals(playerVisuals: PlayerVisual[], bossVisuals: BossVisual[]
 
 function disposeObject(object: THREE.Object3D) {
   object.traverse((child) => {
-    if (!(child instanceof THREE.Mesh)) return;
+    if (!(child instanceof THREE.Mesh) && !(child instanceof THREE.Line)) return;
     child.geometry.dispose();
-    child.material.dispose();
+    const materials = Array.isArray(child.material) ? child.material : [child.material];
+    for (const material of materials) material.dispose();
   });
 }
 

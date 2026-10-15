@@ -1,6 +1,6 @@
 import { createCyberCanyonBackground } from "./cyber-canyon-background";
 import { drawPlayerShip } from "./player-ship";
-import { createBossAircraftSprites } from "./boss-aircraft";
+import { createCanvasBossRenderer } from "./boss-geometry";
 
 export function createCanvasRenderer(options) {
   let { context, getAttackCost, randomRange, createLightningBolt } = options;
@@ -23,7 +23,7 @@ export function createCanvasRenderer(options) {
     HIT_MARKER_RADIUS,
   } = options.settings;
   const canyonBackground = createCyberCanyonBackground(FIELD_WIDTH, FIELD_HEIGHT);
-  const bossAircraft = createBossAircraftSprites();
+  const bossRenderer = createCanvasBossRenderer();
   let frame = null;
 
   return {
@@ -38,7 +38,7 @@ export function createCanvasRenderer(options) {
     },
     dispose() {
       canyonBackground.dispose();
-      bossAircraft.dispose();
+      bossRenderer.dispose();
       context = null;
       frame = null;
       getAttackCost = null;
@@ -110,20 +110,20 @@ export function createCanvasRenderer(options) {
   }
 
   function drawBoss() {
-    drawAircraftBoss(frame.boss, LEFT_X);
+    drawGeometricBoss(frame.boss, LEFT_X);
   }
 
   function drawOpponentBoss() {
-    drawAircraftBoss(frame.opponentBoss, RIGHT_X);
+    drawGeometricBoss(frame.opponentBoss, RIGHT_X);
   }
 
-  function drawAircraftBoss(targetBoss, fieldX) {
+  function drawGeometricBoss(targetBoss, fieldX) {
     if (!targetBoss.active || targetBoss.hp <= 0) return;
     if (!frame.sceneRendered) {
       context.save();
       roundRect(fieldX, FIELD_TOP, FIELD_WIDTH, FIELD_HEIGHT, 18);
       context.clip();
-      bossAircraft.draw(context, targetBoss);
+      bossRenderer.draw(context, targetBoss, frame.elapsedRound);
       context.restore();
     }
     drawBossGauge(targetBoss, fieldX + FIELD_WIDTH / 2);
