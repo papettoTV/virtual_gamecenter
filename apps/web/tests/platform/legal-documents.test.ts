@@ -10,8 +10,10 @@ describe("free beta legal documents", () => {
   it.each([terms, privacy])("publishes the beta version and the operator's real contact route", document => {
     expect(document).toContain("無料ベータ版");
     expect(document).toMatch(/2026-10-(12\.3|14\.1)/);
-    expect(document).toContain("papettoTV");
-    expect(document).toContain("https://x.com/papettoTV");
+    expect(document).toContain("PULBASE");
+    expect(document).toContain("https://x.com/pulbase");
+    expect(document).toContain("@pulbase");
+    expect(document).not.toContain("papettoTV");
     expect(document).not.toContain("プロトタイプ版");
     expect(document).not.toContain("有料化前に正式な運営者情報");
   });
@@ -36,7 +38,9 @@ describe("free beta legal documents", () => {
       expect(markup).toContain(`src="${path}"`);
     }
     const footer = renderToStaticMarkup(createElement(PlatformPolicies, { policy: null, setPolicy: () => {} }));
-    expect(footer).toContain('href="https://x.com/papettoTV"');
+    expect(footer).toContain('href="https://x.com/pulbase"');
+    expect(footer).toContain("お問い合わせ：X @pulbase");
+    expect(footer).not.toContain("papettoTV");
     expect(footer).not.toContain("お問い合わせ（準備中）");
     expect(footer).toContain("アクセス解析設定");
   });

@@ -90,7 +90,7 @@ export function DataDeletionDialog() {
       if (result.scope === "all" && cleared && saved) window.location.assign("/");
     } catch (failure) {
       const code = failure instanceof PlatformApiError ? failure.code : "";
-      setError(code === "purchase_support_required" ? "購入残高または決済記録があるため、自動退会はできません。X @papettoTVへお問い合わせください。" : code === "reauth_required" ? "本人確認が必要です。再認証してからやり直してください。" : "削除を受け付けられませんでした。対象を確認し直してください。");
+      setError(code === "purchase_support_required" ? "購入残高または決済記録があるため、自動退会はできません。X @pulbaseへお問い合わせください。" : code === "reauth_required" ? "本人確認が必要です。再認証してからやり直してください。" : "削除を受け付けられませんでした。対象を確認し直してください。");
     } finally { setBusy(false); }
   };
 
@@ -126,7 +126,7 @@ export function DataDeletionDialog() {
           <div className="platform-dialog-actions"><button type="button" disabled={busy} onClick={() => setPreview(null)}>キャンセル</button><button className="platform-danger-button" type="button" disabled={busy || !confirmed} onClick={() => void remove()}>{busy ? "処理中…" : "確認したデータを削除"}</button></div>
         </>}
       </>}
-      {error && <p role="alert">{error} <a href="https://x.com/papettoTV" target="_blank" rel="noopener noreferrer">お問い合わせ</a></p>}
+      {error && <p role="alert">{error} <a href="https://x.com/pulbase" target="_blank" rel="noopener noreferrer">お問い合わせ</a></p>}
     </section>
   </div>;
 }
