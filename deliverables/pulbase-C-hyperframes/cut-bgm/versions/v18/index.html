@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8"><title>C案30秒 — BGM比較版（Sun in Your Eyes）</title><script src="assets/gsap.min.js"></script>
+<style>
+@font-face{font-family:CutJP;src:url('assets/Japanese.ttc') format('truetype');font-weight:600 900;font-display:block}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:#090b13}#root{position:relative;width:100%;height:100%;overflow:hidden}#world{position:absolute;inset:0;width:720px;height:1280px;transform:scale(1.5);transform-origin:0 0;background:#090b13}#screen{position:absolute;inset:0 0 195px;overflow:hidden}#game{display:block;width:100%;height:100%;object-fit:cover;object-position:center}#caption{position:absolute;left:40px;top:565px;width:640px;height:150px;z-index:10}.state{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:18px 24px;font:800 58px CutJP,sans-serif;color:#fff8ee;letter-spacing:.01em;background:rgba(25,21,31,.94);border-left:12px solid #28cee0;border-bottom:5px solid #100d14;box-shadow:8px 9px 0 rgba(0,0,0,.18);opacity:0;white-space:nowrap;will-change:transform}#s0{font-size:64px}#s2{border-left-color:#ed62a8;font-size:48px}#closing{font-size:64px;border-left-color:#ed62a8}#dock{position:absolute;left:0;right:0;bottom:0;height:195px;background:#10121e;border-top:2px solid #2c3348;z-index:11}#accept{position:absolute;top:12px;left:70px;width:580px;height:32px;font:800 24px CutJP,sans-serif;color:#56deed;text-align:center;opacity:0}#action{position:absolute;left:70px;top:51px;width:580px;height:94px;border:3px solid #40cfde;border-radius:15px;background:#f1eadf;box-shadow:0 6px 0 #303448;color:#201e28;transform-origin:center}#action .button-state{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:800 38px CutJP,sans-serif;opacity:0}#action #challenge{opacity:1}#ripple{position:absolute;left:292px;top:46px;width:136px;height:104px;border:4px solid #ed62a8;border-radius:50%;opacity:0;pointer-events:none}#start-text{position:absolute;left:70px;top:51px;width:580px;height:94px;display:flex;align-items:center;justify-content:center;font:800 60px CutJP,sans-serif;letter-spacing:.08em;color:#56deed;opacity:0}
+
+#duel{position:absolute;inset:0;opacity:0;background:#0b0d19;z-index:2}.duel-panel{position:absolute;left:0;width:720px;height:640px;overflow:hidden;background:#101421}.opponent{top:0;border-bottom:3px solid #465067}.self{top:640px;background:#151225}.duel-panel video{position:absolute;left:150px;width:420px;height:570px;object-fit:contain;display:block}.opponent video{top:32px}.self video{top:64px}.role{position:absolute;left:36px;top:26px;z-index:3;font:800 38px CutJP,sans-serif;color:#fff8ee;border-left:7px solid #56deed;padding-left:13px}.self .role{top:90px;border-color:#ed62a8}#battle-heading{position:absolute;top:12px;left:215px;width:290px;height:54px;display:flex;align-items:center;justify-content:center;font:800 36px CutJP,sans-serif;letter-spacing:.06em;color:#56deed;background:#101421;z-index:4}
+
+#screen{z-index:1}#screen-visual{width:100%;height:100%}#dock{opacity:0}#duel{background:transparent}.duel-panel{background:transparent}
+#color-field{position:absolute;inset:0;width:720px;height:1280px;pointer-events:none}#color-wave{opacity:0}
+
+
+#game{object-fit:contain;background:#101421}
+/* X dark post: black, white, subdued metadata, blue link; no engagement counts. */
+
+/* The one-second post is ready on its first frame behind the opening scenes. */
+
+#watch-status{position:absolute;left:32px;top:24px;width:116px;height:38px;display:flex;align-items:center;justify-content:center;border:1px solid #465368;border-radius:6px;background:#131b29;color:#dce8ec;font:700 22px/1.1 CutJP,sans-serif;letter-spacing:.08em;z-index:12;pointer-events:none}
+#screen-visual{position:relative}#tension-visual{position:absolute;inset:0;opacity:0;pointer-events:none}#tension-game{display:block;width:100%;height:100%;object-fit:contain;background:#101421}
+#challenge-heartbeat-glow{position:absolute;inset:-6px;border:3px solid #ed62a8;border-radius:20px;box-shadow:0 0 24px rgba(237,98,168,.6),inset 0 0 10px rgba(237,98,168,.15);opacity:0;pointer-events:none}
+</style></head><body>
+<div data-hf-id="hf-nqgq" id="root" data-composition-id="c-cut" data-start="0" data-duration="25.1" data-width="1080" data-height="1920">
+<audio data-hf-id="hf-am5q" id="bgm-sun-in-your-eyes" src=".media/audio/bgm/sun-in-your-eyes.mp3" data-start="0" data-duration="25.1" data-media-start="0" data-track-index="6" data-volume="1" data-label="BGM｜Sun in Your Eyes（比較用）" data-automation="{&quot;version&quot;:1,&quot;lanes&quot;:[{&quot;target&quot;:&quot;volume&quot;,&quot;points&quot;:[{&quot;t&quot;:0.0,&quot;v&quot;:0},{&quot;t&quot;:1.2,&quot;v&quot;:0.12},{&quot;t&quot;:6.38333,&quot;v&quot;:0.12},{&quot;t&quot;:7.01818,&quot;v&quot;:0.2},{&quot;t&quot;:9.1,&quot;v&quot;:0.25},{&quot;t&quot;:14.75,&quot;v&quot;:0.25},{&quot;t&quot;:15.05,&quot;v&quot;:0.09874209},{&quot;t&quot;:16.35,&quot;v&quot;:0.09874209},{&quot;t&quot;:16.85,&quot;v&quot;:0.25},{&quot;t&quot;:18.99334,&quot;v&quot;:0.25},{&quot;t&quot;:19.6,&quot;v&quot;:0.3},{&quot;t&quot;:23.32,&quot;v&quot;:0.27},{&quot;t&quot;:24.00702,&quot;v&quot;:0.23},{&quot;t&quot;:25.1,&quot;v&quot;:0}]}]}" preload="auto"></audio>
+<audio data-hf-id="hf-0q93" id="sfx-arcade-crowd" src=".media/audio/sfx/crowd-talking-loop.mp3" data-start="0" data-duration="6.8" data-media-start="8" data-track-index="9" data-volume="1" data-label="環境音｜ゲーセンの人のざわめき（0–6.8秒）" data-automation="{&quot;version&quot;:1,&quot;lanes&quot;:[{&quot;target&quot;:&quot;volume&quot;,&quot;points&quot;:[{&quot;t&quot;:0,&quot;v&quot;:0},{&quot;t&quot;:0.35,&quot;v&quot;:0.35},{&quot;t&quot;:4.3,&quot;v&quot;:0.32},{&quot;t&quot;:6.00833,&quot;v&quot;:0.3},{&quot;t&quot;:6.8,&quot;v&quot;:0}]}]}" preload="auto"></audio>
+<audio data-hf-id="hf-heartbeat-1" id="sfx-heartbeat-1" src=".media/audio/sfx/sfx_001.wav" data-start="15.1" data-duration="0.55" data-media-start="0" data-track-index="12" data-volume="0.2116601" data-label="鼓動｜1回目・タップ前" preload="auto"></audio>
+<audio data-hf-id="hf-heartbeat-2" id="sfx-heartbeat-2" src=".media/audio/sfx/sfx_001.wav" data-start="15.7" data-duration="0.55" data-media-start="0" data-track-index="12" data-volume="0.2116601" data-label="鼓動｜2回目・タップ前" preload="auto"></audio>
+<div data-hf-id="hf-j427" id="world">
+<div data-hf-id="hf-opn-host" id="c-opening-title" class="clip" data-composition-id="c-opening-title" data-composition-src="compositions/c-opening-title.html" data-start="0" data-duration="1.8" data-track-index="10" data-width="720" data-height="1280" style="position:absolute;inset:0;z-index:40"></div>
+<div data-hf-id="hf-cxiz" id="c-memory" class="clip" data-composition-id="c-memory" data-composition-src="compositions/c-memory.html" data-start="0" data-duration="6.8" data-track-index="4" data-width="720" data-height="1280" style="position:absolute;inset:0;z-index:30"></div>
+<svg data-hf-id="hf-ggco" id="color-field" viewBox="0 0 720 1280" aria-hidden="true"><circle data-hf-id="hf-e218" id="color-wave" data-layout-allow-overflow="true" cx="360" cy="1160" r="44" fill="#281528" /></svg>
+<div data-hf-id="hf-social-host" id="c-social-post" class="clip" data-composition-id="c-social-post" data-composition-src="compositions/c-social-post.html" data-start="6.8" data-duration="2.3" data-track-index="0" data-width="720" data-height="1280" style="position:absolute;inset:0;z-index:20"></div>
+<div data-hf-id="hf-ccvt" id="screen"><div data-hf-id="hf-9lua" id="screen-visual"><video data-hf-id="hf-dd35" id="game" class="clip" src="media-v17/buzz-boss-play-v17.mp4" data-start="9.1" data-duration="10.5" data-track-index="1" muted playsinline></video><div data-hf-id="hf-tension-visual" id="tension-visual"><video data-color-grading="{&quot;preset&quot;:null,&quot;intensity&quot;:1,&quot;adjust&quot;:{&quot;exposure&quot;:-0.35,&quot;contrast&quot;:0,&quot;highlights&quot;:0,&quot;shadows&quot;:0,&quot;whites&quot;:0,&quot;blacks&quot;:0,&quot;temperature&quot;:0,&quot;tint&quot;:0,&quot;vibrance&quot;:0,&quot;saturation&quot;:0},&quot;details&quot;:{&quot;vignette&quot;:0.85,&quot;vignetteMidpoint&quot;:0.58,&quot;vignetteRoundness&quot;:0,&quot;vignetteFeather&quot;:0.72,&quot;grain&quot;:0,&quot;grainSize&quot;:0.25,&quot;grainRoughness&quot;:0.5},&quot;effects&quot;:{&quot;blur&quot;:0,&quot;pixelate&quot;:0,&quot;chromaBleed&quot;:0,&quot;tapeDamage&quot;:0,&quot;tapeTracking&quot;:0,&quot;tapeNoise&quot;:1,&quot;tapeSpeed&quot;:0.5,&quot;filmArtifacts&quot;:0,&quot;halftone&quot;:0,&quot;halftoneSize&quot;:0,&quot;twoInkPrint&quot;:0,&quot;twoInkPrintSize&quot;:0,&quot;ascii&quot;:0,&quot;asciiSize&quot;:0.06578947368421052,&quot;asciiInvert&quot;:0,&quot;asciiStyle&quot;:0,&quot;asciiColor&quot;:1,&quot;asciiRotation&quot;:0,&quot;dither&quot;:0,&quot;ditherSize&quot;:0,&quot;bloom&quot;:0,&quot;bloomRadius&quot;:8,&quot;monoScreen&quot;:0,&quot;monoScreenSize&quot;:0,&quot;monoScreenAngle&quot;:0,&quot;monoScreenSpread&quot;:0,&quot;monoScreenShape&quot;:0,&quot;monoScreenInvert&quot;:0,&quot;scanlines&quot;:0,&quot;scanlineCount&quot;:0,&quot;scanlineSoftness&quot;:0,&quot;chromaticAberration&quot;:0,&quot;chromaticAngle&quot;:0,&quot;crtCurvature&quot;:0,&quot;digitalGlitch&quot;:0,&quot;digitalGlitchColorSplit&quot;:0,&quot;digitalGlitchLineTear&quot;:0,&quot;digitalGlitchPixelate&quot;:0,&quot;digitalGlitchBlockAmount&quot;:0,&quot;digitalGlitchBlockDisplacement&quot;:0,&quot;digitalGlitchBlockOpacity&quot;:0,&quot;digitalGlitchSpeed&quot;:0,&quot;engraving&quot;:0,&quot;engravingSpacing&quot;:0.4117647058823529,&quot;engravingMinThickness&quot;:0.2,&quot;engravingMaxThickness&quot;:0.4571428571428572,&quot;engravingAngle&quot;:0.25,&quot;engravingContrast&quot;:0.4666666666666667,&quot;engravingSharpness&quot;:0.59,&quot;engravingWave&quot;:0.2,&quot;engravingWaveFrequency&quot;:0.2222222222222222,&quot;crosshatch&quot;:0,&quot;crosshatchSpacing&quot;:0.28,&quot;crosshatchThickness&quot;:0.25,&quot;crosshatchAngle&quot;:0.25,&quot;crosshatchContrast&quot;:0.3333333333333333,&quot;crosshatchEdges&quot;:0.5,&quot;crosshatchLineWeight&quot;:0,&quot;crosshatchWave&quot;:0.33,&quot;crosshatchWaveFrequency&quot;:0.2222222222222222,&quot;kuwahara&quot;:0,&quot;kuwaharaRadius&quot;:0.14285714285714285,&quot;kuwaharaSharpness&quot;:0.3125,&quot;kuwaharaSaturation&quot;:0.5},&quot;lut&quot;:null,&quot;colorSpace&quot;:&quot;rec709&quot;}" data-hf-id="hf-tension-game" id="tension-game" class="clip" src="media-v17/buzz-boss-play-v17.mp4" data-start="14.7" data-duration="2.05" data-media-start="5.6" data-track-index="13" data-label="挑戦前｜周辺暗転" muted playsinline></video></div></div></div>
+<div data-hf-id="hf-watch-status" id="watch-status" class="clip" data-start="9.1" data-duration="10.5" data-track-index="11" data-label="観戦中｜常時表示">観戦中</div>
+<div data-hf-id="hf-a4hr" id="duel">
+<div data-hf-id="hf-r1de" class="duel-panel opponent"><video data-hf-id="hf-yjhf" id="opponent-game" class="clip" src="assets/buzz-background-duel-opponent-v11.mp4" data-start="19.6" data-duration="3.72" data-track-index="2" muted playsinline></video><div data-hf-id="hf-1mfl" class="role">相手</div></div>
+<div data-hf-id="hf-py6j" class="duel-panel self"><video data-hf-id="hf-ikis" id="self-game" class="clip" src="assets/buzz-background-duel-self-v11.mp4" data-start="19.6" data-duration="3.72" data-track-index="3" muted playsinline></video><div data-hf-id="hf-hs8g" class="role">自分</div></div>
+<div data-hf-id="hf-zesk" id="battle-heading">対戦開始</div>
+</div>
+<div data-hf-id="hf-8af1" id="caption">
+<div data-hf-id="hf-ge39" id="s0" class="state" data-layout-allow-overflow="true">プレイを観戦</div>
+<div data-hf-id="hf-f1nr" id="s2" class="state" data-layout-allow-overflow="true">“自分も、挑んでみたい。”</div>
+<div data-hf-id="hf-2o99" id="closing" class="state" data-layout-allow-overflow="true">いざ、対戦！</div>
+</div>
+<div data-hf-id="hf-3m2w" id="dock">
+<div data-hf-id="hf-i3kb" id="accept">相手が承認しました</div>
+<div data-hf-id="hf-6kmv" id="action"><div data-hf-id="hf-heartbeat-glow" id="challenge-heartbeat-glow" data-layout-ignore="true" aria-hidden="true"></div><div data-hf-id="hf-bhai" id="challenge" class="button-state">挑戦する</div><div data-hf-id="hf-x9g0" id="waiting" class="button-state">対戦を申し込みました</div></div>
+<div data-hf-id="hf-l3gf" id="ripple"></div>
+<div data-hf-id="hf-rf0r" id="start-text">対戦開始</div>
+
+</div>
+<div data-hf-id="hf-ces0" id="c-end-title" class="clip" data-composition-id="c-end-title" data-composition-src="compositions/c-end-title.html" data-start="23.32" data-duration="1.78" data-track-index="5" data-width="720" data-height="1280" style="position:absolute;inset:0;z-index:40"></div>
+</div></div>
+<script>
+const story=gsap.timeline();
+story.set('#screen-visual',{clipPath:'inset(0% 0% 0% 0% round 0px)'},1);
+story.to('#dock',{opacity:1,duration:.16},1);
+// Slow central right-to-left captions; actual gameplay continues underneath.
+const beats=[['#s0',1.25,3.4],['#s2',5.25,4.45],['#closing',11.58,3.62]];
+beats.forEach(([target,start,span])=>{const enter=.50,exit=.50,center=span-enter-exit;
+ story.fromTo(target,{x:760,opacity:1},{x:75,opacity:1,duration:enter,ease:'power2.out'},start);
+ story.to(target,{x:-75,duration:center,ease:'none'},start+enter);
+ story.to(target,{x:-760,duration:exit,ease:'power2.in'},start+enter+center);
+});
+story.to('#action',{scale:.94,duration:.16,ease:'power1.in'},8.25);
+story.to('#action',{scale:1,duration:.40,ease:'back.out(1.4)'},8.41);
+story.fromTo('#ripple',{scale:.5,opacity:0},{scale:1.3,opacity:.8,duration:.18,ease:'power2.out'},8.25);
+story.to('#ripple',{scale:1.8,opacity:0,duration:.34,ease:'power2.out'},8.43);
+story.to('#challenge',{opacity:0,duration:.12},8.45);
+story.to('#waiting',{opacity:1,duration:.12},8.57);
+story.to('#action',{backgroundColor:'#303446',borderColor:'#ed62a8',color:'#fff8ee',duration:.25},8.45);
+story.to('#dock',{backgroundColor:'#211424',duration:1.2,ease:'power2.out'},8.45);
+story.to('#accept',{opacity:1,duration:.25},10.18);
+story.to('#action',{borderColor:'#56deed',duration:.25},10.18);
+// Only the authored surroundings gain color; game pixels remain authentic.
+story.fromTo('#color-wave',{svgOrigin:'360 1160',scale:.2,opacity:0},{svgOrigin:'360 1160',scale:29,opacity:1,duration:1.45,ease:'power2.out'},10.18);
+story.to('#duel',{opacity:1,duration:.18},11.5);
+story.to('#screen',{opacity:0,duration:.18},11.5);
+story.to('#dock',{opacity:0,duration:.18},11.5);
+story.set('#duel',{opacity:0},15.22);
+// The end title is mounted as its own scene at absolute 23.32 seconds.
+const tl=gsap.timeline({paused:true});
+// Hold the tapped SNS post another 0.3 seconds; preserve the tap timing and later scene durations.
+tl.add(story,8.1);
+// Subtle, synchronized tension before the existing tap at absolute 16.35s.
+tl.to('#tension-visual',{opacity:1,duration:.4,ease:'power1.inOut'},14.7);
+tl.to('#tension-visual',{opacity:0,duration:.4,ease:'power1.out'},16.35);
+tl.to('#challenge-heartbeat-glow',{opacity:.1,duration:.25,ease:'power1.out'},14.85);
+// Registry citation: beat-pulse-background; one fast attack and slower decay per supplied beat.
+[15.1,15.7].forEach(beat=>{
+ tl.to('#challenge-heartbeat-glow',{opacity:.65,duration:.08,ease:'expo.out'},beat);
+ tl.to('#challenge-heartbeat-glow',{opacity:.1,duration:.36,ease:'power2.in'},beat+.08);
+});
+tl.to('#challenge-heartbeat-glow',{opacity:0,duration:.25,ease:'power1.out'},16.35);
+
+window.__timelines=window.__timelines||{};window.__timelines['c-cut']=tl;
+</script></body></html>

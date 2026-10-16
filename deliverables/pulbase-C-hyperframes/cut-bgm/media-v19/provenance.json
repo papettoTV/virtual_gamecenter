@@ -1,0 +1,26 @@
+{
+  "source": "assets/buzz-background-duel-self-v11.mp4",
+  "sourceSha256": "124115dd2630f44bb6c2cdc2be3a263e9ee3e9225470419a88cd04f493b8bb4a",
+  "output": "media-v19/buzz-duel-self-smooth-v19.mp4",
+  "method": "Optical-flow motion interpolation from 10fps temporal samples to 30fps; same match, duration and playback speed. Applied only to lower self video.",
+  "ffmpegFilter": "tpad=stop_mode=clone:stop_duration=0.4,fps=10,minterpolate=fps=30:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:me=umh:mb_size=16:search_param=48:vsbmc=1:scd=none",
+  "durationSeconds": 6.5,
+  "timelineStartSeconds": 19.6,
+  "usedSeconds": 3.72,
+  "fps": 30,
+  "approximateShipTracking": {
+    "before": {
+      "frames": 113,
+      "smallMoves": 75,
+      "jumpsOver8px": 20,
+      "maxStep": 16.06605157339307
+    },
+    "after": {
+      "frames": 113,
+      "smallMoves": 44,
+      "jumpsOver8px": 0,
+      "maxStep": 7.614312841173288
+    }
+  },
+  "qa": "Reviewed successive ship frames and full playfield. Large positional jumps reduced; interpolation can add brief softness to moving particles."
+}

@@ -1,0 +1,18 @@
+{
+  "v18": {
+    "frames": 112,
+    "smallMoves": 73,
+    "jumpsOver8px": 21,
+    "maxStep": 17.683322233983105,
+    "validTrackedSteps": 109,
+    "untrackedSteps": 2
+  },
+  "v19": {
+    "frames": 112,
+    "smallMoves": 39,
+    "jumpsOver8px": 2,
+    "maxStep": 16.032806990667634,
+    "validTrackedSteps": 109,
+    "untrackedSteps": 2
+  }
+}

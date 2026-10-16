@@ -1,0 +1,93 @@
+{
+  "file": "PULBASE-C-25p1s-BGM-crowd-v19-smooth-duel.mp4",
+  "durationSeconds": 25.1,
+  "resolution": [
+    1080,
+    1920
+  ],
+  "fps": "30/1",
+  "frames": 753,
+  "videoCodec": "h264",
+  "audioCodec": "aac",
+  "audioSampleRate": "48000",
+  "bytes": 24961688,
+  "sha256": "fe68f824c571ec3bdfa6865adaeeab82b4402910e52cd31e8b39b675d643cc25",
+  "fullDecodeSucceeded": true,
+  "standardCheckPassed": true,
+  "strictCheckRun": false,
+  "warningCount": 0,
+  "checkSamples": 22,
+  "audioStreamCopiedFromV18": true,
+  "audioAdtsSha256": "8cabf50822b23c02296dc302ffaf04fa17c0c3a18cd9977a0ee2f198ec1ff3b5",
+  "priorV18Sha256": "ad416b39189f0a77460a42f5129f60ca1b3539f89303d97664ab0c62c5aef1dd",
+  "priorV18HashUnchanged": true,
+  "priorV18SourceArchived": "versions/v18",
+  "completedV16HashUnchanged": true,
+  "completedV16Sha256": "3746758e5ef3b76c1a3d120ca9a24640fe01b8b6c1898e90f47583a25fd96247",
+  "onlyLowerDuelVideoSourceChanged": true,
+  "allTimelineTimingUnchanged": true,
+  "motionInterpolationProvenance": "media-v19/provenance.json",
+  "preservedSceneFrameComparisons": [
+    {
+      "seconds": 0,
+      "meanAbsoluteRgbDifference": 0.0
+    },
+    {
+      "seconds": 3.05,
+      "meanAbsoluteRgbDifference": 0.0
+    },
+    {
+      "seconds": 8.9,
+      "meanAbsoluteRgbDifference": 0.0
+    },
+    {
+      "seconds": 10,
+      "meanAbsoluteRgbDifference": 0.0
+    },
+    {
+      "seconds": 15.2,
+      "meanAbsoluteRgbDifference": 0.0
+    },
+    {
+      "seconds": 24.5,
+      "meanAbsoluteRgbDifference": 0.0
+    }
+  ],
+  "sceneReviewTimesSeconds": [
+    0,
+    3.05,
+    5.55,
+    8.9,
+    10,
+    15.2,
+    16.6,
+    19.7,
+    20.3,
+    21.1,
+    22.7,
+    24.5
+  ],
+  "silentV19Created": false,
+  "cliVersion": "0.8.164",
+  "cliUpgradedFrom": "0.8.162",
+  "renderCapture": "screenshot / hardware GPU / 2 workers / delivery",
+  "deliveredMotionTracking": {
+    "v18": {
+      "frames": 112,
+      "smallMoves": 73,
+      "jumpsOver8px": 21,
+      "maxStep": 17.683322233983105,
+      "validTrackedSteps": 109,
+      "untrackedSteps": 2
+    },
+    "v19": {
+      "frames": 112,
+      "smallMoves": 39,
+      "jumpsOver8px": 2,
+      "maxStep": 16.032806990667634,
+      "validTrackedSteps": 109,
+      "untrackedSteps": 2
+    }
+  },
+  "deliveredMotionTrackingNote": "Approximate pink-ship tracking, scaled back to source pixels. Invalid steps during transition opacity excluded from max. Optical-flow frames can have short edge softening."
+}
