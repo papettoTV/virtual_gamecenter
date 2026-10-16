@@ -18,3 +18,9 @@
 - `header-comparison.png`：プロフィール画像の重なりを想定した比較。プロフィール画像は確認用で、アップロード用ヘッダーには含まない。X実画面での配置検証は未実施。
 
 全案のPNG寸法と比較画像を確認。再生成：`node deliverables/pulbase-x-profile/build-headers.cjs`。
+
+## ゲーセン背景版
+
+`pulbase-x-header-arcade-v1.png`：画像生成ツールで制作した3:1の横長ヘッダー案。参照元は「宣伝素材」チャットで使用している `deliverables/pulbase-C-hyperframes/cut/assets/arcade-opening-crowded-v1.png` と、既存の `pulbase-x-header-tagline-1500x500.png`。
+
+指示：暖色の照明、筐体、プレイヤーと観客の背景を横長に展開。白いPULBASEとシアンの稲妻、タグラインを右側へ配置。左下に重要な文字を置かず、背景を残しながら文字背後だけ控えめに暗くする。画像生成による再構成であり、背景・ロゴの画素を厳密に保持した合成ではない。生成画像を目視確認。X実画面での表示・アカウント設定は未実施。
