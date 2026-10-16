@@ -85,3 +85,8 @@ favicon等のシンボルは引き続き `pulbase-b-slim-cyan-bolt.svg`。文字
 - 実寸favicon：`favicon-compare-{round,angular}-{16,32}.png`
 
 文字ロゴは両案とも同じシンボルを先頭文字に使い、残りのULBASEの位置・字形は共通。現在サイトで使うChakra PetchのPに稲妻を入れた文字ロゴとは異なる比較案。サイト・採用版は未変更。SVG読み込み、PNG寸法、比較画像の目視確認済み。再生成はリポジトリルートから `python3 deliverables/pulbase-logo-b/build-angular.py`、続いて `node deliverables/pulbase-logo-b/build-angular.cjs`。
+
+
+## 面取りPに統一（2026-10-16）
+
+ユーザーが右の面取り版を採用。正本シンボルは `pulbase-b-angular-cyan.svg`、文字ロゴは `wordmark-symbol-angular.svg`。白とシアン、内側の丸い抜きを維持。これ以前の丸い版とChakra PetchのP＋稲妻は比較履歴。サイトのpublic/brand、favicon、X素材も面取り版へ統一。
