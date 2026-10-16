@@ -1,0 +1,42 @@
+{
+  "source": "assets/buzz-background-duel-self-v11.mp4",
+  "sourceSha256": "124115dd2630f44bb6c2cdc2be3a263e9ee3e9225470419a88cd04f493b8bb4a",
+  "player": "self / 自分",
+  "individualPlayfield": true,
+  "sourceSeconds": 3.1,
+  "mainTimelineEquivalentSeconds": 22.7,
+  "cabinet": {
+    "file": "media-v18/buzz-duel-self-cabinet-v18.png",
+    "resolution": [
+      392,
+      536
+    ],
+    "crop": "full individual game field"
+  },
+  "sns": {
+    "file": "media-v18/buzz-duel-self-post-v18.jpg",
+    "resolution": [
+      392,
+      208
+    ],
+    "crop": [
+      0,
+      328,
+      392,
+      208
+    ],
+    "playerVisible": true
+  },
+  "priorVersion": {
+    "priorFile": "PULBASE-C-25p1s-BGM-crowd-v17-boss.mp4",
+    "priorSha256": "3249c1bdcb1b7babeaca21ff2388244ca063aa5f10d2df9255da3cd5a80ea3b5",
+    "priorSource": "versions/v17",
+    "durationSeconds": 25.1,
+    "fps": 30,
+    "frames": 753
+  },
+  "sha256": {
+    "buzz-duel-self-cabinet-v18.png": "fbce46692eca24718bb7ea0c2d7569083b3699ab4c998e46f84d91473dc161b9",
+    "buzz-duel-self-post-v18.jpg": "fd53c28838f6d336fc0028d102579bcc32e56dcd801b0f9738f509b0a1aa463e"
+  }
+}
