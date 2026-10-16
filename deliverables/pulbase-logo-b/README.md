@@ -75,3 +75,13 @@ SVG再生成：fontToolsを用意して `python3 build-wordmarks.py`。比較画
 ユーザーが③「Pにシアンの稲妻を組み込む」を採用。文字ロゴの正本は `wordmark-chakra-bolt.svg`。Chakra Petch SemiBoldのアウトラインを土台とし、先頭Pにシアン#69F7FFの稲妻を統合。④と加工前は比較用に保持。
 
 favicon等のシンボルは引き続き `pulbase-b-slim-cyan-bolt.svg`。文字ロゴ単体では独立シンボルを添えず、稲妻の重複を避ける構成を基本とする。サイトの文字部分への適用・push・公開はまだ行っていない。
+
+## 丸いPと面取りPの比較
+
+`preview-angular.html` / `comparison-angular.png` は現行シンボルの曲線と、外側だけ面取りにした比較案。内側の丸い抜き、稲妻、配色、文字高さを維持。
+
+- 面取りシンボル：`pulbase-b-angular-cyan.svg`
+- 比較用文字ロゴ：`wordmark-symbol-round.svg` / `wordmark-symbol-angular.svg`
+- 実寸favicon：`favicon-compare-{round,angular}-{16,32}.png`
+
+文字ロゴは両案とも同じシンボルを先頭文字に使い、残りのULBASEの位置・字形は共通。現在サイトで使うChakra PetchのPに稲妻を入れた文字ロゴとは異なる比較案。サイト・採用版は未変更。SVG読み込み、PNG寸法、比較画像の目視確認済み。再生成はリポジトリルートから `python3 deliverables/pulbase-logo-b/build-angular.py`、続いて `node deliverables/pulbase-logo-b/build-angular.cjs`。
