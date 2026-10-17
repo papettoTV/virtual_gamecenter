@@ -33,3 +33,7 @@ preview.htmlが比較ページ、comparison.pngがその描画結果。画像読
 `favicon-depth-{depth,path,warm}.svg` と同名のサイズ別PNG。全9PNGの寸法と画像読み込み・比較画像を確認。16pxでは3案の違いは小さいが、入口の明るさは残る。32pxでは青紫・暖色の差も確認できる。採用データ・サイトは未変更。
 
 再生成：`node deliverables/pulbase-logo-comparison-top/build-depth-favicons.cjs`。
+
+## Pの色の奥行きを文字ロゴで比較
+
+`wordmark-depth-three-directions-v1.png`：青い横長のPULBASEとPの奥行き3案を参照し、画像生成でフル文字ロゴ3段に再構成。Pのみ①青の明暗、②青紫、③入口の暖色を変更する指示。ULはシアン、BSEは白、筐体風Aはマゼンタの縁を共通とした。厳密なSVG共通部品ではなく生成による比較案。画像を目視確認。採用・サイト適用は未実施。
