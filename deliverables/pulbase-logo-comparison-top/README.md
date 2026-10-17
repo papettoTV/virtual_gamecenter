@@ -25,3 +25,11 @@ preview.htmlが比較ページ、comparison.pngがその描画結果。画像読
 ## Pを店内と捉えた色の奥行き
 
 `p-symbol-interior-depth-v1.png`：シンプルPの色面を店内と捉え、下の入口を明るく、奥に相当する上部を濃い青へ移す3案を画像生成。01青の明暗、02Pの経路に沿う青〜青紫、03入口に淡い暖色。人物・筐体の描き込みを足さず色だけで表現。意図は「入りやすい入口から奥の深い遊び場へ」。グラデーションのみから熟練者が集まる意味を直接読み取れるとは限らない。生成結果を目視確認。採用・サイト変更は未実施。
+
+## 色の奥行き3案のfavicon比較
+
+`preview-depth-favicons.html` / `comparison-depth-favicons.png`。生成画像を切り出さず、共通の簡潔なSVG輪郭へ3案の配色を再構成した比較。元画像と厳密に同じ形・光ではなく、発光を除いた小サイズ評価用。各案で16・32・48pxを生成し、明暗タブ、実寸、ピクセル拡大を並べた。
+
+`favicon-depth-{depth,path,warm}.svg` と同名のサイズ別PNG。全9PNGの寸法と画像読み込み・比較画像を確認。16pxでは3案の違いは小さいが、入口の明るさは残る。32pxでは青紫・暖色の差も確認できる。採用データ・サイトは未変更。
+
+再生成：`node deliverables/pulbase-logo-comparison-top/build-depth-favicons.cjs`。
