@@ -9,7 +9,6 @@ export default function DotWaveCabinet() {
   if (!controller) return null;
   const { state: d, network: net, audio, share, requestChallenge, rematch, respondRematch, respond, takeSeat, leaveResult, showError } = controller;
   const resultDraft = controller.getResultShareDraft();
-  const safeSharePhase = ["ready", "paused"].includes(controller.getLivePhase());
   const viewingResult = net.role === "spectator" && net.latest?.engine.mode === "online" && ["impact", "finished"].includes(net.latest.engine.phase);
   const players = d.result && d.resultPlayers ? d.resultPlayers
     : viewingResult && d.room?.dotWaveResultPlayers ? d.room.dotWaveResultPlayers
@@ -29,7 +28,7 @@ export default function DotWaveCabinet() {
     <MochiDuel key={d.revision} players={players} network={net} sharedAudio={audio}
       challengePending={d.pending && net.role === "player"}
       challengeNotice={<>{d.pending && net.role === "player" && <div className="dot-challenge-prompt" role="dialog" aria-label="対戦の申し込み"><strong>対戦の申し込みが来ました</strong><button onClick={() => void respond(true)}>対戦する</button><button onClick={() => void respond(false)}>今回は断る</button></div>}</>}
-      boardNotice={<>{safeSharePhase && <button disabled={!controller.canShareLive()} onClick={() => void share()}>ライブを共有</button>}{net.matchId && !net.startsAt && !d.result && <p role="status">対戦の準備中…</p>}</>}
+      boardNotice={<>{net.matchId && !net.startsAt && !d.result && <p role="status">対戦の準備中…</p>}</>}
       holdResult={Boolean(d.result && !net.matchId && net.role === "player")}
       resultPanel={<>{resultDraft && <ResultShareButton draft={resultDraft} />}{d.result && Date.now() - d.resultAt >= 2500 && <div className="dot-match-result" role="status"><strong>{d.result.winner === "draw" ? "引き分け" : d.result.winner === d.seat ? "あなたの勝ち！" : "相手の勝ち！"}</strong>{d.rematchPending && <div role="dialog" aria-label="再挑戦の申し込み"><strong>再挑戦の申し込みが来ました</strong><button onClick={() => void respondRematch(true).catch(showError)}>対戦する</button><button onClick={() => void respondRematch(false).catch(showError)}>今回は断る</button></div>}{d.result.winner !== "draw" && d.result.winner !== d.seat && <button disabled={d.busy || d.rematchRequested} onClick={() => void rematch()}>{d.rematchRequested ? "承認待ち" : "再挑戦（1クレジット）"}</button>}<button onClick={leaveResult}>{d.result.winner === d.seat || (d.result.winner === "draw" && d.seat === "host") ? "CPUと対戦し直す" : "観戦に戻る"}</button></div>}</>}
     />

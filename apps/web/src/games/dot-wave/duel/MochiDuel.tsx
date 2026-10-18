@@ -1,4 +1,5 @@
 import { notifications } from "../../../features/notifications/notifications";
+import { navigate } from "../../../shared/navigation";
 import type { DotWaveRoster } from "../../../domain/cabinet";
 import { useEffect, useReducer, useRef, useState, type RefObject, type ReactNode } from "react";
 import { turnCue, cueName, inputHint, countdownCue } from "./turnCue";
@@ -293,6 +294,7 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
     const key = (event: KeyboardEvent) => {
       if (network && (network.side === null || !network.connected)) return;
       if (event.target instanceof Element && event.target.closest("input, select, textarea, a, [role=dialog], [data-debug-controls]")) return;
+      if (engine.current.phase === "intro" && event.target instanceof Element && event.target.closest("button") && !event.target.closest(".duel-primary")) return;
       if (event.target instanceof Element && event.target.closest("button") && event.code === "Space" && !["intro", "playing"].includes(engine.current.phase)) return;
       const current = engine.current;
       if (["Space", "KeyF", "KeyJ", "KeyP"].includes(event.code)) event.preventDefault();
@@ -360,8 +362,10 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
       {e.phase === "intro" && !busy.current && <div className="duel-state-overlay duel-start-panel">
       {!replica && !network?.matchId && <div className="duel-intro-panel">
         <div className="duel-start-actions">
+        {network && stage === 1 && network.startCost > 0 && <h2>ゲームを開始しますか？</h2>}
         <p className="duel-input-hint">{e.mode === "cpu" ? "スペース / F / タップでパルス" : "CYAN：F　PINK：J / それぞれのタップボタン"}</p>
         <button className="duel-primary" onClick={() => void begin()} disabled={Boolean(network && !network.connected)}>START / {e.mode === "cpu" && stage > 1 ? `${stageInfo.label} 開始` : network ? network.startCost ? "1クレジットで開始" : "続ける" : "対戦開始"}</button>
+        {network && stage === 1 && network.startCost > 0 && <button type="button" onClick={() => navigate("/")}>キャンセル</button>}
         </div>
         {e.mode === "cpu" && <div className="dot-stage-intro"><strong>{stageInfo.label} · {stageInfo.name}</strong><span>{stageInfo.title}</span></div>}
         <div className="dot-cue-guide"><span><BattleIcon kind="tap"/><span>チカチカ → もうすぐ</span></span><span><BattleIcon kind="note"/><span>音符でこうげき</span></span><span><BattleIcon kind="shield"/><span>シールドでまもる</span></span></div>

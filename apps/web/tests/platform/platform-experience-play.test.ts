@@ -140,6 +140,22 @@ describe("typed platform play integration", () => {
     }
   }
 
+  it("returns to the arcade without spending a credit when initial play is cancelled", () => {
+    const pushState = vi.fn();
+    vi.stubGlobal("location", window.location);
+    vi.stubGlobal("history", { pushState });
+    vi.stubGlobal("document", { body: { classList: { contains: () => false } } });
+    vi.stubGlobal("PopStateEvent", class extends Event {});
+    mount();
+    gameHost.requestPlay("start");
+    const button = elements(render()).find(element => element.props.className === "platform-cancel-button");
+    expect(button).toBeDefined();
+    (button!.props.onClick as () => void)();
+    expect(pushState).toHaveBeenCalledWith({}, "", "/");
+    expect(executePlay).not.toHaveBeenCalled();
+    expect(play).not.toHaveBeenCalled();
+  });
+
   it("opens the start confirmation once and removes only the start query", () => {
     window.location.href = "https://example.test/cabinets/test-cabinet?game=deep-sea-salvage&start=1&watch=0#ranking";
     window.location.search = "?game=deep-sea-salvage&start=1&watch=0";

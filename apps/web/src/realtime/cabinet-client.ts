@@ -1,4 +1,5 @@
 import type { ClientMessage, ServerMessage } from "../shared/protocol";
+import { publishCabinetPresence } from "./cabinet-presence";
 
 export interface CabinetClientHandlers {
   onConnectionChange?: (connected: boolean) => void;
@@ -64,7 +65,11 @@ export function createCabinetClient(handlers: CabinetClientHandlers = {}): Cabin
     connection.addEventListener("message", (event) => {
       if (socket !== connection) return;
       try {
-        handlers.onMessage?.(JSON.parse(event.data));
+        const message = JSON.parse(event.data) as ServerMessage;
+        handlers.onMessage?.(message);
+        if (cabinetId && gameId && (message.type === "cabinetState" || message.type === "playerLeft")) {
+          publishCabinetPresence({ cabinetId, gameId, playerCount: message.type === "cabinetState" ? message.state.playerCount : 0 });
+        }
       } catch {
         handlers.onError?.("筐体サーバーからの応答を読み取れませんでした。");
       }
@@ -82,8 +87,7 @@ export function createCabinetClient(handlers: CabinetClientHandlers = {}): Cabin
 
   function join(nextCabinetId: string, nextGameId: string, asViewer = false) {
     const params = new URLSearchParams(window.location.search);
-    const preview = window.self !== window.top && params.get("preview") === "1" && params.get("watch") === "1";
-    watch = asViewer || preview;
+    watch = asViewer || params.get("watch") === "1";
     if (cabinetId !== nextCabinetId || gameId !== nextGameId) {
       wantsCabinet = false;
       socket?.close();

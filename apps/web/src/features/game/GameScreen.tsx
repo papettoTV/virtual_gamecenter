@@ -109,7 +109,7 @@ export function GameScreen({ game }: GameScreenProps) {
       <AfterFrame game={game} />
 
       <div className="spectator-game-actions">
-        <button id="spectator-game-back" className="secondary-button" type="button" onClickCapture={event => { event.stopPropagation(); navigate(`/?game=${encodeURIComponent(game.id)}`); }}>筐体画面に戻る</button>
+        <button id="spectator-game-back" className="secondary-button" type="button" onClickCapture={event => { event.stopPropagation(); navigate("/"); }}>ほかのゲームを見る</button>
       </div>
 
       <div className="touch-controls" aria-label="スマホ操作">

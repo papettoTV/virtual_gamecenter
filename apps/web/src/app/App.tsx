@@ -6,7 +6,8 @@ import { PlatformExperience } from "../features/platform/PlatformExperience";
 import { DEFAULT_GAME_ID, DOT_WAVE, resolveGameDefinition, type GameDefinition } from "../domain/game";
 import { getGameRegistration } from "../games/registry";
 import { BRAND } from "../domain/brand";
-import { createUuid } from "../shared/id";
+import { gamePlayUrl, startNewGame } from "../features/cabinet/play-navigation";
+import { SpectatorGate } from "../features/cabinet/SpectatorGate";
 import { NotificationCenter } from "../features/notifications/NotificationCenter";
 import { notifications } from "../features/notifications/notifications";
 import type { CanvasGameModule } from "../game-sdk/contracts";
@@ -46,32 +47,30 @@ export function App() {
     sharePanel.close();
     if (!resultMatch) document.title = selection || isCabinet ? `${game.title}${url.searchParams.get("watch") === "1" ? "の観戦" : ""} | PULBASE` : `${BRAND.name} | ${BRAND.category}`;
   }, [address]);
-  const chooseGame = (gameId: string) => navigate("/?game=" + encodeURIComponent(gameId));
   return <>{!preview && <><NotificationCenter /><SharePanel /><AnalyticsConsent /></>}{
     resultMatch ? <SharedResultPage key={resultMatch[1]} resultId={resultMatch[1]!} /> :
     url.pathname === "/labs/buzz-barrier-three" ?
       <Suspense fallback={<Loading />}><ThreeBulletLab /></Suspense> :
-    isCabinet ? <GameRoute key={game.id} game={game} preview={preview} /> :
+    isCabinet ? <SpectatorGate key={`${url.pathname}:${url.searchParams.get("watch")}:${preview}`} game={game} url={url} preview={preview}>
+      <GameRoute game={game} preview={preview} />
+    </SpectatorGate> :
       <main className={`shell${!selection ? " showroom-shell" : ""}`}>
         {!selection && <section className="intro">
           <p className="eyebrow brand-category">{BRAND.category}</p>
           <h1 className="brand-heading"><img className="brand-wordmark" src="/brand/pulbase-wordmark.svg" alt={BRAND.name} /><span className="brand-reading">{BRAND.reading}</span></h1>
           <p className="brand-tagline">{BRAND.tagline}</p>
         </section>}
-        {selection ? <CabinetSelection game={game} /> : <ArcadeScreen onSelectGame={chooseGame} />}
+        {selection ? <StartGameRedirect game={game} /> : <ArcadeScreen onSelectGame={startNewGame} />}
         <PlatformExperience standaloneCredits />
       </main>
   }</>;
 }
 
-function CabinetSelection({ game }: { game: GameDefinition }) {
+function StartGameRedirect({ game }: { game: GameDefinition }) {
   useEffect(() => {
-    document.body.classList.add("is-cabinet-screen");
-    return () => document.body.classList.remove("is-cabinet-screen");
+    navigate(gamePlayUrl(game.id), { replace: true });
   }, []);
-  return <CabinetScreen game={game} visible
-    onStartSolo={() => navigate(`/cabinets/${createUuid()}?game=${encodeURIComponent(game.id)}${getGameRegistration(game.id).kind === "canvas" ? "&start=1" : ""}`)}
-    onBack={() => navigate("/")} />;
+  return <Loading />;
 }
 
 type LoadedGame = { canvas: CanvasGameModule } | { Component: ComponentType };

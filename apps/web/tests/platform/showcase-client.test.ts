@@ -4,8 +4,8 @@ import { createCabinetClient } from "../../src/realtime/cabinet-client";
 afterEach(() => vi.unstubAllGlobals());
 
 describe("showcase spectator connection", () => {
-  for (const explicitWatch of [false, true]) {
-    it(`never takes the player seat when a runtime passes watch=${explicitWatch}`, () => {
+  for (const [explicitWatch, framed] of [[false, true], [true, true], [false, false]] as const) {
+    it(`never takes the player seat when watch=${explicitWatch}, framed=${framed}`, () => {
       const handlers = new Map<string, () => void>();
       const sent: string[] = [];
       class Socket {
@@ -20,9 +20,10 @@ describe("showcase spectator connection", () => {
         constructor() { super(); socket = this; }
       };
       vi.stubGlobal("WebSocket", Factory);
+      const frame = {};
       vi.stubGlobal("window", {
-        self: {}, top: {},
-        location: { protocol: "https:", host: "example.com", search: "?watch=1&preview=1" },
+        self: frame, top: framed ? {} : frame,
+        location: { protocol: "https:", host: "example.com", search: framed ? "?watch=1&preview=1" : "?watch=1" },
       });
       const client = createCabinetClient();
       client.join("room", "graze-duel", explicitWatch);

@@ -199,6 +199,10 @@ export function createDotWaveCabinetController(
     const existing = url.pathname.match(/^\/cabinets\/([a-zA-Z0-9-]+)$/)?.[1] ?? url.searchParams.get("cabinet");
     d.cabinetId = existing ?? createUuid();
     const watch = url.searchParams.get("watch") === "1";
+    if (url.searchParams.has("start")) {
+      url.searchParams.delete("start");
+      history.replaceState(history.state, "", `${url.pathname}${url.search}`);
+    }
     if (!existing) history.replaceState({}, "", `/cabinets/${d.cabinetId}?game=dot-wave`);
     const resetGame = () => { clearResult(); playAttributionRecorded = false; localEngine = null; runStartedAt = 0; net.latest = null; net.inputs = []; d.bestFrameSeq = -1; d.revision++; };
     const handle = async (message: ServerMessage) => {

@@ -3,6 +3,7 @@ import { getActiveGames, type GameDefinition } from "../../domain/game";
 import { openCabinet, useCabinets, type CabinetEntry } from "./CabinetDirectory";
 import { getShowcaseCabinets, livePreviewUrl } from "./showcase-model";
 import { GameDemo } from "./GameDemo";
+import { GameHelp } from "../cabinet/GameHelp";
 import "./showcase.css";
 
 export function ArcadeScreen({ onSelectGame }: { onSelectGame: (gameId: string) => void }) {
@@ -62,6 +63,7 @@ function GameShowcase({ game, onSelectGame }: { game: GameDefinition; onSelectGa
           title={cabinet ? undefined : "プレイ中の筐体がないため観戦できません"}>観戦する <span aria-hidden="true">↗</span></button>
         <button type="button" onClick={() => onSelectGame(game.id)}>{cabinet ? "自分も遊ぶ" : "遊ぶ"} <span aria-hidden="true">→</span></button>
       </div>
+      <GameHelp game={game} />
     </div>
   </article>;
 }

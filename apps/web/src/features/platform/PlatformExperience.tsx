@@ -23,6 +23,7 @@ import {
   type WalletSummary,
 } from "./platform-client";
 import { resolveGameDefinition } from "../../domain/game";
+import { navigate } from "../../shared/navigation";
 import {
   recordPlayStartedFromWatch,
 } from "../engagement/engagement-client";
@@ -330,6 +331,8 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
                 }
                 setPlayDialog(null);
                 setPendingAction(null);
+                if (!standaloneCredits && location.pathname.startsWith("/cabinets/")
+                  && !document.body.classList.contains("is-game-screen")) navigate("/");
               }}>
                 {playDialog === "confirm" ? "キャンセル" : purchasesEnabled ? "いいえ" : "閉じる"}
               </button>

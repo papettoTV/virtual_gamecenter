@@ -1,111 +1,26 @@
-import { CabinetSelector } from "../arcade/CabinetDirectory"
-import type { GameDefinition } from "../../domain/game"
-import { gameHost } from "../../game-sdk/game-host"
-import { navigate } from "../../shared/navigation"
+import type { GameDefinition } from "../../domain/game";
+import { gameHost } from "../../game-sdk/game-host";
+import { navigate } from "../../shared/navigation";
+import { GameHelp } from "./GameHelp";
+import { startNewGame } from "./play-navigation";
 
-export function CabinetScreen({ game, visible = false, onStartSolo, onBack }: { game: GameDefinition; visible?: boolean; onStartSolo?: () => void; onBack?: () => void }) {
-  return (
-    <section className={`cabinet-screen${visible ? "" : " is-hidden"}`} id="cabinet-screen">
-      <div className="arcade-card">
-        <div className="arcade-heading">
-          <div>
-            <p className="eyebrow" id="cabinet-id-label">
-              Cabinet
-            </p>
-            <h2>{game.title}</h2>
-          </div>
-        </div>
-
-        <div className="cabinet-legacy-controls" hidden>
-          <div className="cabinet-status-copy">
-            <strong>筐体状態</strong>
-            <span id="cabinet-status-label">空き</span>
-            <small id="cabinet-role-label">接続中</small>
-          </div>
-          <button
-            id="start-solo"
-            className="cabinet-start-button"
-            type="button"
-            onClick={() => gameHost.requestPlay("start")}
-          >
-            ゲームスタート
-          </button>
-          <small
-            id="cabinet-copy-status"
-            className="cabinet-copy-status"
-            aria-live="polite"
-          >
-            共有アイコンで筐体URLをコピーできます
-          </small>
-        </div>
-
-        <div id="cabinet-selector-title" className="sr-only">筐体選択</div>
-        <CabinetSelector game={game} onStartSolo={onStartSolo} />
-
-        <section
-          className="cabinet-promo"
-          aria-labelledby="cabinet-promo-title"
-        >
-          <div className="cabinet-promo-heading">
-            <strong id="cabinet-promo-title">プレイイメージ</strong>
-            <small>{game.localizedTitle} Gameplay</small>
-          </div>
-          {game.promoVideoUrl ? (
-            <video autoPlay muted loop playsInline preload="metadata" poster={game.promoPosterUrl}>
-              <source src={game.promoVideoUrl} type="video/mp4" />
-              お使いのブラウザでは動画を再生できません。
-            </video>
-          ) : (
-            <img className="cabinet-promo-still" src={game.promoPosterUrl} alt={`${game.localizedTitle} プレイイメージ`} />
-          )}
-        </section>
-
-        <section className="cabinet-help-grid" aria-label="遊び方">
-          {game.id === "dot-wave" ? <>
-            <div><strong>操作</strong><span>スペース / Fキー / 画面タップ</span><span>音をきいてあそぶゲームです。音を出してね！</span></div>
-            <div><strong>あそびかた</strong><span>音符でこうげき、リズムに合わせてシールドでまもろう。</span><span>観戦から対戦を申し込み、相手が承認すると通信対戦が始まります。</span></div>
-          </> : game.id === "deep-sea-salvage" ? <>
-            <div>
-              <strong>操作</strong>
-              <span>移動: 矢印キー / WASD</span>
-              <span>調査: 魚に近づくと自動</span>
-              <span>ポーズ: P　図鑑: F</span>
-            </div>
-            <div>
-              <strong>ゲームのコツ</strong>
-              <span>魚を調査して電力を補充しながら、より深い海を目指します。</span>
-              <span>深海では発光や水流の変化を見て、高速魚を避けましょう。</span>
-              <span>何度も現れる巨大魚を追跡し、調査を完了するとクリアです。</span>
-            </div>
-          </> : <>
-          <div>
-            <strong>操作</strong>
-            <span>移動: 矢印キー / WASD</span>
-            <span>低速移動: Shift</span>
-            <span>ボス攻撃: 無敵シールドを当てる</span>
-            <span>一時停止: Space</span>
-          </div>
-          <div>
-            <strong>ゲームのコツ</strong>
-            <span>
-              弾をかするとゲームが増え、ゲージが溜まるとレベルが上がり一定時間無敵になります。
-            </span>
-            <span>無敵中も、弾をかすってゲージを溜めることができます。</span>
-            <span>無敵シールドをボスに当てて、ラスボス撃破を目指します。</span>
-          </div>
-          </>}
-        </section>
-        <div className="screen-actions">
-          <button
-            id="back-to-arcade"
-            onClickCapture={event => { event.stopPropagation(); if (onBack) onBack(); else navigate("/"); }}
-            className="secondary-button"
-            type="button"
-          >
-            他のゲームを探す
-          </button>
-        </div>
+export function CabinetScreen({ game }: { game: GameDefinition }) {
+  const watch = new URLSearchParams(location.search).get("watch") === "1";
+  return <section className="cabinet-screen is-hidden" id="cabinet-screen">
+    <div className="arcade-card">
+      <p className="eyebrow" id="cabinet-id-label">{game.localizedTitle}</p>
+      <h2>{game.title}</h2>
+      <p>{watch ? "プレイは終了したか、まだ始まっていません。" : "ゲーム開始の確認をしています。"}</p>
+      <div className="cabinet-legacy-controls" hidden>
+        <span id="cabinet-status-label" /><span id="cabinet-role-label" />
+        <button id="start-solo" type="button" onClick={() => gameHost.requestPlay("start")}>ゲームスタート</button>
+        <small id="cabinet-copy-status" />
       </div>
-    </section>
-  )
+      <div className="cabinet-waiting-actions">
+        {watch && <button type="button" onClick={() => startNewGame(game.id)}>自分も遊ぶ</button>}
+        <button id="back-to-arcade" type="button" onClickCapture={event => { event.stopPropagation(); navigate("/"); }}>ほかのゲームを見る</button>
+      </div>
+      <GameHelp game={game} />
+    </div>
+  </section>;
 }

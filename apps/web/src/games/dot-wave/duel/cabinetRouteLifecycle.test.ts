@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { ReactElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import type { CabinetTransportFactory } from "./cabinetController";
 import DotWaveCabinet from "./DotWaveCabinet";
 import MochiDuel from "./MochiDuel";
@@ -80,6 +81,7 @@ function gameElement() {
   return route.props.children.find(child => child.type === MochiDuel)! as ReactElement<{
     network: import("./network").DuelLink;
     sharedAudio: { current: unknown };
+    boardNotice: ReactElement;
   }>;
 }
 
@@ -101,6 +103,15 @@ afterEach(() => {
   unmountRoute();
   vi.useRealTimers();
   vi.unstubAllGlobals();
+});
+
+it("does not cover the start confirmation with a duplicate share overlay", async () => {
+  mountRoute();
+  await flush();
+  sessions[0]!.handlers.onConnectionChange(true);
+  sessions[0]!.handlers.onMessage({ type: "roleChanged", role: "player" });
+  expect(renderToStaticMarkup(gameElement().props.boardNotice)).toBe("");
+  expect(services.reserve).not.toHaveBeenCalled();
 });
 
 it("leaves the DOT route and returns with fresh network/audio state and only one active session", async () => {

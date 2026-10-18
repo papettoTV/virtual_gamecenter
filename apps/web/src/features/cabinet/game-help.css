@@ -1,0 +1,16 @@
+.game-help { border-top: 1px solid #304359; padding-top: 12px; color: #bac9da; font-size: 13px; }
+.game-help summary { cursor: pointer; padding: 4px 0; color: #dbeaf7; }
+.game-help-content { padding: 8px 0 0; }
+.game-help-content p { margin: 0 0 8px; font-size: inherit; line-height: 1.7; }
+.game-help-mobile { display: none; }
+.spectator-availability { max-width: 640px; margin: 40px auto; padding: 24px; background: #0c1424; border: 1px solid #345069; border-radius: 16px; }
+.spectator-availability h2 { margin-top: 0; }
+.spectator-availability p { color: var(--muted); line-height: 1.8; }
+.spectator-availability .showcase-actions { margin: 24px 0; }
+.spectator-offline #cabinet-screen, .spectator-offline #game-screen, .spectator-offline main.dot-wave, .spectator-offline .dot-cabinet-bar { display: none !important; }
+.spectator-offline .shell { padding-top: 0; }
+.cabinet-waiting-actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 24px 0; }
+@media (pointer: coarse) {
+  .game-help-mobile { display: block; }
+  .game-help-desktop { display: none; }
+}
