@@ -9,6 +9,7 @@ vi.mock("react", async importOriginal => ({
   ...await importOriginal<typeof import("react")>(),
   useState: () => [state.playerCount, vi.fn()],
   useEffect() {},
+  useRef: (current: unknown) => ({ current }),
 }));
 
 function render(search = "?watch=1", preview = false) {
