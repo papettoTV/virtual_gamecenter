@@ -1,0 +1,8 @@
+{
+  "asset": "arcade-ambient-v1.jpg",
+  "createdAt": "2026-10-18",
+  "generator": "OpenAI built-in image generation",
+  "purpose": "PULBASE homepage ambient background; no gameplay or interface content",
+  "prompt": "Background only, landscape 1536x1024. Very dark defocused Japanese video game arcade interior. Subtle cyan indirect lighting at the far left and subdued violet lighting at the far right, indistinct cabinets at the edges. Middle 70 percent nearly black navy negative space. Faint colored reflections on a dark polished floor. Intentionally out of focus, low contrast, understated photographic atmosphere. No text, logos, UI, people, readable game screens, decorative frames or foreground objects.",
+  "encoding": "JPEG, quality 78; original generated PNG retained outside the application"
+}
