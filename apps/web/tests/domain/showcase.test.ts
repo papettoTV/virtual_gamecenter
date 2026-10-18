@@ -62,6 +62,9 @@ describe("arcade showcases", () => {
     expect(html.match(/class="showcase-watch" disabled=""/g)).toHaveLength(3);
     expect(html.match(/>遊ぶ /g)).toHaveLength(3);
     expect(html).not.toContain("showcase-window-link");
+    expect(html).toContain('class="showcase-coming-content"');
+    expect(html).toContain('<h2>COMING SOON</h2>');
+    expect(html).not.toContain('<h2>Coming Soon</h2>');
     expect(html).not.toContain("を選択\"");
   });
 });

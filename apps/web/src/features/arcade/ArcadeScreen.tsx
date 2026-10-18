@@ -10,8 +10,11 @@ export function ArcadeScreen({ onSelectGame }: { onSelectGame: (gameId: string) 
   return <section className="arcade-showroom" aria-label="ゲームを見て回る">
     {getActiveGames().map(game => <GameShowcase key={game.id} game={game} onSelectGame={onSelectGame} />)}
     <article className="game-showcase showcase-coming-soon" aria-label="新しいゲームを準備中">
-      <div className="showcase-window" aria-hidden="true"><span>COMING SOON</span></div>
-      <div className="showcase-description"><h2>Coming Soon</h2><p>次のゲームとの出会いを、お楽しみに。</p></div>
+      <div className="showcase-coming-content">
+        <h2>COMING SOON</h2>
+        <span className="showcase-coming-rule" aria-hidden="true" />
+        <p>次のゲームとの出会いを、お楽しみに。</p>
+      </div>
     </article>
   </section>;
 }

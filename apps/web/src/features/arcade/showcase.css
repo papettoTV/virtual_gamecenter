@@ -18,7 +18,8 @@
 .showcase-badge { position: absolute; top: 12px; left: 12px; display: flex; align-items: center; gap: 12px; padding: 5px 9px; border: 1px solid #60708c; border-radius: 6px; background: #081224e8; font-size: 12px; font-weight: 800; pointer-events: none; }
 .showcase-badge.is-live { border-color: #ff597a; color: #ff91a6; }
 .showcase-badge > span { color: #e4ecf7; font-weight: 500; }
-.showcase-description { display: flex; flex-direction: column; align-items: stretch; justify-content: center; padding: clamp(20px, 3vw, 40px); gap: 20px; min-width: 0; background: radial-gradient(ellipse at top right, #5332a51c, transparent 65%), linear-gradient(135deg, #0b1925, #0a1020 65%); }
+.showcase-description { position: relative; display: flex; flex-direction: column; align-items: stretch; justify-content: center; padding: clamp(20px, 3vw, 40px); gap: 20px; min-width: 0; background: radial-gradient(ellipse at top right, #5332a51c, transparent 65%), linear-gradient(135deg, #0b1925, #0a1020 65%); }
+.showcase-description::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 1px; pointer-events: none; background: linear-gradient(180deg, #6d9bd6, #7974ca 55%, #ad79cf); }
 .showcase-description h2 { margin: 0 0 6px; font-size: clamp(20px, 2vw, 30px); letter-spacing: .03em; }
 .showcase-description small { color: var(--muted); font-size: 12px; }
 .showcase-description p { margin: 0; color: #c1ccdf; line-height: 1.85; font-size: 15px; }
@@ -35,9 +36,12 @@
 .showcase-cabinet::after { content: ""; position: absolute; inset: 7px; border-radius: 3px; background: #42d98d; }
 .showcase-cabinet.is-popular::after { background: #ff5d68; }
 .showcase-cabinet[data-preview="true"] { outline: 1px solid #829aad; border-radius: 5px; }
-.showcase-coming-soon { color: #8ea8bc; }
-.showcase-coming-soon .showcase-window { display: grid; place-items: center; background: radial-gradient(ellipse at center, #142439, #060c16 75%); }
-.showcase-coming-soon .showcase-window span { font-size: clamp(16px, 2vw, 24px); letter-spacing: .2em; }
+.showcase-coming-soon { display: block; color: #a9dcef; }
+.showcase-coming-content { position: relative; isolation: isolate; display: grid; justify-items: center; gap: 18px; padding: 56px 24px; text-align: center; background: radial-gradient(ellipse at center, #10213790, #060b17ee 72%); }
+.showcase-coming-content::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: .4; background: radial-gradient(circle, #2f6dba 1px, transparent 2px) 0 0 / 12px 12px; mask-image: linear-gradient(90deg, #0009, transparent 40%, transparent 60%, #0009); }
+.showcase-coming-content h2 { margin: 0; color: #8edff7; font-family: ui-monospace, monospace; font-size: clamp(20px, 2.4vw, 30px); font-weight: 400; letter-spacing: .35em; text-indent: .35em; }
+.showcase-coming-rule { width: min(370px, 70%); height: 1px; background: linear-gradient(90deg, #394f78, #394f78 44%, #73eeff 47%, #73eeff 53%, #394f78 56%); }
+.showcase-coming-content p { margin: 0; font-size: 14px; line-height: 1.8; }
 body.is-showcase-preview { margin: 0; overflow: hidden; background: #02070f; }
 .is-showcase-preview .shell { margin: 0 !important; padding: 0 !important; width: 100% !important; max-width: none !important; }
 .is-showcase-preview #cabinet-screen, .is-showcase-preview .platform-experience, .is-showcase-preview .dot-cabinet-bar, .is-showcase-preview .notifications, .is-showcase-preview .platform-footer { display: none !important; }
@@ -60,6 +64,9 @@ body.is-showcase-preview { margin: 0; overflow: hidden; background: #02070f; }
   .arcade-showroom { gap: 22px; }
   .game-showcase { grid-template-columns: minmax(0, 1fr); border-radius: 12px; }
   .showcase-description { padding: 14px; gap: 10px; }
+  .showcase-description::before { inset: 0 0 auto; width: auto; height: 1px; background: linear-gradient(90deg, #6d9bd6, #7974ca 55%, #ad79cf); }
+  .showcase-coming-content { padding: 38px 16px; gap: 16px; }
+  .showcase-coming-content p { font-size: 12px; }
   .showcase-description h2 { font-size: 19px; }
   .showcase-description small { display: none; }
   .showcase-description p { font-size: 13px; line-height: 1.6; }
