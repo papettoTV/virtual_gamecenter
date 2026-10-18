@@ -10,9 +10,6 @@
 .showcase-window > video, .showcase-window > canvas, .showcase-window > img { display: block; width: 100%; height: 100%; object-fit: contain; }
 .showcase-live { width: 100%; height: 100%; border: 0; pointer-events: none; background: #02070f; color-scheme: dark; }
 .showcase-loading { position: absolute; inset: 0; display: grid; place-items: center; color: #9db7c8; font-size: 14px; }
-.showcase-window-link { position: absolute; inset: 0; width: 100%; border: 0; background: transparent; cursor: pointer; border-radius: 0; }
-.showcase-window-link:hover { background: rgba(105, 247, 255, .04); }
-.showcase-window-link:focus-visible { outline: 3px solid #69f7ff; outline-offset: -4px; }
 .showcase-badge { position: absolute; top: 12px; left: 12px; display: flex; align-items: center; gap: 12px; padding: 5px 9px; border: 1px solid #60708c; border-radius: 6px; background: #081224e8; font-size: 12px; font-weight: 800; pointer-events: none; }
 .showcase-badge.is-live { border-color: #ff597a; color: #ff91a6; }
 .showcase-badge > span { color: #e4ecf7; font-weight: 500; }

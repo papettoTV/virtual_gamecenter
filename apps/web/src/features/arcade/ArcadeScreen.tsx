@@ -35,7 +35,7 @@ function GameShowcase({ game, onSelectGame }: { game: GameDefinition; onSelectGa
     return () => { resize.disconnect(); observer.disconnect(); document.removeEventListener("visibilitychange", visibility); };
   }, []);
   const active = visible && foreground;
-  const watch = () => cabinet ? openCabinet(cabinet.cabinetId, game.id) : onSelectGame(game.id);
+  const watch = () => { if (cabinet) openCabinet(cabinet.cabinetId, game.id); };
   return <article className="game-showcase" ref={element} aria-labelledby={`showcase-${game.id}`}>
     <div className="showcase-window" ref={media}>
       {cabinet && active ? <LivePreview key={cabinet.cabinetId} cabinet={cabinet} game={game} scale={scale} />
@@ -44,8 +44,6 @@ function GameShowcase({ game, onSelectGame }: { game: GameDefinition; onSelectGa
         {cabinet ? "● LIVE" : "DEMO"}
         {cabinet && <span>観戦 {cabinet.spectatorCount}人</span>}
       </span>
-      <button className="showcase-window-link" type="button" onClick={watch}
-        aria-label={cabinet ? `${game.title}を観戦する` : `${game.title}を選択`} />
     </div>
     <div className="showcase-description">
       <div><h2 id={`showcase-${game.id}`}>{game.title}</h2><small>{game.localizedTitle}</small></div>
