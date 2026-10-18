@@ -9,7 +9,7 @@ export interface GameDefinition {
   localizedTitle: string;
   shortTitle: string;
   description: string;
-  instructions?: { desktop: string[]; mobile: string[]; tips: string[] };
+  instructions?: { objective: string; desktop: string[]; mobile: string[]; action: string; ending: string; tips: string[] };
   currentVersion: string;
   creditCost: number;
   iconUrl: string;
@@ -37,9 +37,12 @@ export const BUZZ_BARRIER: GameDefinition = {
   shortTitle: "BB",
   description: "弾幕かすり・無敵体当たり・ボス撃破型シューティング",
   instructions: {
+    objective: "3体のボスを倒し、ハイスコアを目指す。",
+    action: "弾をかすってレベルアップ。無敵シールドをボスに当てて攻撃する。",
+    ending: "ラスボス撃破でクリア。ライフがなくなるとゲームオーバー。",
     desktop: ["移動：矢印キー / WASD", "低速移動：Shift", "開始・一時停止：Space"],
     mobile: ["画面内をタッチし、スライドして移動", "画面下のボタンで開始・一時停止"],
-    tips: ["弾をかすってゲージを溜めると、レベルアップして一定時間無敵になります。", "ボス攻撃：無敵シールドを当てる。ラスボスの撃破を目指しましょう。"],
+    tips: ["レベルアップの無敵時間を活用して、弾幕とボスに近づこう。"],
   },
   currentVersion: "prototype-score-ranking-1",
   creditCost: 1,
@@ -57,9 +60,12 @@ export const DEEP_SEA_SALVAGE: GameDefinition = {
   shortTitle: "DSS",
   description: "魚を調査して電力を補い、巨大深海魚を追う無限潜航ゲーム",
   instructions: {
+    objective: "魚を調査しながら、より深い海を目指す。",
+    action: "魚に近づくと自動調査し、電力を補充できる。",
+    ending: "巨大深海魚の調査完了でクリア。電力切れ・船体大破でゲームオーバー。",
     desktop: ["移動：矢印キー / WASD", "開始・ポーズ：P　図鑑：F"],
     mobile: ["画面内のタッチ操作で潜水艦を移動", "画面下のボタンで開始・ポーズ・図鑑"],
-    tips: ["魚に近づくと自動で調査し、電力を補充できます。", "深海の水流や高速魚に注意しながら、巨大深海魚を追いましょう。"],
+    tips: ["深海の水流や高速魚を避けながら、巨大深海魚を追おう。"],
   },
   currentVersion: "prototype-survey-dive-2",
   creditCost: 1,
@@ -88,9 +94,12 @@ export const DOT_WAVE: GameDefinition = {
   id: "dot-wave", slug: "dot-wave", title: "DOT WAVE", localizedTitle: "ドットウェーブ",
   shortTitle: "DW", description: "音符で攻めてリズムで守る、観戦・通信対戦対応のネオンバトル",
   instructions: {
+    objective: "リズムで攻めて守り、CPUの全3ステージ制覇や対戦での勝利を目指す。",
+    action: "お手本のリズムで攻撃。相手のリズムをまねしてシールドで守る。",
+    ending: "エネルギーがなくなるか、規定の攻防回数に達すると決着。残りエネルギーの多い側が勝利。",
     desktop: ["リズム入力：Space / F", "ポーズ：P", "音を出してプレイしてください。"],
     mobile: ["画面のリズムボタンをタップ", "音を出してプレイしてください。"],
-    tips: ["お手本のリズムに合わせて攻撃し、相手のリズムをまねしてシールドで守ります。", "観戦から対戦を申し込み、相手が承認すると通信対戦が始まります。"],
+    tips: ["音を出して、まずはお手本をよく聞こう。"],
   },
   currentVersion: "dot-wave-online-1", creditCost: 1, iconUrl: "/assets/dot-wave-icon.svg",
   promoVideoUrl: "/dot-wave-promo.mp4?v=20261007", promoPosterUrl: "/dot-wave-promo-poster.jpg?v=20261007", status: "active",

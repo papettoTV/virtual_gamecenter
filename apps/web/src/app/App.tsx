@@ -18,6 +18,7 @@ import { SharedResultPage } from "../features/sharing/SharedResultPage";
 import { SharePanel } from "../features/sharing/ShareActions";
 import { sharePanel } from "../features/sharing/share-service";
 import { AnalyticsConsent } from "../features/analytics/AnalyticsConsent";
+import { installLeaveGameConfirmation } from "../features/game/leave-game";
 
 const ThreeBulletLab = lazy(async () => {
   const module = await import("../features/labs/ThreeBulletLab");
@@ -25,6 +26,7 @@ const ThreeBulletLab = lazy(async () => {
 });
 
 export function App() {
+  useEffect(installLeaveGameConfirmation, []);
   const [address, setAddress] = useState(() => location.pathname + location.search);
   useEffect(() => {
     const sync = () => setAddress(location.pathname + location.search);

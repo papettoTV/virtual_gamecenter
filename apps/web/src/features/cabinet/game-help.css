@@ -8,8 +8,12 @@
 .game-help-heading h2 { margin: 0; font-size: 20px; }
 .game-help-heading button { flex-shrink: 0; padding: 4px; border: 0; background: none; color: #bac9da; font-size: 13px; cursor: pointer; }
 html:has(.game-help-modal[open]) { overflow: hidden; }
-.game-help-content { padding: 8px 0 0; }
-.game-help-content p { margin: 0 0 8px; font-size: inherit; line-height: 1.7; }
+.game-help-table { width: 100%; border-collapse: collapse; font-size: 14px; line-height: 1.7; }
+.game-help-table th, .game-help-table td { padding: 12px; border: 1px solid #304359; text-align: left; vertical-align: top; }
+.game-help-table th { width: 5em; white-space: nowrap; background: #17283b; color: #70e7ee; }
+.game-help-table td { background: #101c2d; overflow-wrap: anywhere; }
+.game-help-table p { margin: 0 0 6px; font-size: inherit; }
+.game-help-table p:last-child { margin-bottom: 0; }
 .game-help-mobile { display: none; }
 .spectator-availability { max-width: 640px; margin: 40px auto; padding: 24px; background: #0c1424; border: 1px solid #345069; border-radius: 16px; }
 .spectator-availability h2 { margin-top: 0; }

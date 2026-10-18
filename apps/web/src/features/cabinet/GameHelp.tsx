@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import type { GameDefinition } from "../../domain/game";
 import "./game-help.css";
 
@@ -13,13 +14,19 @@ export function GameHelp({ game }: { game: GameDefinition }) {
           <h2>{game.title}の遊び方</h2>
           <button type="button" onClick={() => dialog.current?.close()} aria-label="遊び方を閉じる">✕ 閉じる</button>
         </header>
-        <div className="game-help-content">
-          <div className="game-help-desktop">{game.instructions?.desktop.map(line => <p key={line}>{line}</p>)}</div>
-          <div className="game-help-mobile">{game.instructions?.mobile.map(line => <p key={line}>{line}</p>)}</div>
-          {(game.instructions?.tips ?? [game.description]).map(line => <p key={line}>{line}</p>)}
-        </div>
+        <table className="game-help-table" aria-label="ゲームの目的と操作方法">
+          <tbody>
+            <tr><th scope="row">目的</th><td>{game.instructions?.objective ?? game.description}</td></tr>
+            <tr><th scope="row">操作</th><td>
+              <div className="game-help-desktop">{game.instructions?.desktop.map(line => <p key={line}>{line}</p>)}</div>
+              <div className="game-help-mobile">{game.instructions?.mobile.map(line => <p key={line}>{line}</p>)}</div>
+            </td></tr>
+            <tr><th scope="row">遊び方</th><td>{game.instructions?.action ?? "準備中"}</td></tr>
+            <tr><th scope="row">終了条件</th><td>{game.instructions?.ending ?? "準備中"}</td></tr>
+            <tr><th scope="row">コツ</th><td>{game.instructions?.tips.map(line => <p key={line}>{line}</p>)}</td></tr>
+          </tbody>
+        </table>
       </div>
     </dialog>
   </div>;
 }
-import { useRef } from "react";
