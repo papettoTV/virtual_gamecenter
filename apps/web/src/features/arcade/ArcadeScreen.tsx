@@ -8,9 +8,10 @@ import "./showcase.css";
 export function ArcadeScreen({ onSelectGame }: { onSelectGame: (gameId: string) => void }) {
   return <section className="arcade-showroom" aria-label="ゲームを見て回る">
     {getActiveGames().map(game => <GameShowcase key={game.id} game={game} onSelectGame={onSelectGame} />)}
-    <section className="showcase-coming-soon" aria-label="新しいゲームを準備中">
-      <span>COMING SOON</span><p>次のゲームとの出会いを、お楽しみに。</p>
-    </section>
+    <article className="game-showcase showcase-coming-soon" aria-label="新しいゲームを準備中">
+      <div className="showcase-window" aria-hidden="true"><span>COMING SOON</span></div>
+      <div className="showcase-description"><h2>Coming Soon</h2><p>次のゲームとの出会いを、お楽しみに。</p></div>
+    </article>
   </section>;
 }
 
@@ -57,7 +58,8 @@ function GameShowcase({ game, onSelectGame }: { game: GameDefinition; onSelectGa
           onClick={() => openCabinet(entry.cabinetId, game.id)} />)}</div>
       </div>}
       <div className="showcase-actions">
-        {cabinet && <button type="button" className="showcase-watch" onClick={watch}>観戦する <span aria-hidden="true">↗</span></button>}
+        <button type="button" className="showcase-watch" disabled={!cabinet} onClick={watch}
+          title={cabinet ? undefined : "プレイ中の筐体がないため観戦できません"}>観戦する <span aria-hidden="true">↗</span></button>
         <button type="button" onClick={() => onSelectGame(game.id)}>{cabinet ? "自分も遊ぶ" : "遊ぶ"} <span aria-hidden="true">→</span></button>
       </div>
     </div>

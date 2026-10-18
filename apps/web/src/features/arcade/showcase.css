@@ -1,6 +1,7 @@
 .showroom-shell .intro { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 24px; margin-bottom: 24px; }
 .showroom-shell .brand-category { grid-column: 1 / -1; margin: 0; font-size: 11px; }
-.showroom-shell .brand-heading { margin: 0; line-height: 1; }
+.showroom-shell .brand-heading { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin: 0; line-height: 1; }
+.showroom-shell .brand-reading { color: var(--muted); font-size: 12px; font-weight: 500; letter-spacing: .15em; }
 .showroom-shell .brand-wordmark { width: clamp(170px, 22vw, 280px); }
 .showroom-shell .brand-tagline { margin: 0; font-size: 15px; }
 .arcade-showroom { display: grid; gap: 28px; }
@@ -22,7 +23,8 @@
 .showcase-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
 .showcase-actions button { flex: 1 1 120px; display: flex; justify-content: space-between; align-items: center; min-height: 46px; padding: 10px 14px; font: inherit; font-size: 14px; font-weight: 700; color: #eef5ff; border: 1px solid #62718a; border-radius: 10px; background: #142239; cursor: pointer; }
 .showcase-actions .showcase-watch { border-color: #67e2ed; background: #113440; }
-.showcase-actions button:hover { background: #235068; }
+.showcase-actions button:hover:not(:disabled) { background: #235068; }
+.showcase-actions button:disabled { opacity: .4; cursor: not-allowed; background: #151d29; border-color: #485266; color: #b1b9c8; }
 .showcase-actions button:focus-visible, .showcase-cabinet:focus-visible { outline: 2px solid #69f7ff; outline-offset: 4px; }
 .showcase-cabinets { display: grid; gap: 10px; color: var(--muted); font-size: 12px; }
 .showcase-cabinets > div { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -30,9 +32,9 @@
 .showcase-cabinet::after { content: ""; position: absolute; inset: 7px; border-radius: 3px; background: #42d98d; }
 .showcase-cabinet.is-popular::after { background: #ff5d68; }
 .showcase-cabinet[data-preview="true"] { outline: 1px solid #829aad; border-radius: 5px; }
-.showcase-coming-soon { padding: 36px 20px; text-align: center; border-block: 1px solid #263c52; color: #8ea8bc; }
-.showcase-coming-soon span { font-size: 16px; letter-spacing: .3em; }
-.showcase-coming-soon p { font-size: 12px; margin: 10px 0 0; }
+.showcase-coming-soon { color: #8ea8bc; border-color: #263c52; }
+.showcase-coming-soon .showcase-window { display: grid; place-items: center; background: radial-gradient(ellipse at center, #142439, #060c16 75%); }
+.showcase-coming-soon .showcase-window span { font-size: clamp(16px, 2vw, 24px); letter-spacing: .2em; }
 body.is-showcase-preview { margin: 0; overflow: hidden; background: #02070f; }
 .is-showcase-preview .shell { margin: 0 !important; padding: 0 !important; width: 100% !important; max-width: none !important; }
 .is-showcase-preview #cabinet-screen, .is-showcase-preview .platform-experience, .is-showcase-preview .dot-cabinet-bar, .is-showcase-preview .notifications, .is-showcase-preview .platform-footer { display: none !important; }

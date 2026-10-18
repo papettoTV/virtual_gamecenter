@@ -38,8 +38,8 @@ export const BUZZ_BARRIER: GameDefinition = {
   currentVersion: "prototype-score-ranking-1",
   creditCost: 1,
   iconUrl: "/assets/buzz-barrier-icon.png",
-  promoVideoUrl: "/graze-duel-promo.mp4?v=20260801-actual",
-  promoPosterUrl: "/graze-duel-promo-poster.jpg?v=20260801-actual",
+  promoVideoUrl: "/demos/buzz-barrier/boss-demo-v1.mp4",
+  promoPosterUrl: "/demos/buzz-barrier/boss-demo-v1.jpg",
   status: "active",
 };
 
@@ -79,7 +79,7 @@ export const DOT_WAVE: GameDefinition = {
   currentVersion: "dot-wave-online-1", creditCost: 1, iconUrl: "/assets/dot-wave-icon.svg",
   promoVideoUrl: "/dot-wave-promo.mp4?v=20261007", promoPosterUrl: "/dot-wave-promo-poster.jpg?v=20261007", status: "active",
 };
-export const GAME_CATALOG: readonly GameDefinition[] = [BUZZ_BARRIER, DEEP_SEA_SALVAGE, DOT_WAVE];
+export const GAME_CATALOG: readonly GameDefinition[] = [BUZZ_BARRIER, DOT_WAVE, DEEP_SEA_SALVAGE];
 export const DEFAULT_GAME_ID: GameId = BUZZ_BARRIER.id;
 
 export function getGameDefinition(gameId: string | null | undefined): GameDefinition | null {

@@ -1,0 +1,23 @@
+{
+  "gameId": "graze-duel",
+  "savedAt": "2026-10-18",
+  "capturedAt": "2026-10-16",
+  "sourceThread": { "title": "宣伝素材", "id": "01a136f9-f42b-71f0-99b4-6957c7140616" },
+  "sourceFile": "deliverables/pulbase-C-hyperframes/cut-bgm/media-v17/buzz-boss-play-v17.mp4",
+  "sourceProvenance": "deliverables/pulbase-C-hyperframes/cut-bgm/media-v17/provenance.json",
+  "originalCapture": "deliverables/pulbase-C-hyperframes/cut-bgm/media-v17/capture/solo-source.webm",
+  "sourceRevision": "12a584fcac6f7175b07a97ea92f39a9c3cbc4501",
+  "bossGeometryFile": "apps/web/src/games/graze-duel/rendering/boss-geometry.ts",
+  "bossGeometrySha256": "2c8641d2e4c824cf5fb75ea5e5025ff377ba8226df55c45f074c90ccb9ca7c96",
+  "bossGeometryMatchesCurrentSourceOnSave": true,
+  "video": {
+    "file": "boss-demo-v1.mp4", "sha256": "b73d55e3d7afc9f501d10f133976107e8e7f068063818b090e2e7ac4b9525e63",
+    "width": 392, "height": 536, "fps": 30, "durationSeconds": 12,
+    "copiedWithoutReencoding": true
+  },
+  "poster": {
+    "file": "boss-demo-v1.jpg", "videoTimeSeconds": 3,
+    "sha256": "bae9ab2216562028d58255434d5850905fc1bc14d8065fc13e9863ec04232073"
+  },
+  "usage": "Muted looping demo on the homepage and cabinet selection screen. This is prerecorded attract-mode gameplay, not a live match."
+}
