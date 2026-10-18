@@ -81,7 +81,9 @@ export function createCabinetClient(handlers: CabinetClientHandlers = {}): Cabin
   }
 
   function join(nextCabinetId: string, nextGameId: string, asViewer = false) {
-    watch = asViewer;
+    const params = new URLSearchParams(window.location.search);
+    const preview = window.self !== window.top && params.get("preview") === "1" && params.get("watch") === "1";
+    watch = asViewer || preview;
     if (cabinetId !== nextCabinetId || gameId !== nextGameId) {
       wantsCabinet = false;
       socket?.close();

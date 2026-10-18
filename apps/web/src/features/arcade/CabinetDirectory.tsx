@@ -3,7 +3,7 @@ import "./cabinet-directory.css";
 import type { GameDefinition } from "../../domain/game";
 import { gameHost } from "../../game-sdk/game-host";
 
-interface CabinetEntry {
+export interface CabinetEntry {
   cabinetId: string;
   gameId: string;
   status: string;
@@ -19,7 +19,7 @@ const PLAYING_STATUSES = new Set([
   "versusPlaying",
 ]);
 
-function useCabinets(gameId: string) {
+export function useCabinets(gameId: string) {
   const [cabinets, setCabinets] = useState<CabinetEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -32,6 +32,8 @@ function useCabinets(gameId: string) {
       if (!response.ok) return;
       const data = await response.json() as { cabinets?: CabinetEntry[] };
       setCabinets(data.cabinets ?? []);
+    } catch {
+      setCabinets([]);
     } finally {
       setLoading(false);
     }
@@ -52,7 +54,7 @@ function useCabinets(gameId: string) {
   return { cabinets, loading };
 }
 
-function openCabinet(cabinetId: string, gameId: string) {
+export function openCabinet(cabinetId: string, gameId: string) {
   history.pushState({ cabinetId, gameId }, "", `/cabinets/${cabinetId}?game=${encodeURIComponent(gameId)}&watch=1`);
   window.dispatchEvent(new PopStateEvent("popstate"));
 }

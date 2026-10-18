@@ -24,6 +24,7 @@ export function createTrackedWatchUrl(url: string): { shareId: string; url: stri
 }
 
 export function recordWatchStarted(gameId: string, cabinetId: string): void {
+  if (window.self !== window.top && new URL(location.href).searchParams.get("preview") === "1") return;
   const storageKey = `${WATCH_EVENT_PREFIX}${cabinetId}`;
   const shareId = new URL(location.href).searchParams.get("shareId");
   const attribution: WatchAttribution = {

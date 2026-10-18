@@ -33,6 +33,6 @@ export default function DotWaveCabinet() {
       holdResult={Boolean(d.result && !net.matchId && net.role === "player")}
       resultPanel={<>{resultDraft && <ResultShareButton draft={resultDraft} />}{d.result && Date.now() - d.resultAt >= 2500 && <div className="dot-match-result" role="status"><strong>{d.result.winner === "draw" ? "引き分け" : d.result.winner === d.seat ? "あなたの勝ち！" : "相手の勝ち！"}</strong>{d.rematchPending && <div role="dialog" aria-label="再挑戦の申し込み"><strong>再挑戦の申し込みが来ました</strong><button onClick={() => void respondRematch(true).catch(showError)}>対戦する</button><button onClick={() => void respondRematch(false).catch(showError)}>今回は断る</button></div>}{d.result.winner !== "draw" && d.result.winner !== d.seat && <button disabled={d.busy || d.rematchRequested} onClick={() => void rematch()}>{d.rematchRequested ? "承認待ち" : "再挑戦（1クレジット）"}</button>}<button onClick={leaveResult}>{d.result.winner === d.seat || (d.result.winner === "draw" && d.seat === "host") ? "CPUと対戦し直す" : "観戦に戻る"}</button></div>}</>}
     />
-    <PlatformExperience standaloneCredits/>
+    {!(window.self !== window.top && new URLSearchParams(location.search).get("preview") === "1") && <PlatformExperience standaloneCredits/>}
   </>;
 }
