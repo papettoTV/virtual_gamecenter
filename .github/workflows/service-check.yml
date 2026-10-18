@@ -1,0 +1,28 @@
+name: Staging service check
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: staging-service-check
+  cancel-in-progress: false
+jobs:
+  check:
+    if: github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check staging without creating players or spending credits
+        env:
+          PULBASE_CHECK_USERNAME: ${{ secrets.PULBASE_CHECK_USERNAME }}
+          PULBASE_CHECK_PASSWORD: ${{ secrets.PULBASE_CHECK_PASSWORD }}
+        run: |
+          test -n "$PULBASE_CHECK_USERNAME" && test -n "$PULBASE_CHECK_PASSWORD" || { echo 'Staging check credentials are not configured.'; exit 1; }
+          npm run service:check -- --environment staging
