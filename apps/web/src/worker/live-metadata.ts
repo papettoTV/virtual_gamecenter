@@ -21,3 +21,16 @@ export function rewriteLivePage(shell: Response, url: URL): Response {
     .on("head", { element(element) { element.append(metadata, { html: true }); } })
     .transform(new Response(shell.body, { status: shell.status, headers }));
 }
+
+/** Resolve the shared brand card against the actual staging or production host. */
+export function rewriteBrandPage(shell: Response, url: URL): Response {
+  if (!shell.headers.get("content-type")?.includes("text/html")) return shell;
+  const image = new URL("/brand/social-card.png", url.origin).href;
+  const headers = new Headers(shell.headers);
+  for (const key of ["content-length", "etag", "last-modified", "content-encoding"]) headers.delete(key);
+  return new HTMLRewriter()
+    .on('meta[property="og:image"], meta[name="twitter:image"]', {
+      element(element) { element.setAttribute("content", image); },
+    })
+    .transform(new Response(shell.body, { status: shell.status, headers }));
+}

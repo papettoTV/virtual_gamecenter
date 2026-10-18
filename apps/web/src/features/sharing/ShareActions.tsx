@@ -1,3 +1,4 @@
+import { drawBrandWordmark } from "../../brand/wordmark-raster";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { SharedResult, SharedResultDraft } from "../../domain/shared-result";
 import { resultSharing } from "./result-sharing";
@@ -48,7 +49,9 @@ export async function createResultImage(result: SharedResult): Promise<File> {
   context.fillStyle = gradient; context.fillRect(0, 0, 1200, 630);
   context.strokeStyle = presentation.accent; context.lineWidth = 4; context.strokeRect(32, 32, 1136, 566);
   context.fillStyle = presentation.accent; context.font = "bold 30px system-ui";
-  context.fillText(`PULBASE / ${presentation.title}`, 64, 94, 1072);
+  drawBrandWordmark(context, 64, 50);
+  context.fillStyle = presentation.accent;
+  context.fillText(presentation.title, 64, 130, 1072);
   context.fillStyle = "#f3f5ff"; context.font = "bold 65px system-ui";
   context.fillText(presentation.headline, 64, 206, 1072);
   context.font = "32px system-ui";

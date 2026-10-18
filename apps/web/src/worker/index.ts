@@ -6,7 +6,7 @@ import { handleRankingRequest } from "./ranking";
 import { getSharedResult, handleSharedResultsRequest } from "./shared-results";
 import { renderLiveImage, renderResultImage } from "./result-image";
 import { handleSharingEvent } from "./sharing-events";
-import { rewriteLivePage } from "./live-metadata";
+import { rewriteBrandPage, rewriteLivePage } from "./live-metadata";
 import { getGameDefinition } from "../domain/game";
 import { handleDataLifecycleRequest, runRetention } from "./data-lifecycle";
 import { isDeveloperAuthAvailable } from "./google-auth";
@@ -138,7 +138,7 @@ export default {
 
     const assets = await env.ASSETS.fetch(request);
     if (request.method === "GET" && /^\/cabinets\/[^/]+$/.test(url.pathname) && assets.headers.get("content-type")?.includes("text/html")) return rewriteLivePage(assets, url);
-    return assets;
+    return rewriteBrandPage(assets, url);
   },
   async scheduled(event: ScheduledController, env: WorkerEnv, ctx: Pick<ExecutionContext, "waitUntil">): Promise<void> {
     if (event.cron === "0,15,30,45 * * * *") {

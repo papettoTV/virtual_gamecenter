@@ -1,3 +1,4 @@
+import { brandWordmarkRuns } from "../brand/wordmark-raster";
 import { getGameDefinition } from "../domain/game";
 import type { SharedResult } from "../domain/shared-result";
 import { presentResult } from "../features/sharing/result-presenters";
@@ -96,7 +97,15 @@ async function renderCard(title: string, imageLines: string[], accentHex: string
   rectangle(60, 48, 1080, 534, [11, 17, 33]);
   rectangle(60, 48, 8, 534, accent);
   rectangle(96, 202, 1008, 3, accent);
-  text("PULBASE", 100, 80, 4, accent);
+  for (const [x, y, width, r, g, b, a] of brandWordmarkRuns) {
+    const alpha = a! / 255;
+    for (let dx = 0; dx < width!; dx++) {
+      const offset = (70 + y!) * stride + 1 + (100 + x! + dx) * 3;
+      for (const [channel, value] of [r!, g!, b!].entries()) {
+        pixels[offset + channel] = Math.round(value * alpha + pixels[offset + channel]! * (1 - alpha));
+      }
+    }
+  }
   text(title, 100, 134, 7, [240, 246, 255]);
   imageLines.slice(0, 3).forEach((line, index) => {
     text(line, 100, 242 + index * 88, index === 0 ? 7 : 5, index === 0 ? accent : [240, 246, 255]);

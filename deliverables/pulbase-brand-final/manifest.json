@@ -1,0 +1,229 @@
+[
+  {
+    "file": "symbol-color.svg",
+    "bytes": 296,
+    "sha256": "d9501135e4d94c3c7cc835988e54936c99fa3487ddebbcace44fead391383b57"
+  },
+  {
+    "file": "symbol-color-1024.png",
+    "bytes": 18305,
+    "sha256": "639a49637b1ca3da01c51c2f7d22ea243389609853132bc60ad05063c8663f8f",
+    "width": 1024,
+    "height": 1024
+  },
+  {
+    "file": "symbol-white.svg",
+    "bytes": 293,
+    "sha256": "f109f9438140380b3997e9832899a6c95d04028bf9e24761b77871bbe1c53ff4"
+  },
+  {
+    "file": "symbol-white-1024.png",
+    "bytes": 11832,
+    "sha256": "0e0af240a004ec6cc984ecdb17d0e0aead78e0b49cbb7accad69db80312e563a",
+    "width": 1024,
+    "height": 1024
+  },
+  {
+    "file": "symbol-black.svg",
+    "bytes": 296,
+    "sha256": "1b376f55e5a65155ee16a0d5eef2a39cc0589b420c5dcb9a67605839ae86c06d"
+  },
+  {
+    "file": "symbol-black-1024.png",
+    "bytes": 18357,
+    "sha256": "9a3d71ae607adaa7c5912fcf8ba57100bc79c2f48333d952e060145132e68f78",
+    "width": 1024,
+    "height": 1024
+  },
+  {
+    "file": "wordmark-color.svg",
+    "bytes": 1429,
+    "sha256": "2c13717ece992cd5b2cf31c1236a3240a50a6f6f95430fccc2387aec0f8c6a6e"
+  },
+  {
+    "file": "wordmark-color-2400.png",
+    "bytes": 30738,
+    "sha256": "a987b7780c053c4c75fde6b29d8bf4892054a2bbe5ca627097ac272eb3cb409b",
+    "width": 2400,
+    "height": 279
+  },
+  {
+    "file": "wordmark-white.svg",
+    "bytes": 1343,
+    "sha256": "64ff9b1c4f536922b34c3b0831f2aa34a6f4c135f2d8ab7a0ed818ddb21c79d3"
+  },
+  {
+    "file": "wordmark-white-2400.png",
+    "bytes": 24624,
+    "sha256": "6b9bf42ec3f4cac8d832492d6b9761aaa05c26b77c03520004b7a07377d875d8",
+    "width": 2400,
+    "height": 279
+  },
+  {
+    "file": "wordmark-black.svg",
+    "bytes": 1364,
+    "sha256": "f86e54a8eb2d72487d65b365bbd49aac6766b011a2745360c5df267277ec1b74"
+  },
+  {
+    "file": "wordmark-black-2400.png",
+    "bytes": 34515,
+    "sha256": "ef735c58e4175ed312a6690521d4b6cced731335419ff113817e0972321a0f99",
+    "width": 2400,
+    "height": 279
+  },
+  {
+    "file": "wordmark-light.svg",
+    "bytes": 1441,
+    "sha256": "16701bbdc1122556b4be871a1c026c08a07ebf353dd7553b3156f787a01f904d"
+  },
+  {
+    "file": "wordmark-light-2400.png",
+    "bytes": 37999,
+    "sha256": "7e14e65c75b2aa969d5614846ed8ecf750e180cf17853bd93b891185e70d0cea",
+    "width": 2400,
+    "height": 279
+  },
+  {
+    "file": "favicon.svg",
+    "bytes": 643,
+    "sha256": "4303a26e8c5d5db35a2b934e579eed414831b1e18fb5b50d9879e06a53f22266"
+  },
+  {
+    "file": "favicon-16.png",
+    "bytes": 356,
+    "sha256": "4275691d929823ad0746ab317f489c49df0121f5f635be6ad86be0804c46db6c",
+    "width": 16,
+    "height": 16
+  },
+  {
+    "file": "favicon-32.png",
+    "bytes": 544,
+    "sha256": "dcbdbcdaed25967178feaadea41e99b137bea0d160ae0c9e90d911039ebb6c79",
+    "width": 32,
+    "height": 32
+  },
+  {
+    "file": "favicon-48.png",
+    "bytes": 840,
+    "sha256": "f526fd007bc169c029e2d3bd1e6f77a6018ae1cbc481192758bef2b3b7e10186",
+    "width": 48,
+    "height": 48
+  },
+  {
+    "file": "favicon-180.png",
+    "bytes": 3193,
+    "sha256": "c59a4d4cb7503e0ed4bfa6658b0606264b52aacf51b219b16e0a82361f119fde",
+    "width": 180,
+    "height": 180
+  },
+  {
+    "file": "favicon-192.png",
+    "bytes": 3415,
+    "sha256": "348063f84a8ab2e246796e30e5506bf6ba8402db70be7dac219d26bb9b8c4e37",
+    "width": 192,
+    "height": 192
+  },
+  {
+    "file": "favicon-512.png",
+    "bytes": 13775,
+    "sha256": "ec345d28cfdb5987661764a438e0430a4de8e2d1b054c4e4e8ed1009a37fbcaf",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "file": "symbol-screen.svg",
+    "bytes": 542,
+    "sha256": "20b3d35069e8a3dd199481d25e185940dba6bd756b35b4c04556f6d1bcdfc316"
+  },
+  {
+    "file": "symbol-screen.png",
+    "bytes": 79524,
+    "sha256": "d03443ddd6ac1742f95dfca84a82ae3d40f94bcede980a0c2d4b3d23b4a05770",
+    "width": 1024,
+    "height": 1024
+  },
+  {
+    "file": "wordmark-screen.svg",
+    "bytes": 1675,
+    "sha256": "74357bc129858e4bb2b7d84eb1ccddd60de79f5894f6ff2f11c64bbc1fdc60c5"
+  },
+  {
+    "file": "wordmark-screen.png",
+    "bytes": 108505,
+    "sha256": "24d2794d559b03bfea0981df0c1ffd46f03265cf603a2e3cb0cfe0fbc1f69840",
+    "width": 2400,
+    "height": 279
+  },
+  {
+    "file": "favicon.ico",
+    "bytes": 1794,
+    "sha256": "15a0a24c48d3926a24a42c55bb9f8b52c3057855288c5865b03846368851914f"
+  },
+  {
+    "file": "x-profile.svg",
+    "bytes": 657,
+    "sha256": "2df9faf59cc58afc42ebb4fb53478f70cd9a373c930eac071316299bc6a81db2"
+  },
+  {
+    "file": "x-profile-1024.png",
+    "bytes": 32917,
+    "sha256": "80b84cbf8d3589f5dc2a4fbcd67026d7366b1b7a6b68c25945334f4fc64f98f7",
+    "width": 1024,
+    "height": 1024
+  },
+  {
+    "file": "arcade-background.png",
+    "bytes": 1994649,
+    "sha256": "8a30b337c092017d0bf2e5a6102a0aee331cfc24e7a64b15f7ce122fbe7dc493",
+    "width": 2172,
+    "height": 724
+  },
+  {
+    "file": "x-header-plain.svg",
+    "bytes": 2372,
+    "sha256": "cd071a4e6908e344e0ce1fc303448e6714bc494d849866e2feefd8d1e1abd5f8"
+  },
+  {
+    "file": "x-header-plain-1500x500.png",
+    "bytes": 39563,
+    "sha256": "75519dee269b6dbc71a422f4eaec7786ecd3e3e3692fa1054780ccc47eb08652",
+    "width": 1500,
+    "height": 500
+  },
+  {
+    "file": "x-header-arcade.svg",
+    "bytes": 2662027,
+    "sha256": "717f9938f1247fc3ff67fccfd3a707ec4d4ae9bce08cbf24e0992784e7443a1e"
+  },
+  {
+    "file": "x-header-arcade-1500x500.png",
+    "bytes": 1486787,
+    "sha256": "40b3d2a11dc5452f2ac4ddeb467bdf1599b829427798747fa2be36a4baeb4d98",
+    "width": 1500,
+    "height": 500
+  },
+  {
+    "file": "social-card.svg",
+    "bytes": 2482,
+    "sha256": "3fc00433d9da98633411c2d5f66611a759f0e67b13b98652c3c1898e63d0df27"
+  },
+  {
+    "file": "social-card-1200x630.png",
+    "bytes": 39638,
+    "sha256": "09be4a9fbd3469b485cb663a4ad6ab7b82f22debb6edb7f65b9e823a7dca5715",
+    "width": 1200,
+    "height": 630
+  },
+  {
+    "file": "preview.html",
+    "bytes": 4227,
+    "sha256": "8ed469896b7db898bc8c192475f4649f5b015517294ff131130051be8d02ec86"
+  },
+  {
+    "file": "review-sheet.png",
+    "bytes": 716177,
+    "sha256": "4216ff1548e6c4ec8314baa8201a9759df5d215230b7aa90d507ab32e93a1b27",
+    "width": 1180,
+    "height": 2517
+  }
+]

@@ -1,3 +1,4 @@
+import { drawBrandWordmark } from "../../brand/wordmark-raster";
 import type { SharedResult } from "../../domain/shared-result";
 import { SPECIES } from "./species";
 import { presentSalvageResult } from "./sharing";
@@ -21,7 +22,9 @@ export async function drawSalvageResultImage(context: CanvasRenderingContext2D, 
   gradient.addColorStop(0, "#071d32"); gradient.addColorStop(1, "#01040b");
   context.fillStyle = gradient; context.fillRect(0, 0, 1200, 630);
   context.fillStyle = presentation.accent; context.font = "bold 30px system-ui";
-  context.fillText("PULBASE / DEEP SEA SALVAGE", 64, 64);
+  drawBrandWordmark(context, 64, 24);
+  context.fillStyle = presentation.accent;
+  context.fillText("DEEP SEA SALVAGE", 440, 64);
   context.fillStyle = "#f3ffff"; context.font = "bold 56px system-ui";
   context.fillText(presentation.headline, 64, 142, 1072);
   context.font = "28px system-ui"; context.fillStyle = "#b8d4dc";

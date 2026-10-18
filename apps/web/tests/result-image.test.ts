@@ -55,6 +55,14 @@ describe("result PNG", () => {
     const pixels = await decode(png);
     const stride = 1200 * 3 + 1;
     expect(pixels.length).toBe(stride * 630);
+    // Brand colors stay fixed even when a game's accent changes.
+    const headerColors = new Set<string>();
+    for (let y = 70; y < 111; y++) for (let x = 100; x < 450; x++) {
+      const at = y * stride + 1 + x * 3;
+      headerColors.add(Array.from(pixels.subarray(at, at + 3)).join(","));
+    }
+    expect(headerColors.has("41,217,255")).toBe(true);
+    expect(headerColors.has("255,255,255")).toBe(true);
     for (let row = 0; row < 630; row++) expect(pixels[row * stride]).toBe(0);
     expect(new Uint8Array(await (await renderResultImage(saved)).arrayBuffer())).toEqual(png);
     for (const [top, height] of [[80, 28], [134, 49], [242, 49], [330, 35], [418, 35]]) {
