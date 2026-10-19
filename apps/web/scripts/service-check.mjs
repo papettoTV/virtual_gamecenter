@@ -94,7 +94,7 @@ export async function checkService({ environment, origin, authorization, confirm
       });
     }
     for (const [name, path, marker] of [["terms", "/legal/terms.html", "利用規約"], ["privacy", "/legal/privacy.html", "プライバシー"]]) {
-      await check(name, path, body => body.includes(marker));
+      await check(name, environment === "local" ? path : path.replace(/\.html$/, ""), body => body.includes(marker));
     }
   }
   return { environment, checkedAt: new Date().toISOString(), ok: checks.every(check => check.ok), checks };

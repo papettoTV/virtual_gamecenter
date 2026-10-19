@@ -42,6 +42,9 @@ test("checks only read-only endpoints and every active game's directory", async 
     assert.equal(options.headers.Cookie, undefined);
     assert.ok(!url.pathname.includes("bootstrap"));
   }
+  assert.ok(calls.some(({ url }) => url.pathname === "/legal/terms"));
+  assert.ok(calls.some(({ url }) => url.pathname === "/legal/privacy"));
+  assert.ok(!calls.some(({ url }) => url.pathname.endsWith(".html")));
   assert.ok(!JSON.stringify(result).includes("Basic test"));
 });
 
@@ -49,6 +52,14 @@ test("does not treat the holding page as a running application", async () => {
   const result = await checkService({ environment: "local" }, async () => new Response("PULBASE 準備中"));
   assert.equal(result.ok, false);
   assert.equal(result.checks.length, 1);
+});
+
+test("uses Vite's HTML paths for local legal documents", async () => {
+  const paths = [];
+  const result = await checkService({ environment: "local" }, async url => { paths.push(url.pathname); return healthyResponse(url); });
+  assert.equal(result.ok, true);
+  assert.ok(paths.includes("/legal/terms.html"));
+  assert.ok(paths.includes("/legal/privacy.html"));
 });
 
 for (const status of [302, 401, 403, 429, 503]) {

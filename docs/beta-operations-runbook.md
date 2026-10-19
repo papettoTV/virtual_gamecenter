@@ -1,6 +1,6 @@
 # 無料ベータの監視と障害対応
 
-更新日：2026-10-19
+更新日：2026-10-20
 
 対象は購入停止中の無料ベータ。障害の発見から調査・停止判断・復旧確認までを扱う。現状は読み取り専用の疎通チェックと手動実行経路を準備した段階で、自動死活監視・通知の実着信・復旧訓練は未完了。本番公開の承認ではない。
 
@@ -8,7 +8,7 @@
 
 | 対象 | 確認手段 | 現状 |
 | --- | --- | --- |
-| アプリの入口・配信JS・公開文書・全ゲームの筐体一覧 | `service:check` | ローカル検証と自動テスト。リモートの実行・通知は別途確認 |
+| アプリの入口・配信JS・公開文書・全ゲームの筐体一覧 | `service:check` | ローカル・検証Pagesの7項目成功。自動実行・通知は別途確認 |
 | Workers・D1・DOの利用量と費用 | 既存の利用量監視とCloudflare通知 | 設定・検証記録は `cloudflare-usage-monitor.md`、`cloudflare-cost-alerts.md` |
 | ゲーム開始・クレジット付与・ログイン | 専用テスト利用者による主要導線確認、Workerの既存エラーログ | 疎通チェックの成功だけでは確認できない。失敗率の集計・通知は残課題 |
 | 観戦の遅延・再接続 | 2端末の短い手動確認 | 長時間負荷試験とは分ける |
@@ -30,6 +30,7 @@ npm run service:check -- --environment production --confirm-production
 ```
 
 - 検証は `develop.virtual-gamecenter.pages.dev`、本番は正規URLの `pulbase.com` に固定する。リモートURLの任意指定・リダイレクト追従を禁止する。
+- 公開環境の規約は拡張子なしの正規URL（`/legal/terms`、`/legal/privacy`）、ローカルViteでは `.html` 付きのパスを確認する。検証環境の `.html` から正規URLへの307を、障害と誤判定しないための区別。
 - ローカルだけ `--origin http://localhost:5174` 等でloopbackのポートを変更できる。
 - Basic認証が必要なら、`PULBASE_CHECK_USERNAME` と `PULBASE_CHECK_PASSWORD` を環境変数で渡すか、Git管理外のJSONファイルを `PULBASE_CHECK_AUTH_FILE` で指定する。JSONの項目は `username` と `password`。値をコマンド引数・資料・Git・レポートへ書かない。
 - `.dev.vars` に上記2変数を保存した場合は、`node --env-file=.dev.vars --experimental-strip-types scripts/service-check.mjs --environment staging` で明示的に読み込む。通常のコマンドは秘密ファイルを自動探索しない。
@@ -78,3 +79,5 @@ npm run service:check -- --environment production --confirm-production
 ## 確認記録
 
 2026-10-19：ローカル実サーバーに1回実行し、アプリ、開発用JS、3ゲームの筐体一覧、規約2件の7検査が成功。疎通チェック18テストを含む全640テスト・型検査・検証用ビルドが成功。検証環境のBasic認証設定待ちのため、リモート疎通・通知・復旧の確認は未実施。main、本番、準備中ページ、Cloudflare設定は変更していない。
+
+2026-10-20 05:27 JST：運営者の設定済みBasic認証を使い検証Pagesを確認。規約の307転送先が同一Originの拡張子なしURLであることを確認し、監視先を正規URLへ修正した。修正後は7検査すべてHTTP 200、44〜349msで成功。ゲスト作成・クレジット消費・WebSocket接続・負荷試験は行っていない。自動通知・実着信・ゲーム開始やログイン自体の動作は今回の検査範囲外。本番・Cloudflare設定は未変更。
