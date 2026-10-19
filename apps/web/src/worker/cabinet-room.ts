@@ -89,10 +89,12 @@ export class CabinetRoom extends DurableObject<Env> {
   private resultPlayerIds: [string | null, string | null] = [null, null];
   private soloRun: { playerId: string; disconnectedAt: number | null } | null = null;
   private readonly ready: Promise<void>;
+  private recoverySuspended = false;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.ready = this.ctx.blockConcurrencyWhile(async () => {
+      this.recoverySuspended = await this.ctx.storage.get<boolean>("recoverySuspended") ?? false;
       const stored = await this.ctx.storage.get<StoredCabinetRoom>("cabinet");
       if (stored) {
         this.cabinetId = stored.cabinetId;
@@ -132,6 +134,7 @@ export class CabinetRoom extends DurableObject<Env> {
 
   async fetch(request: Request): Promise<Response> {
     await this.ready;
+    if (this.recoverySuspended) return Response.json({ error: "service_maintenance" }, { status: 503, headers: { "Cache-Control": "no-store" } });
     if (request.headers.get("Upgrade") !== "websocket") {
       return new Response("Expected WebSocket upgrade", { status: 426 });
     }
@@ -160,6 +163,7 @@ export class CabinetRoom extends DurableObject<Env> {
     const accepting = this.ctx.getWebSockets().filter(socket => socket.readyState === WebSocket.OPEN);
     if (accepting.length >= CABINET_CONNECTION_LIMIT || (addressKey && accepting.filter(socket => this.attachment(socket).clientAddressKey === addressKey).length >= CABINET_IP_CONNECTION_LIMIT)) return protectionError("cabinet_connections_limited", 429);
     if (identity && accepting.filter(socket => this.attachment(socket).sessionHash === identity.sessionHash).length >= 4) return protectionError("session_connections_limited", 429);
+    if (this.recoverySuspended) return Response.json({ error: "service_maintenance" }, { status: 503 });
     this.ctx.acceptWebSocket(server);
     const attachment: ConnectionAttachment = {
       admissionId: request.headers.get("X-Pulbase-Admission") ?? undefined,
@@ -179,6 +183,7 @@ export class CabinetRoom extends DurableObject<Env> {
 
   async webSocketMessage(socket: WebSocket, rawMessage: string | ArrayBuffer): Promise<void> {
     await this.ready;
+    if (this.recoverySuspended) return;
     if (typeof rawMessage !== "string") {
       await this.closeLimitedSocket(socket, 1003, "テキストメッセージのみ利用できます。");
       return;
@@ -397,15 +402,21 @@ export class CabinetRoom extends DurableObject<Env> {
   }
 
   async webSocketClose(socket: WebSocket): Promise<void> {
-    await this.ready;
-    await this.leave(socket);
-    await this.releaseAdmission(socket);
+    try {
+      await this.ready;
+      if (!this.recoverySuspended) await this.leave(socket);
+    } finally {
+      await this.releaseAdmission(socket);
+    }
   }
 
   async webSocketError(socket: WebSocket): Promise<void> {
-    await this.ready;
-    await this.leave(socket);
-    await this.releaseAdmission(socket);
+    try {
+      await this.ready;
+      if (!this.recoverySuspended) await this.leave(socket);
+    } finally {
+      await this.releaseAdmission(socket);
+    }
   }
 
   private async requestChallenge(
@@ -1100,6 +1111,52 @@ export class CabinetRoom extends DurableObject<Env> {
     return socket.deserializeAttachment() as ConnectionAttachment;
   }
 
+  async suspendForRecovery(): Promise<void> {
+    await this.ready;
+    await this.ctx.blockConcurrencyWhile(async () => {
+      this.recoverySuspended = true;
+      await this.ctx.storage.put("recoverySuspended", true);
+      await this.ctx.storage.deleteAlarm();
+      for (const socket of this.ctx.getWebSockets()) {
+        const attachment = this.attachment(socket);
+        socket.serializeAttachment({ ...attachment, role: "visitor", revoked: true });
+        try { await this.releaseAdmission(socket); }
+        finally { socket.close(1012, "メンテナンスのため接続を終了します。"); }
+      }
+    });
+  }
+
+  async resetAfterRecovery(): Promise<void> {
+    await this.ready;
+    if (!this.recoverySuspended) throw Error("recovery_not_suspended");
+    this.state = createCabinetState(this.cabinetId, this.state.gameId);
+    this.latestKeyframe = null;
+    this.latestMotionFrame = null;
+    this.eventsSinceKeyframe = [];
+    this.eventBufferBytes = 0;
+    this.pendingChallenge = null;
+    this.challengeQueue = [];
+    this.versusMatch = null;
+    this.resultPlayerIds = [null, null];
+    this.soloRun = null;
+    await this.persistState();
+    await this.ctx.storage.deleteAlarm();
+  }
+
+  async recoveryStatus() {
+    await this.ready;
+    return { suspended: this.recoverySuspended, status: this.state.status, players: this.state.playerCount,
+      connections: this.ctx.getWebSockets().filter(socket => socket.readyState === WebSocket.OPEN && !this.attachment(socket).revoked).length,
+      hasReplay: Boolean(this.latestKeyframe || this.latestMotionFrame || this.eventsSinceKeyframe.length) };
+  }
+
+  async resumeAfterRecovery(): Promise<void> {
+    const status = await this.recoveryStatus();
+    if (status.status !== "empty" || status.players || status.connections || status.hasReplay) throw Error("recovery_room_not_empty");
+    await this.ctx.storage.put("recoverySuspended", false);
+    this.recoverySuspended = false;
+  }
+
   async removePlayerData(playerId: string): Promise<void> {
     await this.ready;
     if (!this.state.cabinetId && !this.ctx.getWebSockets().length) return;
@@ -1150,6 +1207,7 @@ export class CabinetRoom extends DurableObject<Env> {
 
   async expireIdleData(cabinetId?: string): Promise<void> {
     await this.ready;
+    if (this.recoverySuspended) return;
     if (this.ctx.getWebSockets().length || (this.state.cabinetId && this.state.updatedAt > Date.now() - 86400000)) return;
     if (!this.cabinetId && cabinetId) this.cabinetId = cabinetId;
     await this.env.DB.prepare("DELETE FROM cabinet_directory WHERE cabinet_id = ?").bind(this.cabinetId).run();

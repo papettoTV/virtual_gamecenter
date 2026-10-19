@@ -1,0 +1,16 @@
+{
+  "name": "pulbase-recovery-drill-20261020-do",
+  "account_id": "60e5472a284dc71bbafbbfac8aa2a940",
+  "main": "../src/recovery/worker.ts",
+  "compatibility_date": "2026-07-26",
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": { "APP_ENV": "staging", "RECOVERY_DRILL": "true", "DEVELOPER_AUTH_ENABLED": "false", "CREDIT_PURCHASES_ENABLED": "false", "USAGE_MONITOR_ENABLED": "false" },
+  "assets": { "directory": "../dist/client", "binding": "ASSETS", "run_worker_first": true, "not_found_handling": "single-page-application" },
+  "d1_databases": [{ "binding": "DB", "database_name": "pulbase-recovery-drill-20261020-do", "database_id": "11111111-1111-4111-8111-111111111111", "migrations_dir": "../migrations" }],
+  "r2_buckets": [{ "binding": "DELETION_AUDIT", "bucket_name": "pulbase-recovery-drill-20261020-do" }],
+  "durable_objects": { "bindings": [{ "name": "CABINET_ROOMS", "class_name": "CabinetRoom" }, { "name": "ABUSE_GUARDS", "class_name": "AbuseGuard" }, { "name": "RECOVERY_CONTROL", "class_name": "RecoveryControl" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["CabinetRoom", "AbuseGuard", "RecoveryControl"] }],
+  "ratelimits": [{"name":"API_READ_LIMITER","namespace_id":"2026102031","simple":{"limit":600,"period":60}},{"name":"API_WRITE_LIMITER","namespace_id":"2026102032","simple":{"limit":120,"period":60}},{"name":"BOOTSTRAP_LIMITER","namespace_id":"2026102033","simple":{"limit":60,"period":60}},{"name":"BENEFIT_LIMITER","namespace_id":"2026102034","simple":{"limit":30,"period":60}},{"name":"SOCKET_LIMITER","namespace_id":"2026102035","simple":{"limit":120,"period":60}},{"name":"AUTH_LIMITER","namespace_id":"2026102036","simple":{"limit":60,"period":60}}],
+  "observability": { "enabled": true, "traces": { "enabled": true } }
+}

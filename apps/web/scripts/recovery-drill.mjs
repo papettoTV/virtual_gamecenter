@@ -12,7 +12,7 @@ const fixtureVersion = "synthetic-only-v1";
 
 export function validateRecoveryConfig(config) {
   const name = config.name;
-  assert.match(name, /^pulbase-recovery-drill-\d{8}$/);
+  assert.match(name, /^pulbase-recovery-drill-\d{8}(?:-do)?$/);
   assert.equal(config.account_id, "60e5472a284dc71bbafbbfac8aa2a940");
   assert.equal(config.workers_dev, false);
   assert.equal(config.preview_urls, false);

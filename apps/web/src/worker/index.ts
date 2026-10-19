@@ -15,10 +15,12 @@ import { recordUsage } from "./usage-monitor";
 import { AbuseGuard } from "./abuse-guard";
 import { distributedBudget, distributedError } from "./distributed-protection";
 import { hashIdentifier } from "./identity-hash";
+import { recoveryResponse, type RecoveryBinding } from "./recovery-control";
 
 export { CabinetRoom, AbuseGuard };
 
 interface WorkerEnv extends Env, BasicAuthEnv {
+  RECOVERY_CONTROL?: RecoveryBinding;
   ASSETS: Fetcher;
   DB: D1Database;
   CABINET_ROOMS: DurableObjectNamespace<CabinetRoom>;
@@ -32,6 +34,11 @@ export default {
     const gatewayEnvironment = request.headers.get("X-Pulbase-Gateway-Environment");
     if (gatewayEnvironment && gatewayEnvironment !== env.APP_ENV) {
       return Response.json({ error: "backend_environment_mismatch" }, { status: 403, headers: { "Cache-Control": "no-store" } });
+    }
+    if (env.RECOVERY_CONTROL) {
+      try {
+        if (!await env.RECOVERY_CONTROL.getByName("global").isOpen()) return recoveryResponse(request);
+      } catch { return recoveryResponse(request); }
     }
     const requiresOrigin = url.pathname.startsWith("/api/")
       && (request.headers.get("Upgrade")?.toLowerCase() === "websocket" || !["GET", "HEAD", "OPTIONS"].includes(request.method))
@@ -147,6 +154,12 @@ export default {
       }
       return;
     }
-    if (event.cron === "0 * * * *") ctx.waitUntil(runRetention(env.DB, env.CABINET_ROOMS, env.DELETION_AUDIT));
+    if (event.cron === "0 * * * *") {
+      if (env.RECOVERY_CONTROL) {
+        try { if (!await env.RECOVERY_CONTROL.getByName("global").isOpen()) return; }
+        catch { return; }
+      }
+      ctx.waitUntil(runRetention(env.DB, env.CABINET_ROOMS, env.DELETION_AUDIT));
+    }
   },
 } satisfies ExportedHandler<WorkerEnv>;

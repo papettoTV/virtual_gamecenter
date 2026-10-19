@@ -80,6 +80,15 @@ export class AbuseGuard extends DurableObject<Env> {
     return this.ctx.storage.sql.exec<{ count: number }>("SELECT count(*) AS count FROM connections WHERE ip = ?", ip).one().count;
   }
 
+  activeConnectionCount(): number {
+    return this.ctx.storage.sql.exec<{ count: number }>("SELECT count(*) AS count FROM connections").one().count;
+  }
+
+  async suspendMaintenanceAlarm(): Promise<void> {
+    if (this.activeConnectionCount()) throw Error("recovery_admissions_remaining");
+    await this.ctx.storage.deleteAlarm();
+  }
+
   async alarm(): Promise<void> {
     await this.reconcileConnections();
     const now = Date.now();
