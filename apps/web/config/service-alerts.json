@@ -1,0 +1,22 @@
+{
+  "dataset": "pulbase_service_health",
+  "environment": "staging",
+  "accountId": "60e5472a284dc71bbafbbfac8aa2a940",
+  "alerts": [
+    {
+      "name": "PULBASE staging - service unavailable",
+      "query": "SELECT argMax(double1, timestamp) AS value FROM events.analyticsEngine.pulbase_service_health WHERE accountTag = '60e5472a284dc71bbafbbfac8aa2a940' AND blob1 = 'staging' AND timestamp >= NOW() - INTERVAL '20' MINUTE",
+      "operator": ">=", "threshold": 1, "executionInterval": "5m", "repeatInterval": "6h"
+    },
+    {
+      "name": "PULBASE staging - service recovered",
+      "query": "SELECT COUNT(*) AS value FROM events.analyticsEngine.pulbase_service_health WHERE accountTag = '60e5472a284dc71bbafbbfac8aa2a940' AND blob1 = 'staging' AND double6 > 0 AND double4 = double6 AND timestamp >= NOW() - INTERVAL '30' MINUTE",
+      "operator": ">=", "threshold": 1, "executionInterval": "5m", "repeatInterval": "6h"
+    },
+    {
+      "name": "PULBASE staging - service monitor missing",
+      "query": "SELECT COUNT(*) AS value FROM events.analyticsEngine.pulbase_service_health WHERE accountTag = '60e5472a284dc71bbafbbfac8aa2a940' AND blob1 = 'staging' AND timestamp >= NOW() - INTERVAL '20' MINUTE",
+      "operator": "<=", "threshold": 0, "executionInterval": "5m", "repeatInterval": "1h"
+    }
+  ]
+}

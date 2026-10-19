@@ -45,6 +45,30 @@ npm run service:check -- --environment production --confirm-production
 
 自動スケジュールは未設定。Actionsの失敗通知はGitHubの個人通知設定に依存するため、ファイル追加だけでメール通知済みとは扱わない。自動化前に、通知先と当番、頻度、失敗・復旧の実着信を確認する。
 
+## 定期監視の準備
+
+2026-10-20時点では実装・ローカル検査まで完了。専用KVを作成したが、定期Workerのデプロイと新規通知の登録は未実施。既存Basic認証を新Workerへ保存する明示承認待ちであり、定期監視が稼働中とは扱わない。
+
+- 設定：`apps/web/wrangler.service-monitor.jsonc`。専用Workerは `pulbase-service-monitor`、5分Cron、検証Pagesだけを読み取る。HTTPの実行用入口・workers.dev・preview URLは公開しない。本番URL、アプリDB・DO・クレジットは操作しない。
+- Secret：`PULBASE_CHECK_USERNAME` と `PULBASE_CHECK_PASSWORD` のみを専用Workerへ保存する。Google・Stripe・Cloudflare管理APIの認証は渡さない。
+- 状態：専用KV `HEALTH_STATE`、ID `ab926be25f7740a08844889f0c5e0b3f`。直近スロット、成功/失敗の連続数、障害状態と遷移時刻だけを保存。利用者情報は保存しない。
+- Analytics Engine：`pulbase_service_health`。予定スロット・成功/失敗・障害状態を記録する。KV書込や状態検証に失敗した場合は正常heartbeatを出さず、監視停止側で検知する。
+- 2回連続の失敗で障害、障害中に3回連続正常なら復旧。初回の正常を復旧通知にしない。欠落スロットがあれば連続数をリセットし、古い実行・重複スロットは記録しない。
+- KVは強整合のロックではないため、同時実行の厳密な排他や通知のexactly-onceは保証しない。通常の単一5分Cronを前提に、状態時刻とCloudflare側の通知抑止で連発を抑える。読み取り遅延や取り込み遅延で検知が遅れる可能性を残す。
+- 通常1日288回、最大2016 HTTP要求、KV読み取り/書き込み各288件、Analytics Engine 288点が追加される。通知3件を5分評価すると864クエリ/日が目安。試験・再実行は別途加算される。プランの変更や利用料金ゼロの保証はしない。
+
+通知の設定値は `apps/web/config/service-alerts.json` に保存する。いずれも登録メール宛のCustom Alert・Manual時間範囲で準備する。
+
+| 通知 | 条件 | 評価・再通知 |
+| --- | --- | --- |
+| service unavailable | 最新の障害状態が1 | 5分評価、継続中6時間ごと |
+| service recovered | 過去30分に復旧遷移の記録がある | 5分評価、6時間抑止。普段の正常記録では通知しない |
+| service monitor missing | 過去20分の記録が0件 | 5分評価、継続中1時間ごと |
+
+まず自然Cronの正常記録を確認してから監視停止通知を有効化する。続いて障害・復旧通知のテスト送信を行い、件名・送信時刻・受信箱/迷惑メールへの到着を運営者または許可された受信箱で確認する。Test送信、実際の判定条件による発報、利用者に影響する実障害は区別して記録する。実サイト停止・誤ったBasic認証への変更・残高消費で障害を作らない。
+
+Cloudflare Custom Alertsの判定と評価間隔は[公式仕様](https://developers.cloudflare.com/notifications/notification-available/#custom-alerts-beta)を参照。通知機構自体が停止した場合やCloudflare全体の障害に備えた別事業者での監視は、別の残課題とする。
+
 ## 内部目標の案
 
 利用者向けSLAではなく、小規模ベータの運営判断用の暫定案。運営者の確認と計測準備が必要。
