@@ -2,6 +2,23 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { nextHealthState } from "../src/monitor/health-state.mjs";
 import worker from "../src/monitor/worker.mjs";
+import { readFile } from "node:fs/promises";
+
+test("fits one remaining custom alert slot without suppressing recovery for six hours", async () => {
+  const config = JSON.parse(await readFile(new URL("../config/service-alerts.json", import.meta.url), "utf8"));
+  assert.equal(config.alerts.length, 1);
+  const alert = config.alerts[0];
+  assert.equal(alert.operator, ">=");
+  assert.equal(alert.threshold, 1);
+  assert.equal(alert.executionInterval, "5m");
+  assert.equal(alert.repeatInterval, "15m");
+  assert.match(alert.query, /CASE WHEN COUNT\(\*\) = 0 THEN 3 WHEN argMax\(double1, timestamp\) >= 1 THEN 1/);
+  assert.match(alert.query, /argMax\(double6, timestamp\) > 0 AND argMax\(double4, timestamp\) - argMax\(double6, timestamp\) < 1800 THEN 2 ELSE 0 END AS value/);
+  assert.ok(alert.query.includes(`accountTag = '${config.accountId}'`));
+  assert.ok(alert.query.includes("blob1 = 'staging'"));
+  assert.ok(alert.query.includes("timestamp >= NOW() - INTERVAL '20' MINUTE"));
+  assert.ok(alert.name.includes("1 DOWN, 2 RECOVERED, 3 NO DATA"));
+});
 
 test("requires two failures and three successes, without repeating transitions", () => {
   let state = nextHealthState(null, false, 300000);

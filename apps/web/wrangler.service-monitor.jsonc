@@ -3,7 +3,7 @@
   "name": "pulbase-service-monitor",
   "account_id": "60e5472a284dc71bbafbbfac8aa2a940",
   "main": "src/monitor/worker.mjs",
-  "compatibility_date": "2026-10-20",
+  "compatibility_date": "2026-10-19",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
   "preview_urls": false,

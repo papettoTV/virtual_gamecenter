@@ -4,19 +4,10 @@
   "accountId": "60e5472a284dc71bbafbbfac8aa2a940",
   "alerts": [
     {
-      "name": "PULBASE staging - service unavailable",
-      "query": "SELECT argMax(double1, timestamp) AS value FROM events.analyticsEngine.pulbase_service_health WHERE accountTag = '60e5472a284dc71bbafbbfac8aa2a940' AND blob1 = 'staging' AND timestamp >= NOW() - INTERVAL '20' MINUTE",
-      "operator": ">=", "threshold": 1, "executionInterval": "5m", "repeatInterval": "6h"
-    },
-    {
-      "name": "PULBASE staging - service recovered",
-      "query": "SELECT COUNT(*) AS value FROM events.analyticsEngine.pulbase_service_health WHERE accountTag = '60e5472a284dc71bbafbbfac8aa2a940' AND blob1 = 'staging' AND double6 > 0 AND double4 = double6 AND timestamp >= NOW() - INTERVAL '30' MINUTE",
-      "operator": ">=", "threshold": 1, "executionInterval": "5m", "repeatInterval": "6h"
-    },
-    {
-      "name": "PULBASE staging - service monitor missing",
-      "query": "SELECT COUNT(*) AS value FROM events.analyticsEngine.pulbase_service_health WHERE accountTag = '60e5472a284dc71bbafbbfac8aa2a940' AND blob1 = 'staging' AND timestamp >= NOW() - INTERVAL '20' MINUTE",
-      "operator": "<=", "threshold": 0, "executionInterval": "5m", "repeatInterval": "1h"
+      "name": "PULBASE staging - service health (1 DOWN, 2 RECOVERED, 3 NO DATA)",
+      "description": "Staging only. Value 1: service DOWN (2 failed probes); 2: RECOVERED (3 healthy probes, shown for 30 min); 3: NO MONITOR DATA for 20 min. 0: healthy, no mail. Checked every 5 min, repeat every 15 min. Recovery delivery may wait up to 15 min plus evaluation/ingestion delay; up to 2 recovery reminders. Check dashboard current value before acting. Existing cost/usage alerts are unchanged.",
+      "query": "SELECT CASE WHEN COUNT(*) = 0 THEN 3 WHEN argMax(double1, timestamp) >= 1 THEN 1 WHEN argMax(double6, timestamp) > 0 AND argMax(double4, timestamp) - argMax(double6, timestamp) < 1800 THEN 2 ELSE 0 END AS value FROM events.analyticsEngine.pulbase_service_health WHERE accountTag = '60e5472a284dc71bbafbbfac8aa2a940' AND blob1 = 'staging' AND timestamp >= NOW() - INTERVAL '20' MINUTE",
+      "operator": ">=", "threshold": 1, "executionInterval": "5m", "repeatInterval": "15m"
     }
   ]
 }
