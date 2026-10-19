@@ -64,6 +64,7 @@ coverage
 .dev.vars
 .dev.vars.*
 !.dev.vars.example
+/apps/web/config/recovery-drill.local.json
 wrangler.toml
 .DS_Store
 *.blend1
