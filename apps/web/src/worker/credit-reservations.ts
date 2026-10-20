@@ -1,6 +1,6 @@
 import { getGameDefinition } from "../domain/game";
 
-export async function validatePlayReservation(database: D1Database, reservationId: unknown, playerId: string | undefined, cabinetId: string, gameId: string, mode: string, status: "active" | "captured", usageId?: string): Promise<boolean> {
+export async function validatePlayReservation(database: D1Database, reservationId: unknown, playerId: string | undefined, cabinetId: string, gameId: string, mode: string, status: "active" | "captured", usageId?: string, sessionHash?: string): Promise<boolean> {
   const game = getGameDefinition(gameId);
   if (!game || game.status !== "active" || !playerId || typeof reservationId !== "string" || !reservationId) return false;
   const query = `SELECT r.id FROM credit_reservations r JOIN play_sessions p ON p.id = r.play_session_id
@@ -8,8 +8,10 @@ export async function validatePlayReservation(database: D1Database, reservationI
       AND p.cabinet_id = ? AND p.game_id = ? AND p.mode = ? AND r.amount = ?
       AND datetime(r.expires_at) > CURRENT_TIMESTAMP
       AND NOT EXISTS (SELECT 1 FROM credit_reservation_uses u WHERE u.reservation_id = r.id)
-      AND (? = 'active' OR EXISTS (SELECT 1 FROM credit_ledger_entries e WHERE e.id = 'consume:' || r.id AND e.player_id = r.player_id AND e.amount = -r.amount AND e.entry_type = 'consumed' AND e.balance_type = r.balance_type AND e.play_session_id = p.id AND e.reference_id = r.id))`;
+      AND (? = 'active' OR EXISTS (SELECT 1 FROM credit_ledger_entries e WHERE e.id = 'consume:' || r.id AND e.player_id = r.player_id AND e.amount = -r.amount AND e.entry_type = 'consumed' AND e.balance_type = r.balance_type AND e.play_session_id = p.id AND e.reference_id = r.id))
+      ${sessionHash ? `AND EXISTS (SELECT 1 FROM player_sessions session_entry JOIN players owner ON owner.id = session_entry.player_id WHERE session_entry.token_hash = ? AND session_entry.player_id = r.player_id AND datetime(session_entry.expires_at) > CURRENT_TIMESTAMP AND owner.deletion_requested_at IS NULL)` : ""}`;
   const values = [reservationId, playerId, status, cabinetId, gameId, mode, game.creditCost, status];
+  if (sessionHash) values.push(sessionHash);
   if (!usageId) return Boolean(await database.prepare(query).bind(...values).first());
   const result = await database.prepare(`INSERT OR IGNORE INTO credit_reservation_uses (reservation_id, usage_id) SELECT id, ? FROM (${query})`)
     .bind(usageId, ...values).run();

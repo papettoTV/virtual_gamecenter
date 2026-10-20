@@ -161,6 +161,26 @@ describe("Pages to Worker gateway", () => {
     expect(response.headers.get("cache-control")).toBe("no-store");
   });
 
+  it("keeps OAuth failures private and logs only a fixed event code", async () => {
+    const bootstrap = await forwarded("/api/platform/bootstrap");
+    const initial = await bootstrap.json() as { playerId: string; consent: { termsVersion: string; privacyVersion: string } };
+    const cookie = bootstrap.headers.get("set-cookie")!.split(";", 1)[0]!;
+    await env.DB.batch(["terms", "privacy"].map(kind => env.DB.prepare("INSERT INTO consent_records (id, player_id, policy_type, policy_version) VALUES (?, ?, ?, ?)").bind(crypto.randomUUID(), initial.playerId, kind, kind === "terms" ? initial.consent.termsVersion : initial.consent.privacyVersion)));
+    const state = crypto.randomUUID();
+    const stateCookie = "vgc_oauth_state=" + encodeURIComponent(JSON.stringify({ state, returnTo: "/cabinets/private-return" }));
+    const upstream = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("private-code private-token person@example.invalid"));
+    const logger = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const response = await forwarded(`/api/platform/auth/google/callback?state=${state}&code=private-code`, { headers: { Cookie: cookie + "; " + stateCookie } });
+      expect(response.status).toBe(302);
+      expect(response.headers.get("location")).toBe(origin + "/cabinets/private-return?account=error&reason=registration_failed");
+      expect(response.headers.get("cache-control")).toBe("private, no-store");
+      expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+      expect(response.headers.get("set-cookie")).toContain("Max-Age=0");
+      expect(logger.mock.calls).toEqual([["oauth_registration_failed"]]);
+    } finally { upstream.mockRestore(); logger.mockRestore(); }
+  });
+
   it("starts a credited game and sends live frames to another spectator through Pages", async () => {
     const cabinetId = crypto.randomUUID();
     const bootstrap = await forwarded("/api/platform/bootstrap");

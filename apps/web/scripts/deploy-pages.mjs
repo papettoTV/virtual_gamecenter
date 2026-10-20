@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { readFile, rename } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { checkReleaseBranch, checkReleaseConfig } from "./release-config.mjs";
+import { parseTokenOutput, tokenCommandOptions } from "./observability-policy.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const environment = process.argv[2];
@@ -27,10 +28,9 @@ try {
   const configErrors = checkReleaseConfig(config, environment);
   if (configErrors.length) throw Error(configErrors.join("\n"));
   if (!/^[a-f0-9]{32}$/.test(config.account_id)) throw Error("対象Cloudflareアカウントを確認してください。");
-  const credentials = spawnSync("npx", ["wrangler", "auth", "token", "--json"], { cwd: root, encoding: "utf8" });
+  const credentials = spawnSync("npx", ["wrangler", "auth", "token", "--json"], { ...tokenCommandOptions(), cwd: root });
   if (credentials.status !== 0) throw Error("Cloudflare認証を確認してください。");
-  const token = JSON.parse(credentials.stdout).token;
-  if (!token) throw Error("Cloudflare認証情報を取得できません。");
+  const token = parseTokenOutput(credentials.stdout);
   authorization = `Bearer ${token}`;
   endpoint = `https://api.cloudflare.com/client/v4/accounts/${config.account_id}/pages/projects/virtual-gamecenter`;
   const project = await projectRequest("GET");

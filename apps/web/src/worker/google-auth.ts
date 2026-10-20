@@ -150,8 +150,8 @@ export async function handleGoogleAuthRequest(
       status: 302,
       headers: { Location: redirect.toString(), "Set-Cookie": clearStateCookie },
     });
-  } catch (error) {
-    console.error("Google account registration failed", error);
+  } catch {
+    console.error("oauth_registration_failed");
     return fail("registration_failed");
   }
 }

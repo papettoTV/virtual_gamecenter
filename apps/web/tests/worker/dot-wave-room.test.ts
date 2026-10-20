@@ -108,6 +108,43 @@ it("allows anonymous watching but not taking a player seat", async () => {
   expect((await viewer.next("clockPong")).sentAt).toBe(14);
 });
 
+it.each(["graze-duel", "dot-wave", "deep-sea-salvage"])("prevents anonymous spectators from controlling the host or its credit: %s", async gameId => {
+  const cabinet = crypto.randomUUID();
+  const cookie = await player();
+  const host = await connect(cookie, cabinet, false, gameId);
+  const reservationId = await reserve(cookie, cabinet, "solo", gameId);
+  await capture(cookie, reservationId);
+  host.send({ type: "startSolo", reservationId });
+  await host.next("cabinetState", message => message.state.status === "soloPlaying");
+  const viewer = await connect("", cabinet, true, gameId);
+  const attempts: ClientMessage[] = [
+    { type: "startSolo", reservationId }, { type: "stopSolo" },
+    { type: "gameKeyframe", seq: 900, snapshot: { injected: true } },
+    { type: "gameEvents", seq: 900, events: [{ type: "injected" }] },
+    { type: "gameMotionFrame", seq: 900, frame: { injected: true } },
+    { type: "dotWaveResult", matchId: "other-match", hp: [0, 0], turn: 99 },
+    { type: "dotWaveReturn", matchId: "other-match" },
+    { type: "requestChallenge", reservationId }, { type: "cancelChallenge" },
+    { type: "respondChallenge", accept: true },
+    { type: "versusReady", matchId: "other-match" },
+    { type: "versusProgress", matchId: "other-match", seq: 900, progress: { injected: true } },
+    { type: "versusAttack", matchId: "other-match", attackId: "injected", level: 999, bossAttack: true },
+    { type: "versusTerminal", matchId: "other-match", report: { reason: "cleared", score: 999, clearTimeMs: 1, matchElapsedMs: 1 } },
+    { type: "requestRematch", matchId: "other-match", reservationId },
+    { type: "respondRematch", matchId: "other-match", accept: true },
+    { type: "declineRematch", matchId: "other-match" },
+  ];
+  for (const attempt of attempts) viewer.send(attempt);
+  viewer.send({ type: "clockPing", sentAt: 901 });
+  await viewer.next("clockPong", message => message.sentAt === 901);
+  host.send({ type: "clockPing", sentAt: 902 });
+  await host.next("clockPong", message => message.sentAt === 902);
+  const directory = await (await exports.default.fetch(`http://localhost/api/cabinets?gameId=${gameId}`)).json<{ cabinets: Array<{ cabinetId: string; status: string }> }>();
+  expect(directory.cabinets.find(entry => entry.cabinetId === cabinet)?.status).toBe("soloPlaying");
+  expect((await env.DB.prepare("SELECT status FROM credit_reservations WHERE id = ?").bind(reservationId).first<{ status: string }>())?.status).toBe("captured");
+  expect(host.messages.some(message => ["challengeReceived", "versusAttack", "versusOpponentProgress", "viewerKeyframe", "viewerEvents", "viewerMotionFrame"].includes(message.type))).toBe(false);
+});
+
 it("deleting a player clears the live stream and closes only that player's connection", async () => {
   const cabinet = crypto.randomUUID();
   const hostCookie = await player();

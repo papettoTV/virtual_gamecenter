@@ -16,6 +16,7 @@ import { AbuseGuard } from "./abuse-guard";
 import { distributedBudget, distributedError } from "./distributed-protection";
 import { hashIdentifier } from "./identity-hash";
 import { recoveryResponse, type RecoveryBinding } from "./recovery-control";
+import { secureResponse } from "./response-security";
 
 export { CabinetRoom, AbuseGuard };
 
@@ -28,7 +29,7 @@ interface WorkerEnv extends Env, BasicAuthEnv {
 
 const CABINET_SOCKET_PATH = /^\/api\/cabinets\/([a-zA-Z0-9-]+)\/ws$/;
 
-export default {
+const handler = {
   async fetch(request: Request, env: WorkerEnv): Promise<Response> {
     const url = new URL(request.url);
     const gatewayEnvironment = request.headers.get("X-Pulbase-Gateway-Environment");
@@ -74,7 +75,7 @@ export default {
       return platformResponse ?? Response.json({ error: "not_found" }, { status: 404 });
     }
 
-    const authorizationError = authorizeRequest(request, env);
+    const authorizationError = await authorizeRequest(request, env);
     if (authorizationError) return authorizationError;
     if (url.pathname === "/analytics.js" && request.method === "GET" && env.APP_ENV === "staging") {
       const asset = await env.ASSETS.fetch(request);
@@ -161,5 +162,12 @@ export default {
       }
       ctx.waitUntil(runRetention(env.DB, env.CABINET_ROOMS, env.DELETION_AUDIT));
     }
+  },
+} satisfies ExportedHandler<WorkerEnv>;
+
+export default {
+  ...handler,
+  async fetch(request: Request, env: WorkerEnv): Promise<Response> {
+    return secureResponse(request, await handler.fetch(request, env));
   },
 } satisfies ExportedHandler<WorkerEnv>;

@@ -2,6 +2,7 @@ import { env, exports } from "cloudflare:workers";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { getActiveGames } from "../../src/domain/game";
 import { validatePlayReservation } from "../../src/worker/credit-reservations";
+import { hashIdentifier } from "../../src/worker/identity-hash";
 import { migrateTestDatabase } from "../migrate-test-database";
 
 beforeAll(migrateTestDatabase);
@@ -21,6 +22,16 @@ async function fixture(gameId: string, purpose = "solo") {
 }
 
 describe.each(getActiveGames())("$id play reservations", game => {
+  it.each(["revoked", "expired", "deleted"])("atomically refuses a captured play with a %s session", async condition => {
+    const test = await fixture(game.id);
+    await test.api(`credit-reservations/${test.reservationId}/capture`);
+    const hash = await hashIdentifier(test.cookie.split("=")[1]!);
+    if (condition === "revoked") await env.DB.prepare("DELETE FROM player_sessions WHERE token_hash = ?").bind(hash).run();
+    if (condition === "expired") await env.DB.prepare("UPDATE player_sessions SET expires_at = '2000-01-01' WHERE token_hash = ?").bind(hash).run();
+    if (condition === "deleted") await env.DB.prepare("UPDATE players SET deletion_requested_at = CURRENT_TIMESTAMP WHERE id = ?").bind(test.playerId).run();
+    expect(await validatePlayReservation(env.DB, test.reservationId, test.playerId, test.cabinetId, game.id, "solo", "captured", crypto.randomUUID(), hash)).toBe(false);
+    expect(await env.DB.prepare("SELECT COUNT(*) FROM credit_reservation_uses WHERE reservation_id = ?").bind(test.reservationId).first("COUNT(*)")).toBe(0);
+  });
   it("keeps a streaming solo cabinet visible after the directory freshness window", async () => {
     const test = await fixture(game.id);
     await test.api(`credit-reservations/${test.reservationId}/capture`);

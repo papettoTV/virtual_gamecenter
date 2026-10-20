@@ -6,6 +6,7 @@ import {
 } from "./google-auth";
 import { DEFAULT_GAME_ID, getGameDefinition } from "../domain/game";
 import { reconcileBetaCredits } from "./beta-credits";
+import { protectionFailureInfo, withProtectionRetry } from "./protection-failure";
 export type { CreditPolicy } from "./beta-credits";
 
 const SESSION_COOKIE = "vgc_session";
@@ -197,10 +198,19 @@ export async function handlePlatformRequest(
     await database.prepare("DELETE FROM player_sessions WHERE token_hash = ?")
       .bind(await hashToken(session.token)).run();
     if (rooms) {
-      const cabinets = await database.prepare("SELECT cabinet_id FROM player_cabinets WHERE player_id = ?")
-        .bind(session.playerId).all<{ cabinet_id: string }>();
-      const sessionHash = await hashToken(session.token);
-      await Promise.all(cabinets.results.map(cabinet => rooms.get(rooms.idFromName(cabinet.cabinet_id)).revokeSession(session.playerId, sessionHash)));
+      try {
+        const cabinets = await database.prepare("SELECT cabinet_id FROM player_cabinets WHERE player_id = ?")
+          .bind(session.playerId).all<{ cabinet_id: string }>();
+        const sessionHash = await hashToken(session.token);
+        const results = await Promise.allSettled(cabinets.results.map(cabinet => withProtectionRetry(
+          () => rooms.get(rooms.idFromName(cabinet.cabinet_id)).revokeSession(session.playerId, sessionHash),
+          (attempt, info) => console.warn("session_revocation_retry", { attempt, ...info }),
+        )));
+        const failed = results.filter(result => result.status === "rejected").length;
+        if (failed) console.warn("session_revocation_incomplete", { stage: "rooms", failed });
+      } catch (error) {
+        console.warn("session_revocation_incomplete", { stage: "directory", ...protectionFailureInfo(error) });
+      }
     }
     const guestSession = await getOrCreatePlayerSession(request, database);
     await database.batch([
