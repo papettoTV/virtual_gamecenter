@@ -80,3 +80,10 @@ vite.config.ts.timestamp-*
 市場分析.md
 カジュアルゲーム流行分析.md
 法律観点調査.md
+
+# CI browser evidence (may contain test session identifiers)
+/ci/results/
+/ci/test-results/
+/ci/playwright-report/
+/ci/request.md
+/ci/review-request.md

@@ -1,0 +1,121 @@
+name: Codex issue to PR
+on:
+  issues:
+    types: [opened, labeled]
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: Open issue number (bootstrap on develop)
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: codex-issue-${{ github.event.issue.number || inputs.issue }}
+  cancel-in-progress: false
+jobs:
+  intake:
+    if: vars.PULBASE_CODEX_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      issue: ${{ steps.request.outputs.issue }}
+      base: ${{ steps.request.outputs.base }}
+      request: ${{ steps.request.outputs.request }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: develop
+          persist-credentials: false
+      - uses: actions/github-script@v7
+        id: request
+        env:
+          ISSUE_INPUT: ${{ inputs.issue }}
+        with:
+          script: |
+            const { intake } = await import(`${process.env.GITHUB_WORKSPACE}/ci/github.mjs`);
+            await intake({ github, context, core, issueInput: process.env.ISSUE_INPUT });
+  implement:
+    needs: intake
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: codex
+    outputs:
+      result: ${{ steps.codex.outputs.final-message }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.intake.outputs.base }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+        working-directory: apps/web
+      - name: Prepare isolated request and disposable credentials
+        env:
+          ISSUE_REQUEST: ${{ needs.intake.outputs.request }}
+        run: |
+          node -e 'const fs = require("fs"); fs.writeFileSync("ci/request.md", fs.readFileSync("ci/prompts/implement.md", "utf8") + "\nUntrusted issue JSON:\n" + process.env.ISSUE_REQUEST)'
+          printf '%s\n' 'GOOGLE_CLIENT_ID=ci-example.apps.googleusercontent.com' 'GOOGLE_CLIENT_SECRET=ci-example' 'STRIPE_SECRET_KEY=sk_test_ci_example' 'STRIPE_WEBHOOK_SECRET=whsec_ci_example' > apps/web/.dev.vars
+      # Last step: do not run code in a runner modified by Codex afterward.
+      - uses: openai/codex-action@v1
+        id: codex
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt-file: ci/request.md
+          sandbox: workspace-write
+          safety-strategy: drop-sudo
+          codex-args: '["--output-schema", "ci/schemas/implementation.json"]'
+  publish:
+    needs: [intake, implement]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: automation
+    steps:
+      - uses: actions/create-github-app-token@v1
+        id: app
+        with:
+          app-id: ${{ vars.PULBASE_APP_ID }}
+          private-key: ${{ secrets.PULBASE_APP_PRIVATE_KEY }}
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.intake.outputs.base }}
+          token: ${{ steps.app.outputs.token }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate and publish text patch without executing candidate code
+        env:
+          CODEX_RESULT: ${{ needs.implement.outputs.result }}
+          BASE_SHA: ${{ needs.intake.outputs.base }}
+          ISSUE_NUMBER: ${{ needs.intake.outputs.issue }}
+          RESULT_FILE: ${{ runner.temp }}/codex-result.json
+          PATCH_FILE: ${{ runner.temp }}/codex.patch
+          PR_BODY_FILE: ${{ runner.temp }}/pr-body.md
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          node -e 'require("fs").writeFileSync(process.env.RESULT_FILE, process.env.CODEX_RESULT)'
+          node ci/publish-patch.mjs
+          gh pr create --base develop --head "codex/issue-$ISSUE_NUMBER" --title "Resolve issue #$ISSUE_NUMBER" --body-file "$PR_BODY_FILE"
+  failure:
+    needs: [intake, implement, publish]
+    if: always() && vars.PULBASE_CODEX_ENABLED == 'true' && contains(needs.*.result, 'failure')
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: develop
+          persist-credentials: false
+      - uses: actions/github-script@v7
+        env:
+          ISSUE_NUMBER: ${{ inputs.issue }}
+        with:
+          script: |
+            const { report } = await import(`${process.env.GITHUB_WORKSPACE}/ci/github.mjs`);
+            await report({ github, context, ok: false });

@@ -1,0 +1,14 @@
+{
+  "name": "pulbase-ci",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "check": "node check-workflows.mjs",
+    "browser": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.1",
+    "yaml": "2.9.1"
+  }
+}

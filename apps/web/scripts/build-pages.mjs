@@ -1,4 +1,4 @@
-import { mkdir, copyFile, writeFile, readFile } from "node:fs/promises";
+import { mkdir, writeFile, readFile } from "node:fs/promises";
 import { checkPagesTargets } from "./pages-targets.mjs";
 
 try {
@@ -10,7 +10,10 @@ try {
   if (errors.length) throw new Error(errors.join("\n"));
   const output = new URL("../dist/client/", import.meta.url);
   await mkdir(output, { recursive: true });
-  await copyFile(new URL("../src/pages/gateway.mjs", import.meta.url), new URL("_worker.js", output));
+  const revision = process.env.PULBASE_RELEASE_SHA ?? "";
+  if (revision && !/^[a-f0-9]{40}$/.test(revision)) throw new Error("PULBASE_RELEASE_SHA must be a full commit SHA");
+  const gateway = await readFile(new URL("../src/pages/gateway.mjs", import.meta.url), "utf8");
+  await writeFile(new URL("_worker.js", output), gateway.replace("__PULBASE_GATEWAY_REVISION__", revision));
   await writeFile(new URL("_routes.json", output), JSON.stringify({ version: 1, include: ["/*"], exclude: [] }));
   process.stdout.write("Pagesゲートウェイをdist/clientへ生成しました。全リクエストをService Bindingへ転送します。\n");
 } catch (error) {

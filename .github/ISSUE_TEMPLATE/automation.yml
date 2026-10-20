@@ -1,0 +1,22 @@
+name: Codex implementation
+description: 自動実装する変更と受け入れ条件
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: 変更したいこと
+      description: 利用者にとって何が変わるかを書いてください。
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 受け入れ条件
+      description: 確認する画面・操作・期待結果を箇条書きで記入してください。
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: 制約・対象外
+      description: 対象端末や変更してはいけない動作など。

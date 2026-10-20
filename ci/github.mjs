@@ -1,0 +1,79 @@
+import { assertAutomatedPr, assertChanges, assertIssueNumber, assertSha } from './policy.mjs';
+
+export async function intake({ github, context, core, issueInput }) {
+  const issue_number = assertIssueNumber(issueInput || context.payload.issue?.number);
+  const repo = context.repo;
+  const { data: actor } = await github.rest.repos.getCollaboratorPermissionLevel({ ...repo, username: context.actor });
+  if (!['admin', 'maintain', 'write'].includes(actor.permission)) throw Error('Write access required');
+  const { data: issue } = await github.rest.issues.get({ ...repo, issue_number });
+  if (issue.pull_request || issue.state !== 'open') throw Error('An open issue is required');
+  if (context.eventName !== 'workflow_dispatch') {
+    const { data: author } = await github.rest.repos.getCollaboratorPermissionLevel({ ...repo, username: issue.user.login });
+    const labelled = context.payload.action === 'labeled' && context.payload.label?.name === 'codex:run';
+    if (!labelled && !['admin', 'maintain', 'write'].includes(author.permission)) throw Error('Maintainer must label this issue');
+  }
+  const { data: branch } = await github.rest.repos.getBranch({ ...repo, branch: 'develop' });
+  const sha = assertSha(branch.commit.sha);
+  const head = `codex/issue-${issue_number}`;
+  const existing = await github.rest.pulls.list({ ...repo, head: `${repo.owner}:${head}`, state: 'open' });
+  if (existing.data.length) throw Error('An automation PR already exists for this issue');
+  const text = JSON.stringify({ number: issue_number, title: issue.title, body: issue.body ?? '' });
+  if (Buffer.byteLength(text) > 18000) throw Error('Issue exceeds automation input limit');
+  core.setOutput('issue', issue_number);
+  core.setOutput('base', sha);
+  core.setOutput('request', text);
+}
+
+export async function preparePr({ github, context, core, bot }) {
+  const { data: pr } = await github.rest.pulls.get({ ...context.repo, pull_number: context.payload.pull_request.number });
+  assertAutomatedPr(pr, { repository: `${context.repo.owner}/${context.repo.repo}`, bot });
+  const files = await github.paginate(github.rest.pulls.listFiles, { ...context.repo, pull_number: pr.number, per_page: 100 });
+  assertChanges(files);
+  core.setOutput('head', pr.head.sha);
+  core.setOutput('base', pr.base.sha);
+  core.setOutput('number', pr.number);
+  const issue_number = assertIssueNumber(pr.head.ref.replace('codex/issue-', ''));
+  const { data: issue } = await github.rest.issues.get({ ...context.repo, issue_number });
+  const request = JSON.stringify({ title: issue.title, body: issue.body ?? '' });
+  if (Buffer.byteLength(request) > 18000) throw Error('Issue too large for review');
+  core.setOutput('request', request);
+}
+
+export async function mergePr({ github, context, head, base, verifiedTree, expectedCheck }) {
+  assertSha(head); assertSha(base); assertSha(verifiedTree);
+  const pull_number = context.payload.pull_request.number;
+  const repo = context.repo;
+  const { data: pr } = await github.rest.pulls.get({ ...repo, pull_number });
+  assertAutomatedPr(pr, { repository: `${repo.owner}/${repo.repo}`, bot: process.env.AUTOMATION_BOT });
+  if (pr.head.sha !== head || pr.base.sha !== base) throw Error('PR changed after verification; rerun against current develop');
+  const { data: protection } = await github.rest.repos.getBranchProtection({ ...repo, branch: 'develop' });
+  const required = protection.required_status_checks;
+  const contexts = new Set([...(required?.contexts ?? []), ...(required?.checks ?? []).map(check => check.context)]);
+  if (!required?.strict || !['verify', 'Automation control checks'].every(name => contexts.has(name))) {
+    throw Error('Strict develop protection with required Web checks is mandatory');
+  }
+  // GitHub enforces the unchanged base atomically through strict branch protection.
+  const checks = await github.paginate(github.rest.checks.listForRef, { ...repo, ref: head, per_page: 100 });
+  const latest = checks.filter(check => check.name === expectedCheck && check.app?.slug === 'github-actions')
+    .sort((a, b) => b.id - a.id)[0];
+  if (latest?.conclusion !== 'success') throw Error('Required Web checks have not passed for this PR head');
+  const result = await github.rest.pulls.merge({ ...repo, pull_number, sha: head, merge_method: 'merge',
+    commit_message: `Verified candidate tree: ${verifiedTree}` });
+  if (!result.data.merged) throw Error('GitHub refused merge');
+  const { data: commit } = await github.rest.git.getCommit({ ...repo, commit_sha: result.data.sha });
+  if (commit.tree.sha !== verifiedTree) throw Error('Merged tree differs; stop release and inspect merge');
+  const issue_number = assertIssueNumber(pr.head.ref.replace('codex/issue-', ''));
+  await github.rest.issues.update({ ...repo, issue_number, state: 'closed', state_reason: 'completed' });
+  return result.data.sha;
+}
+
+export async function reportMerge({ github, context, head, base, verifiedTree, mergedSha }) {
+  const repo = context.repo;
+  await github.rest.issues.createComment({ ...repo, issue_number: context.payload.pull_request.number,
+    body: `検証合格・developへマージしました。\n\nHead: \`${head}\`\nBase: \`${base}\`\nTree: \`${verifiedTree}\`\nMerge: \`${mergedSha}\`\n証跡: ${context.serverUrl}/${repo.owner}/${repo.repo}/actions/runs/${context.runId}\n\n本番公開・X告知は実施していません。` });
+}
+
+export async function report({ github, context, ok }) {
+  await github.rest.issues.createComment({ ...context.repo, issue_number: context.payload.pull_request?.number ?? context.payload.issue?.number ?? assertIssueNumber(process.env.ISSUE_NUMBER),
+    body: `${ok ? '検証が完了しました。' : '自動処理を停止しました。失敗したチェックの確認・修正が必要です。'}\n\n実行結果・画像・ログ: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}\n\n本番公開・X告知は実施していません。` });
+}

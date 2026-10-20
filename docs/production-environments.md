@@ -104,3 +104,7 @@ Pages構成への変更：標準developプレビューURLとmain本番/canonical
 特に検証環境では、本番GAへのイベント混入を防ぐタグ停止または検証用プロパティの分離を、限定公開前に確認する。環境別Worker設定の追加だけでは、既存の共通GAタグまで自動的に分離されない。
 
 技術仕様の根拠：[Cloudflare Vite環境選択](https://developers.cloudflare.com/workers/vite-plugin/reference/cloudflare-environments/)、[環境別binding/Secret](https://developers.cloudflare.com/workers/wrangler/environments/)。Viteでは環境をビルド時に選ぶ。生成済み成果物にdeploy時の `--env` を後付けして環境を変更しない。
+
+## Codex CI/CDの追加準備（2026-10-21）
+
+IssueからのPR作成・レビュー・検証公開・develop自動マージと、人の承認による本番公開・X告知のローカル準備は[設定手順](codex-cicd-setup.md)を参照。新しい自動化はフラグ未設定で停止し、本番用は実行対象外のテンプレート。従来の「Cloudflare認証情報を使う自動デプロイを追加しない」は以前の構成の記録であり、新パイプラインを有効化する際はSecret登録とGit連携公開との競合解消が別途必要。今回main・本番・クラウドの設定は変更していない。

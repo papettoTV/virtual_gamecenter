@@ -1,0 +1,48 @@
+name: Codex API smoke test
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: codex-api-smoke
+  cancel-in-progress: false
+jobs:
+  probe:
+    name: Codex API probe
+    if: github.ref == 'refs/heads/develop' && github.actor == 'papettoTV'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: codex
+    outputs:
+      response: ${{ steps.codex.outputs.final-message }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Prepare empty working directory without project configuration
+        run: mkdir -p "$RUNNER_TEMP/pulbase-codex-smoke"
+      # Last step: the API key is given only to the official action.
+      - uses: openai/codex-action@bdf19a4a223ec2549a3e2274a0cf61556bc07675 # v1
+        id: codex
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          working-directory: ${{ runner.temp }}/pulbase-codex-smoke
+          sandbox: read-only
+          safety-strategy: drop-sudo
+          effort: low
+          codex-args: '["--skip-git-repo-check", "--ephemeral"]'
+          prompt: >-
+            This is a minimal API authentication and response test.
+            Do not use tools, read files, execute commands, modify files, or contact external services.
+            Reply with exactly CODEX_API_OK and nothing else.
+  confirm:
+    name: Confirm Codex response
+    needs: probe
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Confirm fixed response on a fresh runner without API credentials
+        env:
+          CODEX_RESPONSE: ${{ needs.probe.outputs.response }}
+        run: |
+          node -e 'if (process.env.CODEX_RESPONSE?.trim() !== "CODEX_API_OK") { console.error("Unexpected Codex smoke-test response"); process.exit(1); } require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, "Codex API authentication and fixed response verified. No PR, merge, deployment, or X post was executed.\n")'

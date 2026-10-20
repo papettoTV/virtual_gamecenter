@@ -40,3 +40,21 @@ jobs:
           done
       - name: Build for the target environment without deploying
         run: CLOUDFLARE_ENV="$PULBASE_TARGET_ENVIRONMENT" npm run build
+
+  automation-control:
+    name: Automation control checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: ci
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm test
+      - run: npm run check

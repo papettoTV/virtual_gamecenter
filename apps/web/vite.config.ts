@@ -24,6 +24,7 @@ function localAddressApi(): Plugin {
 
 export default defineConfig({
   plugins: [localAddressApi(), react(), cloudflare()],
+  define: { __PULBASE_RELEASE_SHA__: JSON.stringify(process.env.PULBASE_RELEASE_SHA ?? "") },
   server: {
     host: "0.0.0.0",
     port: 5174,

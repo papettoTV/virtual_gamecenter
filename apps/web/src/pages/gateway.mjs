@@ -1,3 +1,4 @@
+const revision = "__PULBASE_GATEWAY_REVISION__";
 const unavailable = () => Response.json({ error: "backend_unavailable" }, { status: 503, headers: { "Cache-Control": "no-store" } });
 
 export default {
@@ -13,7 +14,11 @@ export default {
     const headers = new Headers(request.headers);
     headers.set("X-Pulbase-Gateway-Environment", env.APP_ENV);
     try {
-      return await env.BACKEND.fetch(new Request(request, { headers }));
+      const response = await env.BACKEND.fetch(new Request(request, { headers }));
+      if (response.status === 101 || !/^[a-f0-9]{40}$/.test(revision)) return response;
+      const outgoing = new Headers(response.headers);
+      outgoing.set("X-Pulbase-Gateway-Revision", revision);
+      return new Response(response.body, { status: response.status, statusText: response.statusText, headers: outgoing });
     } catch {
       return unavailable();
     }
