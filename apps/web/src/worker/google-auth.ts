@@ -1,4 +1,5 @@
 import { hashIdentifier, registrationClaim } from "./identity-hash";
+import { observeOperation, operationMetrics, recordOperation, type OperationMetrics } from "./operation-metrics";
 
 const OAUTH_STATE_COOKIE = "vgc_oauth_state";
 const OAUTH_STATE_MAX_AGE_SECONDS = 10 * 60;
@@ -6,6 +7,8 @@ const REGISTRATION_BONUS_CREDITS = 5;
 type AccountAuthResult = "registered" | "registered_without_bonus" | "logged_in";
 
 export interface GoogleAuthEnv {
+  APP_ENV?: string;
+  SECURITY_EVENTS?: OperationMetrics;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
   DEVELOPER_AUTH_ENABLED?: string;
@@ -80,6 +83,7 @@ export async function handleGoogleAuthRequest(
   if (url.pathname === "/api/platform/auth/google/start" && request.method === "GET") {
     const returnTo = sanitizeReturnPath(url.searchParams.get("returnTo"));
     if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
+      recordOperation(operationMetrics(env), "google_login", "failure");
       const redirect = new URL(returnTo, url.origin);
       redirect.searchParams.set("account", "error");
       redirect.searchParams.set("reason", "not_configured");
@@ -129,9 +133,10 @@ export async function handleGoogleAuthRequest(
   if (!stateRecord || !url.searchParams.get("state") || stateRecord.state !== url.searchParams.get("state")) {
     return fail("invalid_state");
   }
-  if (url.searchParams.has("error")) return fail("cancelled");
+  const metrics = operationMetrics(env);
+  if (url.searchParams.has("error")) { recordOperation(metrics, "google_login", url.searchParams.get("error") === "access_denied" ? "cancelled" : "failure"); return fail("cancelled"); }
   const code = url.searchParams.get("code");
-  if (!code || !env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) return fail("invalid_callback");
+  if (!code || !env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) { recordOperation(metrics, "google_login", code ? "failure" : "rejected"); return fail("invalid_callback"); }
 
   try {
     const profile = await fetchGoogleProfile(code, url.origin, {
@@ -140,17 +145,19 @@ export async function handleGoogleAuthRequest(
     });
     if (stateRecord.reauthPlayerId) {
       const identity = await database.prepare("SELECT provider_subject FROM account_identities WHERE provider = 'google' AND account_id = (SELECT account_id FROM players WHERE id = ?)").bind(session.playerId).first<{ provider_subject: string }>();
-      if (stateRecord.reauthPlayerId !== session.playerId || identity?.provider_subject !== profile.sub) return fail("reauth_account_mismatch");
+      if (stateRecord.reauthPlayerId !== session.playerId || identity?.provider_subject !== profile.sub) { recordOperation(metrics, "google_login", "rejected"); return fail("reauth_account_mismatch"); }
       await markVerified(database, session);
     } else {
-      const result = await registerGoogleAccount(database, session, profile);
+      const result = await registerGoogleAccount(database, session, profile, metrics);
       redirect.searchParams.set("account", result);
     }
+    recordOperation(metrics, "google_login", "success");
     return new Response(null, {
       status: 302,
       headers: { Location: redirect.toString(), "Set-Cookie": clearStateCookie },
     });
   } catch {
+    recordOperation(metrics, "google_login", "failure");
     console.error("oauth_registration_failed");
     return fail("registration_failed");
   }
@@ -187,8 +194,9 @@ export async function registerGoogleAccount(
   database: D1Database,
   session: PlayerSession,
   profile: GoogleProfile,
+  metrics?: OperationMetrics,
 ): Promise<AccountAuthResult> {
-  return registerAccount(database, session, profile, "google");
+  return registerAccount(database, session, profile, "google", metrics);
 }
 
 async function registerAccount(
@@ -196,6 +204,7 @@ async function registerAccount(
   session: PlayerSession,
   profile: GoogleProfile,
   provider: "google" | "developer",
+  metrics?: OperationMetrics,
 ): Promise<AccountAuthResult> {
   const existingIdentity = await database.prepare(
     "SELECT account_id FROM account_identities WHERE provider = ? AND provider_subject = ?",
@@ -221,7 +230,7 @@ async function registerAccount(
 
   const accountId = crypto.randomUUID();
   const claimHash = await registrationClaim(provider, profile.sub);
-  const results = await database.batch([
+  const results = await observeOperation(metrics, "registration_credit", () => database.batch([
     database.prepare("DELETE FROM retained_benefits WHERE claim_hash = ? AND benefit_type = 'registration' AND expires_at <= CURRENT_TIMESTAMP").bind(claimHash),
     database.prepare("INSERT OR IGNORE INTO retained_benefits (claim_hash, benefit_type, granted_at, expires_at, grant_id) VALUES (?, 'registration', CURRENT_TIMESTAMP, datetime('now', '+5 years'), ?)").bind(claimHash, accountId),
     database.prepare(
@@ -241,7 +250,7 @@ async function registerAccount(
        WHERE EXISTS (SELECT 1 FROM retained_benefits WHERE claim_hash = ? AND benefit_type = 'registration' AND grant_id = ?)`,
     ).bind(`account-registration:${accountId}`, session.playerId, REGISTRATION_BONUS_CREDITS, claimHash, accountId),
     database.prepare("INSERT INTO player_benefits (player_id, refill_eligible, registration_hash) VALUES (?, 1, ?) ON CONFLICT(player_id) DO UPDATE SET refill_eligible = 1, registration_hash = excluded.registration_hash").bind(session.playerId, claimHash),
-  ]);
+  ]), values => values[5]!.meta.changes > 0 ? "success" : "noop");
   await markVerified(database, session);
   return results[5]!.meta.changes > 0 ? "registered" : "registered_without_bonus";
 }

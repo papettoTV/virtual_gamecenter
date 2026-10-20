@@ -45,7 +45,7 @@ async function main() {
   const summary = verifyServiceHealth(rows, args[2]);
   const alert = await query(config.alerts[0].query);
   const alertValue = Number(alert?.[0]?.value);
-  if (![0, 1, 2, 3, 4, 5].includes(alertValue)) throw Error("invalid_alert_value");
+  if (![0, 1, 2, 3, 4, 5, 6, 7, 8].includes(alertValue)) throw Error("invalid_alert_value");
   if (args[2] === "down" && alertValue !== 1 || args[2] === "recovered" && alertValue !== 2) throw Error("alert_phase_mismatch");
   console.log(JSON.stringify({ environment: "staging", checkedAt: new Date().toISOString(), ...summary, alertValue, writes: 0 }));
 }

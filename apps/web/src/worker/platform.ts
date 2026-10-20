@@ -8,6 +8,7 @@ import { DEFAULT_GAME_ID, getGameDefinition } from "../domain/game";
 import { reconcileBetaCredits } from "./beta-credits";
 import { protectionFailureInfo, withProtectionRetry } from "./protection-failure";
 import { recordRevocation } from "./revocation-metrics";
+import { observeOperation, operationMetrics } from "./operation-metrics";
 export type { CreditPolicy } from "./beta-credits";
 
 const SESSION_COOKIE = "vgc_session";
@@ -125,7 +126,7 @@ export async function handlePlatformRequest(
     const consent = await getConsentState(database, session.playerId);
     const welcomeCreditGranted = await ensureDeviceWelcomeCreditState(database, device.token, session.playerId);
     const creditPolicy = await reconcileBetaCredits(
-      database, session.playerId, await hashToken(device.token), paymentEnv.CREDIT_PURCHASES_ENABLED === "true",
+      database, session.playerId, await hashToken(device.token), paymentEnv.CREDIT_PURCHASES_ENABLED === "true", undefined, operationMetrics(paymentEnv),
     );
     const wallet = await getWalletSummary(database, session.playerId);
     const identity = await getPlayerIdentityById(database, session.playerId);
@@ -277,8 +278,9 @@ export async function handlePlatformRequest(
   if (url.pathname === "/api/platform/welcome-credit" && request.method === "POST") {
     const device = getOrCreateDeviceIdentity(request, session.token);
     const deviceHash = await hashToken(device.token);
-    if (!await hasDeviceWelcomeCreditByHash(database, deviceHash)) {
-      await database.batch([
+    await observeOperation(operationMetrics(paymentEnv), "welcome_credit", async () => {
+      if (await hasDeviceWelcomeCreditByHash(database, deviceHash)) return false;
+      const results = await database.batch([
         database.prepare(
           `INSERT OR IGNORE INTO device_benefits
             (device_hash, benefit_type, player_id)
@@ -291,7 +293,8 @@ export async function handlePlatformRequest(
         ).bind(`device-welcome:${deviceHash}`, session.playerId, INITIAL_FREE_CREDITS),
         database.prepare("INSERT INTO player_benefits (player_id, refill_eligible) VALUES (?, 1) ON CONFLICT(player_id) DO UPDATE SET refill_eligible = 1").bind(session.playerId),
       ]);
-    }
+      return results[1]!.meta.changes > 0;
+    }, granted => granted ? "success" : "noop");
     const response = Response.json({
       welcomeCreditGranted: true,
       wallet: await getWalletSummary(database, session.playerId),
@@ -303,7 +306,7 @@ export async function handlePlatformRequest(
   if (url.pathname === "/api/platform/credits" && request.method === "GET") {
     await ensureDeviceWelcomeCreditState(database, creditDevice.token, session.playerId);
     const creditPolicy = await reconcileBetaCredits(
-      database, session.playerId, await hashToken(creditDevice.token), paymentEnv.CREDIT_PURCHASES_ENABLED === "true",
+      database, session.playerId, await hashToken(creditDevice.token), paymentEnv.CREDIT_PURCHASES_ENABLED === "true", undefined, operationMetrics(paymentEnv),
     );
     return creditJson({ wallet: await getWalletSummary(database, session.playerId), creditPolicy });
   }
@@ -456,7 +459,7 @@ export async function handlePlatformRequest(
     const playSessionId = crypto.randomUUID();
     await ensureDeviceWelcomeCreditState(database, creditDevice.token, session.playerId);
     await reconcileBetaCredits(
-      database, session.playerId, await hashToken(creditDevice.token), paymentEnv.CREDIT_PURCHASES_ENABLED === "true",
+      database, session.playerId, await hashToken(creditDevice.token), paymentEnv.CREDIT_PURCHASES_ENABLED === "true", undefined, operationMetrics(paymentEnv),
     );
     const wallet = await getWalletSummary(database, session.playerId);
     const balanceType = wallet.availableFree >= game.creditCost ? "free" : "purchased";

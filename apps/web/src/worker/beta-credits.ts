@@ -1,3 +1,5 @@
+import { observeOperation, type OperationMetrics } from "./operation-metrics";
+
 export interface CreditPolicy {
   purchasesEnabled: boolean;
   dailyRefillTarget: 3;
@@ -13,6 +15,7 @@ export async function reconcileBetaCredits(
   deviceHash: string,
   purchasesEnabled: boolean,
   now = new Date(),
+  metrics?: OperationMetrics,
 ): Promise<CreditPolicy> {
   const jstOffset = 9 * 60 * 60 * 1000;
   const refillDate = new Date(now.getTime() + jstOffset).toISOString().slice(0, 10);
@@ -20,7 +23,7 @@ export async function reconcileBetaCredits(
     Date.parse(`${refillDate}T00:00:00+09:00`) + 24 * 60 * 60 * 1000,
   ).toISOString();
   const claimId = crypto.randomUUID();
-  const results = await database.batch<{ amount?: number; used?: number }>([
+  const results = await observeOperation(metrics, "daily_credit", () => database.batch<{ amount?: number; used?: number }>([
     database.prepare(
       `INSERT OR IGNORE INTO beta_daily_refills (id, player_id, device_hash, refill_date, amount)
        SELECT ?, wallet.player_id, ?, ?, 3 - wallet.free_balance - wallet.purchased_balance
@@ -44,7 +47,7 @@ export async function reconcileBetaCredits(
        WHERE refill_date = ? AND (player_id = ? OR device_hash = ?)
        UNION ALL SELECT 1 FROM retained_daily_refills WHERE refill_date = ? AND (device_hash = ? OR registration_hash = (SELECT registration_hash FROM player_benefits WHERE player_id = ?)) LIMIT 1`,
     ).bind(refillDate, playerId, deviceHash, refillDate, deviceHash, playerId),
-  ]);
+  ]), values => Number(values[1]!.results[0]?.amount ?? 0) > 0 ? "success" : "noop");
   return {
     purchasesEnabled,
     dailyRefillTarget: 3,

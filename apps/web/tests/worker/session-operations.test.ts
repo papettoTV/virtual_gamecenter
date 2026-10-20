@@ -34,6 +34,38 @@ async function fixture(gameId: string) {
 const cases = ["graze-duel", "dot-wave", "deep-sea-salvage"].flatMap(gameId =>
   ["startSolo", "gameKeyframe", "joinCabinet"].map(operation => ({ gameId, operation })),
 );
+
+for (const gameId of ["graze-duel", "dot-wave", "deep-sea-salvage"]) {
+  for (const outcome of ["success", "rejected", "failure"] as const) {
+    it(`measures ${gameId} start ${outcome} at the actual DO start boundary`, async () => {
+      const test = await fixture(gameId);
+      const result = await runInDurableObject(test.room, async (instance, state) => {
+        const original = Reflect.get(instance, "env") as Env;
+        const points: AnalyticsEngineDataPoint[] = [];
+        const failure = Error("private SQL error");
+        const database = new Proxy(original.DB, { get(target, key) {
+          if (key === "prepare") return (query: string) => {
+            if (outcome === "failure" && query.includes("INSERT OR IGNORE INTO credit_reservation_uses")) throw failure;
+            return target.prepare(query);
+          };
+          const value = Reflect.get(target, key, target);
+          return typeof value === "function" ? value.bind(target) : value;
+        } });
+        Reflect.set(instance, "env", { ...original, DB: database, APP_ENV: "staging", SECURITY_EVENTS: { writeDataPoint(point: AnalyticsEngineDataPoint) { points.push(point); } } });
+        let failed = false;
+        try {
+          await instance.webSocketMessage(state.getWebSockets()[0]!, JSON.stringify({ type: "startSolo", reservationId: outcome === "rejected" ? "unpaid" : test.reservationId }));
+        } catch (error) { failed = error === failure; }
+        finally { Reflect.set(instance, "env", original); }
+        return { points, failed };
+      });
+      expect(result.failed).toBe(outcome === "failure");
+      expect(result.points).toHaveLength(1);
+      expect(result.points[0]!.blobs).toEqual(["staging", "solo_start", "operation-v1", outcome, gameId, "operation-start-v1"]);
+      expect(result.points[0]!.doubles).toEqual(outcome === "success" ? [1, 0, 1, 0, 0] : outcome === "failure" ? [1, 1, 0, 0, 0] : [0, 0, 0, 1, 0]);
+    });
+  }
+}
 cases.push({ gameId: "dot-wave", operation: "refreshDotWaveProfile" });
 
 it.each(cases)("does not resurrect $gameId during revoked $operation", async ({ gameId, operation }) => {

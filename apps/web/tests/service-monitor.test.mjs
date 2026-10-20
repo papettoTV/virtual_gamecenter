@@ -7,12 +7,14 @@ import { alertCases, syntheticAlertQuery } from "../scripts/verify-revocation-al
 import { checkDrill, DRILL_KEY, DRILL_MARKER, drillProbe, finishDrill, recoverDrill, startDrill, validDrill } from "../src/monitor/health-drill.mjs";
 import { healthDrillCommand } from "../scripts/health-drill.mjs";
 import { verifyServiceHealth } from "../scripts/verify-service-health.mjs";
+import { operationExpression, operationReportQuery, summarizeOperations } from "../scripts/operation-report.mjs";
+import { operationVerificationTarget } from "../scripts/verify-operation-metrics-staging.mjs";
 
 test("synthetic SQL is bounded, read-only and cannot supply identifiers or SQL fragments", async () => {
   const config = JSON.parse(await readFile(new URL("../config/service-alerts.json", import.meta.url), "utf8"));
-  assert.equal(alertCases.length, 14);
+  assert.equal(alertCases.length, 21);
   for (const item of alertCases) {
-    const query = syntheticAlertQuery(config.alerts[0].query, item.rows);
+    const query = syntheticAlertQuery(config.alerts[0].query, item.rows, item.operations);
     assert.ok(query.startsWith("SELECT CASE "));
     assert.ok(query.includes("LIMIT 1"));
     assert.ok(query.length < 4000);
@@ -40,6 +42,7 @@ test("fits one remaining custom alert slot without suppressing recovery for six 
   assert.ok(alert.query.includes("blob1 = 'staging'"));
   assert.ok(alert.query.includes("timestamp >= NOW() - INTERVAL '20' MINUTE"));
   assert.ok(alert.name.includes("1 DOWN, 2 RECOVERED, 3 NO DATA, 4 REVOKE, 5 RETRIES"));
+  assert.ok(alert.description.includes("6 START, 7 LOGIN, 8 CREDIT"));
 });
 
 test("requires two failures and three successes, without repeating transitions", () => {
@@ -245,4 +248,36 @@ test("stored health verification rejects stale, future, wrong-phase and unmarked
   assert.throws(() => verifyServiceHealth([{ ...recovered, double7: 503 }], "recovered", now));
   assert.throws(() => verifyServiceHealth([recovered], "normal", now));
   assert.equal(verifyServiceHealth([{ ...recovered, blob4: "normal" }], "normal", now).drill, false);
+});
+
+test("operation reporting keeps missing traffic unknown and excludes denials from failure rates", () => {
+  assert.equal(summarizeOperations([]).start.failureRate, null);
+  const rows = [{ operation: "solo_start", eligible: "3", failed: "3", succeeded: "0", rejected: "50", cancelled: "0" }];
+  const report = summarizeOperations(rows);
+  assert.equal(report.start.failureRate, 1);
+  assert.equal(report.start.warning, true);
+  assert.equal(report.login.traffic, "no_eligible_data");
+  assert.equal(report.start.rejected, 50);
+});
+
+test("operation warning boundaries and invalid aggregate input are explicit", () => {
+  const row = { operation: "google_login", eligible: 15, failed: 3, succeeded: 12, rejected: 0, cancelled: 0 };
+  assert.equal(summarizeOperations([row]).login.warning, true);
+  assert.equal(summarizeOperations([{ ...row, eligible: 16, succeeded: 13 }]).login.warning, false);
+  assert.equal(summarizeOperations([{ ...row, eligible: 2, failed: 2, succeeded: 0 }]).login.warning, false);
+  assert.throws(() => summarizeOperations([{ ...row, failed: 16 }]));
+  assert.throws(() => summarizeOperations([{ ...row, operation: "private-player-id" }]));
+  assert.throws(() => summarizeOperations(Array(64).fill(row)));
+});
+
+test("operation queries are fixed-scope and use sampling weights, without arbitrary SQL", () => {
+  assert.ok(operationReportQuery().includes('sum(double1 * "sampleInterval")'));
+  assert.ok(operationReportQuery().includes("blob3 = 'operation-v1'"));
+  assert.ok(operationReportQuery().endsWith("LIMIT 64"));
+  assert.ok(operationExpression("start", "double2").includes("blob6 = 'operation-start-v1'"));
+  assert.throws(() => operationExpression("DROP TABLE", "double2"));
+  assert.throws(() => operationExpression("login", "private"));
+  assert.equal(operationVerificationTarget(["--environment", "staging"]), "https://develop.virtual-gamecenter.pages.dev");
+  assert.throws(() => operationVerificationTarget(["--environment", "production"]));
+  assert.throws(() => operationVerificationTarget(["--environment", "staging", "https://pulbase.com"]));
 });

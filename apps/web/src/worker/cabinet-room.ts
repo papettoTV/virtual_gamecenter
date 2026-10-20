@@ -28,6 +28,7 @@ import { getPlayerConnectionIdentity, getPlayerIdentityById } from "./platform";
 import { CABINET_CONNECTION_LIMIT, CABINET_IP_CONNECTION_LIMIT, clientAddressKey, protectionError, WS_MESSAGE_LIMIT } from "./request-protection";
 import { hashIdentifier } from "./identity-hash";
 import { recordIdleRevocation } from "./revocation-metrics";
+import { observeOperation, operationMetrics, type OperationOutcome } from "./operation-metrics";
 
 export const SESSION_SWEEP_INTERVAL_MS = 60_000;
 
@@ -339,23 +340,26 @@ export class CabinetRoom extends DurableObject<Env> {
     if (attachment.role !== "player") return;
 
     if (message.type === "startSolo") {
-      if (this.versusMatch) return;
-      const resuming = this.soloRun && this.soloRun.playerId === attachment.playerId && this.soloRun.disconnectedAt !== null
-        && Date.now() - this.soloRun.disconnectedAt <= 120_000;
-      if (message.reservationId || (!attachment.continuationCredit && !resuming)) {
-        if (!await this.validateCredit(attachment, message.reservationId, "captured", "solo", true)) {
-          this.send(socket, { type: "error", message: "プレイ用クレジットを確認できませんでした。" });
-          return;
+      await observeOperation(operationMetrics(this.env), "solo_start", async (): Promise<OperationOutcome> => {
+        if (this.versusMatch) return "rejected";
+        const resuming = this.soloRun && this.soloRun.playerId === attachment.playerId && this.soloRun.disconnectedAt !== null
+          && Date.now() - this.soloRun.disconnectedAt <= 120_000;
+        if (message.reservationId || (!attachment.continuationCredit && !resuming)) {
+          if (!await this.validateCredit(attachment, message.reservationId, "captured", "solo", true)) {
+            this.send(socket, { type: "error", message: "プレイ用クレジットを確認できませんでした。" });
+            return "rejected";
+          }
         }
-      }
-      if (!this.liveConnection(attachment) || this.versusMatch) return;
-      socket.serializeAttachment({ ...attachment, dotWaveCredit: true, continuationCredit: false, streamAuthorized: true });
-      this.soloRun = { playerId: attachment.playerId!, disconnectedAt: null };
-      this.state = reduceCabinetState(this.state, { type: "START_SOLO" });
-      await this.persistState();
-      this.broadcastState();
-      if (this.state.gameId === "dot-wave") this.send(socket, { type: "dotWaveSoloStarted" });
-      this.send(socket, { type: "soloStarted", reservationId: message.reservationId ?? null });
+        if (!this.liveConnection(attachment) || this.versusMatch) return "rejected";
+        socket.serializeAttachment({ ...attachment, dotWaveCredit: true, continuationCredit: false, streamAuthorized: true });
+        this.soloRun = { playerId: attachment.playerId!, disconnectedAt: null };
+        this.state = reduceCabinetState(this.state, { type: "START_SOLO" });
+        await this.persistState();
+        this.broadcastState();
+        if (this.state.gameId === "dot-wave") this.send(socket, { type: "dotWaveSoloStarted" });
+        this.send(socket, { type: "soloStarted", reservationId: message.reservationId ?? null });
+        return "success";
+      }, outcome => outcome, this.state.gameId);
       return;
     }
     if (message.type === "stopSolo") {
@@ -599,14 +603,18 @@ export class CabinetRoom extends DurableObject<Env> {
     attachment: ConnectionAttachment,
     matchId: string,
   ): Promise<void> {
+    await observeOperation(operationMetrics(this.env), "versus_start", () => this.prepareVersusStart(attachment, matchId), outcome => outcome, this.state.gameId);
+  }
+
+  private async prepareVersusStart(attachment: ConnectionAttachment, matchId: string): Promise<OperationOutcome> {
     const match = this.versusMatch;
-    if (!match || match.id !== matchId || this.state.status !== "versusReady") return;
+    if (!match || match.id !== matchId || this.state.status !== "versusReady") return "noop";
     const seat = this.getMatchSeat(attachment.clientId);
-    if (attachment.clientId === (match.dotWavePayerClientId ?? match.challengerClientId) && !(seat === "host" ? match.hostReady : match.challengerReady) && !await this.validateCredit(attachment, match.challengerReservationId, "captured", "versus", true)) return;
-    if (!this.liveConnection(attachment) || this.versusMatch !== match || match.id !== matchId || this.state.status !== "versusReady") return;
+    if (attachment.clientId === (match.dotWavePayerClientId ?? match.challengerClientId) && !(seat === "host" ? match.hostReady : match.challengerReady) && !await this.validateCredit(attachment, match.challengerReservationId, "captured", "versus", true)) return "rejected";
+    if (!this.liveConnection(attachment) || this.versusMatch !== match || match.id !== matchId || this.state.status !== "versusReady") return "rejected";
     if (seat === "host") match.hostReady = true;
     if (seat === "challenger") match.challengerReady = true;
-    if (!seat) return;
+    if (!seat) return "noop";
 
     const readyCount = Number(match.hostReady) + Number(match.challengerReady);
     this.state = reduceCabinetState(this.state, { type: "VERSUS_READY", readyCount });
@@ -627,6 +635,7 @@ export class CabinetRoom extends DurableObject<Env> {
     }
     await this.persistState();
     this.broadcastState();
+    return readyCount === 2 ? "success" : "noop";
   }
 
   private relayVersusProgress(
