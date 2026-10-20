@@ -19,10 +19,12 @@ import { recoveryResponse, type RecoveryBinding } from "./recovery-control";
 import { secureResponse } from "./response-security";
 import { WorkerEntrypoint } from "cloudflare:workers";
 import { activateSessionSweeps } from "./session-maintenance";
+import { handleOperatorRequest } from "./operator-dashboard";
 
 export { CabinetRoom, AbuseGuard };
 
 interface WorkerEnv extends Env, BasicAuthEnv {
+  OPERATOR_ACCOUNT_IDS?: string;
   SECURITY_EVENTS?: AnalyticsEngineDataset;
   RECOVERY_CONTROL?: RecoveryBinding;
   ASSETS: Fetcher;
@@ -87,6 +89,8 @@ const handler = {
 
     const authorizationError = await authorizeRequest(request, env);
     if (authorizationError) return authorizationError;
+    const operatorResponse = await handleOperatorRequest(request, env);
+    if (operatorResponse) return operatorResponse;
     if (url.pathname === "/analytics.js" && request.method === "GET" && env.APP_ENV === "staging") {
       const asset = await env.ASSETS.fetch(request);
       if (!asset.ok) return asset;

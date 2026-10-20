@@ -28,7 +28,7 @@ export async function clientAddressKey(request: Request, environment?: string): 
 
 export async function limitRequest(request: Request, env: ProtectionEnv): Promise<Response | null> {
   const url = new URL(request.url);
-  if (!url.pathname.startsWith("/api/") || url.pathname === "/api/health" || url.pathname === "/api/platform/stripe/webhook") return null;
+  if ((!url.pathname.startsWith("/api/") && url.pathname !== "/operator/operations") || url.pathname === "/api/health" || url.pathname === "/api/platform/stripe/webhook") return null;
   const ipKey = await clientAddressKey(request, env.APP_ENV);
   if (env.APP_ENV === "local" && !ipKey) return null;
   const limiter = request.headers.get("Upgrade")?.toLowerCase() === "websocket" ? env.SOCKET_LIMITER

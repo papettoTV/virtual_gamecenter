@@ -58,7 +58,7 @@
         "DEVELOPER_AUTH_ENABLED": "false",
         "CREDIT_PURCHASES_ENABLED": "false"
       },
-      "secrets": { "required": ["BASIC_AUTH_USERNAME", "BASIC_AUTH_PASSWORD", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "CLOUDFLARE_METRICS_TOKEN"] },
+      "secrets": { "required": ["BASIC_AUTH_USERNAME", "BASIC_AUTH_PASSWORD", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "CLOUDFLARE_METRICS_TOKEN", "OPERATOR_ACCOUNT_IDS"] },
       "analytics_engine_datasets": [{ "binding": "USAGE_METRICS", "dataset": "pulbase_account_usage" }, { "binding": "SECURITY_EVENTS", "dataset": "pulbase_service_health" }],
       "durable_objects": { "bindings": [{ "name": "CABINET_ROOMS", "class_name": "CabinetRoom" }, { "name": "ABUSE_GUARDS", "class_name": "AbuseGuard" }] },
       "d1_databases": [{
