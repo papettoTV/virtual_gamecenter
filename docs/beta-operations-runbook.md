@@ -103,6 +103,8 @@ Cloudflare Custom Alertsの判定と評価間隔は[公式仕様](https://develo
 
 ## 次に残る実施事項
 
+失効RPCの警告は既存サービス通知へ統合する。追加コード4（未完了1件/20分）、5（再試行10回/20分）と復旧手順は [session-revocation-operations.md](session-revocation-operations.md) を正とする。従来コード0〜3と費用・利用量通知は維持する。
+
 - 実障害を用いた条件発報と復旧の訓練、本番監視の別途設定。検証の集約通知Testの実着信は確認済み。GitHubの手動チェック用Secretsは別経路として確認する。
 - ゲーム開始・付与・ログインの失敗率集計と通知。死活チェックと区別する。
 - 隔離D1/R2の[復元訓練](recovery-drill.md)と、専用の非公開Workerでの[実DO停止/復元/再開訓練](do-recovery-drill.md)は2026-10-20に確認済み。既存検証/本番への停止機構導入、一般公開の切替、本番DB復元は別途確認・承認する。

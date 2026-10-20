@@ -1,5 +1,7 @@
 # セキュリティ差分の検証環境反映
 
+追記（2026-10-20）：失効RPC警告の匿名集計・既存通知への統合・復旧手順を追加反映した。新版の証跡と未実施範囲は[失効RPCの運用手順](session-revocation-operations.md)と公開前チェックリストを参照。以下の684件・版IDは前回反映時の履歴。
+
 更新：2026-10-20。対象はdevelop / `develop.virtual-gamecenter.pages.dev` / `pulbase-staging`。本番・main・負荷試験は対象外。
 
 ## 公開範囲

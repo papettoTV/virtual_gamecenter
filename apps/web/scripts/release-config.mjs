@@ -16,6 +16,8 @@ export function checkReleaseConfig(config, environment) {
   const selected = config.env?.[environment];
   if (!selected) return [`${environment} の設定がありません。`];
   const errors = [];
+  if (environment === "staging" && !selected.analytics_engine_datasets?.some(item => item.binding === "SECURITY_EVENTS" && item.dataset === "pulbase_service_health")) errors.push("失効障害の検証環境専用集計バインディングが必要です。");
+  if (environment === "production" && selected.analytics_engine_datasets?.some(item => item.dataset === "pulbase_service_health")) errors.push("本番から検証用の警告集計へ書き込めません。");
   if (!selected.durable_objects?.bindings?.some(item => item.name === "ABUSE_GUARDS" && item.class_name === "AbuseGuard" && !item.script_name)) errors.push("分散乱用対策は環境専用のAbuseGuardが必要です。");
   if (!config.migrations?.some(item => item.new_sqlite_classes?.includes("AbuseGuard"))) errors.push("分散乱用対策のSQLite移行が必要です。");
   if (selected.vars?.USAGE_MONITOR_ENABLED === "true") {

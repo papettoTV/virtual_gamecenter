@@ -18,6 +18,19 @@ function ready() {
   return config;
 }
 
+test("失効警告の欠落・本番から検証データへの混入を拒否", () => {
+  const missing = ready();
+  missing.env.staging.analytics_engine_datasets = missing.env.staging.analytics_engine_datasets.filter(item => item.binding !== "SECURITY_EVENTS");
+  assert.ok(checkReleaseConfig(missing, "staging").some(error => error.includes("失効障害")));
+  const shared = ready();
+  shared.env.production.analytics_engine_datasets = [{ binding: "SECURITY_EVENTS", dataset: "pulbase_service_health" }];
+  assert.ok(checkReleaseConfig(shared, "production").some(error => error.includes("検証用の警告")));
+  const selected = ready().env.staging;
+  const built = structuredClone(selected);
+  built.analytics_engine_datasets = built.analytics_engine_datasets.filter(item => item.binding !== "SECURITY_EVENTS");
+  assert.ok(checkBuildConfig(built, selected, "staging").some(error => error.includes("監視")));
+});
+
 test("分散対策のbinding・移行・成果物の環境取り違えを拒否", () => {
   const missing = ready(); missing.env.staging.durable_objects.bindings = [];
   assert.ok(checkReleaseConfig(missing, "staging").some(error => error.includes("分散乱用")));

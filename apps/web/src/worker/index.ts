@@ -21,6 +21,7 @@ import { secureResponse } from "./response-security";
 export { CabinetRoom, AbuseGuard };
 
 interface WorkerEnv extends Env, BasicAuthEnv {
+  SECURITY_EVENTS?: AnalyticsEngineDataset;
   RECOVERY_CONTROL?: RecoveryBinding;
   ASSETS: Fetcher;
   DB: D1Database;
@@ -137,7 +138,7 @@ const handler = {
     const cabinetDirectoryResponse = await handleCabinetDirectoryRequest(request, env.DB);
     if (cabinetDirectoryResponse) return cabinetDirectoryResponse;
 
-    const platformResponse = await handlePlatformRequest(request, env.DB, env, env.CABINET_ROOMS);
+    const platformResponse = await handlePlatformRequest(request, env.DB, env, env.CABINET_ROOMS, env.APP_ENV === "staging" ? env.SECURITY_EVENTS : undefined);
     if (platformResponse) return platformResponse;
 
     if (url.pathname === "/api/health") {

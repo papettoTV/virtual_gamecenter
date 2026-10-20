@@ -3,6 +3,21 @@ import { test } from "node:test";
 import { nextHealthState } from "../src/monitor/health-state.mjs";
 import worker from "../src/monitor/worker.mjs";
 import { readFile } from "node:fs/promises";
+import { alertCases, syntheticAlertQuery } from "../scripts/verify-revocation-alert.mjs";
+
+test("synthetic SQL is bounded, read-only and cannot supply identifiers or SQL fragments", async () => {
+  const config = JSON.parse(await readFile(new URL("../config/service-alerts.json", import.meta.url), "utf8"));
+  assert.equal(alertCases.length, 12);
+  for (const item of alertCases) {
+    const query = syntheticAlertQuery(config.alerts[0].query, item.rows);
+    assert.ok(query.startsWith("SELECT CASE "));
+    assert.ok(query.includes("LIMIT 1"));
+    assert.ok(query.length < 4000);
+  }
+  assert.throws(() => syntheticAlertQuery(config.alerts[0].query, [["private-cookie", 1, 0, 0, 1]]));
+  assert.throws(() => syntheticAlertQuery(config.alerts[0].query, [["v1", "DROP TABLE", 0, 0, 1]]));
+  assert.throws(() => syntheticAlertQuery("SELECT secret FROM anything", []));
+});
 
 test("fits one remaining custom alert slot without suppressing recovery for six hours", async () => {
   const config = JSON.parse(await readFile(new URL("../config/service-alerts.json", import.meta.url), "utf8"));
@@ -12,12 +27,15 @@ test("fits one remaining custom alert slot without suppressing recovery for six 
   assert.equal(alert.threshold, 1);
   assert.equal(alert.executionInterval, "5m");
   assert.equal(alert.repeatInterval, "15m");
-  assert.match(alert.query, /CASE WHEN COUNT\(\*\) = 0 THEN 3 WHEN argMax\(double1, timestamp\) >= 1 THEN 1/);
-  assert.match(alert.query, /argMax\(double6, timestamp\) > 0 AND argMax\(double4, timestamp\) - argMax\(double6, timestamp\) < 1800 THEN 2 ELSE 0 END AS value/);
+  assert.ok(alert.query.includes("sum(if(blob3 = 'v1', 1, 0)) = 0 THEN 3"));
+  assert.ok(alert.query.includes("argMax(double1, if(blob3 = 'v1', double4, 0.0)) >= 1 THEN 1"));
+  assert.ok(alert.query.includes('double1 * "sampleInterval", 0.0)) >= 1 THEN 4'));
+  assert.ok(alert.query.includes('double4 * "sampleInterval", 0.0)) >= 10 THEN 5'));
+  assert.ok(alert.query.includes("< 1800 THEN 2 ELSE 0 END AS value"));
   assert.ok(alert.query.includes(`accountTag = '${config.accountId}'`));
   assert.ok(alert.query.includes("blob1 = 'staging'"));
   assert.ok(alert.query.includes("timestamp >= NOW() - INTERVAL '20' MINUTE"));
-  assert.ok(alert.name.includes("1 DOWN, 2 RECOVERED, 3 NO DATA"));
+  assert.ok(alert.name.includes("1 DOWN, 2 RECOVERED, 3 NO DATA, 4 REVOKE, 5 RETRIES"));
 });
 
 test("requires two failures and three successes, without repeating transitions", () => {

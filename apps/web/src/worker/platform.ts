@@ -7,6 +7,7 @@ import {
 import { DEFAULT_GAME_ID, getGameDefinition } from "../domain/game";
 import { reconcileBetaCredits } from "./beta-credits";
 import { protectionFailureInfo, withProtectionRetry } from "./protection-failure";
+import { recordRevocation } from "./revocation-metrics";
 export type { CreditPolicy } from "./beta-credits";
 
 const SESSION_COOKIE = "vgc_session";
@@ -93,6 +94,7 @@ export async function handlePlatformRequest(
   database: D1Database,
   paymentEnv: StripePaymentEnv & GoogleAuthEnv = {},
   rooms?: { idFromName(name: string): DurableObjectId; get(id: DurableObjectId): { revokeSession(playerId: string, sessionHash: string): Promise<void> } },
+  revocationMetrics?: Pick<AnalyticsEngineDataset, "writeDataPoint">,
 ): Promise<Response | null> {
   const url = new URL(request.url);
   if (!url.pathname.startsWith("/api/platform/")) return null;
@@ -198,19 +200,24 @@ export async function handlePlatformRequest(
     await database.prepare("DELETE FROM player_sessions WHERE token_hash = ?")
       .bind(await hashToken(session.token)).run();
     if (rooms) {
+      const summary = { rooms: 0, failed: 0, retries: 0, directoryFailed: false };
       try {
         const cabinets = await database.prepare("SELECT cabinet_id FROM player_cabinets WHERE player_id = ?")
           .bind(session.playerId).all<{ cabinet_id: string }>();
         const sessionHash = await hashToken(session.token);
+        summary.rooms = cabinets.results.length;
         const results = await Promise.allSettled(cabinets.results.map(cabinet => withProtectionRetry(
           () => rooms.get(rooms.idFromName(cabinet.cabinet_id)).revokeSession(session.playerId, sessionHash),
-          (attempt, info) => console.warn("session_revocation_retry", { attempt, ...info }),
+          (attempt, info) => { summary.retries += 1; console.warn("session_revocation_retry", { attempt, ...info }); },
         )));
         const failed = results.filter(result => result.status === "rejected").length;
+        summary.failed = failed;
         if (failed) console.warn("session_revocation_incomplete", { stage: "rooms", failed });
       } catch (error) {
+        summary.directoryFailed = true;
         console.warn("session_revocation_incomplete", { stage: "directory", ...protectionFailureInfo(error) });
       }
+      recordRevocation(revocationMetrics, summary);
     }
     const guestSession = await getOrCreatePlayerSession(request, database);
     await database.batch([

@@ -40,7 +40,13 @@ it.each(["permanent", "transient", "always-transient", "overloaded", "directory"
       return typeof value === "function" ? value.bind(target) : value;
     },
   });
-  const response = await handlePlatformRequest(new Request("http://localhost/api/platform/auth/logout", { method: "POST", headers: { Cookie: cookie } }), database, {}, rooms);
+  const writeDataPoint = vi.fn();
+  const response = await handlePlatformRequest(new Request("http://localhost/api/platform/auth/logout", { method: "POST", headers: { Cookie: cookie } }), database, {}, rooms, { writeDataPoint });
+  expect(writeDataPoint).toHaveBeenCalledExactlyOnceWith({
+    indexes: ["staging-revocation"], blobs: ["staging", mode === "directory" ? "directory" : "rooms", "revocation-v1"],
+    doubles: [mode === "transient" ? 0 : 1, mode === "directory" || mode === "transient" ? 0 : 1, mode === "directory" ? 0 : 2, mode === "transient" ? 1 : mode === "always-transient" ? 2 : 0],
+  });
+  expect(JSON.stringify(writeDataPoint.mock.calls)).not.toContain(cookie);
   expect(response?.status).toBe(200);
   const result = await response!.json<{ playerId: string; accountRegistered: boolean }>();
   expect(result.accountRegistered).toBe(false);
