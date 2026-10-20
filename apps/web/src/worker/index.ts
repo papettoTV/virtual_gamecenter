@@ -20,6 +20,7 @@ import { secureResponse } from "./response-security";
 import { WorkerEntrypoint } from "cloudflare:workers";
 import { activateSessionSweeps } from "./session-maintenance";
 import { handleOperatorRequest } from "./operator-dashboard";
+import { settleStartAttempts, recordStartSloCoverage } from "./start-slo";
 
 export { CabinetRoom, AbuseGuard };
 
@@ -164,6 +165,7 @@ const handler = {
   },
   async scheduled(event: ScheduledController, env: WorkerEnv, ctx: Pick<ExecutionContext, "waitUntil">): Promise<void> {
     if (event.cron === "0,15,30,45 * * * *") {
+      if (env.APP_ENV === "staging") ctx.waitUntil(recordStartSloCoverage(env.DB, event.scheduledTime));
       if (env.USAGE_MONITOR_ENABLED === "true" && env.USAGE_METRICS) {
         ctx.waitUntil(recordUsage(env.METRICS_ACCOUNT_ID, env.CLOUDFLARE_METRICS_TOKEN ?? "", env.USAGE_METRICS));
       }
@@ -174,7 +176,14 @@ const handler = {
         try { if (!await env.RECOVERY_CONTROL.getByName("global").isOpen()) return; }
         catch { return; }
       }
-      ctx.waitUntil(runRetention(env.DB, env.CABINET_ROOMS, env.DELETION_AUDIT));
+      ctx.waitUntil((async () => {
+        let sloFailed = false;
+        if (env.APP_ENV === "staging") {
+          try { await settleStartAttempts(env.DB); } catch { sloFailed = true; }
+        }
+        await runRetention(env.DB, env.CABINET_ROOMS, env.DELETION_AUDIT);
+        if (sloFailed) throw Error("start_slo_maintenance_failed");
+      })());
     }
   },
 } satisfies ExportedHandler<WorkerEnv>;

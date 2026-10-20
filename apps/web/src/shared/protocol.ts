@@ -17,6 +17,7 @@ export interface VersusTerminalReport {
 export type ChallengeQueueClientStatus = "none" | "pending" | "queued" | "matched";
 
 export type ClientMessage =
+  | { type: "startReceipt"; attemptId: string; token: string }
   | { type: "joinCabinet"; gameId: string; watch?: boolean }
   | { type: "clockPing"; sentAt: number }
   | { type: "refreshDotWaveProfile" }
@@ -40,7 +41,7 @@ export type ClientMessage =
   | { type: "declineRematch"; matchId: string };
 
 export type ServerMessage =
-  | { type: "soloStarted"; reservationId: string | null }
+  | { type: "soloStarted"; reservationId: string | null; startReceipt?: { attemptId: string; token: string } }
   | { type: "dotWaveSoloStarted" }
   | { type: "clockPong"; sentAt: number; serverAt: number }
   | { type: "connected"; clientId: string }
@@ -62,7 +63,7 @@ export type ServerMessage =
   | { type: "challengeRejected"; reservationId: string; reason: string }
   | { type: "challengeAccepted"; matchId: string; seat: VersusSeat; reservationId: string | null }
   | { type: "versusReadyState"; matchId: string; hostReady: boolean; challengerReady: boolean }
-  | { type: "versusCountdown"; matchId: string; startsAt: number }
+  | { type: "versusCountdown"; matchId: string; startsAt: number; startReceipt?: { attemptId: string; token: string } }
   | { type: "versusOpponentProgress"; matchId: string; seq: number; progress: VersusProgress }
   | { type: "versusAttack"; matchId: string; attackId: string; level: number; bossAttack: boolean }
   | { type: "versusClearWaiting"; matchId: string }

@@ -1,4 +1,5 @@
 import { refundUnusedCapture } from "./credit-reservations";
+import { beginStartAttempt, rejectStartAttempt } from "./start-slo";
 import {
   handleGoogleAuthRequest,
   isDeveloperAuthAvailable,
@@ -548,6 +549,7 @@ export async function handlePlatformRequest(
     }
 
     if (action === "capture") {
+      if (paymentEnv.APP_ENV === "staging") await beginStartAttempt(database, reservationId, session.playerId);
       await database.batch([
         database.prepare(
           `INSERT OR IGNORE INTO credit_ledger_entries
@@ -590,7 +592,10 @@ export async function handlePlatformRequest(
     }
 
     const current = await database.prepare("SELECT status FROM credit_reservations WHERE id = ?").bind(reservationId).first<{ status: string }>();
-    if (action === "capture" && current?.status !== "captured") return creditJson({ error: "reservation_not_captured" }, { status: 409 });
+    if (action === "capture" && current?.status !== "captured") {
+      if (paymentEnv.APP_ENV === "staging") await rejectStartAttempt(database, reservationId, session.playerId);
+      return creditJson({ error: "reservation_not_captured" }, { status: 409 });
+    }
     return creditJson({
       reservationId,
       status: current!.status,

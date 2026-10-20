@@ -9,6 +9,14 @@ import { healthDrillCommand } from "../scripts/health-drill.mjs";
 import { verifyServiceHealth } from "../scripts/verify-service-health.mjs";
 import { operationExpression, operationReportQuery, summarizeOperations } from "../scripts/operation-report.mjs";
 import { operationVerificationTarget } from "../scripts/verify-operation-metrics-staging.mjs";
+import { startSloVerificationTarget } from "../scripts/verify-start-slo-staging.mjs";
+
+test("start SLO verification is staging-only and cannot override a destination", () => {
+  assert.equal(startSloVerificationTarget(["--environment", "staging"]), "https://develop.virtual-gamecenter.pages.dev");
+  for (const args of [[], ["--environment", "production"], ["--environment", "staging", "--origin", "https://pulbase.com"]]) {
+    assert.throws(() => startSloVerificationTarget(args));
+  }
+});
 
 test("synthetic SQL is bounded, read-only and cannot supply identifiers or SQL fragments", async () => {
   const config = JSON.parse(await readFile(new URL("../config/service-alerts.json", import.meta.url), "utf8"));

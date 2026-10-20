@@ -66,6 +66,12 @@ export function createCabinetClient(handlers: CabinetClientHandlers = {}): Cabin
       if (socket !== connection) return;
       try {
         const message = JSON.parse(event.data) as ServerMessage;
+        if ((message.type === "soloStarted" || message.type === "versusCountdown") && message.startReceipt
+          && typeof message.startReceipt.attemptId === "string" && message.startReceipt.attemptId.length > 0 && message.startReceipt.attemptId.length <= 64
+          && typeof message.startReceipt.token === "string" && message.startReceipt.token.length > 0 && message.startReceipt.token.length <= 64) {
+          try { connection.send(JSON.stringify({ type: "startReceipt", attemptId: message.startReceipt.attemptId, token: message.startReceipt.token })); }
+          catch {}
+        }
         handlers.onMessage?.(message);
         if (cabinetId && gameId && (message.type === "cabinetState" || message.type === "playerLeft")) {
           publishCabinetPresence({ cabinetId, gameId, playerCount: message.type === "cabinetState" ? message.state.playerCount : 0 });

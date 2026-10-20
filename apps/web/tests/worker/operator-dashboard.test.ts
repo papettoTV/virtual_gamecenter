@@ -59,6 +59,7 @@ it("renders responsive operator counts, warning rates and no-data states without
   const monthlyCall = fetcher.mock.calls[1] as unknown as [string, RequestInit];
   expect(monthlyCall[1].body).toContain("blob7 != 'operation-drill-v1'");
   for (const text of ["今月のサーバー処理", "98%", "目標水準未満（参考）", "月間SLOの達成判定ではありません", "日本時間"]) expect(html).toContain(text);
+  for (const text of ["ゲーム開始SLO（受理済み要求）", "受信確認", "応答欠落", "15分記録", "計測開始待ち", "ソロは5秒"]) expect(html).toContain(text);
   const navigation = request(owner.cookie);
   navigation.headers.set("Sec-Fetch-Site", "cross-site");
   navigation.headers.set("Sec-Fetch-Mode", "navigate");

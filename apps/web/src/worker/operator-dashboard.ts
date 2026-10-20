@@ -1,4 +1,5 @@
 import { hashIdentifier } from "./identity-hash";
+import { collectStartSloReport } from "./start-slo";
 import { operationReportQuery, summarizeOperations, monthlyOperationReportQuery, operationMonthWindow, summarizeMonthlyOperations } from "../shared/operation-report.mjs";
 
 export interface OperatorEnv {
@@ -83,7 +84,14 @@ export async function handleOperatorRequest(request: Request, env: OperatorEnv, 
     if (!session.google || !session.account_id || !allowed.includes(session.account_id)) return error(403, "運営者権限がありません。");
     const report = await collectOperationReport(env.CLOUDFLARE_METRICS_TOKEN ?? "", fetcher);
     const monthly = await collectMonthlyOperationReport(env.CLOUDFLARE_METRICS_TOKEN ?? "", fetcher);
-    if (api) return Response.json({ ...report, monthly }, { headers });
+    const startSlo = await collectStartSloReport(env.DB);
+    if (api) return Response.json({ ...report, monthly, startSlo }, { headers });
+    const assessments: Record<string, string> = { not_instrumented: "計測開始待ち", insufficient_coverage: "計測期間不足", collecting: "集計中（月/確定待ち）",
+      unresolved: "未確定データあり", coverage_gap: "計測の欠測あり", no_data: "判定対象なし", passed: "達成", failed: "未達" };
+    const sloRows = startSlo.periods.map(value => `<tr><th scope="row">${value.month}</th><td>${value.requested}</td><td>${value.allowed}</td>
+      <td>${value.succeeded}</td><td>${value.missing_response}</td><td>${value.rejected}</td><td>${value.pending}</td>
+      <td>${value.successRate === null ? "—" : (value.successRate * 100).toFixed(2) + "%"}</td><td>${value.checkpoints}/${value.expectedCheckpoints}</td>
+      <td>${assessments[value.assessment]}</td></tr>`).join("");
     const labels: Record<string, string> = { start: "ゲーム開始", login: "Googleログイン", credit: "無料クレジット付与" };
     const rows = Object.entries(report.families).map(([key, value]) => `<tr><th scope="row">${labels[key]}</th>
       <td>${value.eligible}</td><td>${value.succeeded}</td><td>${value.failed}</td>
@@ -100,12 +108,17 @@ export async function handleOperatorRequest(request: Request, env: OperatorEnv, 
       <p>直近<strong>20分</strong>の推計件数・技術失敗率</p>
       <p>取得時刻：<time datetime="${report.checkedAt}">${report.checkedAt}</time>（UTC）</p>
       <div class="table"><table><caption>操作別の処理結果</caption><thead><tr><th scope="col">操作</th><th scope="col">判定対象</th><th scope="col">成功</th><th scope="col">技術失敗</th><th scope="col">失敗率</th><th scope="col">拒否</th><th scope="col">キャンセル</th><th scope="col">通知判定</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <section><h2>ゲーム開始SLO（受理済み要求）</h2>
+      <p>目標98%。クレジット確定要求の永続受理から、開始許可をクライアントが受信し確認を返すまでを測定します。ソロは5秒、対戦は30秒以内に両者の確認が必要です。</p>
+      <p>計測開始：${startSlo.coverageStartedAt ?? "未開始"}。日本時間の暦月・D1の実件数です。欠落は失敗、重複は1件、期限後の確認では成功に戻しません。</p>
+      <p>月未終了・開始前を含む月・15分チェックの欠測・未確定・対象なしは達成扱いにしません。未受理の通信/DB障害、無課金継続、実際の描画開始はこのSLIの対象外で、別途監視が必要です。</p></section>
+      <div class="table"><table><caption>正式な月間開始SLO（目標98%）</caption><thead><tr><th>月（JST）</th><th>受理</th><th>許可</th><th>受信確認</th><th>応答欠落</th><th>対象外</th><th>待機中</th><th>成功率</th><th>15分記録</th><th>正式判定</th></tr></thead><tbody>${sloRows}</tbody></table></div>
       <section><h2>今月のサーバー処理（参考）</h2><p>${monthly.window.month}（日本時間）。月初から取得時刻の5分前までの推計です。</p>
       <p>対象期間（UTC）：${monthly.window.from} 以上 〜 ${monthly.window.to} 未満</p>
       <p>成功率 = 成功 ÷（成功 + 技術失敗）。拒否・キャンセルを除外。開始の参考目標は98%、ログイン・無料付与の目標は未設定です。</p>
-      <p>月途中・計測開始前の空白・欠測・サンプリングがあります。開始要求前の障害や開始許可の受信失敗は未捕捉のため、月間SLOの達成判定ではありません。隔離通知訓練を除外しますが、通常の検証用疎通は含みます。</p></section>
+      <p>この参考表はサーバーの処理完了までを測り、月途中・計測開始前の空白・欠測・サンプリングがあります。月間SLOの達成判定ではありません。受信確認と正式判定は上の開始SLOを参照してください。隔離通知訓練を除外しますが、通常の検証用疎通は含みます。</p></section>
       <div class="table"><table><caption>今月の参考成功率・目標との差（pt = パーセントポイント）</caption><thead><tr><th scope="col">操作</th><th scope="col">判定対象</th><th scope="col">成功</th><th scope="col">技術失敗</th><th scope="col">成功率</th><th scope="col">参考目標</th><th scope="col">目標との差</th><th scope="col">参考評価</th></tr></thead><tbody>${monthlyRows}</tbody></table></div>
-      <section><h2>読み方</h2><p>失敗率 = 技術失敗 ÷（成功 + 技術失敗）。拒否・キャンセルは分母に含めません。</p>
+      <section><h2>参考集計の読み方</h2><p>失敗率 = 技術失敗 ÷（成功 + 技術失敗）。拒否・キャンセルは分母に含めません。</p>
       <p>技術失敗3件以上、かつ失敗率20%以上で「要確認」。対象なしは正常・復旧の証明ではありません。</p>
       <p>取り込みに数分の遅れやサンプリング・欠落があります。厳密な台帳件数、ユーザー数、月間SLOではありません。ゲーム開始はサーバー側の開始許可までを測ります。</p>
       <p>自動更新は行いません。「集計を更新」で再取得できます。本番の集計は対象外です。</p></section><a href="/">サイトに戻る</a>`);

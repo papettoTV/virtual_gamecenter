@@ -29,10 +29,12 @@ import { CABINET_CONNECTION_LIMIT, CABINET_IP_CONNECTION_LIMIT, clientAddressKey
 import { hashIdentifier } from "./identity-hash";
 import { recordIdleRevocation } from "./revocation-metrics";
 import { observeOperation, operationMetrics, type OperationOutcome } from "./operation-metrics";
+import { acknowledgeStart, allowStartReceipt, type StartReceipt } from "./start-slo";
 
 export const SESSION_SWEEP_INTERVAL_MS = 60_000;
 
 interface ConnectionAttachment {
+  startReceipt?: StartReceipt & { seat: 1 | 2 };
   admissionId?: string;
   clientId: string;
   role: CabinetRole;
@@ -269,6 +271,15 @@ export class CabinetRoom extends DurableObject<Env> {
     }
 
     const attachment = this.attachment(socket);
+    if (message.type === "startReceipt") {
+      const expected = attachment.startReceipt;
+      if (this.env.APP_ENV !== "staging" || !expected || !attachment.playerId
+        || (attachment.role !== "player" && !this.getMatchSeat(attachment.clientId))
+        || message.attemptId !== expected.attemptId || message.token !== expected.token) return;
+      try { await acknowledgeStart(this.env.DB, expected, expected.seat); }
+      catch { console.warn("start_slo_receipt_failed"); }
+      return;
+    }
     if (message.type === "refreshDotWaveProfile") {
       if (this.state.gameId !== "dot-wave" || !attachment.playerId) return;
       const identity = await getPlayerIdentityById(this.env.DB, attachment.playerId);
@@ -356,8 +367,10 @@ export class CabinetRoom extends DurableObject<Env> {
         this.state = reduceCabinetState(this.state, { type: "START_SOLO" });
         await this.persistState();
         this.broadcastState();
+        const startReceipt = await this.prepareStartReceipt(message.reservationId, [{ socket, seat: 1 }]);
+        if (!this.liveConnection(attachment)) return "rejected";
         if (this.state.gameId === "dot-wave") this.send(socket, { type: "dotWaveSoloStarted" });
-        this.send(socket, { type: "soloStarted", reservationId: message.reservationId ?? null });
+        this.send(socket, { type: "soloStarted", reservationId: message.reservationId ?? null, ...(startReceipt ? { startReceipt } : {}) });
         return "success";
       }, outcome => outcome, this.state.gameId);
       return;
@@ -627,13 +640,21 @@ export class CabinetRoom extends DurableObject<Env> {
     this.sendToMatch(readyState);
     if (readyCount === 2) {
       this.state = reduceCabinetState(this.state, { type: "VERSUS_STARTED" });
+      await this.persistState();
+      const recipients = this.ctx.getWebSockets().flatMap(socket => {
+        const seat = this.getMatchSeat(this.attachment(socket).clientId);
+        return seat ? [{ socket, seat: (seat === "host" ? 1 : 2) as 1 | 2 }] : [];
+      });
+      const startReceipt = await this.prepareStartReceipt(match.challengerReservationId, recipients);
+      if (this.versusMatch !== match || !this.liveConnection(attachment)) return "rejected";
       this.sendToMatch({
         type: "versusCountdown",
         matchId,
         startsAt: Date.now() + 3000,
+        ...(startReceipt ? { startReceipt } : {}),
       });
     }
-    await this.persistState();
+    if (readyCount !== 2) await this.persistState();
     this.broadcastState();
     return readyCount === 2 ? "success" : "noop";
   }
@@ -927,6 +948,19 @@ export class CabinetRoom extends DurableObject<Env> {
     } catch {
       console.error("challenge_reservation_release_failed");
     }
+  }
+
+  private async prepareStartReceipt(reservationId: string | undefined, recipients: Array<{ socket: WebSocket; seat: 1 | 2 }>): Promise<StartReceipt | undefined> {
+    if (this.env.APP_ENV !== "staging" || !reservationId) return;
+    try {
+      const receipt = await allowStartReceipt(this.env.DB, reservationId, recipients.length);
+      if (!receipt) return;
+      for (const { socket, seat } of recipients) {
+        const current = this.attachment(socket);
+        if (!current.revoked && socket.readyState === WebSocket.OPEN) socket.serializeAttachment({ ...current, startReceipt: { ...receipt, seat } });
+      }
+      return receipt;
+    } catch { console.warn("start_slo_allow_failed"); return; }
   }
 
   private async validateCredit(attachment: ConnectionAttachment, reservationId: unknown, status: "active" | "captured", mode: string, consume = false): Promise<boolean> {
