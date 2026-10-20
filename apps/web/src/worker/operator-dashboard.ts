@@ -1,5 +1,5 @@
 import { hashIdentifier } from "./identity-hash";
-import { operationReportQuery, summarizeOperations } from "../shared/operation-report.mjs";
+import { operationReportQuery, summarizeOperations, monthlyOperationReportQuery, operationMonthWindow, summarizeMonthlyOperations } from "../shared/operation-report.mjs";
 
 export interface OperatorEnv {
   APP_ENV?: string;
@@ -16,11 +16,11 @@ const headers = {
   "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
 };
 
-export async function collectOperationReport(token: string, fetcher: typeof fetch = fetch) {
+async function collectRows(token: string, query: string, fetcher: typeof fetch) {
   if (!token) throw Error("metrics_unavailable");
   const response = await fetcher("https://api.cloudflare.com/client/v4/analytics/sql", {
     method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "text/plain" },
-    body: operationReportQuery(), redirect: "manual", signal: AbortSignal.timeout(10_000),
+    body: query, redirect: "manual", signal: AbortSignal.timeout(10_000),
   });
   if (!response.ok) throw Error("metrics_unavailable");
   const reader = response.body?.getReader();
@@ -41,8 +41,20 @@ export async function collectOperationReport(token: string, fetcher: typeof fetc
   for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
   const payload = JSON.parse(new TextDecoder().decode(bytes));
   if (payload.success === false || payload.errors?.length) throw Error("metrics_unavailable");
+  return payload.data;
+}
+
+export async function collectOperationReport(token: string, fetcher: typeof fetch = fetch) {
+  const rows = await collectRows(token, operationReportQuery(), fetcher);
   return { checkedAt: new Date().toISOString(), environment: "staging", windowMinutes: 20,
-    countsAreEstimates: true, families: summarizeOperations(payload.data) };
+    countsAreEstimates: true, families: summarizeOperations(rows) };
+}
+
+export async function collectMonthlyOperationReport(token: string, fetcher: typeof fetch = fetch, now = new Date()) {
+  const rows = await collectRows(token, monthlyOperationReportQuery(now), fetcher);
+  return { checkedAt: now.toISOString(), environment: "staging", window: operationMonthWindow(now),
+    provisional: true, countsAreEstimates: true, measurementBoundary: "server_operation_only",
+    families: summarizeMonthlyOperations(rows) };
 }
 
 export async function handleOperatorRequest(request: Request, env: OperatorEnv, fetcher: typeof fetch = fetch): Promise<Response | null> {
@@ -70,17 +82,29 @@ export async function handleOperatorRequest(request: Request, env: OperatorEnv, 
     if (!session) return error(401, "Googleログインが必要です。");
     if (!session.google || !session.account_id || !allowed.includes(session.account_id)) return error(403, "運営者権限がありません。");
     const report = await collectOperationReport(env.CLOUDFLARE_METRICS_TOKEN ?? "", fetcher);
-    if (api) return Response.json(report, { headers });
+    const monthly = await collectMonthlyOperationReport(env.CLOUDFLARE_METRICS_TOKEN ?? "", fetcher);
+    if (api) return Response.json({ ...report, monthly }, { headers });
     const labels: Record<string, string> = { start: "ゲーム開始", login: "Googleログイン", credit: "無料クレジット付与" };
     const rows = Object.entries(report.families).map(([key, value]) => `<tr><th scope="row">${labels[key]}</th>
       <td>${value.eligible}</td><td>${value.succeeded}</td><td>${value.failed}</td>
       <td class="${value.warning ? "warning" : ""}">${value.failureRate === null ? "—（対象なし）" : (value.failureRate * 100).toFixed(1) + "%"}</td>
       <td>${value.rejected}</td><td>${value.cancelled}</td>
       <td>${value.warning ? "要確認" : value.failureRate === null ? "判定対象なし" : "通知条件なし"}</td></tr>`).join("");
+    const monthlyRows = Object.entries(monthly.families).map(([key, value]) => `<tr><th scope="row">${labels[key]}</th>
+      <td>${value.eligible}</td><td>${value.succeeded}</td><td>${value.failed}</td>
+      <td>${value.successRate === null ? "—（対象なし）" : (value.successRate * 100).toFixed(2) + "%"}</td>
+      <td>${value.target === null ? "未設定" : (value.target * 100).toFixed(0) + "%"}</td>
+      <td>${value.targetGap === null ? "—" : (value.targetGap >= 0 ? "+" : "") + (value.targetGap * 100).toFixed(2) + "pt"}</td>
+      <td class="${value.assessment === "below_reference" ? "warning" : ""}">${value.assessment === "no_eligible_data" ? "判定対象なし" : value.assessment === "target_not_set" ? "目標未設定" : value.assessment === "below_reference" ? "目標水準未満（参考）" : "目標水準以上（参考）"}</td></tr>`).join("");
     return page(`<header><div><p class="eyebrow">PULBASE / 運営者専用 / 検証環境</p><h1>処理結果モニター</h1></div><a class="button" href="${dashboardPath}">集計を更新</a></header>
       <p>直近<strong>20分</strong>の推計件数・技術失敗率</p>
       <p>取得時刻：<time datetime="${report.checkedAt}">${report.checkedAt}</time>（UTC）</p>
       <div class="table"><table><caption>操作別の処理結果</caption><thead><tr><th scope="col">操作</th><th scope="col">判定対象</th><th scope="col">成功</th><th scope="col">技術失敗</th><th scope="col">失敗率</th><th scope="col">拒否</th><th scope="col">キャンセル</th><th scope="col">通知判定</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <section><h2>今月のサーバー処理（参考）</h2><p>${monthly.window.month}（日本時間）。月初から取得時刻の5分前までの推計です。</p>
+      <p>対象期間（UTC）：${monthly.window.from} 以上 〜 ${monthly.window.to} 未満</p>
+      <p>成功率 = 成功 ÷（成功 + 技術失敗）。拒否・キャンセルを除外。開始の参考目標は98%、ログイン・無料付与の目標は未設定です。</p>
+      <p>月途中・計測開始前の空白・欠測・サンプリングがあります。開始要求前の障害や開始許可の受信失敗は未捕捉のため、月間SLOの達成判定ではありません。隔離通知訓練を除外しますが、通常の検証用疎通は含みます。</p></section>
+      <div class="table"><table><caption>今月の参考成功率・目標との差（pt = パーセントポイント）</caption><thead><tr><th scope="col">操作</th><th scope="col">判定対象</th><th scope="col">成功</th><th scope="col">技術失敗</th><th scope="col">成功率</th><th scope="col">参考目標</th><th scope="col">目標との差</th><th scope="col">参考評価</th></tr></thead><tbody>${monthlyRows}</tbody></table></div>
       <section><h2>読み方</h2><p>失敗率 = 技術失敗 ÷（成功 + 技術失敗）。拒否・キャンセルは分母に含めません。</p>
       <p>技術失敗3件以上、かつ失敗率20%以上で「要確認」。対象なしは正常・復旧の証明ではありません。</p>
       <p>取り込みに数分の遅れやサンプリング・欠落があります。厳密な台帳件数、ユーザー数、月間SLOではありません。ゲーム開始はサーバー側の開始許可までを測ります。</p>

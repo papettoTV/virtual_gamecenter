@@ -1,6 +1,6 @@
 import { beforeAll, expect, it, vi } from "vitest";
 import { env } from "cloudflare:workers";
-import { handleOperatorRequest, collectOperationReport } from "../../src/worker/operator-dashboard";
+import { handleOperatorRequest, collectOperationReport, collectMonthlyOperationReport } from "../../src/worker/operator-dashboard";
 import { handlePlatformRequest } from "../../src/worker/platform";
 import { registerGoogleAccount } from "../../src/worker/google-auth";
 import { migrateTestDatabase } from "../migrate-test-database";
@@ -51,11 +51,14 @@ it("renders responsive operator counts, warning rates and no-data states without
   const html = await response.text();
   for (const text of ["30.0%", "要確認", "対象なし", "キャンセル", "集計を更新", "viewport"]) expect(html).toContain(text);
   for (const text of [owner.accountId, owner.playerId, config.CLOUDFLARE_METRICS_TOKEN, "<script", "setInterval"]) expect(html).not.toContain(text);
-  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(fetcher).toHaveBeenCalledTimes(2);
   const [url, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
   expect(url).toBe("https://api.cloudflare.com/client/v4/analytics/sql");
   expect(init.redirect).toBe("manual");
   expect(init.body).toContain("INTERVAL '20' MINUTE");
+  const monthlyCall = fetcher.mock.calls[1] as unknown as [string, RequestInit];
+  expect(monthlyCall[1].body).toContain("blob7 != 'operation-drill-v1'");
+  for (const text of ["今月のサーバー処理", "98%", "目標水準未満（参考）", "月間SLOの達成判定ではありません", "日本時間"]) expect(html).toContain(text);
   const navigation = request(owner.cookie);
   navigation.headers.set("Sec-Fetch-Site", "cross-site");
   navigation.headers.set("Sec-Fetch-Mode", "navigate");
@@ -99,4 +102,35 @@ it("shows a generic error rather than stale or zero values on failed collection"
   const response = (await handleOperatorRequest(request(owner.cookie), { ...config, OPERATOR_ACCOUNT_IDS: owner.accountId }, async () => { throw Error("private failure"); }))!;
   expect(response.status).toBe(503);
   expect(await response.text()).not.toContain("private failure");
+});
+
+it("never substitutes the short window for a failed monthly query", async () => {
+  const owner = await player();
+  let calls = 0;
+  const fetcher: typeof fetch = async () => {
+    if (++calls === 2) throw Error("private monthly failure");
+    return Response.json({ data: [row] });
+  };
+  const response = (await handleOperatorRequest(request(owner.cookie), { ...config, OPERATOR_ACCOUNT_IDS: owner.accountId }, fetcher))!;
+  expect(response.status).toBe(503);
+  expect(await response.text()).not.toContain("30.0%");
+});
+
+it("returns fixed, provisional monthly JSON without leaking private identifiers", async () => {
+  const owner = await player();
+  const response = (await handleOperatorRequest(request(owner.cookie, "/api/operator/operations"), { ...config, OPERATOR_ACCOUNT_IDS: owner.accountId },
+    async () => Response.json({ data: [] })))!;
+  const result = await response.json<{ monthly: { provisional: boolean; window: { timeZone: string }; measurementBoundary: string; families: { start: { successRate: number | null; assessment: string } } } }>();
+  expect(result.monthly).toMatchObject({ provisional: true, measurementBoundary: "server_operation_only", window: { timeZone: "Asia/Tokyo" } });
+  expect(result.monthly.families.start).toMatchObject({ successRate: null, assessment: "no_eligible_data" });
+  expect(JSON.stringify(result)).not.toContain(owner.accountId);
+});
+
+it.each(["oversized", "inconsistent", "api_error", "network"])("rejects invalid monthly response: %s", async kind => {
+  const fetcher: typeof fetch = async () => {
+    if (kind === "network") throw Error("private");
+    if (kind === "oversized") return new Response("x".repeat(65537));
+    return Response.json(kind === "api_error" ? { success: false, errors: ["private"], data: [] } : { data: [{ ...row, eligible: 99 }] });
+  };
+  await expect(collectMonthlyOperationReport("test", fetcher)).rejects.toThrow();
 });
