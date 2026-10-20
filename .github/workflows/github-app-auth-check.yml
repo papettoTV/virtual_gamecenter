@@ -1,0 +1,97 @@
+name: GitHub App authentication check
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: github-app-auth-check
+  cancel-in-progress: false
+jobs:
+  authenticate:
+    if: github.ref == 'refs/heads/develop' && github.actor == 'papettoTV'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    environment: automation
+    steps:
+      # No checkout, application code, deployment, or OpenAI API invocation.
+      - name: Validate App identity, installation, scoped token and repository read access
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          APP_ID: ${{ vars.PULBASE_APP_ID }}
+          EXPECTED_BOT: ${{ vars.PULBASE_AUTOMATION_BOT }}
+          APP_PRIVATE_KEY: ${{ secrets.PULBASE_APP_PRIVATE_KEY }}
+        with:
+          script: |
+            const { createSign } = require('node:crypto');
+            const repo = { owner: 'papettoTV', repo: 'virtual_gamecenter' };
+            let token;
+            let stage = 'configuration';
+            let revokeOk = true;
+            try {
+              if (context.repo.owner !== repo.owner || context.repo.repo !== repo.repo || process.env.APP_ID !== '5403155') {
+                throw new Error('Unexpected configuration');
+              }
+              const { data: repository } = await github.rest.repos.get(repo);
+              const { data: mainBefore } = await github.rest.repos.getBranch({ ...repo, branch: 'main' });
+              stage = 'PEM / JWT';
+              const now = Math.floor(Date.now() / 1000);
+              const encode = value => Buffer.from(JSON.stringify(value)).toString('base64url');
+              const unsigned = `${encode({ alg: 'RS256', typ: 'JWT' })}.${encode({ iat: now - 60, exp: now + 540, iss: process.env.APP_ID })}`;
+              const signer = createSign('RSA-SHA256');
+              signer.update(unsigned);
+              const jwt = `${unsigned}.${signer.sign(process.env.APP_PRIVATE_KEY).toString('base64url')}`;
+              core.setSecret(jwt);
+              const appHeaders = { authorization: `Bearer ${jwt}` };
+              stage = 'App identity';
+              const { data: app } = await github.request('GET /app', { headers: appHeaders });
+              if (app.id !== 5403155 || app.slug !== 'pulbase-codex' || app.owner?.login !== repo.owner
+                || `${app.slug}[bot]` !== process.env.EXPECTED_BOT) throw new Error('Unexpected App identity');
+              const required = { contents: 'write', pull_requests: 'write', issues: 'write', checks: 'read', administration: 'read' };
+              stage = 'App permissions';
+              for (const [name, permission] of Object.entries(required)) {
+                if (app.permissions[name] !== permission) throw new Error('Missing expected App permission');
+              }
+              stage = 'repository installation';
+              const { data: installation } = await github.request('GET /repos/{owner}/{repo}/installation', { ...repo, headers: appHeaders });
+              if (installation.app_id !== app.id || installation.suspended_at) throw new Error('Installation unavailable');
+              stage = 'read-only installation token';
+              const { data: created } = await github.request('POST /app/installations/{installation_id}/access_tokens', {
+                installation_id: installation.id,
+                repository_ids: [repository.id],
+                permissions: { contents: 'read', metadata: 'read', pull_requests: 'read', issues: 'read', checks: 'read', administration: 'read' },
+                headers: appHeaders,
+              });
+              token = created.token;
+              core.setSecret(token);
+              const tokenHeaders = { authorization: `Bearer ${token}` };
+              stage = 'scoped repository access';
+              const { data: accessible } = await github.request('GET /installation/repositories', { headers: tokenHeaders });
+              if (accessible.total_count !== 1 || accessible.repositories[0]?.id !== repository.id) throw new Error('Unexpected token repository scope');
+              const { data: develop } = await github.request('GET /repos/{owner}/{repo}/branches/develop', { ...repo, headers: tokenHeaders });
+              const { data: mainAfter } = await github.request('GET /repos/{owner}/{repo}/branches/main', { ...repo, headers: tokenHeaders });
+              if (mainBefore.commit.sha !== mainAfter.commit.sha) throw new Error('Main changed during verification; inspect independently');
+              await core.summary.addHeading('GitHub App authentication verified').addTable([
+                [{ data: 'Check', header: true }, { data: 'Result', header: true }],
+                ['App', `${app.slug} (${app.id})`],
+                ['Installation', String(installation.id)],
+                ['Token scope', `${repo.owner}/${repo.repo} only; read-only`],
+                ['Required App permissions', 'Contents/PR/Issues write; Checks/Administration read'],
+                ['develop', develop.commit.sha],
+                ['main', 'Unchanged during verification'],
+                ['Deployment / OpenAI API / PR creation', 'Not executed'],
+              ]).write();
+              core.info('GitHub App JWT, installation and scoped read access verified.');
+            } catch (error) {
+              core.setFailed(`GitHub App authentication failed at ${stage}${error.status ? ` (HTTP ${error.status})` : ''}. Check App settings and the registered PEM key; secret values are not logged.`);
+            } finally {
+              if (token) {
+                try {
+                  await github.request('DELETE /installation/token', { headers: { authorization: `Bearer ${token}` } });
+                  core.info('Temporary installation token revoked.');
+                } catch {
+                  revokeOk = false;
+                  core.setFailed('Could not revoke the temporary token. It will expire automatically; inspect the run before retrying.');
+                }
+              }
+              if (!token || revokeOk) core.info('Authentication check finished without deploying application code.');
+            }
