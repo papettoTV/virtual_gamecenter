@@ -32,5 +32,11 @@ jobs:
         run: |
           printf '%s\n' 'GOOGLE_CLIENT_ID=ci-example.apps.googleusercontent.com' 'GOOGLE_CLIENT_SECRET=ci-example' 'STRIPE_SECRET_KEY=sk_test_ci_example' 'STRIPE_WEBHOOK_SECRET=whsec_ci_example' > .dev.vars
       - run: npm test
+      - name: Verify DOT WAVE integration stability without retries
+        run: |
+          for iteration in 1 2 3; do
+            echo "DOT WAVE stability run $iteration/3"
+            npm run test:dot-wave
+          done
       - name: Build for the target environment without deploying
         run: CLOUDFLARE_ENV="$PULBASE_TARGET_ENVIRONMENT" npm run build
