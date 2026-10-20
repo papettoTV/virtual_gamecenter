@@ -7,7 +7,7 @@ import { alertCases, syntheticAlertQuery } from "../scripts/verify-revocation-al
 
 test("synthetic SQL is bounded, read-only and cannot supply identifiers or SQL fragments", async () => {
   const config = JSON.parse(await readFile(new URL("../config/service-alerts.json", import.meta.url), "utf8"));
-  assert.equal(alertCases.length, 12);
+  assert.equal(alertCases.length, 14);
   for (const item of alertCases) {
     const query = syntheticAlertQuery(config.alerts[0].query, item.rows);
     assert.ok(query.startsWith("SELECT CASE "));
@@ -30,6 +30,7 @@ test("fits one remaining custom alert slot without suppressing recovery for six 
   assert.ok(alert.query.includes("sum(if(blob3 = 'v1', 1, 0)) = 0 THEN 3"));
   assert.ok(alert.query.includes("argMax(double1, if(blob3 = 'v1', double4, 0.0)) >= 1 THEN 1"));
   assert.ok(alert.query.includes('double1 * "sampleInterval", 0.0)) >= 1 THEN 4'));
+  assert.ok(alert.query.includes("blob3 = 'revocation-v1' OR blob3 = 'idle-revocation-v1'"));
   assert.ok(alert.query.includes('double4 * "sampleInterval", 0.0)) >= 10 THEN 5'));
   assert.ok(alert.query.includes("< 1800 THEN 2 ELSE 0 END AS value"));
   assert.ok(alert.query.includes(`accountTag = '${config.accountId}'`));

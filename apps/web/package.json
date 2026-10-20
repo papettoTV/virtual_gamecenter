@@ -18,7 +18,7 @@
     "test:analytics": "node --test tests/analytics-runtime.test.mjs",
     "test:release": "node --test tests/release-config.test.mjs tests/pages-targets.test.mjs",
     "test:monitor": "node --test tests/usage-monitor-verification.test.mjs",
-    "test:service-check": "node --experimental-strip-types --test tests/service-check.test.mjs tests/service-monitor.test.mjs tests/recovery-drill.test.mjs tests/do-recovery-drill.test.mjs tests/observability-policy.test.mjs tests/log-redaction.test.mjs tests/security-history.test.mjs",
+    "test:service-check": "node --experimental-strip-types --test tests/service-check.test.mjs tests/service-monitor.test.mjs tests/recovery-drill.test.mjs tests/do-recovery-drill.test.mjs tests/observability-policy.test.mjs tests/log-redaction.test.mjs tests/security-history.test.mjs tests/session-revocation-drill.test.mjs",
     "security:history": "node scripts/security-history-audit.mjs",
     "logs:policy": "node scripts/observability-policy.mjs",
     "logs:verify": "node scripts/verify-log-redaction.mjs",

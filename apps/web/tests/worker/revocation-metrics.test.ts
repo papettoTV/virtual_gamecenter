@@ -1,5 +1,11 @@
 import { expect, it, vi } from "vitest";
-import { recordRevocation } from "../../src/worker/revocation-metrics";
+import { recordRevocation, recordIdleRevocation } from "../../src/worker/revocation-metrics";
+
+it.each([false, true])("records idle validation with privacy-safe bounded fields: failure=%s", failed => {
+  const writeDataPoint = vi.fn();
+  recordIdleRevocation({ writeDataPoint }, { checked: 3, closed: 1, checkFailed: failed, cleanupFailures: 0 });
+  expect(writeDataPoint).toHaveBeenCalledExactlyOnceWith({ indexes: ["staging-idle-revocation"], blobs: ["staging", failed ? "check_failed" : "checked", "idle-revocation-v1"], doubles: [failed ? 1 : 0, 1, 3, 0] });
+});
 
 it("does not let a telemetry failure interrupt session invalidation or leak details", () => {
   const warning = vi.spyOn(console, "warn").mockImplementation(() => {});

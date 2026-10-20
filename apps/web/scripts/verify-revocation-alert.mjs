@@ -3,6 +3,8 @@ import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 
 export const alertCases = [
+  { name: "idle-check-failure", rows: [["v1", 0, 1800000000, 0, 1], ["idle-revocation-v1", 1, 0, 0, 1]], expected: 4 },
+  { name: "idle-closed", rows: [["v1", 0, 1800000000, 0, 1], ["idle-revocation-v1", 0, 0, 0, 1]], expected: 0 },
   { name: "healthy", rows: [["v1", 0, 1800000000, 0, 1]], expected: 0 },
   { name: "down", rows: [["v1", 1, 1800000000, 0, 1]], expected: 1 },
   { name: "recovery", rows: [["v1", 0, 1800000000, 1799999900, 1]], expected: 2 },
@@ -21,15 +23,16 @@ export function syntheticAlertQuery(query, rows) {
   assert.ok(query.startsWith("SELECT CASE "));
   assert.ok(query.includes(" FROM events.analyticsEngine.pulbase_service_health WHERE "));
   for (const [schema, failed, retries, recovered, weight] of rows) {
-    assert.ok(["v1", "revocation-v1"].includes(schema));
+    assert.ok(["v1", "revocation-v1", "idle-revocation-v1"].includes(schema));
     assert.ok([failed, retries, recovered, weight].every(value => Number.isSafeInteger(value) && value >= 0));
   }
   const health = rows.filter(row => row[0] === "v1").sort((first, second) => second[2] - first[2]);
   const warnings = rows.filter(row => row[0] === "revocation-v1");
+  const incomplete = rows.filter(row => ["revocation-v1", "idle-revocation-v1"].includes(row[0]));
   const values = [
     ["sum(if(blob3 = 'v1', 1, 0))", health.length],
     ["argMax(double1, if(blob3 = 'v1', double4, 0.0))", health[0]?.[1] ?? 0],
-    ['sum(if(blob3 = \'revocation-v1\', double1 * "sampleInterval", 0.0))', warnings.reduce((sum, row) => sum + row[1] * row[4], 0)],
+    ['sum(if(blob3 = \'revocation-v1\' OR blob3 = \'idle-revocation-v1\', double1 * "sampleInterval", 0.0))', incomplete.reduce((sum, row) => sum + row[1] * row[4], 0)],
     ['sum(if(blob3 = \'revocation-v1\', double4 * "sampleInterval", 0.0))', warnings.reduce((sum, row) => sum + row[2] * row[4], 0)],
     ["argMax(double6, if(blob3 = 'v1', double4, 0.0))", health[0]?.[3] ?? 0],
     ["argMax(double4, if(blob3 = 'v1', double4, 0.0))", health[0]?.[2] ?? 0],

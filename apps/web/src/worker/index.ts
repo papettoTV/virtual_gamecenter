@@ -17,6 +17,8 @@ import { distributedBudget, distributedError } from "./distributed-protection";
 import { hashIdentifier } from "./identity-hash";
 import { recoveryResponse, type RecoveryBinding } from "./recovery-control";
 import { secureResponse } from "./response-security";
+import { WorkerEntrypoint } from "cloudflare:workers";
+import { activateSessionSweeps } from "./session-maintenance";
 
 export { CabinetRoom, AbuseGuard };
 
@@ -29,6 +31,13 @@ interface WorkerEnv extends Env, BasicAuthEnv {
 }
 
 const CABINET_SOCKET_PATH = /^\/api\/cabinets\/([a-zA-Z0-9-]+)\/ws$/;
+
+export class SessionMaintenance extends WorkerEntrypoint<WorkerEnv> {
+  async activate(cursor = "") {
+    if (this.env.APP_ENV !== "staging") return { visited: 0, next: null, error: "staging_maintenance_only" };
+    return activateSessionSweeps(this.env.DB, this.env.CABINET_ROOMS, cursor);
+  }
+}
 
 const handler = {
   async fetch(request: Request, env: WorkerEnv): Promise<Response> {

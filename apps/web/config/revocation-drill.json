@@ -1,0 +1,14 @@
+{
+  "name": "pulbase-revocation-drill-20261020",
+  "account_id": "60e5472a284dc71bbafbbfac8aa2a940",
+  "main": "../src/recovery/revocation-drill.ts",
+  "compatibility_date": "2026-07-26",
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": { "APP_ENV": "staging", "REVOCATION_DRILL": "synthetic-only-v1", "DEVELOPER_AUTH_ENABLED": "false", "CREDIT_PURCHASES_ENABLED": "false", "USAGE_MONITOR_ENABLED": "false" },
+  "d1_databases": [{ "binding": "DB", "database_name": "pulbase-revocation-drill-20261020", "database_id": "9787b59a-a5cb-46f2-b10d-26a0ab679493", "migrations_dir": "../migrations" }],
+  "durable_objects": { "bindings": [{ "name": "CABINET_ROOMS", "class_name": "CabinetRoom" }, { "name": "ABUSE_GUARDS", "class_name": "AbuseGuard" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["CabinetRoom", "AbuseGuard"] }],
+  "analytics_engine_datasets": [{ "binding": "SECURITY_EVENTS", "dataset": "pulbase_service_health" }],
+  "observability": { "enabled": true }
+}

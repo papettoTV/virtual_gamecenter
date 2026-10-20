@@ -5,6 +5,19 @@ export interface RevocationSummary {
   directoryFailed: boolean;
 }
 
+export function recordIdleRevocation(
+  metrics: Pick<AnalyticsEngineDataset, "writeDataPoint"> | undefined,
+  summary: { checked: number; closed: number; checkFailed: boolean; cleanupFailures: number },
+): void {
+  if (!metrics) return;
+  try {
+    metrics.writeDataPoint({
+      indexes: ["staging-idle-revocation"], blobs: ["staging", summary.checkFailed ? "check_failed" : "checked", "idle-revocation-v1"],
+      doubles: [summary.checkFailed || summary.cleanupFailures ? 1 : 0, summary.closed, summary.checked, summary.cleanupFailures],
+    });
+  } catch { console.warn("session_revocation_metrics_failed"); }
+}
+
 export function recordRevocation(
   metrics: Pick<AnalyticsEngineDataset, "writeDataPoint"> | undefined,
   summary: RevocationSummary,

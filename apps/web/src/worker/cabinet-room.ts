@@ -27,6 +27,9 @@ import { getGameDefinition } from "../domain/game";
 import { getPlayerConnectionIdentity, getPlayerIdentityById } from "./platform";
 import { CABINET_CONNECTION_LIMIT, CABINET_IP_CONNECTION_LIMIT, clientAddressKey, protectionError, WS_MESSAGE_LIMIT } from "./request-protection";
 import { hashIdentifier } from "./identity-hash";
+import { recordIdleRevocation } from "./revocation-metrics";
+
+export const SESSION_SWEEP_INTERVAL_MS = 60_000;
 
 interface ConnectionAttachment {
   admissionId?: string;
@@ -116,6 +119,7 @@ export class CabinetRoom extends DurableObject<Env> {
         }
       }
     }).then(async () => {
+      await this.scheduleNextAlarm();
       if (env.APP_ENV === "local") return;
       for (const socket of this.ctx.getWebSockets()) {
         const attachment = this.attachment(socket);
@@ -176,6 +180,7 @@ export class CabinetRoom extends DurableObject<Env> {
       ...(requestedGame.id === "dot-wave" ? { dotWavePlayer: { name: identity?.playerName ?? "ゲスト", wins: 0 } } : {}),
     };
     server.serializeAttachment(attachment);
+    await this.scheduleNextAlarm();
     if (identity) {
       try {
         if (!await this.connectionSessionActive(attachment)) await this.disconnectRevokedSocket(server);
@@ -1232,7 +1237,13 @@ export class CabinetRoom extends DurableObject<Env> {
 
   private async disconnectRevokedSocket(socket: WebSocket): Promise<void> {
     const attachment = this.attachment(socket);
-    if (attachment.revoked) return;
+    if (attachment.revoked) {
+      if (socket.readyState === WebSocket.OPEN) {
+        try { await this.releaseAdmission(socket); }
+        finally { socket.close(1008, "セッションが無効になりました。"); }
+      }
+      return;
+    }
     socket.serializeAttachment({ ...attachment, revoked: true });
     if (attachment.role === "player") this.soloRun = null;
     try {
@@ -1278,7 +1289,56 @@ export class CabinetRoom extends DurableObject<Env> {
   }
 
   async alarm(): Promise<void> {
-    await this.expireIdleData();
+    await this.ready;
+    try {
+      if (!this.recoverySuspended) await this.sweepSessions();
+      await this.expireIdleData();
+    } finally {
+      await this.scheduleNextAlarm();
+    }
+  }
+
+  async activateSessionSweep(): Promise<void> {
+    await this.ready;
+    await this.scheduleNextAlarm();
+  }
+
+  private async sweepSessions(): Promise<void> {
+    const sockets = this.ctx.getWebSockets().filter(socket => socket.readyState === WebSocket.OPEN
+      && (this.attachment(socket).revoked || this.attachment(socket).playerId));
+    if (!sockets.length) return;
+    const snapshots = sockets.map(socket => ({ socket, attachment: this.attachment(socket) }));
+    const hashes = [...new Set(snapshots.map(item => item.attachment.sessionHash).filter((hash): hash is string => Boolean(hash)))];
+    const active = new Map<string, string>();
+    let checkFailed = false;
+    try {
+      if (hashes.length) {
+        const rows = await this.env.DB.prepare(
+          `SELECT token_hash, player_id FROM player_sessions WHERE token_hash IN (${hashes.map(() => "?").join(",")})
+           AND datetime(expires_at) > CURRENT_TIMESTAMP
+           AND EXISTS (SELECT 1 FROM players WHERE id = player_sessions.player_id AND deletion_requested_at IS NULL)`,
+        ).bind(...hashes).all<{ token_hash: string; player_id: string }>();
+        for (const row of rows.results) active.set(row.token_hash, row.player_id);
+      }
+    } catch { checkFailed = true; }
+    const revoked = snapshots.filter(item => item.attachment.revoked
+      ? item.socket.readyState === WebSocket.OPEN && this.attachment(item.socket).clientId === item.attachment.clientId
+      : this.liveConnection(item.attachment) && (checkFailed || !item.attachment.sessionHash || active.get(item.attachment.sessionHash) !== item.attachment.playerId));
+    const results = await Promise.allSettled(revoked.map(item => this.disconnectRevokedSocket(item.socket)));
+    const cleanupFailures = results.filter(result => result.status === "rejected").length;
+    const summary = { checked: sockets.length, closed: revoked.length, checkFailed, cleanupFailures };
+    if (checkFailed || cleanupFailures) console.warn("idle_session_sweep_incomplete", { checkFailed, cleanupFailures });
+    if (this.env.APP_ENV === "staging" && (revoked.length || checkFailed || cleanupFailures)) recordIdleRevocation(this.env.SECURITY_EVENTS, summary);
+  }
+
+  private async scheduleNextAlarm(): Promise<void> {
+    if (this.recoverySuspended) return;
+    const authenticated = !this.recoverySuspended && this.ctx.getWebSockets().some(socket => socket.readyState === WebSocket.OPEN
+      && (this.attachment(socket).revoked || this.attachment(socket).playerId));
+    const next = authenticated ? Date.now() + SESSION_SWEEP_INTERVAL_MS
+      : this.state.cabinetId ? Date.now() + 86400000 : null;
+    const current = await this.ctx.storage.getAlarm();
+    if (next !== null && (current === null || next < current)) await this.ctx.storage.setAlarm(next);
   }
 
   async activeAdmissionIds(): Promise<string[]> {
@@ -1306,6 +1366,6 @@ export class CabinetRoom extends DurableObject<Env> {
       soloRun: this.soloRun,
     } satisfies StoredCabinetRoom);
     await syncCabinetDirectory(this.env.DB, this.state);
-    await this.ctx.storage.setAlarm(Date.now() + 86400000);
+    await this.scheduleNextAlarm();
   }
 }

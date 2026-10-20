@@ -1,5 +1,7 @@
 # セキュリティ差分の検証環境反映
 
+追記（2026-10-20）：DO alarmによる失効済みアイドル接続の切断と、隔離した実RPC障害の自然発報/復旧を確認した。公開対象708テスト・検証版 `ed4192d1-b5a6-4a1f-923f-f30145672d5e`、[最新の総合訓練記録](idle-session-revocation-drill.md)を参照。下記の古い版ID・未実施記述は過去時点の履歴。
+
 追記（2026-10-20）：失効RPC警告の匿名集計・既存通知への統合・復旧手順を追加反映した。新版の証跡と未実施範囲は[失効RPCの運用手順](session-revocation-operations.md)と公開前チェックリストを参照。以下の684件・版IDは前回反映時の履歴。
 
 更新：2026-10-20。対象はdevelop / `develop.virtual-gamecenter.pages.dev` / `pulbase-staging`。本番・main・負荷試験は対象外。
