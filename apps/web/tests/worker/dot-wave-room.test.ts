@@ -223,6 +223,40 @@ it("releases a rejected challenge and prevents unpaid or reused solo credit", as
   host.send({ type: "startSolo", reservationId: id }); await host.next("error");
 });
 
+it("preserves the solo host and viewer through a paid retry on the same connections", async () => {
+  const cabinet = crypto.randomUUID();
+  const hostCookie = await player();
+  const viewerCookie = await player();
+  const host = await connect(hostCookie, cabinet);
+  const viewer = await connect(viewerCookie, cabinet, true);
+  const first = await reserve(hostCookie, cabinet, "solo");
+  await capture(hostCookie, first);
+  host.send({ type: "startSolo", reservationId: first });
+  await host.next("dotWaveSoloStarted");
+  host.send({ type: "stopSolo" });
+  await viewer.next("cabinetState", message => message.state.status === "occupied");
+  host.send({ type: "gameKeyframe", seq: 1, snapshot: { engine: { phase: "finished" } } });
+  expect((await viewer.next("viewerKeyframe")).snapshot.engine).toEqual({ phase: "finished" });
+  const second = await reserve(hostCookie, cabinet, "solo");
+  expect(second).not.toBe(first);
+  await capture(hostCookie, second);
+  host.send({ type: "startSolo", reservationId: second });
+  await host.next("dotWaveSoloStarted");
+  const resumed = await viewer.next("cabinetState", message => message.state.status === "soloPlaying");
+  expect(resumed.state).toMatchObject({ playerCount: 1, spectatorCount: 1 });
+  host.send({ type: "gameKeyframe", seq: 2, snapshot: { engine: { phase: "playing", match: { turn: 0 } } } });
+  expect((await viewer.next("viewerKeyframe")).snapshot.engine).toEqual({ phase: "playing", match: { turn: 0 } });
+  expect(host.messages.filter(message => message.type === "roleChanged")).toEqual([]);
+  for (const [cookie, expected] of [[hostCookie, 3], [viewerCookie, 5]] as const) {
+    const response = await exports.default.fetch("http://localhost/api/platform/credits", { headers: { Cookie: cookie } });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ wallet: { availableTotal: expected } });
+  }
+  host.send({ type: "leaveCabinet" });
+  await viewer.next("playerLeft");
+  expect((await viewer.next("cabinetState", message => message.state.status === "empty")).state.playerCount).toBe(0);
+});
+
 it("shares the arena, gates participant input by match, and moves the winning challenger into the seat", async () => {
   const cabinet = crypto.randomUUID(), hostCookie = await player(), guestCookie = await player();
   const host = await connect(hostCookie, cabinet), guest = await connect(guestCookie, cabinet, true), watcher = await connect(await player(), cabinet, true);
