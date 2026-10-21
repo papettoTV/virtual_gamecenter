@@ -24,6 +24,7 @@ import type {
   VersusTerminalReport,
 } from "../shared/protocol";
 import { getGameDefinition } from "../domain/game";
+import { isGameModeAvailable, isSoloOrSpectatorCommand, GAME_MODE_UNAVAILABLE, GAME_MODE_UNAVAILABLE_MESSAGE } from "../domain/play-mode-policy";
 import { getPlayerConnectionIdentity, getPlayerIdentityById } from "./platform";
 import { CABINET_CONNECTION_LIMIT, CABINET_IP_CONNECTION_LIMIT, clientAddressKey, protectionError, WS_MESSAGE_LIMIT } from "./request-protection";
 import { hashIdentifier } from "./identity-hash";
@@ -82,7 +83,7 @@ interface StoredCabinetRoom {
   soloRun?: { playerId: string; disconnectedAt: number | null } | null;
 }
 
-export class CabinetRoom extends DurableObject<Env> {
+export class CabinetRoom extends DurableObject<Env & { LOCAL_MULTIPLAYER_ENABLED?: string }> {
   private cabinetId = "";
   private state: CabinetState = createCabinetState("");
   private latestKeyframe: Extract<ServerMessage, { type: "viewerKeyframe" }> | null = null;
@@ -97,7 +98,7 @@ export class CabinetRoom extends DurableObject<Env> {
   private readonly ready: Promise<void>;
   private recoverySuspended = false;
 
-  constructor(ctx: DurableObjectState, env: Env) {
+  constructor(ctx: DurableObjectState, env: Env & { LOCAL_MULTIPLAYER_ENABLED?: string }) {
     super(ctx, env);
     this.ready = this.ctx.blockConcurrencyWhile(async () => {
       this.recoverySuspended = await this.ctx.storage.get<boolean>("recoverySuspended") ?? false;
@@ -254,6 +255,15 @@ export class CabinetRoom extends DurableObject<Env> {
       }
       if (this.attachment(socket).revoked) return;
       socket.serializeAttachment({ ...this.attachment(socket), sessionCheckedAt: Date.now() });
+    }
+
+    const requestedMode = "mode" in message ? message.mode : undefined;
+    const requestedPurpose = "purpose" in message ? message.purpose : undefined;
+    if ((!isGameModeAvailable("versus", this.env) && !isSoloOrSpectatorCommand(message.type))
+      || (requestedMode !== undefined && !isGameModeAvailable(requestedMode, this.env))
+      || (message.type === "startSolo" && requestedPurpose !== undefined && requestedPurpose !== "solo")) {
+      this.send(socket, { type: "error", code: GAME_MODE_UNAVAILABLE, message: GAME_MODE_UNAVAILABLE_MESSAGE });
+      return;
     }
 
     if (message.type === "joinCabinet") {
@@ -900,6 +910,7 @@ export class CabinetRoom extends DurableObject<Env> {
   }
 
   private async promoteNextChallenge(): Promise<void> {
+    if (!isGameModeAvailable("versus", this.env)) return;
     if (this.pendingChallenge || this.versusMatch || this.state.status !== "soloPlaying") return;
     while (this.challengeQueue.length > 0) {
       if (this.pendingChallenge || this.versusMatch || this.state.status !== "soloPlaying") return;

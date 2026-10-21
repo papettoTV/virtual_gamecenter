@@ -1,4 +1,5 @@
 import type { GameDefinition } from "../../domain/game";
+import { isGameModeAvailable } from "../../domain/play-mode-policy";
 import { DebugPanel, getGameUI } from "../../games/ui-registry";
 import { navigate } from "../../shared/navigation";
 import { LiveShareButton, ResultShareButton } from "../sharing/ShareActions";
@@ -31,7 +32,7 @@ export function GameScreen({ game }: GameScreenProps) {
         <button className="spectator-switch-button is-hidden" id="spectator-switch-player" type="button">
           プレイヤーBを見る
         </button>
-        <button id="challenge-request" type="button">1クレジットで対戦申込</button>
+        {isGameModeAvailable("versus") && <button id="challenge-request" type="button">1クレジットで対戦申込</button>}
       </div>
       <div className="versus-status is-hidden" id="versus-status" role="status">
         対戦者が待っています。ゲーム停止時に確認できます。

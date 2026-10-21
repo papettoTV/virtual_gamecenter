@@ -12,6 +12,6 @@
 
 [PC実機確認記録](pc-play-spectating-verification.md)に3ゲームの報告と残課題を記載。
 Windows/iPhone/Android、切断復帰などの確認、修正後の検証サイトでの実ゲーム確認は残る。
-負荷テストは保留・未合格。対戦申込導線の扱いは別課題とし、このIssueでは制御機能を追加しない。
+負荷テストは保留・未合格。対戦申込導線の制御は後続のIssue #26で[UI/API共通の提供モード制限](free-beta-play-modes.md)として対応。検証反映の結果はそのIssue/PRの証跡で確認する。
 BT-01/02/03は対応中とし、[公開前チェックリスト](production-launch-checklist.md)の公開判定を維持する。
 検証への反映SHAとActions証跡は未取得であり、今回push・デプロイは行わない。

@@ -80,4 +80,4 @@ export type ServerMessage =
   | { type: "versusEnded"; matchId: string; nextRole: CabinetRole; reason: string }
   | { type: "roleChanged"; role: CabinetRole }
   | { type: "playerLeft" }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string; code?: string };

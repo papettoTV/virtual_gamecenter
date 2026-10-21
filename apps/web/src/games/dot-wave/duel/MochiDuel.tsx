@@ -1,6 +1,7 @@
 import { notifications } from "../../../features/notifications/notifications";
 import { navigate } from "../../../shared/navigation";
 import type { DotWaveRoster } from "../../../domain/cabinet";
+import { isGameModeAvailable } from "../../../domain/play-mode-policy";
 import { useEffect, useReducer, useRef, useState, type RefObject, type ReactNode } from "react";
 import { turnCue, cueName, inputHint, countdownCue } from "./turnCue";
 import { DotScene, PixelWord } from "./DotScene";
@@ -370,10 +371,10 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
         {e.mode === "cpu" && <div className="dot-stage-intro"><strong>{stageInfo.label} · {stageInfo.name}</strong><span>{stageInfo.title}</span></div>}
         <div className="dot-cue-guide"><span><BattleIcon kind="tap"/><span>チカチカ → もうすぐ</span></span><span><BattleIcon kind="note"/><span>音符でこうげき</span></span><span><BattleIcon kind="shield"/><span>シールドでまもる</span></span></div>
         <ol><li><strong>攻める4拍：</strong>毎回ランダムに決まるお手本に合わせてタップ。正確なほど強い音符パルスに。</li><li><strong>守る4拍：</strong>相手のリズムをまねして受け止める。外した分だけエネルギーが減る！</li><li><strong>攻守交代：</strong>止まらず次の4拍で準備、続けて攻撃！完全防御で次の攻撃が強くなる。</li></ol>
-        {!network && <label>遊び方 <select value={e.mode} onChange={(event) => { engine.current = fresh(event.target.value as Engine["mode"], e.match.ending); render(); }}><option value="cpu">CPUと対戦</option><option value="local">同じ端末で2人対戦</option></select></label>}
+        {!network && isGameModeAvailable("versus") && <label>遊び方 <select value={e.mode} onChange={(event) => { engine.current = fresh(event.target.value as Engine["mode"], e.match.ending); render(); }}><option value="cpu">CPUと対戦</option><option value="local">同じ端末で2人対戦</option></select></label>}
         {(e.mode !== "cpu" || stage > 1) && <p>長い帯は、おしつづけて終点の輪で離そう！</p>}
 
-        <small>{network ? "観戦・通信対戦に対応" : "同じ端末で対戦"} · 自動でリズムが変わる連続バトル</small>
+        <small>ソロプレイ・観戦に対応 · 自動でリズムが変わる連続バトル</small>
       </div>}
       </div>}
       <div aria-hidden={e.phase !== "playing" ? true : undefined} inert={e.phase !== "playing"} key={`${e.match.turn}-${cue.phase}`} className={`duel-rhythm is-neon ${e.phase !== "playing" ? "is-inactive" : ""} turn-${cueSide} ${cue.phase === "ready" ? "is-ready" : "is-now"} ${spectator ? "is-spectator" : opponentCue ? "is-opponent" : ""}`} aria-label={`${cue.current === null ? "次" : "今"}は${cueName(cueSide, e.mode, viewSide)}の${cue.role}。技：${move.name}。${move.rhythm}`}>
