@@ -1,7 +1,7 @@
 import { env, exports } from "cloudflare:workers";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { getActiveGames } from "../../src/domain/game";
-import { refundUnusedCapture, validatePlayReservation } from "../../src/worker/credit-reservations";
+import { recoverExpiredUnusedCaptures, refundUnusedCapture, validatePlayReservation } from "../../src/worker/credit-reservations";
 import { hashIdentifier } from "../../src/worker/identity-hash";
 import { migrateTestDatabase } from "../migrate-test-database";
 
@@ -22,6 +22,56 @@ async function fixture(gameId: string, purpose = "solo") {
 }
 
 describe.each(getActiveGames())("$id play reservations", game => {
+  it.each(["credits", "bootstrap", "reserve"])("recovers an expired unused capture before %s and never refunds twice", async action => {
+    const test = await fixture(game.id);
+    await test.api(`credit-reservations/${test.reservationId}/capture`);
+    await env.DB.prepare("UPDATE credit_reservations SET expires_at = datetime('now', '-1 second') WHERE id = ?").bind(test.reservationId).run();
+    const response = action === "reserve"
+      ? await test.api("credit-reservations", { cabinetId: test.cabinetId, gameId: game.id })
+      : await exports.default.fetch(`http://localhost/api/platform/${action}`, { headers: { Cookie: test.cookie } });
+    expect(response.status).toBe(200);
+    const result = await response.json<{ reservationId?: string; wallet: { freeBalance: number; availableTotal: number } }>();
+    expect(result.wallet.freeBalance).toBe(5);
+    expect(result.wallet.availableTotal).toBe(action === "reserve" ? 4 : 5);
+    await Promise.all([recoverExpiredUnusedCaptures(env.DB, test.playerId), test.api(`credit-reservations/${test.reservationId}/release`)]);
+    expect(await env.DB.prepare("SELECT COUNT(*) AS count FROM credit_ledger_entries WHERE reference_id = ? AND entry_type = 'refunded'").bind(test.reservationId).first("count")).toBe(1);
+    expect(await env.DB.prepare("SELECT status FROM play_sessions WHERE id = (SELECT play_session_id FROM credit_reservations WHERE id = ?)").bind(test.reservationId).first("status")).toBe("cancelled");
+    expect(await test.validate("captured", "recovered-replay")).toBe(false);
+    if (result.reservationId) await test.api(`credit-reservations/${result.reservationId}/release`);
+  });
+
+  it("does not recover another owner, an unexpired capture, or a used capture", async () => {
+    const test = await fixture(game.id);
+    await test.api(`credit-reservations/${test.reservationId}/capture`);
+    await recoverExpiredUnusedCaptures(env.DB, test.playerId);
+    expect(await env.DB.prepare("SELECT status FROM credit_reservations WHERE id = ?").bind(test.reservationId).first("status")).toBe("captured");
+    expect(await test.validate("captured", "started")).toBe(true);
+    await env.DB.prepare("UPDATE credit_reservations SET expires_at = datetime('now', '-1 second') WHERE id = ?").bind(test.reservationId).run();
+    await recoverExpiredUnusedCaptures(env.DB, test.playerId);
+    const unused = await fixture(game.id);
+    await unused.api(`credit-reservations/${unused.reservationId}/capture`);
+    await env.DB.prepare("UPDATE credit_reservations SET expires_at = datetime('now', '-1 second') WHERE id = ?").bind(unused.reservationId).run();
+    await recoverExpiredUnusedCaptures(env.DB, test.playerId);
+    for (const reservationId of [test.reservationId, unused.reservationId]) {
+      expect(await env.DB.prepare("SELECT status FROM credit_reservations WHERE id = ?").bind(reservationId).first("status")).toBe("captured");
+    }
+    expect(await env.DB.prepare("SELECT free_balance FROM credit_wallets WHERE player_id = ?").bind(test.playerId).first("free_balance")).toBe(4);
+  });
+
+  it("does not recover unsupported modes or a capture without a matching consumption entry", async () => {
+    const test = await fixture(game.id);
+    await test.api(`credit-reservations/${test.reservationId}/capture`);
+    await env.DB.prepare("UPDATE credit_reservations SET expires_at = datetime('now', '-1 second') WHERE id = ?").bind(test.reservationId).run();
+    await env.DB.prepare("UPDATE play_sessions SET mode = 'versus' WHERE id = (SELECT play_session_id FROM credit_reservations WHERE id = ?)").bind(test.reservationId).run();
+    await recoverExpiredUnusedCaptures(env.DB, test.playerId);
+    expect(await env.DB.prepare("SELECT status FROM credit_reservations WHERE id = ?").bind(test.reservationId).first("status")).toBe("captured");
+    await env.DB.prepare("UPDATE play_sessions SET mode = 'solo' WHERE id = (SELECT play_session_id FROM credit_reservations WHERE id = ?)").bind(test.reservationId).run();
+    await env.DB.prepare("UPDATE credit_ledger_entries SET reference_id = 'invalid' WHERE id = ?").bind(`consume:${test.reservationId}`).run();
+    await recoverExpiredUnusedCaptures(env.DB, test.playerId);
+    expect(await env.DB.prepare("SELECT status FROM credit_reservations WHERE id = ?").bind(test.reservationId).first("status")).toBe("captured");
+    expect(await env.DB.prepare("SELECT COUNT(*) AS count FROM credit_ledger_entries WHERE reference_id = ? AND entry_type = 'refunded'").bind(test.reservationId).first("count")).toBe(0);
+  });
+
   it("captures concurrent duplicate requests once and refunds concurrent releases once", async () => {
     const test = await fixture(game.id);
     const captures = await Promise.all([test.api(`credit-reservations/${test.reservationId}/capture`), test.api(`credit-reservations/${test.reservationId}/capture`)]);
@@ -163,4 +213,24 @@ describe.each(getActiveGames())("$id play reservations", game => {
     expect(await test.validate("captured", "ready")).toBe(true);
     expect(await test.validate("captured", "rematch-replay")).toBe(false);
   });
+});
+
+it("bounds recovery to twenty reservations per reconciliation and drains the rest on the next call", async () => {
+  const test = await fixture(getActiveGames()[0]!.id);
+  await test.api(`credit-reservations/${test.reservationId}/release`);
+  await env.DB.prepare("UPDATE credit_wallets SET free_balance = 30 WHERE player_id = ?").bind(test.playerId).run();
+  for (let index = 0; index < 21; index++) {
+    const reservationId = crypto.randomUUID();
+    const playSessionId = crypto.randomUUID();
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO play_sessions (id, cabinet_id, game_id, mode, status, host_player_id) VALUES (?, ?, ?, 'solo', 'playing', ?)").bind(playSessionId, test.cabinetId, getActiveGames()[0]!.id, test.playerId),
+      env.DB.prepare("INSERT INTO credit_reservations (id, player_id, play_session_id, amount, balance_type, status, expires_at) VALUES (?, ?, ?, 1, 'free', 'captured', datetime('now', '-1 second'))").bind(reservationId, test.playerId, playSessionId),
+      env.DB.prepare("INSERT INTO credit_ledger_entries (id, player_id, balance_type, entry_type, amount, play_session_id, reference_id) VALUES (?, ?, 'free', 'consumed', -1, ?, ?)").bind(`consume:${reservationId}`, test.playerId, playSessionId, reservationId),
+    ]);
+  }
+  await recoverExpiredUnusedCaptures(env.DB, test.playerId);
+  expect(await env.DB.prepare("SELECT COUNT(*) AS count FROM credit_reservations WHERE player_id = ? AND status = 'captured'").bind(test.playerId).first("count")).toBe(1);
+  expect(await env.DB.prepare("SELECT free_balance FROM credit_wallets WHERE player_id = ?").bind(test.playerId).first("free_balance")).toBe(29);
+  await recoverExpiredUnusedCaptures(env.DB, test.playerId);
+  expect(await env.DB.prepare("SELECT free_balance FROM credit_wallets WHERE player_id = ?").bind(test.playerId).first("free_balance")).toBe(30);
 });

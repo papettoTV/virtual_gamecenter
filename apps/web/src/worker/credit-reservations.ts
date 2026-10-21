@@ -68,3 +68,16 @@ export async function refundUnusedCapture(database: D1Database, reservationId: s
     database.prepare(`UPDATE play_sessions SET status = 'cancelled', ended_at = CURRENT_TIMESTAMP WHERE id = (SELECT play_session_id FROM credit_reservations WHERE id = ? AND status = 'released')`).bind(reservationId),
   ]);
 }
+
+export async function recoverExpiredUnusedCaptures(database: D1Database, playerId: string): Promise<void> {
+  const reservations = await database.prepare(`SELECT r.id FROM credit_reservations r
+    JOIN play_sessions p ON p.id = r.play_session_id
+    WHERE r.player_id = ? AND p.host_player_id = r.player_id AND p.mode = 'solo'
+      AND r.status = 'captured' AND datetime(r.expires_at) <= CURRENT_TIMESTAMP
+      AND NOT EXISTS (SELECT 1 FROM credit_reservation_uses u WHERE u.reservation_id = r.id)
+      AND EXISTS (SELECT 1 FROM credit_ledger_entries e WHERE e.id = 'consume:' || r.id
+        AND e.player_id = r.player_id AND e.amount = -r.amount AND e.entry_type = 'consumed'
+        AND e.balance_type = r.balance_type AND e.play_session_id = p.id AND e.reference_id = r.id)
+    ORDER BY r.expires_at, r.id LIMIT 20`).bind(playerId).all<{ id: string }>();
+  for (const reservation of reservations.results) await refundUnusedCapture(database, reservation.id);
+}
