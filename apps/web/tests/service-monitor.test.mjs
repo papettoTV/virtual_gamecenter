@@ -10,6 +10,119 @@ import { verifyServiceHealth } from "../scripts/verify-service-health.mjs";
 import { operationExpression, operationReportQuery, summarizeOperations } from "../scripts/operation-report.mjs";
 import { operationVerificationTarget } from "../scripts/verify-operation-metrics-staging.mjs";
 import { startSloVerificationTarget } from "../scripts/verify-start-slo-staging.mjs";
+import { recordStartAlert, startReceiptExpression } from "../src/monitor/start-slo-alert.mjs";
+import { verifyMissingStarts } from "../scripts/verify-start-receipt-alert.mjs";
+import { receiptDrillCommand, receiptDrillConfig, cronPauseConfig } from "../scripts/start-slo-drill.mjs";
+import { RECEIPT_DRILL_MARKER, RECEIPT_DRILL_DURATION, RECEIPT_DRILL_DATABASE, startReceiptTarget } from "../src/monitor/start-slo-drill.mjs";
+import { CRON_PAUSE_MARKER, CRON_PAUSE_DURATION, monitorPaused } from "../src/monitor/cron-pause.mjs";
+
+test("bounded Cron pause expires even with no health or receipt writes and rejects unsafe settings", async () => {
+  const now = Date.now();
+  const env = { MONITOR_ENVIRONMENT: "staging", MONITOR_PAUSE_KIND: CRON_PAUSE_MARKER,
+    MONITOR_PAUSE_STARTED_MS: String(now), MONITOR_PAUSE_UNTIL_MS: String(now + CRON_PAUSE_DURATION) };
+  assert.equal(monitorPaused({}, now), false);
+  assert.equal(monitorPaused(env, now), true);
+  assert.equal(monitorPaused(env, now + CRON_PAUSE_DURATION - 1), true);
+  assert.equal(monitorPaused(env, now + CRON_PAUSE_DURATION), false);
+  assert.equal(monitorPaused(env, now + CRON_PAUSE_DURATION + 1), false);
+  for (const changed of [{ ...env, MONITOR_ENVIRONMENT: "production" }, { ...env, MONITOR_PAUSE_KIND: "wrong" },
+    { ...env, MONITOR_PAUSE_UNTIL_MS: "Infinity" }, { ...env, MONITOR_PAUSE_UNTIL_MS: String(now + CRON_PAUSE_DURATION + 1) },
+    { ...env, MONITOR_PAUSE_STARTED_MS: String(now + 1) }, { MONITOR_PAUSE_KIND: CRON_PAUSE_MARKER }]) assert.throws(() => monitorPaused(changed, now));
+  const originalLog = console.log, logs = [];
+  try {
+    console.log = value => logs.push(value);
+    await worker.scheduled({ scheduledTime: now }, env);
+    assert.deepEqual(logs.map(value => JSON.parse(value).event), ["monitor_cron_paused"]);
+    await assert.rejects(worker.scheduled({ scheduledTime: now }, { ...env,
+      MONITOR_PAUSE_STARTED_MS: String(now - CRON_PAUSE_DURATION), MONITOR_PAUSE_UNTIL_MS: String(now) }), /monitor_auth_missing/);
+    await assert.rejects(worker.scheduled({ scheduledTime: now }, { ...env, MONITOR_PAUSE_UNTIL_MS: "0" }), /invalid_monitor_pause/);
+  } finally { console.log = originalLog; }
+});
+
+test("code10 drill only accepts fixed staging commands and never mutates the base configuration", async () => {
+  for (const command of ["fault", "pause", "restore", "status"]) assert.equal(receiptDrillCommand(["--environment", "staging", command]), command);
+  for (const args of [[], ["--environment", "production", "fault"], ["--environment", "staging", "fault", "extra"], ["--environment", "staging", "scheduled"]]) assert.throws(() => receiptDrillCommand(args));
+  const base = JSON.parse(await readFile(new URL("../wrangler.service-monitor.jsonc", import.meta.url), "utf8")), original = JSON.stringify(base);
+  const now = 1800000000000, fault = receiptDrillConfig(base, now);
+  assert.equal(JSON.stringify(base), original);
+  assert.equal(fault.vars.START_SLO_DRILL_UNTIL_MS, String(now + RECEIPT_DRILL_DURATION));
+  assert.equal(fault.d1_databases[1].database_id, RECEIPT_DRILL_DATABASE);
+  assert.deepEqual(fault.d1_databases[0], base.d1_databases[0]);
+  const paused = cronPauseConfig(base, now);
+  assert.deepEqual(paused.d1_databases, base.d1_databases);
+  assert.deepEqual(paused.triggers, base.triggers);
+  assert.equal(paused.vars.MONITOR_PAUSE_UNTIL_MS, String(now + CRON_PAUSE_DURATION));
+  assert.ok(!Object.keys(paused.vars).some(key => key.startsWith("START_SLO_DRILL_")));
+  assert.throws(() => cronPauseConfig({ ...base, vars: { ...base.vars, MONITOR_PAUSE_KIND: CRON_PAUSE_MARKER } }, now));
+  for (const field of ["services", "triggers", "kv_namespaces", "analytics_engine_datasets", "secrets"]) assert.deepEqual(fault[field], base[field]);
+  for (const changed of [{ ...base, name: "pulbase-production" }, { ...base, workers_dev: true }, { ...base, vars: { ...base.vars, MONITOR_ENVIRONMENT: "production" } },
+    { ...base, d1_databases: [] }, { ...base, routes: ["pulbase.com/*"] }, { ...base, main: "src/worker/index.ts" }, { ...base, analytics_engine_datasets: [] },
+    { ...base, services: [] }, { ...base, kv_namespaces: [] }]) assert.throws(() => receiptDrillConfig(changed, now));
+  const script = await readFile(new URL("../scripts/start-slo-drill.mjs", import.meta.url), "utf8");
+  assert.ok(script.indexOf('command === "restore"') < script.indexOf("process.loadEnvFile"));
+});
+
+test("code10 drill cannot run forever, in production, or with partial/invalid configuration", () => {
+  const now = 1800000000000, normal = {}, isolated = {};
+  const env = { MONITOR_ENVIRONMENT: "staging", START_SLO_DB: normal, START_SLO_DRILL_DB: isolated, START_SLO_DRILL_KIND: RECEIPT_DRILL_MARKER,
+    START_SLO_DRILL_STARTED_MS: String(now), START_SLO_DRILL_UNTIL_MS: String(now + RECEIPT_DRILL_DURATION) };
+  assert.equal(startReceiptTarget({ START_SLO_DB: normal }, now).database, normal);
+  assert.equal(startReceiptTarget(env, now).database, isolated);
+  assert.equal(startReceiptTarget(env, now + RECEIPT_DRILL_DURATION - 1).fault, true);
+  assert.deepEqual(startReceiptTarget({ ...env, START_SLO_DRILL_DB: undefined }, now + RECEIPT_DRILL_DURATION), { database: normal, configured: true, fault: false });
+  for (const changed of [{ ...env, MONITOR_ENVIRONMENT: "production" }, { ...env, START_SLO_DRILL_KIND: "unknown" }, { ...env, START_SLO_DRILL_UNTIL_MS: "Infinity" },
+    { ...env, START_SLO_DRILL_UNTIL_MS: String(now + RECEIPT_DRILL_DURATION + 1) }, { ...env, START_SLO_DRILL_STARTED_MS: String(now + 1) }, { ...env, START_SLO_DRILL_DB: undefined },
+    { START_SLO_DRILL_KIND: RECEIPT_DRILL_MARKER }]) assert.throws(() => startReceiptTarget(changed, now));
+});
+
+test("code10 drill uses the real collection failure path and returns to normal without changing counters or thresholds", async () => {
+  const now = 1800000000000, points = [], originalWarn = console.warn;
+  let normalReads = 0, isolatedReads = 0;
+  const normal = { prepare: () => ({ bind() { return this; } }), batch: async () => { normalReads++; return [
+    { results: [{ requested: 1, rejected: 0, missing: 0 }] }, { results: [{ expired: 0 }] }, { results: [{ started_ms: now - 86400000 }] },
+  ]; } };
+  const isolated = { prepare: normal.prepare, batch: async () => { isolatedReads++; throw Error("private D1 query details"); } };
+  const env = { MONITOR_ENVIRONMENT: "staging", START_SLO_DB: normal, START_SLO_DRILL_DB: isolated, HEALTH_EVENTS: { writeDataPoint: point => points.push(point) },
+    START_SLO_DRILL_KIND: RECEIPT_DRILL_MARKER, START_SLO_DRILL_STARTED_MS: String(now), START_SLO_DRILL_UNTIL_MS: String(now + RECEIPT_DRILL_DURATION) };
+  try {
+    console.warn = () => {};
+    const failed = await recordStartAlert(env, now);
+    assert.equal(failed.doubles[0], 10); assert.deepEqual(failed.blobs.slice(3), [RECEIPT_DRILL_MARKER, "fault"]);
+    assert.equal(normalReads, 0); assert.equal(isolatedReads, 1);
+    const recovered = await recordStartAlert(env, now + RECEIPT_DRILL_DURATION);
+    assert.equal(recovered.doubles[0], 0); assert.equal(recovered.doubles[1], 1); assert.equal(recovered.doubles[2], 0);
+    assert.deepEqual(recovered.blobs.slice(3), [RECEIPT_DRILL_MARKER, "expired"]); assert.equal(normalReads, 1); assert.equal(isolatedReads, 1);
+    assert.equal(JSON.stringify(points).includes("private D1 query details"), false);
+  } finally { console.warn = originalWarn; }
+});
+
+test("missing receipt drill rejects production and destination overrides before any side effects", async () => {
+  for (const args of [[], ["--environment", "production"], ["--environment", "staging", "normal", "extra"], ["--environment", "staging", "https://pulbase.com"]]) {
+    await assert.rejects(verifyMissingStarts(args));
+  }
+});
+
+test("receipt snapshots contain only aggregate numbers and never turn query errors into healthy data", async () => {
+  const now = 1800000000000, points = [], warnings = [], originalWarn = console.warn;
+  const database = { prepare: () => ({ bind() { return this; } }), batch: async () => [
+    { results: [{ requested: 15, rejected: 0, missing: 1 }] }, { results: [{ expired: 2 }] }, { results: [{ started_ms: now - 86400000 }] },
+  ] };
+  const env = { START_SLO_DB: database, HEALTH_EVENTS: { writeDataPoint: point => points.push(point) } };
+  try {
+    console.warn = value => warnings.push(value);
+    assert.equal((await recordStartAlert(env, now)).doubles[0], 9);
+    database.batch = async () => { throw Error("private-token-or-sql"); };
+    assert.equal((await recordStartAlert(env, now + 1)).doubles[0], 10);
+    database.batch = async () => [
+      { results: [{ requested: 0, rejected: 0, missing: 0 }] }, { results: [{ expired: 0 }] }, { results: [{ started_ms: now }] },
+    ];
+    const idle = await recordStartAlert(env, now + 2);
+    assert.equal(idle.doubles[0], 0); assert.equal(idle.blobs[1], "warmup");
+    assert.equal(JSON.stringify({ points, warnings }).includes("private-token-or-sql"), false);
+    assert.deepEqual(warnings, ["start_receipt_collection_failed"]);
+    assert.throws(() => startReceiptExpression("cookie"));
+  } finally { console.warn = originalWarn; }
+});
 
 test("start SLO verification is staging-only and cannot override a destination", () => {
   assert.equal(startSloVerificationTarget(["--environment", "staging"]), "https://develop.virtual-gamecenter.pages.dev");
@@ -20,9 +133,9 @@ test("start SLO verification is staging-only and cannot override a destination",
 
 test("synthetic SQL is bounded, read-only and cannot supply identifiers or SQL fragments", async () => {
   const config = JSON.parse(await readFile(new URL("../config/service-alerts.json", import.meta.url), "utf8"));
-  assert.equal(alertCases.length, 21);
+  assert.equal(alertCases.length, 31);
   for (const item of alertCases) {
-    const query = syntheticAlertQuery(config.alerts[0].query, item.rows, item.operations);
+    const query = syntheticAlertQuery(config.alerts[0].query, item.rows, item.operations, item.receipt);
     assert.ok(query.startsWith("SELECT CASE "));
     assert.ok(query.includes("LIMIT 1"));
     assert.ok(query.length < 4000);
@@ -41,6 +154,7 @@ test("fits one remaining custom alert slot without suppressing recovery for six 
   assert.equal(alert.executionInterval, "5m");
   assert.equal(alert.repeatInterval, "15m");
   assert.ok(alert.query.includes("sum(if(blob3 = 'v1', 1, 0)) = 0 THEN 3"));
+  assert.ok(alert.query.includes("toUnixTimestamp(NOW()) - argMax(double4, if(blob3 = 'start-receipt-v1', double4, 0.0)) > 600"));
   assert.ok(alert.query.includes("argMax(double1, if(blob3 = 'v1', double4, 0.0)) >= 1 THEN 1"));
   assert.ok(alert.query.includes('double1 * "sampleInterval", 0.0)) >= 1 THEN 4'));
   assert.ok(alert.query.includes("blob3 = 'revocation-v1' OR blob3 = 'idle-revocation-v1'"));
@@ -145,6 +259,8 @@ test("health drill only accepts staging and fixed commands, with no target overr
   assert.equal(config.vars.MONITOR_ENVIRONMENT, "staging");
   assert.equal(config.workers_dev, false);
   assert.equal(config.preview_urls, false);
+  assert.equal(config.vars.START_SLO_ENABLED, "true");
+  assert.deepEqual(config.d1_databases, [{ binding: "START_SLO_DB", database_name: "pulbase-staging", database_id: "c49b03c7-e616-4acb-96a8-2837ff62034f" }]);
   assert.deepEqual(config.services, [{ binding: "HEALTH_DRILL_PROBE", service: "pulbase-service-monitor", entrypoint: "HealthDrillProbe" }]);
   assert.deepEqual(config.triggers.crons, ["*/5 * * * *"]);
 });
