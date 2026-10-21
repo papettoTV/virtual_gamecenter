@@ -1,3 +1,4 @@
+import { drawGameOverOverlay } from "./game-over-overlay";
 import { createCyberCanyonBackground } from "./cyber-canyon-background";
 import { drawPlayerShip } from "./player-ship";
 import { createCanvasBossRenderer } from "./boss-geometry";
@@ -537,27 +538,7 @@ export function createCanvasRenderer(options) {
   }
 
   function drawGameOver() {
-    const showingGameOverEffect = !frame.clearGame && !frame.lastRankingResult;
-    const winner = showingGameOverEffect ? "GAME OVER" : getWinner();
-    context.fillStyle = "rgba(0,0,0,0.68)";
-    context.fillRect(0, 0, WIDTH, HEIGHT);
-    context.fillStyle = "#f4f7ff";
-    context.textAlign = "center";
-    context.font = "800 58px system-ui";
-    context.fillText(winner, WIDTH / 2, HEIGHT / 2 + (frame.clearGame ? -118 : -28));
-    if (showingGameOverEffect) {
-      context.font = "700 22px system-ui";
-      context.fillStyle = "#69f7ff";
-      context.fillText(`SCORE ${frame.players[0].score}`, WIDTH / 2, HEIGHT / 2 + 18);
-    }
-    if (frame.cabinetRole === "spectator") {
-      context.font = "600 20px system-ui";
-      context.fillText("プレイヤーが続けるか辞めるか選ぶのを待っています", WIDTH / 2, HEIGHT / 2 + (frame.clearGame ? -72 : 18));
-    } else if (!frame.clearGame && !showingGameOverEffect) {
-      context.font = "500 20px system-ui";
-      context.fillText("Rキーで1クレジットリトライ", WIDTH / 2, HEIGHT / 2 + 18);
-    }
-    context.textAlign = "left";
+    drawGameOverOverlay(context, frame, WIDTH, HEIGHT);
   }
 
   function drawHitDebug() {
@@ -611,12 +592,6 @@ export function createCanvasRenderer(options) {
       context.fillText(instruction, instructionX, HEIGHT / 2 - 18 + index * 31);
     });
     context.textAlign = "left";
-  }
-
-  function getWinner() {
-    if (frame.clearGame) return `ALL CLEAR  TIME ${Math.floor(frame.elapsedRound)}s`;
-    if (frame.players[0].lives <= 0) return `SCORE ${frame.players[0].score}`;
-    return `SCORE ${frame.players[0].score}`;
   }
 
   function roundRect(x, y, width, height, radius) {
