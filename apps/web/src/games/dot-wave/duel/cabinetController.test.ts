@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { createDotWaveCabinetController, type CabinetTransportFactory, type DotWaveCabinetController } from "./cabinetController";
 import { freshDuel } from "./campaign";
+import { createCabinetState } from "../../../domain/cabinet";
 import type { ClientMessage, GameSnapshot } from "../../../shared/protocol";
 
 const services = vi.hoisted(() => ({
@@ -70,6 +71,35 @@ it("arbitrates solo credit and resolves acknowledgement without a leftover timer
   controller.network.soloEnded();
   expect(controller.network.startCost).toBe(1);
   expect(client.send).toHaveBeenCalledWith({ type: "stopSolo" });
+});
+
+it("keeps the player's seat and transport through a paid solo retry", async () => {
+  await flush();
+  handlers.onConnectionChange(true);
+  handlers.onMessage({ type: "roleChanged", role: "player" });
+  const firstStart = controller.network.beforeSolo();
+  await flush();
+  handlers.onMessage({ type: "dotWaveSoloStarted" });
+  expect(await firstStart).toBe(true);
+  controller.network.soloEnded();
+  const engine = freshDuel("cpu");
+  engine.phase = "finished";
+  engine.match.winner = 1;
+  controller.network.publish(engine, 0);
+  handlers.onMessage({ type: "cabinetState", state: { ...createCabinetState("test", "dot-wave"), status: "occupied", playerCount: 1, spectatorCount: 1 } });
+  services.reserve.mockResolvedValueOnce({ reservationId: "credit-2" });
+  const secondStart = controller.network.beforeSolo();
+  await flush();
+  expect(controller.network).toMatchObject({ role: "player", side: 0, connected: true });
+  expect(client.send).toHaveBeenCalledWith({ type: "startSolo", reservationId: "credit-2" });
+  handlers.onMessage({ type: "dotWaveSoloStarted" });
+  expect(await secondStart).toBe(true);
+  expect(services.reserve).toHaveBeenCalledTimes(2);
+  expect(services.capture).toHaveBeenCalledTimes(2);
+  expect(client.join).toHaveBeenCalledTimes(1);
+  expect(client.leave).not.toHaveBeenCalled();
+  expect(controller.network).toMatchObject({ role: "player", side: 0, startCost: 0 });
+  expect(vi.getTimerCount()).toBe(1);
 });
 
 it("stops transport, audio, profile listener and a pending solo timeout on disposal", async () => {
