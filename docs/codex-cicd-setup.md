@@ -4,7 +4,7 @@
 
 ## 現在の通常運用
 
-- `実装:自動` ラベル付きIssueだけを対象に、Codex実装 → GitHub Appによるdevelop向けPR → 必須CIと候補テスト → 独立Codexレビュー → staging公開とSHA/HTTP/ブラウザ確認 → develop自動マージ → Issue完了 → 実マージSHAのstaging再公開まで、人のEnvironment承認なしで進む。
+- `実装:自動` ラベル付きIssueだけを対象に、Codex実装 → GitHub Appによるdevelop向けPR → 必須CIと候補テスト → 独立Codexレビュー → staging公開とSHA/HTTP/ブラウザ確認 → develop自動マージ → Issue完了 → 実マージSHAのCI成功後のstaging再公開まで、人のEnvironment承認なしで進む。
 - 自動実装を希望する場合だけ、書込権限を持つ運営者が `実装:自動` を付ける。ラベルなしは手元実装。`実装:手元` は任意。旧 `codex:run` は起動条件にしない。Issueには期待する変更と受け入れ条件を明記する。初期運用は1件ずつ進め、並行変更で古いbaseになったPRは確認して最新developで再実行する。
 - `codex` / `automation` / `staging` はdevelopと `refs/pull/*/merge` だけを許可。main・タグからは利用不可。required reviewersとwait timerはなく、管理者bypassも禁止。
 - developはPR必須、GitHub Actionsの `verify` / `Automation control checks` 必須、最新baseへの追従、管理者も保護対象。独立レビュー不合格・テスト失敗・保護パス変更・公開SHA不一致等では自動マージを停止する。
@@ -20,8 +20,8 @@
 | --- | --- |
 | `.github/workflows/codex-issue.yml` | `実装:自動` 付きIssue起票、または運営者による同ラベル付与 → Codex実装 → テキスト差分検査 → develop向けPR作成 |
 | `.github/workflows/codex-pr.yml` | 自動PRの対象/差分確認 → 合成マージコミットのテスト → 独立したCodexレビュー → staging公開 → HTTP/ブラウザ確認 → developへのマージ・Issue完了 |
-| `.github/workflows/develop-staging.yml` | develop push後のテスト・検証公開・ブラウザ確認。マージ後の実コミットSHAを検証URLへ反映 |
-| `.github/workflows/web-checks.yml` | 従来のテスト/ビルドに自動化制御部分のテストを追加 |
+| `.github/workflows/develop-staging.yml` | developの同SHAのWeb checks成功後に、別ジョブで成果物の検証公開・ブラウザ確認。マージ後の実コミットSHAを検証URLへ反映 |
+| `.github/workflows/web-checks.yml` | テスト・SHA付きビルド・自動化制御チェックと検証済み成果物の保存 |
 | `.github/workflow-templates/production-release.yml.disabled` | **実行されない本番用テンプレート**。人の承認 → mainへfast-forward → 本番公開 → 回帰確認 → 手動投稿用の告知文提示 |
 | `ci/` | 入力・差分・レビュー・公開先・リビジョンの検査、ブラウザテスト、手動投稿用リリース文面の保存 |
 
@@ -60,6 +60,12 @@ node ci/check-manual-issue.mjs <Issue番号>
 自動から手元への引継ぎを指示されたら、`実装:自動` を外して `実装:手元` を付け、該当IssueのActions実行を停止して完了を確認する。既存PR/ブランチを確認し、引継ぎ対象を決めてから手元で作業する。ラベル変更だけで既存プロセスが即時停止するとは扱わない。新しい実行名には `Issue #番号 の自動実装` を表示する。
 
 本番への反映・公開は従来どおり別の明示指示と人の承認が必要。今回の区分変更でマージ後の公開先や本番フラグを変更しない。
+
+## テスト・ビルドと公開の分離（2026-10-21）
+
+`Web checks` がSHA付き成果物を作成し、developは同SHAのCI成功イベントで検証公開へ進む。自動PRも同じCIが作成した合成マージSHAの成果物を使う。公開ジョブは別のクリーンなランナーとし、受け取ったコードのビルド・npm script・Wrangler設定は実行しない。公開後の回帰テストもCloudflareトークンを持たない別ジョブに分ける。
+
+CI run・attempt・SHA/tree・成果物ID・ファイルハッシュと公開直前のdevelopを確認する。手動の `dry_run=true` で公開を伴わない確認も可能。詳しい実行順序と制約は[公開ジョブの分離](cicd-deployment-isolation.md)を参照。本番テンプレートへの適用と部分公開からの復旧訓練は別途行う。
 
 ## 1. 今回の準備段階で行うこと
 
@@ -115,7 +121,7 @@ Settings → Environmentsで以下を作成する。
 | `production` | 本番専用 `CLOUDFLARE_API_TOKEN`, `PULBASE_CHECK_USERNAME`, `PULBASE_CHECK_PASSWORD`, `PULBASE_RELEASE_APP_PRIVATE_KEY` | **将来のみ**。Required reviewersに人を指定。管理者bypassを許可しない |
 | `announcement` | 新規登録不要 | 旧自動投稿用。現在の文面提示ジョブでは利用しない |
 
-stagingにはdevelop pushと自動PRの合成マージrefがアクセスする。Environmentのブランチ制限でPRを許可する場合は `refs/pull/*/merge` を対象に含める。productionはmainのみ。旧announcement環境は利用しない。文面提示ジョブはSecretを参照しない。
+stagingにはdevelopのCI成功後の公開と自動PRの検証公開がアクセスする。Environmentのブランチ制限でPRを許可する場合は `refs/pull/*/merge` を対象に含める。productionはmainのみ。旧announcement環境は利用しない。文面提示ジョブはSecretを参照しない。
 
 一人でリリース開始/承認する場合、productionのPrevent self-reviewを有効にすると自分の開始した実行を承認できない。運営体制に合わせて設定する。いずれの場合も自動処理が人の代わりに承認しない。
 
@@ -168,7 +174,7 @@ DB移行が必要な変更は停止して人が扱う。既存の公開チェッ
 2. `PULBASE_CODEX_ENABLED=true` のみ有効化し、小さなUI変更と明確な受け入れ条件のIssueを運営者が起票し、`実装:自動` を付ける。PRがdevelop向けであることと、レビュー/テストの証跡を確認する。
 3. パス保護対象・テスト失敗・第三者の未承認Issue・レビュー不合格で停止することを確認する。既存PRがあるIssueの再実行では重複PRを作らない。
 4. Cloudflare Preview自動公開停止と検証トークンを確認し、`PULBASE_STAGING_DEPLOY_ENABLED=true` にする。PRワークフローを再実行する。Worker/PagesのSHA、HTTP結果、デスクトップ/モバイル画像を確認する。
-5. developのstrict保護を確認後、`PULBASE_AUTO_MERGE_ENABLED=true` にする。PRワークフローを再実行し、developだけへのマージ、Issue完了、develop pushによるstaging更新を確認する。
+5. developのstrict保護を確認後、`PULBASE_AUTO_MERGE_ENABLED=true` にする。PRワークフローを再実行し、developだけへのマージ、Issue完了、developの同SHAのCI成功によるstaging更新を確認する。
 6. 本番/Xのフラグとテンプレートは引き続き無効にしておく。
 
 初期はIssueを1件ずつ処理する。検証URLを共有するため、PR検証とdevelop公開は同じconcurrencyグループで直列化する。GitHub concurrencyは一般的なFIFOキューではなく、複数の待機実行があると古い待機が置き換えられる場合がある。キャンセル/古いbaseで止まったPRは最新developに更新して再実行する。大量同時受付の保証が必要になった段階で永続キュー/merge queueとPR専用環境へ拡張する。
