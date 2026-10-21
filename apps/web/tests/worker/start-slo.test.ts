@@ -13,15 +13,20 @@ beforeEach(async () => {
 });
 
 async function fixture(mode = "solo") {
+  const environment = mode === "solo" ? { APP_ENV: "staging" } : { APP_ENV: "local", LOCAL_MULTIPLAYER_ENABLED: "true" };
   const call = (path: string, cookie = "", body?: object) => handlePlatformRequest(new Request("http://localhost/api/platform/" + path,
-    { method: body || path.endsWith("/capture") ? "POST" : "GET", headers: { Cookie: cookie, "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined }), env.DB, { APP_ENV: "staging" });
+    { method: body || path.endsWith("/capture") ? "POST" : "GET", headers: { Cookie: cookie, "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined }), env.DB, environment);
   const bootstrap = (await call("bootstrap"))!;
   const cookie = bootstrap.headers.get("set-cookie")!.split(";", 1)[0]!;
   const identity = await bootstrap.json<{ playerId: string }>();
   await call("welcome-credit", cookie, {});
   const reserved = (await call("credit-reservations", cookie, { cabinetId: crypto.randomUUID(), gameId: "graze-duel", purpose: mode === "solo" ? "solo" : "challenge" }))!;
+  expect(reserved.status).toBe(200);
   const { reservationId } = await reserved.json<{ reservationId: string }>();
-  return { reservationId, cookie, playerId: identity.playerId, capture: () => call("credit-reservations/" + reservationId + "/capture", cookie) };
+  return { reservationId, cookie, playerId: identity.playerId, capture: async () => {
+    if (mode !== "solo") await beginStartAttempt(env.DB, reservationId, identity.playerId);
+    return call("credit-reservations/" + reservationId + "/capture", cookie);
+  } };
 }
 
 it("durably counts a capture request once even when no start message reaches the room", async () => {
@@ -47,7 +52,7 @@ it("requires a valid on-time receipt, never turns a late receipt into success, a
   expect((await collectStartSloReport(env.DB)).periods[0]).toMatchObject({ requested: 1, missing_response: 1, pending: 0 });
 });
 
-it("needs both versus participants and rejects duplicate or pre-permission acknowledgements", async () => {
+it("retains historical two-seat SLO accounting and rejects duplicate or pre-permission acknowledgements", async () => {
   const player = await fixture("versus"); await player.capture();
   const raw = await env.DB.prepare("SELECT receipt_token FROM start_slo_attempts WHERE reservation_id = ?").bind(player.reservationId).first<{ receipt_token: string }>();
   await acknowledgeStart(env.DB, { attemptId: player.reservationId, token: raw!.receipt_token }, 1);

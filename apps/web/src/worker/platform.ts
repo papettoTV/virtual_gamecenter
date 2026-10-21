@@ -6,6 +6,7 @@ import {
   type GoogleAuthEnv,
 } from "./google-auth";
 import { DEFAULT_GAME_ID, getGameDefinition } from "../domain/game";
+import { availableGameModes, isGameModeAvailable, GAME_MODE_UNAVAILABLE, type PlayModeEnvironment } from "../domain/play-mode-policy";
 import { reconcileBetaCredits } from "./beta-credits";
 import { protectionFailureInfo, withProtectionRetry } from "./protection-failure";
 import { recordRevocation } from "./revocation-metrics";
@@ -23,7 +24,7 @@ const PRIVACY_VERSION = "2026-10-14.1";
 const CREDIT_UNITS = new Set([1, 3, 5, 10]);
 const STRIPE_SIGNATURE_TOLERANCE_SECONDS = 300;
 
-export interface StripePaymentEnv {
+export interface StripePaymentEnv extends PlayModeEnvironment {
   CREDIT_PURCHASES_ENABLED?: string;
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
@@ -138,6 +139,7 @@ export async function handlePlatformRequest(
         accountRegistered: identity.accountRegistered,
         avatarUrl: identity.avatarUrl,
         developerLoginAvailable: isDeveloperAuthAvailable(url, paymentEnv),
+        availableGameModes: availableGameModes(paymentEnv),
         consent,
         welcomeCreditGranted,
         creditPolicy,
@@ -448,14 +450,22 @@ export async function handlePlatformRequest(
 
   if (url.pathname === "/api/platform/credit-reservations" && request.method === "POST") {
     const body = await readJson(request);
+    if (!body || typeof body !== "object" || Array.isArray(body)) return creditJson({ error: "invalid_play_mode" }, { status: 400 });
+    const requestedModes = [body.mode, url.searchParams.has("mode") ? url.searchParams.get("mode") : undefined].filter(mode => mode !== undefined);
+    const purpose = body.purpose === undefined ? "solo" : body.purpose;
+    if (requestedModes.some(mode => (mode === "versus" || mode === "coop") && !isGameModeAvailable(mode, paymentEnv))
+      || (["challenge", "rematch", "versus", "coop"].some(value => value === purpose) && !isGameModeAvailable(purpose === "coop" ? "coop" : "versus", paymentEnv))) {
+      return creditJson({ error: GAME_MODE_UNAVAILABLE }, { status: 403 });
+    }
+    if (typeof purpose !== "string" || !["solo", "challenge", "rematch"].includes(purpose)
+      || requestedModes.some(mode => mode !== (purpose === "solo" ? "solo" : "versus"))) {
+      return creditJson({ error: "invalid_play_mode" }, { status: 400 });
+    }
     const cabinetId = sanitizeId(body?.cabinetId, "cabinet");
     const game = getGameDefinition(String(body?.gameId || DEFAULT_GAME_ID));
     if (!game || game.status !== "active") {
       return creditJson({ error: "unknown_game" }, { status: 404 });
     }
-    const purpose = body?.purpose === "challenge" || body?.purpose === "rematch"
-      ? body.purpose
-      : "solo";
     const reservationId = crypto.randomUUID();
     const playSessionId = crypto.randomUUID();
     await ensureDeviceWelcomeCreditState(database, creditDevice.token, session.playerId);
@@ -521,19 +531,23 @@ export async function handlePlatformRequest(
     const reservationId = reservationMatch[1]!;
     const action = reservationMatch[2]!;
     const reservation = await database.prepare(
-      `SELECT id, play_session_id, amount, balance_type, status
-       FROM credit_reservations
-       WHERE id = ? AND player_id = ?`,
+      `SELECT r.id, r.play_session_id, r.amount, r.balance_type, r.status, p.mode
+       FROM credit_reservations r JOIN play_sessions p ON p.id = r.play_session_id
+       WHERE r.id = ? AND r.player_id = ?`,
     ).bind(reservationId, session.playerId).first<{
       id: string;
       play_session_id: string;
       amount: number;
       balance_type: "free" | "purchased";
       status: string;
+      mode: string;
     }>();
 
     if (!reservation) {
       return creditJson({ error: "reservation_not_found" }, { status: 404 });
+    }
+    if (action === "capture" && !isGameModeAvailable(reservation.mode, paymentEnv)) {
+      return creditJson({ error: GAME_MODE_UNAVAILABLE }, { status: 403 });
     }
     if (action === "release" && reservation.status === "captured") {
       await refundUnusedCapture(database, reservationId);

@@ -5,6 +5,7 @@ import type { CabinetTransportFactory } from "./cabinetController";
 import DotWaveCabinet from "./DotWaveCabinet";
 import MochiDuel from "./MochiDuel";
 import { DuelAudio } from "./audio";
+import { createCabinetState } from "../../../domain/cabinet";
 
 const runtime = vi.hoisted(() => ({
   refs: [] as Array<{ current: unknown }>,
@@ -112,6 +113,20 @@ it("does not cover the start confirmation with a duplicate share overlay", async
   sessions[0]!.handlers.onMessage({ type: "roleChanged", role: "player" });
   expect(renderToStaticMarkup(gameElement().props.boardNotice)).toBe("");
   expect(services.reserve).not.toHaveBeenCalled();
+});
+
+it("keeps live sharing but hides the beta spectator challenge entry", async () => {
+  mountRoute();
+  await flush();
+  sessions[0]!.handlers.onConnectionChange(true);
+  sessions[0]!.handlers.onMessage({ type: "roleChanged", role: "spectator" });
+  sessions[0]!.handlers.onMessage({ type: "cabinetState", state: {
+    ...createCabinetState("route-test", "dot-wave"), status: "soloPlaying", playerCount: 1, spectatorCount: 1,
+  } });
+  const html = renderToStaticMarkup(renderRoute());
+  expect(html).toContain("観戦中");
+  expect(html).toContain("ライブを共有");
+  expect(html).not.toContain("1クレジットで対戦");
 });
 
 it("leaves the DOT route and returns with fresh network/audio state and only one active session", async () => {

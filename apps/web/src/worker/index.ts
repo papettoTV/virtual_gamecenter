@@ -8,6 +8,7 @@ import { renderLiveImage, renderResultImage } from "./result-image";
 import { handleSharingEvent } from "./sharing-events";
 import { rewriteBrandPage, rewriteLivePage } from "./live-metadata";
 import { getGameDefinition } from "../domain/game";
+import { isGameModeAvailable, GAME_MODE_UNAVAILABLE } from "../domain/play-mode-policy";
 import { handleDataLifecycleRequest, runRetention } from "./data-lifecycle";
 import { isDeveloperAuthAvailable } from "./google-auth";
 import { boundRequestBody, clientAddressKey, limitRequest, WEBHOOK_BODY_LIMIT } from "./request-protection";
@@ -25,6 +26,7 @@ import { settleStartAttempts, recordStartSloCoverage } from "./start-slo";
 export { CabinetRoom, AbuseGuard };
 
 interface WorkerEnv extends Env, BasicAuthEnv {
+  LOCAL_MULTIPLAYER_ENABLED?: string;
   OPERATOR_ACCOUNT_IDS?: string;
   SECURITY_EVENTS?: AnalyticsEngineDataset;
   RECOVERY_CONTROL?: RecoveryBinding;
@@ -115,6 +117,9 @@ const handler = {
     if (cabinetMatch) {
       if (request.headers.get("Upgrade") !== "websocket") {
         return new Response("Expected WebSocket upgrade", { status: 426 });
+      }
+      if (url.searchParams.has("mode") && !isGameModeAvailable(url.searchParams.get("mode"), env)) {
+        return Response.json({ error: GAME_MODE_UNAVAILABLE }, { status: 403 });
       }
       const cabinetId = cabinetMatch[1]!;
       if (env.APP_ENV !== "local" && !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(cabinetId)) return Response.json({ error: "invalid_cabinet_id" }, { status: 400 });

@@ -7,6 +7,7 @@ export default defineConfig({
     fileParallelism: false,
     pool: cloudflarePool({
       main: "./src/worker/index.ts",
+      miniflare: { bindings: { LOCAL_MULTIPLAYER_ENABLED: "true" } },
       wrangler: { configPath: "./wrangler.jsonc" },
     }),
   },
