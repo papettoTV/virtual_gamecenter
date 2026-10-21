@@ -40,6 +40,7 @@ export async function settleStartAttempts(database: D1Database, now = Date.now()
     database.prepare("DELETE FROM start_slo_attempts WHERE outcome <> 'pending' AND deadline_ms < ?").bind(now - 2 * 86400_000),
     database.prepare("DELETE FROM start_slo_daily WHERE day < strftime('%Y-%m-%d', ? / 1000, 'unixepoch', '+9 hours')").bind(now - 400 * 86400_000),
     database.prepare("DELETE FROM start_slo_coverage WHERE slot_ms < ?").bind(now - 400 * 86400_000),
+    database.prepare("DELETE FROM start_slo_alert_buckets WHERE bucket_ms < ?").bind(now - 2 * 86400_000),
   ]);
 }
 

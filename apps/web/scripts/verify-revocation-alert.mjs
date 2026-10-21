@@ -2,8 +2,19 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { operationExpression } from "./operation-report.mjs";
+import { startReceiptExpression } from "../src/monitor/start-slo-alert.mjs";
 
 export const alertCases = [
+  { name: "all-cron-stopped-stale", rows: [["v1", 0, 1799999399, 0, 1]], receipt: { code: 0, at: 1799999399, present: 1 }, expected: 10 },
+  { name: "freshness-exactly-600", rows: [["v1", 0, 1799999400, 0, 1]], receipt: { code: 0, at: 1799999400, present: 1 }, expected: 0 },
+  { name: "receipt-newer-than-heartbeat-but-stale", rows: [["v1", 0, 1799999300, 0, 1]], receipt: { code: 0, at: 1799999399, present: 1 }, expected: 10 },
+  { name: "no-heartbeat-over-stale-receipt", rows: [], receipt: { code: 0, at: 1799999000, present: 1 }, expected: 3 },
+  { name: "receipt-missing", rows: [["v1", 0, 1800000000, 0, 1]], receipt: { code: 9, at: 1800000000, present: 1 }, expected: 9 },
+  { name: "receipt-query-failed", rows: [["v1", 0, 1800000000, 0, 1]], receipt: { code: 10, at: 1800000000, present: 1 }, expected: 10 },
+  { name: "receipt-absent", rows: [["v1", 0, 1800000000, 0, 1]], receipt: { code: 0, at: 0, present: 0 }, expected: 10 },
+  { name: "receipt-stale", rows: [["v1", 0, 1800000000, 0, 1]], receipt: { code: 0, at: 1799999399, present: 1 }, expected: 10 },
+  { name: "down-over-receipt", rows: [["v1", 1, 1800000000, 0, 1]], receipt: { code: 9, at: 1800000000, present: 1 }, expected: 1 },
+  { name: "receipt-over-operation", rows: [["v1", 0, 1800000000, 0, 1]], operations: { start: [3, 3] }, receipt: { code: 9, at: 1800000000, present: 1 }, expected: 9 },
   { name: "idle-check-failure", rows: [["v1", 0, 1800000000, 0, 1], ["idle-revocation-v1", 1, 0, 0, 1]], expected: 4 },
   { name: "idle-closed", rows: [["v1", 0, 1800000000, 0, 1], ["idle-revocation-v1", 0, 0, 0, 1]], expected: 0 },
   { name: "healthy", rows: [["v1", 0, 1800000000, 0, 1]], expected: 0 },
@@ -27,7 +38,7 @@ export const alertCases = [
   { name: "operation-over-recovery", rows: [["v1", 0, 1800000000, 1799999900, 1]], operations: { credit: [3, 3] }, expected: 8 },
 ];
 
-export function syntheticAlertQuery(query, rows, operations = {}) {
+export function syntheticAlertQuery(query, rows, operations = {}, receipt = { code: 0, at: 1800000000, present: 1 }) {
   assert.ok(query.startsWith("SELECT CASE "));
   assert.ok(query.includes(" FROM events.analyticsEngine.pulbase_service_health WHERE "));
   for (const [schema, failed, retries, recovered, weight] of rows) {
@@ -38,6 +49,10 @@ export function syntheticAlertQuery(query, rows, operations = {}) {
   const warnings = rows.filter(row => row[0] === "revocation-v1");
   const incomplete = rows.filter(row => ["revocation-v1", "idle-revocation-v1"].includes(row[0]));
   const values = [
+    ["toUnixTimestamp(NOW())", 1800000000],
+    ["sum(if(blob3 = 'start-receipt-v1', 1, 0))", receipt.present],
+    [startReceiptExpression("double1"), receipt.code],
+    [startReceiptExpression("double4"), receipt.at],
     ["sum(if(blob3 = 'v1', 1, 0))", health.length],
     ["argMax(double1, if(blob3 = 'v1', double4, 0.0))", health[0]?.[1] ?? 0],
     ['sum(if(blob3 = \'revocation-v1\' OR blob3 = \'idle-revocation-v1\', double1 * "sampleInterval", 0.0))', incomplete.reduce((sum, row) => sum + row[1] * row[4], 0)],
@@ -46,6 +61,8 @@ export function syntheticAlertQuery(query, rows, operations = {}) {
     ["argMax(double4, if(blob3 = 'v1', double4, 0.0))", health[0]?.[2] ?? 0],
   ];
   let synthetic = query;
+  assert.ok([0, 9, 10].includes(receipt.code));
+  assert.ok([receipt.at, receipt.present].every(value => Number.isSafeInteger(value) && value >= 0));
   for (const family of ["start", "login", "credit"]) {
     const [eligible, failed] = operations[family] ?? [0, 0];
     assert.ok([eligible, failed].every(value => Number.isSafeInteger(value) && value >= 0));
@@ -69,7 +86,7 @@ async function main() {
   for (const item of alertCases) {
     const response = await fetch("https://api.cloudflare.com/client/v4/analytics/sql", {
       method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "text/plain" },
-      body: syntheticAlertQuery(config.alerts[0].query, item.rows, item.operations), redirect: "manual", signal: AbortSignal.timeout(10000),
+      body: syntheticAlertQuery(config.alerts[0].query, item.rows, item.operations, item.receipt), redirect: "manual", signal: AbortSignal.timeout(10000),
     });
     if (!response.ok) throw Error(`Alert SQL verification failed: HTTP ${response.status}`);
     const result = await response.json();
@@ -82,7 +99,7 @@ async function main() {
   });
   if (!response.ok) throw Error("Live aggregation query failed");
   const live = await response.json();
-  assert.ok([0, 1, 2, 3, 4, 5, 6, 7, 8].includes(Number(live.data?.[0]?.value)));
+  assert.ok([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].includes(Number(live.data?.[0]?.value)));
   console.log(JSON.stringify({ environment: "staging", liveValue: live.data[0].value, writes: 0, syntheticBranchCases: alertCases.length }));
 }
 
