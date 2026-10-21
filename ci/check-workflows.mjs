@@ -40,7 +40,12 @@ export async function checkWorkflows() {
   assert.match(release.jobs.prepare.if, /PULBASE_PRODUCTION_ENABLED/);
   assert.equal(release.jobs.prepare.environment, 'release-preflight');
   assert.equal(release.jobs.release.environment, 'production');
-  assert.equal(release.jobs.announce.environment, 'announcement');
+  assert.equal(release.jobs.announce.environment, undefined);
+  assert.equal(release.jobs.announce.if, "needs.release.result == 'success'");
+  const announcement = JSON.stringify(release.jobs.announce);
+  assert.ok(!/secrets\.|create-github-app-token|PULBASE_X_ENABLED|announce-x/.test(announcement));
+  assert.ok(announcement.includes('node ci/release-announcement.mjs'));
+  assert.ok(announcement.includes('actions/upload-artifact@'));
   assert.ok(release.jobs.announce.needs.includes('release'));
   assert.ok(!entries.filter(item => !item.file.endsWith('.disabled')).some(item => JSON.stringify(item.data).includes('npm run deploy -- production')));
   return entries.length;
