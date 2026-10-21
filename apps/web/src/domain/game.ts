@@ -92,9 +92,9 @@ export const MOCHI_BEAT: GameDefinition = {
 
 export const DOT_WAVE: GameDefinition = {
   id: "dot-wave", slug: "dot-wave", title: "DOT WAVE", localizedTitle: "ドットウェーブ",
-  shortTitle: "DW", description: "音符で攻めてリズムで守る、観戦・通信対戦対応のネオンバトル",
+  shortTitle: "DW", description: "音符で攻めてリズムで守る、ソロプレイ・観戦対応のネオンバトル",
   instructions: {
-    objective: "リズムで攻めて守り、CPUの全3ステージ制覇や対戦での勝利を目指す。",
+    objective: "リズムで攻めて守り、CPUの全3ステージ制覇を目指す。",
     action: "お手本のリズムで攻撃。相手のリズムをまねしてシールドで守る。",
     ending: "エネルギーがなくなるか、規定の攻防回数に達すると決着。残りエネルギーの多い側が勝利。",
     desktop: ["リズム入力：Space / F", "ポーズ：P", "音を出してプレイしてください。"],

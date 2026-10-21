@@ -1,3 +1,5 @@
+import type { GameMode } from "../../domain/game";
+
 export interface WalletSummary {
   freeBalance: number;
   purchasedBalance: number;
@@ -20,6 +22,7 @@ export interface PlatformBootstrap {
   accountRegistered: boolean;
   avatarUrl: string | null;
   developerLoginAvailable: boolean;
+  availableGameModes?: readonly GameMode[];
   consent: ConsentState;
   welcomeCreditGranted: boolean;
   wallet: WalletSummary;
