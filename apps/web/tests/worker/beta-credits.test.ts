@@ -57,6 +57,33 @@ async function eligible(free = 0, purchased = 0) {
 }
 
 describe("free beta daily credits", () => {
+  it("preserves completed refunds after a partial failure and recovers only the remainder on retry", async () => {
+    const player = await eligible(5);
+    for (let index = 0; index < 2; index++) {
+      const response = await api("credit-reservations", player.cookie, "POST", { cabinetId: crypto.randomUUID(), gameId: "graze-duel" });
+      const { reservationId } = await response.json<{ reservationId: string }>();
+      await api(`credit-reservations/${reservationId}/capture`, player.cookie, "POST");
+    }
+    await env.DB.prepare("UPDATE credit_reservations SET expires_at = datetime('now', '-1 second') WHERE player_id = ?").bind(player.playerId).run();
+    const failure = Error("private partial recovery failure"), writeDataPoint = vi.fn();
+    let batches = 0;
+    const database = new Proxy(env.DB, { get(target, key) {
+      if (key === "batch") return async (statements: D1PreparedStatement[]) => {
+        if (++batches === 2) throw failure;
+        return target.batch(statements);
+      };
+      const value = Reflect.get(target, key, target);
+      return typeof value === "function" ? value.bind(target) : value;
+    } });
+    await expect(reconcileBetaCredits(database, player.playerId, "partial-recovery-device", false, new Date(), { writeDataPoint })).rejects.toBe(failure);
+    expect(await env.DB.prepare("SELECT free_balance FROM credit_wallets WHERE player_id = ?").bind(player.playerId).first("free_balance")).toBe(4);
+    const retry = await (await api("credits", player.cookie)).json<State>();
+    expect(retry).toMatchObject({ wallet: { freeBalance: 5 }, creditPolicy: { refilledAmount: 0 } });
+    expect(await env.DB.prepare("SELECT COUNT(*) AS count FROM credit_ledger_entries WHERE player_id = ? AND entry_type = 'refunded'").bind(player.playerId).first("count")).toBe(2);
+    expect(await env.DB.prepare("SELECT COUNT(*) AS count FROM beta_daily_refills WHERE player_id = ?").bind(player.playerId).first("count")).toBe(0);
+    expect(writeDataPoint).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps the wallet unchanged and records a failure when recovery cannot read its candidates", async () => {
     const player = await eligible(2);
     const failure = Error("private recovery failure"), writeDataPoint = vi.fn();
