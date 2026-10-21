@@ -1,3 +1,4 @@
+import { createPlayerEffects } from "./three-player-effects";
 import * as THREE from "three";
 import { drawPlayerShip } from "./player-ship";
 import { createBossModels, getBossAppearance, getBossRotation, writeBossPositions, type BossModel } from "./boss-geometry";
@@ -172,7 +173,7 @@ type PlayerVisual = {
   root: THREE.Group;
   ship: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
   shipColor: string;
-  shield: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
+  effects: ReturnType<typeof createPlayerEffects>;
   hitMarker: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
 };
 
@@ -205,19 +206,15 @@ function createPlayerVisual(): PlayerVisual {
     new THREE.PlaneGeometry(80, 80),
     new THREE.MeshBasicMaterial({ map: createPlayerShipTexture(shipColor), transparent: true, depthTest: false, depthWrite: false }),
   );
-  const shield = new THREE.Mesh(
-    new THREE.CircleGeometry(1, 48),
-    new THREE.MeshBasicMaterial({ color: 0x69f7ff, transparent: true, opacity: 0.36, blending: THREE.AdditiveBlending, depthTest: false }),
-  );
+  const effects = createPlayerEffects();
   const hitMarker = new THREE.Mesh(
     new THREE.CircleGeometry(3, 20),
     new THREE.MeshBasicMaterial({ color: 0xff3355, transparent: true, depthTest: false }),
   );
-  shield.renderOrder = 3;
   ship.renderOrder = 4;
   hitMarker.renderOrder = 5;
-  root.add(shield, ship, hitMarker);
-  return { root, ship, shipColor, shield, hitMarker };
+  root.add(effects.root, ship, hitMarker);
+  return { root, ship, shipColor, effects, hitMarker };
 }
 
 function createPlayerShipTexture(color: string): THREE.CanvasTexture {
@@ -348,10 +345,7 @@ function updatePlayerVisuals(
     const hitInvincible = player.invincible > 0 && !levelInvincible;
     const warning = levelInvincible && player.levelUpInvincible <= 0.5;
     visual.ship.material.opacity = hitInvincible && Math.floor(elapsed * 18) % 2 === 0 ? 0.45 : 1;
-    visual.shield.visible = levelInvincible;
-    const shieldRadius = 18 + player.barrierRatio * 28 + (0.55 + Math.sin(elapsed * 18) * 0.22) * 5;
-    visual.shield.scale.setScalar(shieldRadius);
-    visual.shield.material.opacity = warning && Math.floor(elapsed * 18) % 2 === 0 ? 0.1 : 0.42;
+    visual.effects.update(player, elapsed);
     visual.hitMarker.material.color.set(levelInvincible ? 0xd9fdff : hitInvincible ? 0xffd166 : 0xff3355);
     visual.hitMarker.material.opacity = warning && Math.floor(elapsed * 18) % 2 === 0 ? 0.25 : 1;
   }
@@ -434,6 +428,7 @@ function updateParticleVisual(
 function disposeVisuals(playerVisuals: PlayerVisual[], bossVisuals: BossVisual[], particleVisual: ParticleVisual) {
   for (const visual of playerVisuals) {
     visual.ship.material.map?.dispose();
+    visual.effects.dispose();
     disposeObject(visual.root);
   }
   for (const visual of bossVisuals) disposeObject(visual.root);
