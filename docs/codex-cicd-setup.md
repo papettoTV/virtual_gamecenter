@@ -235,5 +235,17 @@ OpenAIの初回試験39518429088は、人の承認後にCLI起動引数の重複
 - [修正PR #1](https://github.com/papettoTV/virtual_gamecenter/pull/1)の必須チェック合格後、`6a1856f` としてdevelopへマージ。管理者bypassや保護解除は使用していない。
 - [OpenAI固定応答試験 39520165299](https://github.com/papettoTV/virtual_gamecenter/actions/runs/39520165299)は、人がcodex環境を承認した後に成功。公式Codex ActionによるAPI実行と、別ランナーでの `CODEX_API_OK` 完全一致確認の両方が成功した。Secret値は取得・表示していない。
 - [マージ後のWeb checks 39520159957](https://github.com/papettoTV/virtual_gamecenter/actions/runs/39520159957)も成功。これはAPI認証と固定応答の試験であり、IssueからPR作成・レビュー・検証環境公開・自動マージまでの通し試験ではない。
-- 次の準備はstaging環境と検証専用のCloudflareトークン・Basic認証情報。現在のGitHub Environmentsはautomationとcodexだけで、stagingは未作成。Cloudflareの設定変更や検証公開はまだ実施していない。
+- 次の準備はstaging環境と検証専用のCloudflareトークン・Basic認証情報。このAPI試験の時点ではGitHub Environmentsはautomationとcodexだけで、stagingは未作成だった。Cloudflareの設定変更や検証公開はまだ実施していない。
 - mainのSHAは引き続き `73cb5d9267c56f06f9f1150327ec6b8b3caa2bb9`。自動化フラグはfalse、本番用テンプレートは無効のまま。
+
+
+## staging Secretと公開前の接続確認（2026-10-21）
+
+staging Environmentの作成と、`CLOUDFLARE_API_TOKEN`・`PULBASE_CHECK_USERNAME`・`PULBASE_CHECK_PASSWORD` の登録名を確認。値の取得はしていない。承認者はpapettoTV、本人が開始した処理も承認可能、管理者による承認スキップは禁止。利用対象はdevelopと `refs/pull/*/merge` に限定し、mainやタグを許可しない。
+
+手動の `Staging service check` をstaging Environmentに接続する。以前のworkflowはEnvironmentの指定がなく、Environment Secretsを参照できなかった。developからpapettoTVが開始し、人の承認後に次を確認する。
+
+1. Cloudflare APIで固定対象の `pulbase-staging` のscript-settingsと `virtual-gamecenter` のPages設定をGETする。API応答本文や例外の詳細は出力せず、アクセス結果とPagesのPreview自動公開の停止状態だけを記録する。Production branchがmainであることを確認し、変更しない。
+2. 別ステップでBasic認証を使い、既存の検証URLに対してサービス確認を行う。新規プレイヤー・クレジット消費・デプロイ・設定更新・本番URLへのアクセスは実施しない。Cloudflare確認が失敗しても、セットアップ成功時にはBasic認証の確認を行う。
+
+CloudflareトークンはAPI確認ステップだけ、Basic認証はサービス確認ステップだけに渡す。この試験でCloudflareの書込権限やデプロイ成功は証明しない。Preview自動公開が有効な場合は事前チェックの結果で示し、検証公開フラグを有効にする前に停止する。現時点で自動化フラグはすべてfalse、クラウドの設定変更・デプロイ・main反映は未実施。
