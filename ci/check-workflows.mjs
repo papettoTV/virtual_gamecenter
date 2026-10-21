@@ -28,6 +28,10 @@ export async function checkWorkflows() {
   }
   const issue = entries.find(item => item.file === 'codex-issue.yml').data;
   assert.match(issue.jobs.intake.if, /PULBASE_CODEX_ENABLED/);
+  assert.match(issue.jobs.intake.if, /実装:自動/);
+  assert.ok(issue['run-name'].includes('github.event.issue.number'));
+  assert.equal(issue.jobs.implement.if, "needs.intake.outputs.eligible == 'true'");
+  assert.ok(issue.jobs.publish.steps.some(step => step.run === undefined && step.with?.script?.includes('assertAutomaticAssignment')));
   assert.ok(!JSON.stringify(issue).includes('refs/heads/main'));
   const pr = entries.find(item => item.file === 'codex-pr.yml').data;
   assert.deepEqual(pr.on.pull_request.branches, ['develop']);
