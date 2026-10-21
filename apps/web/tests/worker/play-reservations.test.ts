@@ -1,7 +1,7 @@
 import { env, exports } from "cloudflare:workers";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { getActiveGames } from "../../src/domain/game";
-import { validatePlayReservation } from "../../src/worker/credit-reservations";
+import { refundUnusedCapture, validatePlayReservation } from "../../src/worker/credit-reservations";
 import { hashIdentifier } from "../../src/worker/identity-hash";
 import { migrateTestDatabase } from "../migrate-test-database";
 
@@ -22,6 +22,39 @@ async function fixture(gameId: string, purpose = "solo") {
 }
 
 describe.each(getActiveGames())("$id play reservations", game => {
+  it("captures concurrent duplicate requests once and refunds concurrent releases once", async () => {
+    const test = await fixture(game.id);
+    const captures = await Promise.all([test.api(`credit-reservations/${test.reservationId}/capture`), test.api(`credit-reservations/${test.reservationId}/capture`)]);
+    expect(captures.map(response => response.status)).toEqual([200, 200]);
+    expect(await env.DB.prepare("SELECT COUNT(*) AS count FROM credit_ledger_entries WHERE reference_id = ? AND entry_type = 'consumed'").bind(test.reservationId).first("count")).toBe(1);
+    const releases = await Promise.all([test.api(`credit-reservations/${test.reservationId}/release`), test.api(`credit-reservations/${test.reservationId}/release`)]);
+    for (const response of releases) expect(await response.json()).toMatchObject({ status: "released", wallet: { availableTotal: 5, reservedFree: 0 } });
+    expect(await env.DB.prepare("SELECT COUNT(*) AS count FROM credit_ledger_entries WHERE reference_id = ? AND entry_type = 'refunded'").bind(test.reservationId).first("count")).toBe(1);
+  });
+
+  it("cancels an uncaptured reservation without spending and requires a new reservation to retry", async () => {
+    const test = await fixture(game.id);
+    expect(await (await test.api(`credit-reservations/${test.reservationId}/release`)).json()).toMatchObject({ status: "released", wallet: { availableTotal: 5, reservedFree: 0 } });
+    expect((await test.api(`credit-reservations/${test.reservationId}/capture`)).status).toBe(200);
+    expect(await test.validate("captured", "cancelled-retry")).toBe(false);
+    expect(await env.DB.prepare("SELECT COUNT(*) AS count FROM credit_ledger_entries WHERE reference_id = ?").bind(test.reservationId).first("count")).toBe(0);
+    const retry = await (await test.api("credit-reservations", { cabinetId: test.cabinetId, gameId: game.id })).json<{ reservationId: string }>();
+    expect(retry.reservationId).not.toBe(test.reservationId);
+    expect(await (await test.api(`credit-reservations/${retry.reservationId}/capture`)).json()).toMatchObject({ status: "captured", wallet: { availableTotal: 4 } });
+    await test.api(`credit-reservations/${retry.reservationId}/release`);
+  });
+
+  it("serializes start authorization against a concurrent refund without granting a free play", async () => {
+    const test = await fixture(game.id);
+    await test.api(`credit-reservations/${test.reservationId}/capture`);
+    const [authorized] = await Promise.all([test.validate("captured", "racing-start"), refundUnusedCapture(env.DB, test.reservationId)]);
+    const reservation = await env.DB.prepare("SELECT status FROM credit_reservations WHERE id = ?").bind(test.reservationId).first<{ status: string }>();
+    const balance = await env.DB.prepare("SELECT free_balance FROM credit_wallets WHERE player_id = ?").bind(test.playerId).first("free_balance");
+    expect(reservation?.status).toBe(authorized ? "captured" : "released");
+    expect(balance).toBe(authorized ? 4 : 5);
+    expect(await test.validate("captured", "racing-replay")).toBe(false);
+  });
+
   it.each(["revoked", "expired", "deleted"])("atomically refuses a captured play with a %s session", async condition => {
     const test = await fixture(game.id);
     await test.api(`credit-reservations/${test.reservationId}/capture`);

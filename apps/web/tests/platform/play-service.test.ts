@@ -52,4 +52,20 @@ describe("play credit transaction", () => {
     vi.mocked(releasePlayCredit).mockResolvedValue({ status: "captured", wallet: {} } as Awaited<ReturnType<typeof releasePlayCredit>>);
     await expect(executePlay(transaction)).rejects.toThrow("game_start_confirmation_pending");
   });
+  it("does not request capture or release when reservation creation fails", async () => {
+    const transaction = setup();
+    vi.mocked(reservePlayCredit).mockRejectedValue(new Error("insufficient_credit"));
+    await expect(executePlay(transaction)).rejects.toThrow("insufficient_credit");
+    expect(capturePlayCredit).not.toHaveBeenCalled();
+    expect(releasePlayCredit).not.toHaveBeenCalled();
+    expect(transaction.start).not.toHaveBeenCalled();
+  });
+  it("does not claim automatic recovery when the release request also fails", async () => {
+    const transaction = setup();
+    transaction.start.mockResolvedValue(false);
+    vi.mocked(releasePlayCredit).mockRejectedValue(new Error("release_unavailable"));
+    await expect(executePlay(transaction)).rejects.toThrow("release_unavailable");
+    expect(transaction.walletChanged).toHaveBeenCalledTimes(2);
+    expect(releasePlayCredit).toHaveBeenCalledOnce();
+  });
 });
