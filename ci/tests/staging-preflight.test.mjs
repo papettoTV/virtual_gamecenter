@@ -60,3 +60,29 @@ test('manual service check uses staging approval and separates API and Basic cre
   assert.match(basic.run, /--environment staging/);
   assert.ok(!JSON.stringify(workflow).includes('wrangler deploy'));
 });
+
+
+test('manual staging deployment is operator-only on develop while push deployment still requires its flag', async () => {
+  const workflow = parse(await readFile(new URL('../../.github/workflows/develop-staging.yml', import.meta.url), 'utf8'));
+  const job = workflow.jobs.staging;
+  assert.equal(job.environment, 'staging');
+  const allowed = new Function('github', 'vars', `return (${job.if});`);
+  for (const ref of ['refs/heads/develop', 'refs/heads/main']) {
+    for (const event_name of ['workflow_dispatch', 'push', 'pull_request']) {
+      for (const actor of ['papettoTV', 'another-user']) {
+        for (const flag of ['false', 'true', undefined]) {
+          const expected = ref === 'refs/heads/develop' &&
+            ((event_name === 'workflow_dispatch' && actor === 'papettoTV') || (event_name === 'push' && flag === 'true'));
+          assert.equal(allowed({ ref, event_name, actor }, { PULBASE_STAGING_DEPLOY_ENABLED: flag }), expected);
+        }
+      }
+    }
+  }
+  const steps = job.steps;
+  const preflight = steps.findIndex(step => step.run?.includes('check-pages.mjs staging'));
+  const build = steps.findIndex(step => step.run?.includes('npm run build:staging'));
+  const deploy = steps.findIndex(step => step.run?.includes('deploy-built.mjs staging'));
+  assert.ok(preflight >= 0 && preflight < build && build < deploy);
+  assert.deepEqual(Object.keys(steps[preflight].env), ['CLOUDFLARE_API_TOKEN']);
+  assert.ok(!JSON.stringify(steps[build]).includes('secrets.'));
+});

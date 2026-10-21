@@ -11,8 +11,10 @@ concurrency:
   cancel-in-progress: false
 jobs:
   staging:
-    if: github.ref == 'refs/heads/develop' && vars.PULBASE_STAGING_DEPLOY_ENABLED ==
-      'true'
+    if: >-
+      github.ref == 'refs/heads/develop' &&
+      ((github.event_name == 'workflow_dispatch' && github.actor == 'papettoTV') ||
+       (github.event_name == 'push' && vars.PULBASE_STAGING_DEPLOY_ENABLED == 'true'))
     runs-on: ubuntu-latest
     timeout-minutes: 25
     environment: staging
@@ -38,6 +40,13 @@ jobs:
           EXPECTED_BASE: ${{ github.sha }}
         run: test "$(gh api "repos/$GH_REPO/git/ref/heads/develop" --jq .object.sha)" =
           "$EXPECTED_BASE"
+      - name: Require staging access and disabled Pages preview auto-deploy before building
+        working-directory: apps/web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          node ../../ci/staging-preflight.mjs
+          node ../../ci/check-pages.mjs staging
       - name: Build stamped staging candidate without deployment credentials
         working-directory: apps/web
         env:
