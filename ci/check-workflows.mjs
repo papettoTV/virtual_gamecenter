@@ -40,6 +40,24 @@ export async function checkWorkflows() {
   assert.equal(pr.concurrency.group, 'pulbase-staging-pipeline');
   assert.equal(pr.concurrency['cancel-in-progress'], false);
   assert.ok(pr.jobs.merge.needs.includes('staging'));
+  assert.ok(pr.jobs.merge.needs.includes('regression'));
+  const develop = entries.find(item => item.file === 'develop-staging.yml').data;
+  assert.deepEqual(develop.on.workflow_run.workflows, ['Web checks']);
+  assert.ok(!develop.on.push);
+  assert.equal(develop.jobs.ready.environment, undefined);
+  for (const flow of [pr, develop]) {
+    const deploy = JSON.stringify(flow.jobs.staging);
+    assert.ok(deploy.includes('deploy-staging-artifact.mjs'));
+    assert.ok(deploy.includes('download-artifact@'));
+    assert.ok(!/npm (?:test|run build|run deploy)/.test(deploy));
+    assert.ok(deploy.includes('npm ci --ignore-scripts'));
+    assert.ok(!JSON.stringify(flow.jobs.regression).includes('CLOUDFLARE_API_TOKEN'));
+    assert.ok(!JSON.stringify(flow.jobs.verify ?? flow.jobs.ready).includes('secrets.'));
+  }
+  const web = entries.find(item => item.file === 'web-checks.yml').data;
+  assert.ok(!JSON.stringify(web).includes('secrets.'));
+  assert.ok(JSON.stringify(web.jobs.verify).includes('staging-artifact.mjs'));
+
   const release = entries.find(item => item.file.endsWith('.disabled')).data;
   assert.match(release.jobs.prepare.if, /PULBASE_PRODUCTION_ENABLED/);
   assert.equal(release.jobs.prepare.environment, 'release-preflight');

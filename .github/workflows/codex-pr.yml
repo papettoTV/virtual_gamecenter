@@ -5,6 +5,7 @@ on:
     types: [opened, synchronize, reopened]
 permissions:
   contents: read
+  actions: read
 # Holds the shared staging environment through testing and merge; no deployment overlaps.
 concurrency:
   group: pulbase-staging-pipeline
@@ -40,6 +41,9 @@ jobs:
     outputs:
       candidate: ${{ steps.identity.outputs.candidate }}
       tree: ${{ steps.identity.outputs.tree }}
+      run_id: ${{ steps.ci.outputs.runId }}
+      attempt: ${{ steps.ci.outputs.attempt }}
+      artifact_id: ${{ steps.ci.outputs.artifactId }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -59,13 +63,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: npm ci
-        working-directory: apps/web
-      - run: |
-          printf '%s\n' 'GOOGLE_CLIENT_ID=ci-example.apps.googleusercontent.com' 'GOOGLE_CLIENT_SECRET=ci-example' 'STRIPE_SECRET_KEY=sk_test_ci_example' 'STRIPE_WEBHOOK_SECRET=whsec_ci_example' > .dev.vars
-          npm test
-          npm run build:staging
-        working-directory: apps/web
+      - name: Require successful CI artifact for the identical merge candidate
+        id: ci
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PULBASE_CHECK_SHA: ${{ needs.gate.outputs.head }}
+          PULBASE_RELEASE_SHA: ${{ steps.identity.outputs.candidate }}
+          PULBASE_EXPECTED_BASE: ${{ needs.gate.outputs.base }}
+          PULBASE_PR_NUMBER: ${{ needs.gate.outputs.number }}
+          PULBASE_CI_EVENT: pull_request
+        run: node ci/ci-evidence.mjs
   review:
     needs: [gate, verify]
     runs-on: ubuntu-latest
@@ -111,55 +118,67 @@ jobs:
     needs: [gate, verify, review-gate]
     if: vars.PULBASE_STAGING_DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 12
     environment: staging
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.verify.outputs.candidate }}
-          fetch-depth: 0
+          ref: ${{ needs.gate.outputs.base }}
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: npm ci
+      - name: Install locked deploy tools without lifecycle scripts
+        run: npm ci --ignore-scripts
         working-directory: apps/web
-      - run: npm ci
-        working-directory: ci
-      - run: npx playwright install --with-deps chromium
-        working-directory: ci
-      - name: Confirm develop has not moved
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ needs.verify.outputs.artifact_id }}
+          run-id: ${{ needs.verify.outputs.run_id }}
+          github-token: ${{ github.token }}
+          path: ci/downloaded-build
+          merge-multiple: true
+      - name: Recheck CI and deploy artifact without executing candidate code
         env:
           GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          EXPECTED_BASE: ${{ needs.gate.outputs.base }}
-        run: test "$(gh api "repos/$GH_REPO/git/ref/heads/develop" --jq .object.sha)" = "$EXPECTED_BASE"
-      - name: Build stamped staging candidate without deployment credentials
-        working-directory: apps/web
-        env:
-          PULBASE_RELEASE_SHA: ${{ needs.verify.outputs.candidate }}
-        run: |
-          git checkout -B develop
-          printf '%s\n' 'GOOGLE_CLIENT_ID=ci-example.apps.googleusercontent.com' 'GOOGLE_CLIENT_SECRET=ci-example' 'STRIPE_SECRET_KEY=sk_test_ci_example' 'STRIPE_WEBHOOK_SECRET=whsec_ci_example' > .dev.vars
-          npm test
-          npm run build:staging
-      - name: Deploy verified candidate to staging only
-        working-directory: apps/web
-        env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          PULBASE_DRY_RUN: 'false'
+          PULBASE_CHECK_SHA: ${{ needs.gate.outputs.head }}
           PULBASE_RELEASE_SHA: ${{ needs.verify.outputs.candidate }}
-        run: |
-          node ../../ci/deploy-built.mjs staging
-      - name: Check deployed identity and public HTTP routes
-        working-directory: apps/web
+          PULBASE_EXPECTED_BASE: ${{ needs.gate.outputs.base }}
+          PULBASE_EXPECTED_TREE: ${{ needs.verify.outputs.tree }}
+          PULBASE_PR_NUMBER: ${{ needs.gate.outputs.number }}
+          PULBASE_CI_EVENT: pull_request
+          PULBASE_CI_RUN_ID: ${{ needs.verify.outputs.run_id }}
+          PULBASE_CI_ATTEMPT: ${{ needs.verify.outputs.attempt }}
+          PULBASE_ARTIFACT_ID: ${{ needs.verify.outputs.artifact_id }}
+        run: node ci/deploy-staging-artifact.mjs
+  regression:
+    needs: [gate, verify, staging]
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.gate.outputs.base }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts
+        working-directory: ci
+      - run: npx --no-install playwright install --with-deps chromium
+        working-directory: ci
+      - name: HTTP and exact deployed candidate revision
         env:
           PULBASE_CHECK_USERNAME: ${{ secrets.PULBASE_CHECK_USERNAME }}
           PULBASE_CHECK_PASSWORD: ${{ secrets.PULBASE_CHECK_PASSWORD }}
           PULBASE_EXPECTED_SHA: ${{ needs.verify.outputs.candidate }}
         run: |
-          mkdir -p ../../ci/results
-          node --experimental-strip-types scripts/service-check.mjs --environment staging > ../../ci/results/service.json
-          node ../../ci/check-revision.mjs staging
+          mkdir -p ci/results
+          node --experimental-strip-types apps/web/scripts/service-check.mjs --environment staging > ci/results/service.json
+          node ci/check-revision.mjs staging
       - name: Browser regression on desktop and mobile
         working-directory: ci
         env:
@@ -179,7 +198,7 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
   merge:
-    needs: [gate, verify, staging]
+    needs: [gate, verify, staging, regression]
     if: vars.PULBASE_AUTO_MERGE_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 8
@@ -214,7 +233,7 @@ jobs:
             const { reportMerge } = await import(`${process.env.GITHUB_WORKSPACE}/ci/github.mjs`);
             await reportMerge({ github, context, head: process.env.HEAD_SHA, base: process.env.BASE_SHA, verifiedTree: process.env.VERIFIED_TREE, mergedSha: sha });
   report:
-    needs: [gate, verify, review, review-gate, staging, merge]
+    needs: [gate, verify, review, review-gate, staging, regression, merge]
     if: always() && needs.gate.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 3
@@ -234,4 +253,4 @@ jobs:
           script: |
             const jobs = JSON.parse(process.env.JOB_RESULTS);
             const { report } = await import(`${process.env.GITHUB_WORKSPACE}/ci/github.mjs`);
-            await report({ github, context, ok: jobs.staging.result === 'success' && !Object.values(jobs).some(j => j.result === 'failure' || j.result === 'cancelled') });
+            await report({ github, context, ok: jobs.regression.result === 'success' && !Object.values(jobs).some(j => j.result === 'failure' || j.result === 'cancelled') });

@@ -87,3 +87,7 @@ vite.config.ts.timestamp-*
 /ci/playwright-report/
 /ci/request.md
 /ci/review-request.md
+
+# CI staging build artifacts
+ci/staging-build/
+ci/downloaded-build/
