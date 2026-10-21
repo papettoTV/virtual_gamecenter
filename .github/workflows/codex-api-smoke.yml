@@ -30,7 +30,8 @@ jobs:
           sandbox: read-only
           safety-strategy: drop-sudo
           effort: low
-          codex-args: '["--skip-git-repo-check", "--ephemeral"]'
+          # Codex Action adds --skip-git-repo-check itself.
+          codex-args: '["--ephemeral"]'
           prompt: >-
             This is a minimal API authentication and response test.
             Do not use tools, read files, execute commands, modify files, or contact external services.

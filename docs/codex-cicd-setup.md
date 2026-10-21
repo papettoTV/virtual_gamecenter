@@ -1,6 +1,6 @@
 # Codex・GitHub CI/CD の準備と設定
 
-更新日：2026-10-21。developでのローカル準備。ユーザーの指示でGitHubのデフォルトブランチだけをdevelopへ変更・確認済み。mainへの反映、Cloudflareの設定変更、デプロイ、OpenAI API実行、X投稿は行っていない。GitHub App・Environment・Secretを設定し、認証確認専用ワークフロー1ファイルだけをContents APIでリモートdevelopへ追加・実行した。CI/CD本体は最新リモートdevelopを基点にした一時チェックアウトへ選択的に取り込み、検証後に反映する段階。
+更新日：2026-10-21。developでのローカル準備。ユーザーの指示でGitHubのデフォルトブランチだけをdevelopへ変更・確認済み。mainへの反映、Cloudflareの設定変更、デプロイ、OpenAI API実行、X投稿は行っていない。GitHub App・Environment・Secretを設定し、認証確認専用ワークフロー1ファイルだけをContents APIでリモートdevelopへ追加・実行した。CI/CD本体は `d19e3ac` としてリモートdevelopへ選択的に反映済み。Web checks成功後にdevelopの保護設定を適用した。OpenAIの応答確認は起動引数を修正して再試験する段階。
 
 ## 構成と実装範囲
 
@@ -30,7 +30,7 @@ Codexは実装とレビューを別ジョブ・別ランナーで行う。実装
 3. 自動化フラグはfalseのまま維持する。X/main/本番の設定は本番導入時まで保留できる。
 4. ローカルのテスト・静的検証を行う。クラウドでの通し試験は別の導入段階として記録する。
 
-**デフォルトブランチについて：** 2026-10-21、ユーザーの指示でGitHubのデフォルトをmainからdevelopへ変更し、APIで反映を確認した。mainへのコミットやPages Production branchは変更していない。`issues` と `workflow_dispatch` の登録先は今後developとなる。CI/CD準備コミットはまだローカルにあり、リモートdevelopとの既存の分岐を整理して安全に反映するまでは、新ワークフローはGitHub上で未稼働。`--ref develop` だけでは未登録のワークフローを実行できない。設定確認時点でリポジトリの有効化フラグは未登録だった。
+**デフォルトブランチについて：** 2026-10-21、ユーザーの指示でGitHubのデフォルトをmainからdevelopへ変更し、APIで反映を確認した。mainへのコミットやPages Production branchは変更していない。`issues` と `workflow_dispatch` の登録先は今後developとなる。CI/CD本体はリモートdevelopへ反映済み。ただし自動実装/マージ/公開のフラグは無効。元のローカルdevelopとの分岐は保持し、無関係な履歴は取り込んでいない。`--ref develop` だけでは未登録のワークフローを実行できない。設定確認時点でリポジトリの有効化フラグは未登録だった。
 
 ## 2. GitHub App
 
@@ -214,7 +214,7 @@ GitHub Actions上のSecret/API/デプロイを使う通し試験、実環境の�
 - `PULBASE_CODEX_ENABLED` / `PULBASE_STAGING_DEPLOY_ENABLED` / `PULBASE_AUTO_MERGE_ENABLED` は引き続きfalse。OpenAI APIキーは登録確認のみで、APIによる実行・有効性の検証は次の段階。
 
 
-## CI/CD本体のdevelop統合（2026-10-21・進行中）
+## CI/CD本体のdevelop統合（2026-10-21）
 
 元の作業フォルダとは別の一時チェックアウトで、最新リモートdevelopを基点にCI/CD準備コミットの差分だけを適用。最近のSLO対応を含むリモート側の既存変更を維持し、無関係なローカル履歴を一括pushしない。
 
@@ -223,3 +223,8 @@ GitHub Actions上のSecret/API/デプロイを使う通し試験、実環境の�
 統合コミットの先頭には `[CF-Pages-Skip]` を付け、Pages公開をスキップしつつGitHubのWeb checksを実行する。本番用テンプレートは引き続き無効のまま。Web checks成功後、developのclassic branch protectionでPR必須・最新baseへの追従・GitHub Actionsによる `verify` / `Automation control checks` 成功・管理者も対象・force push/削除禁止を設定する。Codexレビューを自動処理できるよう、人の必須レビュー数は0とし、別実行のCodexレビューと検証環境確認を自動マージジョブの前提に保つ。
 
 統合前のローカル確認：最新リモートdevelop由来の既存801テスト、制御系20テスト、型検査・stagingビルド、8ワークフロー/テンプレートの検査とactionlintが成功。元の作業フォルダの未公開機能を含むテスト件数とは区別する。
+
+
+統合結果：`d19e3ac` の [Web checks 39518395360](https://github.com/papettoTV/virtual_gamecenter/actions/runs/39518395360) は成功。developにPR必須、最新base、GitHub Actions（App ID 15368）の `verify` / `Automation control checks` 必須、管理者も対象、force push/削除禁止、会話解決必須を適用し、APIで再確認した。人の必須レビュー数は0。mainのSHAは `73cb5d9267c56f06f9f1150327ec6b8b3caa2bb9` のまま維持している。
+
+OpenAIの初回試験39518429088は、人の承認後にCLI起動引数の重複で停止した。固定したCodex Actionが `--skip-git-repo-check` を自動追加するため、workflow側の追加指定を除去し、ローカルの回帰検査にこの契約を追加。モデル応答・APIキーの有効性は、この起動失敗を根拠に合格扱いにしない。修正は保護ルールを迂回せず、develop向けPRと必須チェックを通して取り込む。
