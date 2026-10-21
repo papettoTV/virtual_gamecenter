@@ -1,3 +1,4 @@
+import { drawPlayerShield, drawLevelUpLightning, shieldAppearance } from "./player-effects";
 import { drawGameOverOverlay } from "./game-over-overlay";
 import { createCyberCanyonBackground } from "./cyber-canyon-background";
 import { drawPlayerShip } from "./player-ship";
@@ -19,8 +20,6 @@ export function createCanvasRenderer(options) {
     BULLET_GLOW_DISABLE_THRESHOLD,
     BULLET_GLOW_REDUCE_THRESHOLD,
     INVINCIBLE_WARNING_TIME,
-    INVINCIBLE_RING_INNER_RADIUS,
-    INVINCIBLE_RING_INNER_SCALE,
     HIT_MARKER_RADIUS,
   } = options.settings;
   const canyonBackground = createCyberCanyonBackground(FIELD_WIDTH, FIELD_HEIGHT);
@@ -298,25 +297,13 @@ export function createCanvasRenderer(options) {
     context.globalAlpha = isHitInvincible && invincibleBlink ? 0.45 : 1;
     if (isLevelInvincible) {
       context.save();
-      const invincibleRatio = player.barrierRatio;
-      const pulse = 0.55 + Math.sin(frame.elapsedRound * 18) * 0.22;
-      const isWarning = player.levelUpInvincible <= INVINCIBLE_WARNING_TIME;
-      const warningBlink = isWarning && Math.floor(frame.elapsedRound * 18) % 2 === 0;
-      const warningAlpha = warningBlink ? 0.28 : 1;
-      context.globalAlpha *= warningAlpha;
-      const barrierRadius = INVINCIBLE_RING_INNER_RADIUS + invincibleRatio * INVINCIBLE_RING_INNER_SCALE + pulse * 5;
-      const barrierGradient = context.createRadialGradient(player.x, player.y, 0, player.x, player.y, barrierRadius);
-      barrierGradient.addColorStop(0, "rgba(105, 247, 255, 0.46)");
-      barrierGradient.addColorStop(0.48, "rgba(105, 247, 255, 0.28)");
-      barrierGradient.addColorStop(1, "rgba(105, 247, 255, 0.12)");
-      context.fillStyle = barrierGradient;
-      context.beginPath();
-      context.arc(player.x, player.y, barrierRadius, 0, Math.PI * 2);
-      context.fill();
+      const appearance = shieldAppearance(player.barrierRatio, player.levelUpInvincible, frame.elapsedRound);
+      context.globalAlpha *= appearance.opacity;
+      drawPlayerShield(context, player.x, player.y, appearance.radius);
       context.restore();
     }
     if (player.levelUpFlash > 0) {
-      drawLevelUpLightning(player);
+      drawLevelUpLightning(context, player.x, player.y, player.color, player.levelUpFlash);
     }
     drawPixelPlayerShip(player);
 
@@ -351,44 +338,6 @@ export function createCanvasRenderer(options) {
     context.translate(player.x + bankOffset, player.y);
     context.scale(bankScale, 1);
     drawPlayerShip(context, player.color);
-    context.restore();
-  }
-
-  function drawLevelUpLightning(player) {
-    context.save();
-    const progress = player.levelUpFlash / 0.42;
-    const alpha = Math.min(1, progress * 1.4);
-    const boltCount = 10;
-
-    context.globalAlpha = alpha;
-    context.fillStyle = `rgba(255, 255, 255, ${0.18 * alpha})`;
-    context.shadowBlur = 44;
-    context.shadowColor = player.color;
-    context.beginPath();
-    context.arc(player.x, player.y, 34 + (1 - progress) * 34, 0, Math.PI * 2);
-    context.fill();
-
-    for (let boltIndex = 0; boltIndex < boltCount; boltIndex += 1) {
-      const angle = frame.elapsedRound * 12 + (Math.PI * 2 * boltIndex) / boltCount + randomRange(-0.24, 0.24);
-      const radius = randomRange(42, 86);
-      const bolt = createLightningBolt(player.x, player.y, radius, angle, 16);
-
-      context.strokeStyle = boltIndex % 2 === 0 ? "#ffffff" : player.color;
-      context.lineWidth = boltIndex % 2 === 0 ? 4 : 2.4;
-      context.shadowBlur = 24;
-      context.shadowColor = player.color;
-      context.beginPath();
-      context.moveTo(bolt[0].x, bolt[0].y);
-      for (const point of bolt.slice(1)) context.lineTo(point.x, point.y);
-      context.stroke();
-    }
-
-    context.strokeStyle = "#ffffff";
-    context.lineWidth = 5;
-    context.globalAlpha = alpha * 0.7;
-    context.beginPath();
-    context.arc(player.x, player.y, 72 - progress * 22, 0, Math.PI * 2);
-    context.stroke();
     context.restore();
   }
 
