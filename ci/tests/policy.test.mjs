@@ -6,12 +6,19 @@ import { checkWorkflows } from '../check-workflows.mjs';
 const sha = 'a'.repeat(40);
 test('automation allows UI changes and rejects infrastructure, security, path tricks and renames', () => {
   assertChanges([{ filename: 'apps/web/src/games/dot-wave/game.ts' }, { filename: 'apps/web/tests/game.test.mjs' }]);
+  assertChanges([{ filename: 'apps/web/src/games/graze-duel/rendering/canvas-renderer.js' },
+    { filename: 'apps/web/src/games/graze-duel/rendering/game-over-overlay.js' }, { filename: 'docs/pc-play-spectating-verification.md' }]);
   for (const filename of ['.github/workflows/x.yml', 'ci/policy.mjs', 'apps/web/package.json', 'apps/web/src/worker/index.ts',
-    'apps/web/src/features/platform/PlatformExperience.tsx', 'docs/../AGENTS.md', 'docs/AGENTS.md', 'docs/a b.md', '/docs/a.md', 'docs//a.md']) {
+    'apps/web/src/features/platform/PlatformExperience.tsx', 'docs/../AGENTS.md', 'docs/AGENTS.md', 'docs/a b.md', '/docs/a.md', 'docs//a.md',
+    'apps/web/src/games/graze-duel/game.js', 'apps/web/src/shared/rendering/client.js', 'apps/web/src/worker/rendering/renderer.js',
+    'apps/web/src/games/graze-duel/rendering/auth.js', 'apps/web/src/games/graze-duel/rendering/../game.js',
+    'apps/web/src/games/graze-duel/rendering/config.json', 'docs/SKILL.md', 'docs/CLAUDE.md', 'docs/GEMINI.md', 'docs/agents.md',
+    'AGENTS.md', 'README.md', 'apps/web/src/games/graze-duel/rendering/README.md']) {
     assert.equal(allowedPath(filename), false, filename);
   }
   assert.throws(() => assertChanges([]));
   assert.throws(() => assertChanges([{ filename: 'docs/a.md', previous_filename: 'ci/policy.mjs' }]));
+  assert.throws(() => assertChanges([{ filename: 'apps/web/src/games/graze-duel/rendering/a.js', previous_filename: 'apps/web/src/worker/index.js' }]));
 });
 test('review fails closed on malformed/negative findings', () => {
   assertReview({ pass: true, findings: [] });

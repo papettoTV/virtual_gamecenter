@@ -1,4 +1,5 @@
 import { assertAutomatedPr, assertChanges, assertIssueNumber, assertSha } from './policy.mjs';
+import { publicationFailureText } from './publication-result.mjs';
 
 export async function intake({ github, context, core, issueInput }) {
   const issue_number = assertIssueNumber(issueInput || context.payload.issue?.number);
@@ -73,7 +74,7 @@ export async function reportMerge({ github, context, head, base, verifiedTree, m
     body: `検証合格・developへマージしました。\n\nHead: \`${head}\`\nBase: \`${base}\`\nTree: \`${verifiedTree}\`\nMerge: \`${mergedSha}\`\n証跡: ${context.serverUrl}/${repo.owner}/${repo.repo}/actions/runs/${context.runId}\n\n本番公開・X告知は実施していません。` });
 }
 
-export async function report({ github, context, ok }) {
+export async function report({ github, context, ok, failureJson }) {
   await github.rest.issues.createComment({ ...context.repo, issue_number: context.payload.pull_request?.number ?? context.payload.issue?.number ?? assertIssueNumber(process.env.ISSUE_NUMBER),
-    body: `${ok ? '検証が完了しました。' : '自動処理を停止しました。失敗したチェックの確認・修正が必要です。'}\n\n実行結果・画像・ログ: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}\n\n本番公開・X告知は実施していません。` });
+    body: `${ok ? '検証が完了しました。' : '自動処理を停止しました。失敗したチェックの確認・修正が必要です。'}${ok ? '' : publicationFailureText(failureJson)}\n\n実行結果・画像・ログ: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}\n\n本番公開・X告知は実施していません。` });
 }
