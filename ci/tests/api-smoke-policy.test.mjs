@@ -16,6 +16,8 @@ test('API smoke is human-gated, manual-only, uses an empty directory and keeps t
   assert.equal(action.with['safety-strategy'], 'drop-sudo');
   assert.equal(action.with['working-directory'], '${{ runner.temp }}/pulbase-codex-smoke');
   assert.equal(action.with['openai-api-key'], '${{ secrets.OPENAI_API_KEY }}');
+  // The pinned Action supplies --skip-git-repo-check. Passing it again makes the CLI fail before inference.
+  assert.deepEqual(JSON.parse(action.with['codex-args']), ['--ephemeral']);
   assert.match(action.with.prompt, /exactly CODEX_API_OK/);
   assert.ok(probe.steps.slice(0, -1).every(step => !JSON.stringify(step).includes('secrets.')));
   assert.deepEqual(workflow.jobs.confirm.needs, 'probe');
