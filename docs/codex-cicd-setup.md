@@ -1,6 +1,18 @@
 # Codex・GitHub CI/CD の準備と設定
 
-更新日：2026-10-21。CI/CD本体をリモートdevelopへ選択的に統合し、Web checks成功とdevelopの保護設定を確認済み。GitHub Appの認証試験と、人が承認したOpenAI API固定応答試験が成功した。GitHubのデフォルトブランチはdevelop。mainへの反映、Cloudflareの設定変更・デプロイ、X投稿は行っていない。自動実装・自動マージ・検証公開のフラグはfalseのまま。
+更新日：2026-10-21。develop向け自動化を通常運用へ切替。Issue #5 / PR #6の通し試験では、Codex実装・PR作成・独立レビュー・検証公開・develop自動マージ・Issue完了・実マージSHAの検証公開が成功した。codex/stagingの人手承認要件を解除し、自動実装・検証公開・自動マージの3フラグをtrueに設定。本番/Xは明示的にfalseで、本番用テンプレートは無効。mainへの反映・本番公開・X投稿は行っていない。
+
+## 現在の通常運用
+
+- 運営者がIssueを起票すると、Codex実装 → GitHub Appによるdevelop向けPR → 必須CIと候補テスト → 独立Codexレビュー → staging公開とSHA/HTTP/ブラウザ確認 → develop自動マージ → Issue完了 → 実マージSHAのstaging再公開まで、人のEnvironment承認なしで進む。
+- 第三者のIssueは、書込権限を持つ運営者が `codex:run` を付ける。Issueには期待する変更と受け入れ条件を明記する。初期運用は1件ずつ進め、並行変更で古いbaseになったPRは確認して最新developで再実行する。
+- `codex` / `automation` / `staging` はdevelopと `refs/pull/*/merge` だけを許可。main・タグからは利用不可。required reviewersとwait timerはなく、管理者bypassも禁止。
+- developはPR必須、GitHub Actionsの `verify` / `Automation control checks` 必須、最新baseへの追従、管理者も保護対象。独立レビュー不合格・テスト失敗・保護パス変更・公開SHA不一致等では自動マージを停止する。
+- `PULBASE_CODEX_ENABLED` / `PULBASE_STAGING_DEPLOY_ENABLED` / `PULBASE_AUTO_MERGE_ENABLED` はtrue。`PULBASE_PRODUCTION_ENABLED` / `PULBASE_X_ENABLED` はfalse。PagesのProduction branchはmainのまま、PreviewのGit自動公開はNoneを維持する。
+- 通常運用を止めるときは3つのdevelop用フラグをfalseにする。進行中の処理がある場合、フラグ変更だけで停止済みとせずActionsの状態を確認する。失敗時はPRの実行リンクと成果物を確認して修正する。
+
+設定開始時からの手順・検証履歴は以下に残す。初期の承認付き試験とフラグfalseの記述は、その時点の履歴であり、現在の設定は本節を参照する。
+
 
 ## 構成と実装範囲
 
@@ -13,7 +25,7 @@
 | `.github/workflow-templates/production-release.yml.disabled` | **実行されない本番用テンプレート**。人の承認 → mainへfast-forward → 本番公開 → 回帰確認 → X告知 |
 | `ci/` | 入力・差分・レビュー・公開先・リビジョンの検査、ブラウザテスト、X投稿と永続状態管理 |
 
-すべての有効化フラグは未設定をfalseとして扱う。現在はIssue起票やdevelop pushによって新しい自動実装・公開は開始しない。既存の `Web checks` と手動サービス確認は維持する。
+すべての有効化フラグは未設定をfalseとして扱う。通常運用では上記のdevelop用3フラグを有効にしている。既存の `Web checks` と手動サービス確認も維持する。
 
 Codexは実装とレビューを別ジョブ・別ランナーで行う。実装ジョブにGitHub書込資格情報・Cloudflare・XのSecretを渡さない。Codexをジョブ最後のステップに置き、後続のGitHub書込は新しいランナーで行う。候補のテスト/ビルドのステップにCloudflareトークンを渡さず、検査済み成果物のデプロイ時だけ渡す。
 
@@ -260,3 +272,10 @@ CloudflareトークンはAPI確認ステップだけ、Basic認証はサービ�
 承認後、developのSHAが変わっていないこと、Cloudflareの対象が検証Worker/既存Pagesであること、Pages Production branchがmainでPreview自動公開が停止していることを確認する。前提条件に合格してからテストとSHA付きビルド、staging WorkerとPages developへの公開、両者のSHA照合、HTTP確認、Chromiumのデスクトップ/モバイル回帰確認を行う。公開直前にもPages設定を再確認する。本番のmainへの反映・本番公開・X投稿は行わない。
 
 ブラウザ確認は検証用ゲストを作成するが、Googleログインやクレジット消費を伴うプレイは行わない。証跡はActionsのstaging-evidence成果物で確認する。公開や検査の失敗時は、部分公開の有無を調べてから次の操作を判断する。失敗を成功扱いにしない。
+
+
+## 通し試験の完了記録
+
+[Issue #5](https://github.com/papettoTV/virtual_gamecenter/issues/5)から[PR #6](https://github.com/papettoTV/virtual_gamecenter/pull/6)が自動作成された。差分は `docs/cicd-smoke-test.md` だけ。 [PR検証39526879413](https://github.com/papettoTV/virtual_gamecenter/actions/runs/39526879413)の候補テスト・独立レビュー・検証公開・回帰確認がすべて成功し、pulbase-codex Appがdevelopへ `937138d4ebe7c4ed5ef9fbb98926cb7707a5df04` としてマージ、Issueを自動完了した。
+
+[実マージSHAの検証公開39528349645](https://github.com/papettoTV/virtual_gamecenter/actions/runs/39528349645)ではWorker/Pages双方のSHA一致、HTTP7項目、Chromiumのデスクトップ/モバイル8ケースが成功し、skip・失敗・リトライは0。マージ後の通常CIも成功した。試験後はいったん3フラグをfalseへ戻し、その後ユーザーの明示指示で通常運用としてtrueへ切り替え、codex/stagingの承認要件を解除した。
