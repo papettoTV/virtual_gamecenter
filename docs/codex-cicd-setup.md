@@ -249,3 +249,14 @@ staging Environmentの作成と、`CLOUDFLARE_API_TOKEN`・`PULBASE_CHECK_USERNA
 2. 別ステップでBasic認証を使い、既存の検証URLに対してサービス確認を行う。新規プレイヤー・クレジット消費・デプロイ・設定更新・本番URLへのアクセスは実施しない。Cloudflare確認が失敗しても、セットアップ成功時にはBasic認証の確認を行う。
 
 CloudflareトークンはAPI確認ステップだけ、Basic認証はサービス確認ステップだけに渡す。この試験でCloudflareの書込権限やデプロイ成功は証明しない。Preview自動公開が有効な場合は事前チェックの結果で示し、検証公開フラグを有効にする前に停止する。現時点で自動化フラグはすべてfalse、クラウドの設定変更・デプロイ・main反映は未実施。
+
+
+## 初回の手動staging公開試験
+
+[公開前の接続確認39524149715](https://github.com/papettoTV/virtual_gamecenter/actions/runs/39524149715)は成功。Cloudflareの検証Worker/Pagesメタデータ読取と、Basic認証を使うサービス確認7項目が成功した。この時点ではPreview自動公開が有効だったため、利用者がCloudflareでPreviewをNoneに変更した。変更後のAPI再確認と公開試験は以下の承認後に行う。
+
+`Develop staging deployment` はdevelopからpapettoTVが手動実行できる。手動実行にもstaging環境の人の承認が必要。pushイベントは従来どおり `PULBASE_STAGING_DEPLOY_ENABLED=true` が必要で、初回試験ではfalseを維持する。Issue実装・自動マージのフラグもfalseのまま。
+
+承認後、developのSHAが変わっていないこと、Cloudflareの対象が検証Worker/既存Pagesであること、Pages Production branchがmainでPreview自動公開が停止していることを確認する。前提条件に合格してからテストとSHA付きビルド、staging WorkerとPages developへの公開、両者のSHA照合、HTTP確認、Chromiumのデスクトップ/モバイル回帰確認を行う。公開直前にもPages設定を再確認する。本番のmainへの反映・本番公開・X投稿は行わない。
+
+ブラウザ確認は検証用ゲストを作成するが、Googleログインやクレジット消費を伴うプレイは行わない。証跡はActionsのstaging-evidence成果物で確認する。公開や検査の失敗時は、部分公開の有無を調べてから次の操作を判断する。失敗を成功扱いにしない。
