@@ -1,6 +1,6 @@
 # 無料ベータの公開環境とリリース手順
 
-更新日：2026-10-13。検証用Cloudflareリソース・Secret・Pages→Worker接続まで反映済み。main/本番は未変更。最新の実測と残作業は [接続・検証記録](pages-worker-gateway.md) を参照。
+更新日：2026-10-21。検証用Cloudflareリソース・Secret・Pages→Worker接続まで反映済み。本番専用D1と非公開R2を新規作成し、developの本番設定へ対応付けた。本番Worker・DB移行・Secret・Pages接続は未反映。今回の準備と残作業は [本番準備手順](production-cicd-preparation.md)、検証の実測は [接続・検証記録](pages-worker-gateway.md) を参照。
 
 ## 確定した公開先とブランチ
 
@@ -32,8 +32,8 @@ GitHub Actionsはmain/developへのpushと、それらを対象とするPRでテ
 | 項目 | ローカル（ルート設定） | 検証 `staging` | 本番 `production` |
 | --- | --- | --- | --- |
 | Worker | 既存名のローカルエミュレーション | `pulbase-staging` | `pulbase-production` |
-| D1 | `.wrangler`内のローカルDB | `pulbase-staging`（作成・移行済み） | `pulbase-production`（未作成） |
-| R2 | ローカルエミュレーション | `pulbase-staging-deletion-audit`（非公開、作成済み） | `pulbase-production-deletion-audit`（未作成） |
+| D1 | `.wrangler`内のローカルDB | `pulbase-staging`（作成・移行済み） | `pulbase-production`（作成済み、移行未適用） |
+| R2 | ローカルエミュレーション | `pulbase-staging-deletion-audit`（非公開、作成済み） | `pulbase-production-deletion-audit`（非公開、作成済み） |
 | Durable Objects | ローカル筐体 | 検証Workerの筐体 | 本番Workerの筐体 |
 | Google OAuth | 開発者ログイン/ローカル設定 | 専用のGoogle OAuth client | 本番用Google OAuth client |
 | 開発者ログイン | 有効 | 無効 | 無効 |
@@ -41,7 +41,7 @@ GitHub Actionsはmain/developへのpushと、それらを対象とするPRでテ
 | サイト閲覧 | localhost/LAN | Basic認証を維持 | 当面Basic認証を維持 |
 | 削除Cron | テスト/手動検証 | 毎時 | 毎時 |
 
-検証D1 IDは実際の値へ反映。本番D1 IDは意図的な仮値のままで、本番公開用チェックは失敗する。ローカルの保存場所・既存DB IDは変更していない。
+検証・本番D1 IDは実際の専用DBへ対応付け済み。本番D1は空で、スキーマ移行とアプリの接続確認は未実施。ローカルの保存場所・既存DB IDは変更していない。
 
 ## 今回用意した安全策
 
@@ -52,7 +52,7 @@ GitHub Actionsはmain/developへのpushと、それらを対象とするPRでテ
 - `.dev.vars` はローカル用。クラウドのSecretは環境ごとに別途登録。秘密値を資料・Git・CIへコピーしない。CIは固定のダミー値だけを使用する。
 - これらはnpm経由の誤操作防止であり、直接の `npx wrangler` や管理画面の操作まで禁止する権限境界ではない。クラウド権限・公開判定は別途必要。
 
-## 次の作業：判断・リソース作成（未実施）
+## 環境構築の手順（検証は実施済み、本番は準備中）
 
 1. 本番はPagesのmainとpulbase.com、検証はdevelopと標準develop URLと確定。pulbase.comはPages側で管理する。環境別バックエンドWorkerは公開routesなし・workers.dev無効でService Bindingから利用する。PagesカスタムドメインとDNSの実設定は未確認。
 2. Pages Production/Previewから各Workerへの接続を準備する。既存DB/R2/認証/台帳を引き継ぐかは実際のbindingを棚卸しして決め、未確認のIDやテストデータを本番へコピーしない。

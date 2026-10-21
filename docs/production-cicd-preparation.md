@@ -17,7 +17,7 @@
 1. 実装用とは別のリリース用GitHub Appを作成し、このrepoだけへインストールする。Repository permissionsはContents: Read and write、Workflows: Read and write、Metadata: Read。Workflowsはworkflowファイルを含むコミットのmain反映に必要。Webhookは不要。App IDを `PULBASE_RELEASE_APP_ID`、秘密鍵をproduction/announcementの `PULBASE_RELEASE_APP_PRIVATE_KEY` として登録する。実装用Appやcodex/staging/automationへ本番鍵を渡さない。
 2. リリースAppの認証と権限を公開なしで検証し、そのIDを使ってmain保護を設計・設定する。mainには後述の2つのactiveルールセットを適用済み。実装用Appにはmain更新のbypassを付けない。mainのコードを動かす試験は別途明示指示まで行わない。
 3. release-preflightへ検証Basic認証2値を登録する。productionへ本番専用Cloudflareトークンと本番Basic認証2値を登録する。検証と本番のトークン・ユーザー情報を混同しない。
-4. 本番Worker/D1/R2/Service Binding/Google OAuth等の存在・分離・必要Secret・移行・バックアップ・復旧手順を確認する。現行設定にはproduction D1の仮IDが残るため、本番構成は未完成。リソース作成やSecret更新はクラウド反映として別途扱い、ローカルビルド成功で完了にしない。
+4. 本番Worker/D1/R2/Service Binding/Google OAuth等の存在・分離・必要Secret・移行・バックアップ・復旧手順を確認する。本番専用D1/R2は作成・対応付け済みだが、DB移行・Worker・Secret・接続は未完了。リソース作成やSecret更新はクラウド反映として別途扱い、ローカルビルド成功で完了にしない。
 5. X Developer Appを用意する。OAuth 1.0aユーザーコンテキストのRead and Write権限で、実際に告知するアカウントの4資格情報をannouncementへ登録する。必要な契約・利用枠はXのConsoleで確認し、投稿試験は今は行わない。
 6. Xの重複投稿防止用 `automation-state` ブランチを公開対象外として準備し、更新権限を本番側のAppに限定する。送信結果不明時は自動再送せず、投稿有無を人が照合する。
 7. 既存の `production-launch-checklist.md` の公開判定を確認する。長時間負荷試験等の未完了事項はCI成功だけで合格に変更しない。
@@ -57,7 +57,7 @@
 - main SHAは `73cb5d9267c56f06f9f1150327ec6b8b3caa2bb9` のまま。本番/Xフラグはfalse。本番用テンプレートは無効。本番Cloudflare資格情報・実リソース・X設定等は引き続き未完了。
 
 
-## 本番Cloudflareリソースの読取棚卸し（2026-10-21）
+## 作成前の本番Cloudflareリソース棚卸し（2026-10-21）
 
 既存のローカルWrangler OAuth認証で、設定のaccount ID `60e5472a284dc71bbafbbfac8aa2a940` と権限を確認してGETのみを実行した。トークンやAPI応答本文は公開せず、リソースやデータの作成・更新は行っていない。
 
@@ -66,4 +66,46 @@
 - `pulbase-production-deletion-audit` R2：HTTP 404 / code 10006。
 - Pages `virtual-gamecenter`：Production branchはmain、Preview自動公開はnone。本番Git自動公開は有効で、ProductionのService Bindingは未設定。
 
-従って、現在は既存の本番Workerを選択してEditor権限だけのトークンを作れる状態ではない。本番専用リソース・設定・Secret・接続を準備し、新規Workerの初回作成に必要な権限と、その後の既存Worker更新の権限を分けて確認する。Pages本番Git自動公開の停止と、本番のService Binding設定変更はまだ実施していない。本番/Xフラグはfalseを維持する。
+この時点では、既存の本番Workerを選択してEditor権限だけのトークンを作れる状態ではない。本番専用リソース・設定・Secret・接続を準備し、新規Workerの初回作成に必要な権限と、その後の既存Worker更新の権限を分けて確認する。Pages本番Git自動公開の停止と、本番のService Binding設定変更はまだ実施していない。本番/Xフラグはfalseを維持する。
+
+
+## 本番専用D1・非公開R2の作成（2026-10-21）
+
+ユーザーの指示に基づき、アカウント `60e5472a284dc71bbafbbfac8aa2a940` に次の2リソースだけを新規作成した。既存の検証・旧環境のデータやSecretはコピーしていない。
+
+| リソース | 実体・設定 | 確認結果 |
+| --- | --- | --- |
+| D1 | `pulbase-production` / `af463342-06e5-4904-97fc-6569d59ceec3` / APAC | 名前とUUIDをAPIで照合、テーブル数0、移行未適用 |
+| R2 | `pulbase-production-deletion-audit` / APAC location hint / Standard | managed domain（r2.dev）無効、custom domainsは0件 |
+| Worker | `pulbase-production` | script-settingsは404 / code 10007。未作成・未デプロイ |
+| Pages | `virtual-gamecenter` | Production branchはmain、Preview自動公開はnone、本番Git自動公開は有効、Production Service Binding未設定 |
+
+`apps/web/wrangler.jsonc` のproduction DB binding `DB`へ実UUIDを設定した。R2 binding `DELETION_AUDIT`、Worker/DO/Rate Limitingの環境分離、workers.dev無効、公開routeなし、開発者ログイン無効、新規購入停止を維持する。本番だけLogsを有効・100%、Tracesを有効・1%に設定した。本番の `analytics_engine_datasets` は空配列を明示し、生成物の検証でも検証用集計の混入を拒否する。これはdevelop上の構成宣言で、稼働環境への適用ではない。設定根拠：[Cloudflare公式Traces設定](https://developers.cloudflare.com/workers/observability/traces/)。
+
+Workerのデプロイ、D1リモート移行、Worker Secretの登録、Pages/DNS変更、main更新、本番公開、X投稿はこの作業では実行しない。Worker Secretの `wrangler secret put` もデプロイを伴うため、今は使わない。GitHubのproduction/announcementの承認必須と、本番/Xフラグfalseを維持する。
+
+### 次の操作：本番用Basic認証をGitHubへ保管する
+
+1. 検証とは別の本番用ユーザー名と十分に長いランダムなパスワードをパスワード管理ツールで作成する。
+2. [GitHub Environments](https://github.com/papettoTV/virtual_gamecenter/settings/environments) → `production` → Add environment secret に、`PULBASE_CHECK_USERNAME` と `PULBASE_CHECK_PASSWORD` を登録する。
+3. 値はチャットへ貼らない。GitHub登録後、こちらでは登録名だけを確認する。この操作自体はWorkerを作成・公開しない。
+
+これらは公開後の回帰テスト用Secretであり、Worker側の `BASIC_AUTH_USERNAME` / `BASIC_AUTH_PASSWORD` の登録ではない。同じ本番用値をWorker側へ設定する操作は、初回デプロイの明示指示時に扱う。検証用値をそのままコピーしない。
+
+### その後の準備と未実施項目
+
+- 本番Google OAuth clientを準備し、正規URLとcallback URLを確認する。`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` はWorker初回作成時の安全な登録方法と合わせて別途扱う。
+- 本番専用Cloudflare API Tokenは初回Worker作成に必要な権限と継続更新用権限を区別し、対象アカウントへ限定する。GitHub productionへの登録はデプロイとは別操作として案内する。
+- D1移行は適用予定ファイル・対象UUID・復旧手順を確認したうえで別途許可を受ける。現時点でアプリのSQLが動くDBではない。
+- 初回デプロイ前にログのクエリ除去設定、ログ/トレースに保存される認証情報等の範囲、監視と復旧を確認する。トレース有効の宣言だけで秘匿確認済みとはしない。
+- Pages本番Git自動公開の停止とProduction Service Bindingの設定は、mainへの反映・本番公開を明示的に指示された段階で実施する。
+- X資格情報と重複投稿防止用状態ブランチは未準備。投稿は別途許可まで行わない。
+
+
+### 公開を伴わない設定検証
+
+- 自動化の既存25テスト、workflow構造8件、actionlint、公開設定/Pages対応18テストに合格。
+- `npm run build:production` で型生成・型検査・Worker/Pagesビルド・本番成果物の環境/DB/R2/監視設定の照合に合格。生成型に差分なし。
+- 生成した本番設定を指定した `wrangler deploy --dry-run` が正常終了し、DB/R2/DO/Rate Limitingの接続宣言を確認。Workerのuploadは実行していない。
+- 本番Basic認証Secret未登録の警告と既存のThree.js大容量チャンク警告は残る。ビルド合格を本番公開可能の判定にはしない。
+- この準備差分をdevelopへ取り込む間は `PULBASE_STAGING_DEPLOY_ENABLED` を一時falseにし、pushによる検証Worker公開がスキップされたことを確認してからtrueへ戻す。設定準備のために検証Workerもデプロイしない。

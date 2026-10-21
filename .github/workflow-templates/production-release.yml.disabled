@@ -185,5 +185,5 @@ jobs:
             const jobs = JSON.parse(process.env.JOB_RESULTS);
             const announcementOnly = jobs.release.result === 'success';
             await github.rest.issues.create({ ...context.repo,
-              title: announcementOnly ? 'X release announcement needs attention' : 'Production release needs attention',
-              body: `SHA: ${process.env.RELEASE_SHA || 'prepare failed'}\n\n${announcementOnly ? '本番確認は成功。X投稿状態を照合し、告知ジョブだけ再実行してください。' : '公開/回帰確認が未完了。部分公開の有無を確認し、復旧を判断してください。X告知は実行していません。'}\n\nEvidence: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}` });
+              title: announcementOnly ? 'Xリリース告知の確認が必要です' : '本番リリースの確認が必要です',
+              body: `SHA: ${process.env.RELEASE_SHA || '準備処理失敗'}\n\n${announcementOnly ? '本番確認は成功。X投稿状態を照合し、告知ジョブだけ再実行してください。' : '公開/回帰確認が未完了。部分公開の有無を確認し、復旧を判断してください。X告知は実行していません。'}\n\n実行記録: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}` });

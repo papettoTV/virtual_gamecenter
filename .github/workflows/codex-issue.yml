@@ -98,7 +98,7 @@ jobs:
         run: |
           node -e 'require("fs").writeFileSync(process.env.RESULT_FILE, process.env.CODEX_RESULT)'
           node ci/publish-patch.mjs
-          gh pr create --base develop --head "codex/issue-$ISSUE_NUMBER" --title "Resolve issue #$ISSUE_NUMBER" --body-file "$PR_BODY_FILE"
+          gh pr create --base develop --head "codex/issue-$ISSUE_NUMBER" --title "Issue #$ISSUE_NUMBER の対応" --body-file "$PR_BODY_FILE"
   failure:
     needs: [intake, implement, publish]
     if: always() && vars.PULBASE_CODEX_ENABLED == 'true' && contains(needs.*.result, 'failure')
