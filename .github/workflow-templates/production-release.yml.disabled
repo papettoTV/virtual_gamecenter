@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       announcement:
-        description: Approved X message, maximum 140 Unicode characters
+        description: 手動投稿用の日本語告知案（最大140文字）
         required: true
         type: string
 permissions:
@@ -36,7 +36,7 @@ jobs:
           RELEASE_SHA: ${{ inputs.release_sha }}
           ANNOUNCEMENT: ${{ inputs.announcement }}
         run: |
-          node --input-type=module -e 'import { assertSha } from "./ci/policy.mjs"; import { announcementText } from "./ci/announce-x.mjs"; assertSha(process.env.RELEASE_SHA); announcementText(process.env.ANNOUNCEMENT)'
+          node --input-type=module -e 'import { assertSha } from "./ci/policy.mjs"; import { announcementText } from "./ci/release-announcement.mjs"; assertSha(process.env.RELEASE_SHA); announcementText(process.env.ANNOUNCEMENT)'
           git merge-base --is-ancestor HEAD "$RELEASE_SHA"
           git merge-base --is-ancestor "$RELEASE_SHA" origin/develop
           git checkout --detach "$RELEASE_SHA"
@@ -63,7 +63,7 @@ jobs:
           RELEASE_SHA: ${{ inputs.release_sha }}
           ANNOUNCEMENT: ${{ inputs.announcement }}
         run: |
-          node -e 'require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, `Release SHA: ${process.env.RELEASE_SHA}\n\nX announcement:\n\n${process.env.ANNOUNCEMENT}\n\nCheck staging evidence and production-launch-checklist.md before approval.\n`)'
+          node -e 'require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, `Release SHA: ${process.env.RELEASE_SHA}\n\n手動投稿用の告知案（未投稿）:\n\n${process.env.ANNOUNCEMENT}\n\nCheck staging evidence and production-launch-checklist.md before approval.\n`)'
   release:
     needs: prepare
     runs-on: ubuntu-latest
@@ -139,10 +139,9 @@ jobs:
           retention-days: 14
   announce:
     needs: [prepare, release]
-    if: vars.PULBASE_X_ENABLED == 'true'
+    if: needs.release.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    environment: announcement
     steps:
       - uses: actions/checkout@v4
         with:
@@ -151,22 +150,20 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - uses: actions/create-github-app-token@v1
-        id: app
-        with:
-          app-id: ${{ vars.PULBASE_RELEASE_APP_ID }}
-          private-key: ${{ secrets.PULBASE_RELEASE_APP_PRIVATE_KEY }}
-      - name: Publish to X once, after regression success
+      - name: Present release text for manual X posting after regression success
         env:
-          GH_TOKEN: ${{ steps.app.outputs.token }}
           PULBASE_RELEASE_SHA: ${{ needs.prepare.outputs.sha }}
           PULBASE_ANNOUNCEMENT: ${{ inputs.announcement }}
           PULBASE_PRODUCTION_REGRESSION_PASSED: 'true'
-          X_API_KEY: ${{ secrets.X_API_KEY }}
-          X_API_SECRET: ${{ secrets.X_API_SECRET }}
-          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
-          X_ACCESS_TOKEN_SECRET: ${{ secrets.X_ACCESS_TOKEN_SECRET }}
-        run: node ci/announce-x.mjs
+        run: node ci/release-announcement.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: manual-release-announcement-${{ needs.prepare.outputs.sha }}
+          path: |
+            ci/results/release-announcement.txt
+            ci/results/release-announcement.md
+          if-no-files-found: error
+          retention-days: 14
   failure:
     needs: [prepare, release, announce]
     if: always() && contains(needs.*.result, 'failure')
@@ -185,5 +182,5 @@ jobs:
             const jobs = JSON.parse(process.env.JOB_RESULTS);
             const announcementOnly = jobs.release.result === 'success';
             await github.rest.issues.create({ ...context.repo,
-              title: announcementOnly ? 'Xリリース告知の確認が必要です' : '本番リリースの確認が必要です',
-              body: `SHA: ${process.env.RELEASE_SHA || '準備処理失敗'}\n\n${announcementOnly ? '本番確認は成功。X投稿状態を照合し、告知ジョブだけ再実行してください。' : '公開/回帰確認が未完了。部分公開の有無を確認し、復旧を判断してください。X告知は実行していません。'}\n\n実行記録: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}` });
+              title: announcementOnly ? '手動投稿用リリース文面の生成に失敗しました' : '本番リリースの確認が必要です',
+              body: `SHA: ${process.env.RELEASE_SHA || '準備処理失敗'}\n\n${announcementOnly ? '本番確認は成功。入力を確認し、文面生成ジョブだけ再実行してください。Xへの投稿は手動です。' : '公開/回帰確認が未完了。部分公開の有無を確認し、復旧を判断してください。X告知は実行していません。'}\n\n実行記録: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}` });

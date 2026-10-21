@@ -22,8 +22,8 @@
 | `.github/workflows/codex-pr.yml` | 自動PRの対象/差分確認 → 合成マージコミットのテスト → 独立したCodexレビュー → staging公開 → HTTP/ブラウザ確認 → developへのマージ・Issue完了 |
 | `.github/workflows/develop-staging.yml` | develop push後のテスト・検証公開・ブラウザ確認。マージ後の実コミットSHAを検証URLへ反映 |
 | `.github/workflows/web-checks.yml` | 従来のテスト/ビルドに自動化制御部分のテストを追加 |
-| `.github/workflow-templates/production-release.yml.disabled` | **実行されない本番用テンプレート**。人の承認 → mainへfast-forward → 本番公開 → 回帰確認 → X告知 |
-| `ci/` | 入力・差分・レビュー・公開先・リビジョンの検査、ブラウザテスト、X投稿と永続状態管理 |
+| `.github/workflow-templates/production-release.yml.disabled` | **実行されない本番用テンプレート**。人の承認 → mainへfast-forward → 本番公開 → 回帰確認 → 手動投稿用の告知文提示 |
+| `ci/` | 入力・差分・レビュー・公開先・リビジョンの検査、ブラウザテスト、手動投稿用リリース文面の保存 |
 
 すべての有効化フラグは未設定をfalseとして扱う。通常運用では上記のdevelop用3フラグを有効にしている。既存の `Web checks` と手動サービス確認も維持する。
 
@@ -75,7 +75,7 @@ Repository → Settings → Secrets and variables → Actions → Variablesに�
 | `PULBASE_STAGING_DEPLOY_ENABLED` | `false` | 検証環境の公開 |
 | `PULBASE_AUTO_MERGE_ENABLED` | `false` | 検証成功後のdevelopマージ |
 | `PULBASE_PRODUCTION_ENABLED` | `false` | 将来の本番テンプレート用 |
-| `PULBASE_X_ENABLED` | `false` | 将来のX告知用 |
+| `PULBASE_X_ENABLED` | `false` | 旧自動投稿用。未使用のままfalseを維持 |
 | `PULBASE_APP_ID` | 作成したApp ID | 実装用App |
 | `PULBASE_AUTOMATION_BOT` | 作成したAppのbot名 | 自動PRの本人確認 |
 | `PULBASE_RELEASE_APP_ID` | 本番導入時に設定 | リリース用App |
@@ -89,9 +89,9 @@ Settings → Environmentsで以下を作成する。
 | `staging` | `CLOUDFLARE_API_TOKEN`, `PULBASE_CHECK_USERNAME`, `PULBASE_CHECK_PASSWORD` | 検証専用の権限/Basic認証。最初は人の承認付きで試す |
 | `release-preflight` | 検証用 `PULBASE_CHECK_USERNAME`, `PULBASE_CHECK_PASSWORD` | main限定。本番公開前に検証URLのSHAを読む専用環境。staging環境自体をmainへ開放しない |
 | `production` | 本番専用 `CLOUDFLARE_API_TOKEN`, `PULBASE_CHECK_USERNAME`, `PULBASE_CHECK_PASSWORD`, `PULBASE_RELEASE_APP_PRIVATE_KEY` | **将来のみ**。Required reviewersに人を指定。管理者bypassを許可しない |
-| `announcement` | `PULBASE_RELEASE_APP_PRIVATE_KEY`, `X_API_KEY`, `X_API_SECRET`, `X_ACCESS_TOKEN`, `X_ACCESS_TOKEN_SECRET` | **将来のみ**。X投稿専用。初回は承認付きで確認 |
+| `announcement` | 新規登録不要 | 旧自動投稿用。現在の文面提示ジョブでは利用しない |
 
-stagingにはdevelop pushと自動PRの合成マージrefがアクセスする。Environmentのブランチ制限でPRを許可する場合は `refs/pull/*/merge` を対象に含める。productionはmainのみ。announcementもmain実行の本番ワークフローに限定する。
+stagingにはdevelop pushと自動PRの合成マージrefがアクセスする。Environmentのブランチ制限でPRを許可する場合は `refs/pull/*/merge` を対象に含める。productionはmainのみ。旧announcement環境は利用しない。文面提示ジョブはSecretを参照しない。
 
 一人でリリース開始/承認する場合、productionのPrevent self-reviewを有効にすると自分の開始した実行を承認できない。運営体制に合わせて設定する。いずれの場合も自動処理が人の代わりに承認しない。
 
@@ -159,23 +159,21 @@ DB移行が必要な変更は停止して人が扱う。既存の公開チェッ
 4. `PULBASE_PRODUCTION_ENABLED=true` にする。mainから手動実行し、stagingで確認済みのdevelopの40桁SHAと、人が確認したX告知文を指定する。告知文は今回の実装では保守的に140 Unicode文字まで。
 5. prepareでローカルテスト・本番設定ビルド・stagingのSHA照合を行う。人が同じSHAと告知文・既存公開判定の残課題を確認し、productionを承認する。
 6. 承認後にmainを指定SHAへfast-forwardする。mainがdevelop候補の祖先でない場合は停止し、履歴を人が整理する。勝手なマージ・force pushはしない。
-7. 本番Worker/Pagesを公開し、HTTP・リビジョン・ブラウザ回帰確認が成功した場合だけ告知ジョブへ進む。
+7. 本番Worker/Pagesを公開し、HTTP・リビジョン・ブラウザ回帰確認が成功した場合だけ手動投稿用の文面を提示する。
 
 本番公開/回帰確認に失敗した場合はX告知を実施せず、Actionsの失敗通知と証跡を確認する。main更新後・Worker公開後・Pages公開後の部分失敗があり得るため、mainが進んだことだけで公開完了としない。自動DBロールバックは行わない。既知の正常Worker/Pagesへ戻す操作とデータ整合確認は運営者が判断する。コードのロールバックだけでDB/DOデータが元へ戻るとは扱わない。
 
-### X Developer設定
+### Xは手動投稿（2026-10-21の方針変更）
 
-X Developer Consoleで投稿先の運営アカウント用Appを用意する。OAuth 1.0aのユーザーコンテキスト、Read and Write権限を設定し、そのアカウントのAccess Token/Secretを発行する。権限変更後は必要に応じて再発行する。App-only Bearer Tokenでは代用しない。利用可能な契約・残高・投稿上限はConsoleで確認する。
+Xへの自動送信を廃止し、本番公開・回帰確認が成功した後に日本語のリリース文面だけを提示する。X App・API Key・Access Token・投稿用Secret・`automation-state` ブランチは不要。`PULBASE_X_ENABLED` は文面提示の条件に使わず、旧フラグはfalseのまま残す。
 
-`announcement` Environmentに次の4値を保存する：`X_API_KEY`, `X_API_SECRET`, `X_ACCESS_TOKEN`, `X_ACCESS_TOKEN_SECRET`。投稿先が本当に運営アカウントであることを初回有効化前に確認する。
+リリース準備時にCodexが対象変更から利用者向けの日本語告知案を用意し、人が内容を確認する。workflowの `announcement` 入力へその告知案を渡す。現在の保守的な上限は140 Unicode文字。公開前の承認サマリーには「未投稿の案」として示し、本番公開後の回帰確認に失敗した場合は手動投稿用の成功成果物を作らない。
 
-GitHubに状態記録専用の `automation-state` ブランチを人が作成する。本番/検証公開の対象には含めない。リリース用Appだけにこのブランチの更新を許可する。実装は `x-announcements/<release SHA>.json` にpending/sent/uncertainと投稿IDを保存する。公開リポジトリなので、この状態ファイルに秘密情報や非公開情報を入れない。
+回帰確認成功後、Actionsの `announce` ジョブのサマリーにコピー用の文面・リリースSHA・未投稿である旨を表示する。同じ文面を `manual-release-announcement-<SHA>` artifactの `release-announcement.txt` と `release-announcement.md` に14日保存する。運営者が確認してXへ手動投稿する。手動で投稿したかどうかをCIは取得・記録しないので、投稿前にX上で確認する。
 
-準備後に `PULBASE_X_ENABLED=true` にする。今回の導入ではまだ設定しない。
+文面提示ジョブはEnvironment・GitHub App token・X資格情報を使用せず、Xへの送信やGitHubの投稿状態書込を行わない。文面生成に失敗した場合は入力を確認し、そのジョブだけを再実行する。本番公開全体を文面生成のために再実行しない。
 
-投稿前にGitHubへpendingを排他的に予約し、その後 `POST https://api.x.com/2/tweets` を1回だけ実行する。sentの再実行はスキップする。送信結果不明・投稿成功後の記録失敗は自動再送しない。運営者がX上の投稿有無を照合し、投稿済みなら正しいID付きsentへ、未投稿と確認できた場合だけ予約を解除して告知ジョブを再実行する。再実行は失敗した告知ジョブだけを対象にし、本番公開全体を再実行しない。
-
-告知先の追加はこの公開成功後のジョブに追加する。ユーザー向けGitHub Releasesやサイト内告知は今回作成しない。
+告知先を追加する場合も、まず配布用文面として準備する。自動投稿への再変更は別途指示を受ける。ユーザー向けGitHub Releasesやサイト内告知は今回作成しない。
 
 ## 8. ローカル検証
 
@@ -201,7 +199,6 @@ GitHub Actions上のSecret/API/デプロイを使う通し試験、実環境の�
 - [GitHubのデプロイ承認](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/review-deployments)
 - [Cloudflare Pages自動公開設定](https://developers.cloudflare.com/api/resources/pages/subresources/projects/methods/edit/)
 - [Wranglerの権限](https://developers.cloudflare.com/workers/authorization/workers/)
-- [X投稿API](https://docs.x.com/x-api/posts/create-post)
 - [既存環境設計](production-environments.md)・[公開条件](production-launch-checklist.md)
 
 ## 今回の検証記録
@@ -284,4 +281,4 @@ CloudflareトークンはAPI確認ステップだけ、Basic認証はサービ�
 [実マージSHAの検証公開39528349645](https://github.com/papettoTV/virtual_gamecenter/actions/runs/39528349645)ではWorker/Pages双方のSHA一致、HTTP7項目、Chromiumのデスクトップ/モバイル8ケースが成功し、skip・失敗・リトライは0。マージ後の通常CIも成功した。試験後はいったん3フラグをfalseへ戻し、その後ユーザーの明示指示で通常運用としてtrueへ切り替え、codex/stagingの承認要件を解除した。
 
 
-本番CI/CDの準備状態と順序は [本番準備手順](production-cicd-preparation.md) を参照。本番テンプレートは未有効化で、mainの保護は設定済み。本番リソース・資格情報・X等の準備は未完了。
+本番CI/CDの準備状態と順序は [本番準備手順](production-cicd-preparation.md) を参照。本番テンプレートは未有効化で、mainの保護は設定済み。本番リソース・資格情報・接続等の準備は継続中。Xは手動投稿とし、API連携は準備不要。
