@@ -282,4 +282,4 @@ CloudflareトークンはAPI確認ステップだけ、Basic認証はサービ�
 [実マージSHAの検証公開39528349645](https://github.com/papettoTV/virtual_gamecenter/actions/runs/39528349645)ではWorker/Pages双方のSHA一致、HTTP7項目、Chromiumのデスクトップ/モバイル8ケースが成功し、skip・失敗・リトライは0。マージ後の通常CIも成功した。試験後はいったん3フラグをfalseへ戻し、その後ユーザーの明示指示で通常運用としてtrueへ切り替え、codex/stagingの承認要件を解除した。
 
 
-本番CI/CDの準備状態と順序は [本番準備手順](production-cicd-preparation.md) を参照。本番テンプレートは未有効化で、mainの保護・本番リソース等の準備は未完了。
+本番CI/CDの準備状態と順序は [本番準備手順](production-cicd-preparation.md) を参照。本番テンプレートは未有効化で、mainの保護は設定済み。本番リソース・資格情報・X等の準備は未完了。
