@@ -1,6 +1,6 @@
 # Codex・GitHub CI/CD の準備と設定
 
-更新日：2026-10-21。developでのローカル準備。ユーザーの指示でGitHubのデフォルトブランチだけをdevelopへ変更・確認済み。mainへの反映、Cloudflareの設定変更、デプロイ、OpenAI API実行、X投稿は行っていない。GitHub App・Environment・Secretを設定し、認証確認専用ワークフロー1ファイルだけをContents APIでリモートdevelopへ追加・実行した。CI/CD本体は `d19e3ac` としてリモートdevelopへ選択的に反映済み。Web checks成功後にdevelopの保護設定を適用した。OpenAIの応答確認は起動引数を修正して再試験する段階。
+更新日：2026-10-21。CI/CD本体をリモートdevelopへ選択的に統合し、Web checks成功とdevelopの保護設定を確認済み。GitHub Appの認証試験と、人が承認したOpenAI API固定応答試験が成功した。GitHubのデフォルトブランチはdevelop。mainへの反映、Cloudflareの設定変更・デプロイ、X投稿は行っていない。自動実装・自動マージ・検証公開のフラグはfalseのまま。
 
 ## 構成と実装範囲
 
@@ -121,9 +121,9 @@ PagesとWorkerは同一SHAでビルドして公開する。HTTP応答の `X-Pulb
 
 DB移行が必要な変更は停止して人が扱う。既存の公開チェックリストの未完了事項は維持し、自動テスト成功で本番公開条件を満たしたとは扱わない。
 
-## 6. 有効化と通し試験の順序（今回未実施）
+## 6. 有効化と通し試験の順序
 
-準備コミットをリモートdevelopへ安全に取り込み、デフォルトブランチ上でワークフロー登録を確認した後に実施する。今回はまだpushしていない。
+準備コミットのリモートdevelopへの統合、ワークフロー登録、全フラグfalseでのWeb checks、GitHub App認証、OpenAI固定応答試験、develop保護は完了。以下の自動実装から検証公開までの通し試験は未実施。
 
 1. 全フラグfalseでWeb checksを通す。API/Secretが無い状態でも既存のCIが動くことを確認する。
 2. `PULBASE_CODEX_ENABLED=true` のみ有効化し、小さなUI変更と明確な受け入れ条件のIssueを運営者が起票する。PRがdevelop向けであることと、レビュー/テストの証跡を確認する。
@@ -211,7 +211,7 @@ GitHub Actions上のSecret/API/デプロイを使う通し試験、実環境の�
 - [GitHub App認証試験 39513777525](https://github.com/papettoTV/virtual_gamecenter/actions/runs/39513777525)：成功。JWTによるApp本人確認、必要なApp権限宣言、対象repoへのインストール、repo限定・読み取り専用インストールトークンの発行/読取を確認し、試験後にトークンを失効させた。PR作成・書込動作自体は未試験。
 - 認証試験は `.github/workflows/github-app-auth-check.yml`。固定SHAのgithub-scriptを使用し、checkout・アプリコード実行・OpenAI呼出・公開コマンドは含めない。最初の試験はOctokitの既定認証がカスタムJWTヘッダーを上書きする問題で失敗し、直接HTTP送信へ修正。JWT署名・送信先・読み取り専用scope・失敗時のトークン失効をローカル試験へ追加し、制御系19テストとactionlintが成功した。
 - リモートdevelopへの追加/修正コミットは `[skip ci]` を先頭に付け、既存CI/Pagesの自動ビルドをスキップ。認証試験の前後でmainのSHAが同一であることを確認した。
-- `PULBASE_CODEX_ENABLED` / `PULBASE_STAGING_DEPLOY_ENABLED` / `PULBASE_AUTO_MERGE_ENABLED` は引き続きfalse。OpenAI APIキーは登録確認のみで、APIによる実行・有効性の検証は次の段階。
+- `PULBASE_CODEX_ENABLED` / `PULBASE_STAGING_DEPLOY_ENABLED` / `PULBASE_AUTO_MERGE_ENABLED` は引き続きfalse。この時点ではOpenAIキーの登録確認のみ。その後の固定応答試験の結果は以下に記録する。
 
 
 ## CI/CD本体のdevelop統合（2026-10-21）
@@ -228,3 +228,12 @@ GitHub Actions上のSecret/API/デプロイを使う通し試験、実環境の�
 統合結果：`d19e3ac` の [Web checks 39518395360](https://github.com/papettoTV/virtual_gamecenter/actions/runs/39518395360) は成功。developにPR必須、最新base、GitHub Actions（App ID 15368）の `verify` / `Automation control checks` 必須、管理者も対象、force push/削除禁止、会話解決必須を適用し、APIで再確認した。人の必須レビュー数は0。mainのSHAは `73cb5d9267c56f06f9f1150327ec6b8b3caa2bb9` のまま維持している。
 
 OpenAIの初回試験39518429088は、人の承認後にCLI起動引数の重複で停止した。固定したCodex Actionが `--skip-git-repo-check` を自動追加するため、workflow側の追加指定を除去し、ローカルの回帰検査にこの契約を追加。モデル応答・APIキーの有効性は、この起動失敗を根拠に合格扱いにしない。修正は保護ルールを迂回せず、develop向けPRと必須チェックを通して取り込む。
+
+
+## OpenAI APIの実行確認（2026-10-21）
+
+- [修正PR #1](https://github.com/papettoTV/virtual_gamecenter/pull/1)の必須チェック合格後、`6a1856f` としてdevelopへマージ。管理者bypassや保護解除は使用していない。
+- [OpenAI固定応答試験 39520165299](https://github.com/papettoTV/virtual_gamecenter/actions/runs/39520165299)は、人がcodex環境を承認した後に成功。公式Codex ActionによるAPI実行と、別ランナーでの `CODEX_API_OK` 完全一致確認の両方が成功した。Secret値は取得・表示していない。
+- [マージ後のWeb checks 39520159957](https://github.com/papettoTV/virtual_gamecenter/actions/runs/39520159957)も成功。これはAPI認証と固定応答の試験であり、IssueからPR作成・レビュー・検証環境公開・自動マージまでの通し試験ではない。
+- 次の準備はstaging環境と検証専用のCloudflareトークン・Basic認証情報。現在のGitHub Environmentsはautomationとcodexだけで、stagingは未作成。Cloudflareの設定変更や検証公開はまだ実施していない。
+- mainのSHAは引き続き `73cb5d9267c56f06f9f1150327ec6b8b3caa2bb9`。自動化フラグはfalse、本番用テンプレートは無効のまま。
