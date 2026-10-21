@@ -72,6 +72,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     environment: automation
+    outputs:
+      failure: ${{ steps.publish.outputs.failure }}
     steps:
       - uses: actions/create-github-app-token@v1
         id: app
@@ -86,6 +88,7 @@ jobs:
         with:
           node-version: '22'
       - name: Validate and publish text patch without executing candidate code
+        id: publish
         env:
           CODEX_RESULT: ${{ needs.implement.outputs.result }}
           BASE_SHA: ${{ needs.intake.outputs.base }}
@@ -115,7 +118,8 @@ jobs:
       - uses: actions/github-script@v7
         env:
           ISSUE_NUMBER: ${{ inputs.issue }}
+          PUBLICATION_FAILURE: ${{ needs.publish.outputs.failure }}
         with:
           script: |
             const { report } = await import(`${process.env.GITHUB_WORKSPACE}/ci/github.mjs`);
-            await report({ github, context, ok: false });
+            await report({ github, context, ok: false, failureJson: process.env.PUBLICATION_FAILURE });

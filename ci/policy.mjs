@@ -11,8 +11,9 @@ export function assertIssueNumber(value) {
 export function allowedPath(path) {
   if (typeof path !== 'string' || !/^[a-zA-Z0-9_./-]+$/.test(path)
     || path.split('/').some(p => !p || p === '.' || p === '..')) return false;
-  if (/AGENTS\.md|SKILL\.md|(?:auth|secret|payment|stripe|consent|credit|platform)/i.test(path)) return false;
+  if (/(?:AGENTS|SKILL|CLAUDE|GEMINI)\.md|(?:auth|secret|payment|stripe|consent|credit|platform)/i.test(path)) return false;
   return /^apps\/web\/src\/(?:app|brand|games|game-sdk|shared|features)\/.+\.(?:ts|tsx|css)$/.test(path)
+    || /^apps\/web\/src\/games\/[a-z0-9-]+\/rendering\/.+\.js$/.test(path)
     || /^apps\/web\/tests\/.+\.(?:test\.mjs|test\.ts)$/.test(path)
     || /^docs\/.+\.md$/.test(path);
 }

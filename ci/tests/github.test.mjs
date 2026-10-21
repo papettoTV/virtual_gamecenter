@@ -1,8 +1,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { intake, mergePr } from '../github.mjs';
+import { intake, mergePr, report } from '../github.mjs';
 const base = 'a'.repeat(40), head = 'b'.repeat(40), tree = 'c'.repeat(40);
 const context = { repo: { owner: 'owner', repo: 'repo' }, actor: 'owner', eventName: 'issues', payload: { action: 'opened', issue: { number: 1 }, pull_request: { number: 2 } } };
+test('issue failure comment includes the implementation stop reason and run evidence', async () => {
+  const comments = [];
+  const github = { rest: { issues: { createComment: async value => comments.push(value) } } };
+  await report({ github, context: { ...context, serverUrl: 'https://github.com', runId: 42 }, ok: false,
+    failureJson: JSON.stringify({ code: 'no_patch', reason: '対象外のため人の対応が必要です。' }) });
+  assert.equal(comments.length, 1);
+  assert.match(comments[0].body, /対象外のため人の対応/);
+  assert.match(comments[0].body, /actions\/runs\/42/);
+  assert.match(comments[0].body, /本番公開・X告知は実施していません/);
+});
 test('public issue author cannot invoke Codex until maintainer explicitly labels it', async () => {
   let branchReads = 0;
   const github = { rest: { repos: { getCollaboratorPermissionLevel: async ({ username }) => ({ data: { permission: username === 'owner' ? 'admin' : 'read' } }),
