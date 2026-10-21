@@ -38,7 +38,9 @@ export async function checkWorkflows() {
   assert.ok(pr.jobs.merge.needs.includes('staging'));
   const release = entries.find(item => item.file.endsWith('.disabled')).data;
   assert.match(release.jobs.prepare.if, /PULBASE_PRODUCTION_ENABLED/);
+  assert.equal(release.jobs.prepare.environment, 'release-preflight');
   assert.equal(release.jobs.release.environment, 'production');
+  assert.equal(release.jobs.announce.environment, 'announcement');
   assert.ok(release.jobs.announce.needs.includes('release'));
   assert.ok(!entries.filter(item => !item.file.endsWith('.disabled')).some(item => JSON.stringify(item.data).includes('npm run deploy -- production')));
   return entries.length;

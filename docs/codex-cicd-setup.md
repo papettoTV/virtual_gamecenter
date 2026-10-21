@@ -61,7 +61,7 @@ App IDと、生成したPrivate keyを後述の変数/Secretに保存する。`P
 
 Appトークンを使ってPRを作成し、後続のpull_request/pushワークフローを起動する。通常の `GITHUB_TOKEN` への置き換えはしない。Appをmain保護のbypass actorに登録しない。
 
-本番導入時はリリース用Appを別に作成する。Contents: Read and write、Metadata: Read。実装Appと鍵を共有せず、main反映に必要な権限は本番Environmentに限定して保存する。本番Appのmain更新を許可するルールと承認Environmentをセットで整備し、単にmain保護を解除しない。
+本番導入時はリリース用Appを別に作成する。Contents: Read and write、Workflows: Read and write、Metadata: Read。Workflows権限はworkflowファイルを含む検証済みコミットをmainへ反映するため。実装Appと鍵を共有せず、main反映に必要な権限は本番Environmentに限定して保存する。本番Appのmain更新を許可するルールと承認Environmentをセットで整備し、単にmain保護を解除しない。
 
 ## 3. GitHub Variables / Environments / Secrets
 
@@ -85,6 +85,7 @@ Settings → Environmentsで以下を作成する。
 | `codex` | `OPENAI_API_KEY` | 最初は人の承認付きで試し、運営者Issueの自動実行確認後に見直す |
 | `automation` | `PULBASE_APP_PRIVATE_KEY` | 実装用App。mainへのbypass不可 |
 | `staging` | `CLOUDFLARE_API_TOKEN`, `PULBASE_CHECK_USERNAME`, `PULBASE_CHECK_PASSWORD` | 検証専用の権限/Basic認証。最初は人の承認付きで試す |
+| `release-preflight` | 検証用 `PULBASE_CHECK_USERNAME`, `PULBASE_CHECK_PASSWORD` | main限定。本番公開前に検証URLのSHAを読む専用環境。staging環境自体をmainへ開放しない |
 | `production` | 本番専用 `CLOUDFLARE_API_TOKEN`, `PULBASE_CHECK_USERNAME`, `PULBASE_CHECK_PASSWORD`, `PULBASE_RELEASE_APP_PRIVATE_KEY` | **将来のみ**。Required reviewersに人を指定。管理者bypassを許可しない |
 | `announcement` | `PULBASE_RELEASE_APP_PRIVATE_KEY`, `X_API_KEY`, `X_API_SECRET`, `X_ACCESS_TOKEN`, `X_ACCESS_TOKEN_SECRET` | **将来のみ**。X投稿専用。初回は承認付きで確認 |
 
@@ -279,3 +280,6 @@ CloudflareトークンはAPI確認ステップだけ、Basic認証はサービ�
 [Issue #5](https://github.com/papettoTV/virtual_gamecenter/issues/5)から[PR #6](https://github.com/papettoTV/virtual_gamecenter/pull/6)が自動作成された。差分は `docs/cicd-smoke-test.md` だけ。 [PR検証39526879413](https://github.com/papettoTV/virtual_gamecenter/actions/runs/39526879413)の候補テスト・独立レビュー・検証公開・回帰確認がすべて成功し、pulbase-codex Appがdevelopへ `937138d4ebe7c4ed5ef9fbb98926cb7707a5df04` としてマージ、Issueを自動完了した。
 
 [実マージSHAの検証公開39528349645](https://github.com/papettoTV/virtual_gamecenter/actions/runs/39528349645)ではWorker/Pages双方のSHA一致、HTTP7項目、Chromiumのデスクトップ/モバイル8ケースが成功し、skip・失敗・リトライは0。マージ後の通常CIも成功した。試験後はいったん3フラグをfalseへ戻し、その後ユーザーの明示指示で通常運用としてtrueへ切り替え、codex/stagingの承認要件を解除した。
+
+
+本番CI/CDの準備状態と順序は [本番準備手順](production-cicd-preparation.md) を参照。本番テンプレートは未有効化で、mainの保護・本番リソース等の準備は未完了。
