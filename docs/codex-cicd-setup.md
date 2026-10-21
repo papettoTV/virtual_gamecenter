@@ -4,8 +4,8 @@
 
 ## 現在の通常運用
 
-- 運営者がIssueを起票すると、Codex実装 → GitHub Appによるdevelop向けPR → 必須CIと候補テスト → 独立Codexレビュー → staging公開とSHA/HTTP/ブラウザ確認 → develop自動マージ → Issue完了 → 実マージSHAのstaging再公開まで、人のEnvironment承認なしで進む。
-- 第三者のIssueは、書込権限を持つ運営者が `codex:run` を付ける。Issueには期待する変更と受け入れ条件を明記する。初期運用は1件ずつ進め、並行変更で古いbaseになったPRは確認して最新developで再実行する。
+- `実装:自動` ラベル付きIssueだけを対象に、Codex実装 → GitHub Appによるdevelop向けPR → 必須CIと候補テスト → 独立Codexレビュー → staging公開とSHA/HTTP/ブラウザ確認 → develop自動マージ → Issue完了 → 実マージSHAのstaging再公開まで、人のEnvironment承認なしで進む。
+- 自動実装を希望する場合だけ、書込権限を持つ運営者が `実装:自動` を付ける。ラベルなしは手元実装。`実装:手元` は任意。旧 `codex:run` は起動条件にしない。Issueには期待する変更と受け入れ条件を明記する。初期運用は1件ずつ進め、並行変更で古いbaseになったPRは確認して最新developで再実行する。
 - `codex` / `automation` / `staging` はdevelopと `refs/pull/*/merge` だけを許可。main・タグからは利用不可。required reviewersとwait timerはなく、管理者bypassも禁止。
 - developはPR必須、GitHub Actionsの `verify` / `Automation control checks` 必須、最新baseへの追従、管理者も保護対象。独立レビュー不合格・テスト失敗・保護パス変更・公開SHA不一致等では自動マージを停止する。
 - `PULBASE_CODEX_ENABLED` / `PULBASE_STAGING_DEPLOY_ENABLED` / `PULBASE_AUTO_MERGE_ENABLED` はtrue。`PULBASE_PRODUCTION_ENABLED` / `PULBASE_X_ENABLED` はfalse。PagesのProduction branchはmainのまま、PreviewのGit自動公開はNoneを維持する。
@@ -18,7 +18,7 @@
 
 | ファイル | 用途 |
 | --- | --- |
-| `.github/workflows/codex-issue.yml` | 運営者のIssue起票、または運営者による `codex:run` ラベル付与 → Codex実装 → テキスト差分検査 → develop向けPR作成 |
+| `.github/workflows/codex-issue.yml` | `実装:自動` 付きIssue起票、または運営者による同ラベル付与 → Codex実装 → テキスト差分検査 → develop向けPR作成 |
 | `.github/workflows/codex-pr.yml` | 自動PRの対象/差分確認 → 合成マージコミットのテスト → 独立したCodexレビュー → staging公開 → HTTP/ブラウザ確認 → developへのマージ・Issue完了 |
 | `.github/workflows/develop-staging.yml` | develop push後のテスト・検証公開・ブラウザ確認。マージ後の実コミットSHAを検証URLへ反映 |
 | `.github/workflows/web-checks.yml` | 従来のテスト/ビルドに自動化制御部分のテストを追加 |
@@ -36,6 +36,30 @@ Codexは実装とレビューを別ジョブ・別ランナーで行う。実装
 ブラウザ確認はChromiumのデスクトップ/モバイル画面で、ホーム・ゲーム一覧・規約・プライバシー・ゲーム画面への遷移・初回特典の辞退・開始前のキャンセル・ホームへの復帰を確認する。Googleの実認証、クレジット消費を伴うプレイ、課金、全ゲームの実機性能を網羅したものではない。変更固有の受け入れ条件はIssueに明記し、対応するテストを実装する。高リスクな変更は通常の人のレビューへ回す。
 
 ブラウザがホームを開くと既存のbootstrap APIによりテスト用ゲストが作成される。開始・クレジット消費・Googleログインは行わない。公開後のブラウザ確認にもこの書込があるため、本番有効化時にテストデータの扱いと既存保持/削除方針を確認する。画面サイズのエミュレーションをiPhone/Android実機検証の完了とは扱わない。
+
+## Issueの実装担当（2026-10-21）
+
+| Issueのラベル | 担当・起動方法 | マージ前 | developへのマージ後 |
+| --- | --- | --- | --- |
+| `実装:自動` だけ | GitHub Actions上のCodex。ラベル付き起票または後から付与 | 既存の候補テスト・独立レビュー・検証公開・自動マージ | 共通のdevelop検証公開とSHA/HTTP/ブラウザ確認 |
+| ラベルなし、または `実装:手元` だけ | チャットで指示を受けた手元のCodex | これまでどおり必須CIを通し、人の判断でマージ | 同じdevelop検証公開とSHA/HTTP/ブラウザ確認 |
+| 両ラベル | 担当の指定が競合 | 自動処理・手元の新規実装を停止して担当を整理 | — |
+
+Issue起票だけで一律に自動実装しない。workflowの手動実行でも `実装:自動` は必須。ラベルなしや旧 `codex:run` のIssueには、Codex実装やPR公開ジョブを実行しない。関係のないラベル追加も自動実装の再起動に使わない。
+
+手元実装では、開始前と新規PR作成直前に最新developの制御スクリプトで次を実行する。
+
+```sh
+node ci/check-manual-issue.mjs <Issue番号>
+```
+
+これはIssue担当と未マージPRの読取確認だけを行う。手元ブランチは `manual/issue-<番号>`、PR本文は `Closes #<番号>` を使う。既存PRがあれば別PRを作らず、そのPRの続きを扱う。Issueを実装するPRの識別は、自動・手元の標準ブランチ名と `Closes` / `Fixes` / `Resolves` の完了参照を使う。`Refs` で関連を説明しただけの別作業を、担当PRと誤認しない。
+
+自動側も受付時、PR公開直前、PRのレビュー受付時、マージ直前に現在の担当と他の未マージPRを再確認する。同じIssueのActionsは既存concurrencyで直列化する。手元側との共通の原子的な排他ロックではないため、担当ラベルと事前確認・引継ぎ停止手順を必ず守る。
+
+自動から手元への引継ぎを指示されたら、`実装:自動` を外して `実装:手元` を付け、該当IssueのActions実行を停止して完了を確認する。既存PR/ブランチを確認し、引継ぎ対象を決めてから手元で作業する。ラベル変更だけで既存プロセスが即時停止するとは扱わない。新しい実行名には `Issue #番号 の自動実装` を表示する。
+
+本番への反映・公開は従来どおり別の明示指示と人の承認が必要。今回の区分変更でマージ後の公開先や本番フラグを変更しない。
 
 ## 1. 今回の準備段階で行うこと
 
@@ -141,7 +165,7 @@ DB移行が必要な変更は停止して人が扱う。既存の公開チェッ
 準備コミットのリモートdevelopへの統合、ワークフロー登録、全フラグfalseでのWeb checks、GitHub App認証、OpenAI固定応答試験、develop保護は完了。以下の自動実装から検証公開までの通し試験は未実施。
 
 1. 全フラグfalseでWeb checksを通す。API/Secretが無い状態でも既存のCIが動くことを確認する。
-2. `PULBASE_CODEX_ENABLED=true` のみ有効化し、小さなUI変更と明確な受け入れ条件のIssueを運営者が起票する。PRがdevelop向けであることと、レビュー/テストの証跡を確認する。
+2. `PULBASE_CODEX_ENABLED=true` のみ有効化し、小さなUI変更と明確な受け入れ条件のIssueを運営者が起票し、`実装:自動` を付ける。PRがdevelop向けであることと、レビュー/テストの証跡を確認する。
 3. パス保護対象・テスト失敗・第三者の未承認Issue・レビュー不合格で停止することを確認する。既存PRがあるIssueの再実行では重複PRを作らない。
 4. Cloudflare Preview自動公開停止と検証トークンを確認し、`PULBASE_STAGING_DEPLOY_ENABLED=true` にする。PRワークフローを再実行する。Worker/PagesのSHA、HTTP結果、デスクトップ/モバイル画像を確認する。
 5. developのstrict保護を確認後、`PULBASE_AUTO_MERGE_ENABLED=true` にする。PRワークフローを再実行し、developだけへのマージ、Issue完了、develop pushによるstaging更新を確認する。

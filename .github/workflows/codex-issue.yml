@@ -1,11 +1,12 @@
 name: Codex issue to PR
+run-name: "Issue #${{ github.event.issue.number || inputs.issue }} の自動実装"
 on:
   issues:
     types: [opened, labeled]
   workflow_dispatch:
     inputs:
       issue:
-        description: Open issue number (bootstrap on develop)
+        description: 実装:自動ラベル付きの開いているIssue番号（developで実行）
         required: true
         type: string
 permissions:
@@ -15,10 +16,15 @@ concurrency:
   cancel-in-progress: false
 jobs:
   intake:
-    if: vars.PULBASE_CODEX_ENABLED == 'true'
+    if: >-
+      vars.PULBASE_CODEX_ENABLED == 'true' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event.action == 'opened' && contains(github.event.issue.labels.*.name, '実装:自動')) ||
+       (github.event.action == 'labeled' && github.event.label.name == '実装:自動'))
     runs-on: ubuntu-latest
     timeout-minutes: 3
     outputs:
+      eligible: ${{ steps.request.outputs.eligible }}
       issue: ${{ steps.request.outputs.issue }}
       base: ${{ steps.request.outputs.base }}
       request: ${{ steps.request.outputs.request }}
@@ -37,6 +43,7 @@ jobs:
             await intake({ github, context, core, issueInput: process.env.ISSUE_INPUT });
   implement:
     needs: intake
+    if: needs.intake.outputs.eligible == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: codex
@@ -87,6 +94,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Recheck automatic assignment and existing PRs immediately before publication
+        uses: actions/github-script@v7
+        env:
+          ISSUE_NUMBER: ${{ needs.intake.outputs.issue }}
+        with:
+          script: |
+            const { assertAutomaticAssignment } = await import(`${process.env.GITHUB_WORKSPACE}/ci/issue-routing.mjs`);
+            await assertAutomaticAssignment({ github, repo: context.repo, issueNumber: process.env.ISSUE_NUMBER });
       - name: Validate and publish text patch without executing candidate code
         id: publish
         env:
