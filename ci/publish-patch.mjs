@@ -41,6 +41,6 @@ try {
   const failure = publicationFailure(error);
   if (process.env.GITHUB_OUTPUT) await writeFile(process.env.GITHUB_OUTPUT, `failure=${JSON.stringify(failure)}\n`, { flag: 'a' });
   if (process.env.GITHUB_STEP_SUMMARY) await writeFile(process.env.GITHUB_STEP_SUMMARY, `\n### 自動実装の停止（${failure.code}）\n\n${failure.reason.replaceAll('\r', '').split('\n').map(line => `> ${line}`).join('\n')}\n`, { flag: 'a' });
-  console.error(`自動実装の停止（${failure.code}）：${failure.reason}`);
+  console.error(`自動実装の停止：${JSON.stringify(failure)}`);
   process.exitCode = 1;
 }

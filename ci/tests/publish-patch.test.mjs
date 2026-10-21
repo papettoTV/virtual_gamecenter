@@ -49,12 +49,13 @@ test('empty implementation reports its reason without applying a patch or publis
     await writeFile(join(cwd, 'README.md'), 'fixture\n'); git(cwd, 'add', '.'); git(cwd, 'commit', '-m', 'fixture');
     const base = git(cwd, 'rev-parse', 'HEAD');
     const result = join(temporary, 'result.json'), output = join(temporary, 'output'), summary = join(temporary, 'summary');
-    const explanation = '対象ファイルは保護範囲のため人の対応が必要です。\n許可ルールは変更していません。';
+    const explanation = '対象ファイルは保護範囲のため人の対応が必要です。\n::error::未信頼の出力\n許可ルールは変更していません。';
     await writeFile(result, JSON.stringify({ patch: '', summary: explanation }));
     const env = { ...process.env, RESULT_FILE: result, PATCH_FILE: join(temporary, 'patch.diff'), ISSUE_NUMBER: '12', BASE_SHA: base, GITHUB_OUTPUT: output, GITHUB_STEP_SUMMARY: summary };
     const stopped = spawnSync(process.execPath, [publisher], { cwd, env, encoding: 'utf8' });
     assert.equal(stopped.status, 1);
-    assert.match(stopped.stderr, /no_patch/); assert.ok(stopped.stderr.includes(explanation));
+    assert.match(stopped.stderr, /no_patch/); assert.match(stopped.stderr, /人の対応が必要/);
+    assert.ok(!stopped.stderr.includes('\n::error::'));
     assert.doesNotMatch(stopped.stderr, /Invalid Codex patch output/);
     const failure = JSON.parse((await readFile(output, 'utf8')).trim().slice('failure='.length));
     assert.equal(failure.code, 'no_patch'); assert.ok(failure.reason.includes(explanation));
