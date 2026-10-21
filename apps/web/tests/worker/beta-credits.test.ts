@@ -57,6 +57,68 @@ async function eligible(free = 0, purchased = 0) {
 }
 
 describe("free beta daily credits", () => {
+  it("preserves completed refunds after a partial failure and recovers only the remainder on retry", async () => {
+    const player = await eligible(5);
+    for (let index = 0; index < 2; index++) {
+      const response = await api("credit-reservations", player.cookie, "POST", { cabinetId: crypto.randomUUID(), gameId: "graze-duel" });
+      const { reservationId } = await response.json<{ reservationId: string }>();
+      await api(`credit-reservations/${reservationId}/capture`, player.cookie, "POST");
+    }
+    await env.DB.prepare("UPDATE credit_reservations SET expires_at = datetime('now', '-1 second') WHERE player_id = ?").bind(player.playerId).run();
+    const failure = Error("private partial recovery failure"), writeDataPoint = vi.fn();
+    let batches = 0;
+    const database = new Proxy(env.DB, { get(target, key) {
+      if (key === "batch") return async (statements: D1PreparedStatement[]) => {
+        if (++batches === 2) throw failure;
+        return target.batch(statements);
+      };
+      const value = Reflect.get(target, key, target);
+      return typeof value === "function" ? value.bind(target) : value;
+    } });
+    await expect(reconcileBetaCredits(database, player.playerId, "partial-recovery-device", false, new Date(), { writeDataPoint })).rejects.toBe(failure);
+    expect(await env.DB.prepare("SELECT free_balance FROM credit_wallets WHERE player_id = ?").bind(player.playerId).first("free_balance")).toBe(4);
+    const retry = await (await api("credits", player.cookie)).json<State>();
+    expect(retry).toMatchObject({ wallet: { freeBalance: 5 }, creditPolicy: { refilledAmount: 0 } });
+    expect(await env.DB.prepare("SELECT COUNT(*) AS count FROM credit_ledger_entries WHERE player_id = ? AND entry_type = 'refunded'").bind(player.playerId).first("count")).toBe(2);
+    expect(await env.DB.prepare("SELECT COUNT(*) AS count FROM beta_daily_refills WHERE player_id = ?").bind(player.playerId).first("count")).toBe(0);
+    expect(writeDataPoint).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the wallet unchanged and records a failure when recovery cannot read its candidates", async () => {
+    const player = await eligible(2);
+    const failure = Error("private recovery failure"), writeDataPoint = vi.fn();
+    const database = new Proxy(env.DB, { get(target, key) {
+      if (key === "prepare") return (sql: string) => {
+        if (sql.includes("SELECT r.id FROM credit_reservations")) throw failure;
+        return target.prepare(sql);
+      };
+      const value = Reflect.get(target, key, target);
+      return typeof value === "function" ? value.bind(target) : value;
+    } });
+    await expect(reconcileBetaCredits(database, player.playerId, "recovery-failure-device", false, new Date(), { writeDataPoint })).rejects.toBe(failure);
+    expect(await env.DB.prepare("SELECT free_balance FROM credit_wallets WHERE player_id = ?").bind(player.playerId).first("free_balance")).toBe(2);
+    expect(await env.DB.prepare("SELECT COUNT(*) AS count FROM beta_daily_refills WHERE player_id = ?").bind(player.playerId).first("count")).toBe(0);
+    expect(writeDataPoint).toHaveBeenCalledTimes(1);
+    expect(writeDataPoint.mock.calls[0]![0].doubles).toEqual([1, 1, 0, 0, 0]);
+    expect(JSON.stringify(writeDataPoint.mock.calls)).not.toContain("private");
+  });
+
+  it("recovers unused captures before a parallel daily refill decision", async () => {
+    const player = await eligible(5);
+    for (let index = 0; index < 3; index++) {
+      const response = await api("credit-reservations", player.cookie, "POST", { cabinetId: crypto.randomUUID(), gameId: "graze-duel" });
+      const { reservationId } = await response.json<{ reservationId: string }>();
+      expect((await api(`credit-reservations/${reservationId}/capture`, player.cookie, "POST")).status).toBe(200);
+    }
+    await env.DB.prepare("UPDATE credit_reservations SET expires_at = datetime('now', '-1 second') WHERE player_id = ?").bind(player.playerId).run();
+    const responses = await Promise.all([api("credits", player.cookie), api("credits", player.cookie)]);
+    for (const response of responses) {
+      expect(await response.json<State>()).toMatchObject({ wallet: { freeBalance: 5 }, creditPolicy: { refilledToday: false, refilledAmount: 0 } });
+    }
+    expect(await env.DB.prepare("SELECT COUNT(*) AS count FROM credit_ledger_entries WHERE player_id = ? AND entry_type = 'refunded'").bind(player.playerId).first("count")).toBe(3);
+    expect(await env.DB.prepare("SELECT COUNT(*) AS count FROM beta_daily_refills WHERE player_id = ?").bind(player.playerId).first("count")).toBe(0);
+  });
+
   it("does not grant a new guest anything before the exact five-credit welcome", async () => {
     const player = await guest();
     expect(player.wallet.availableTotal).toBe(0);
