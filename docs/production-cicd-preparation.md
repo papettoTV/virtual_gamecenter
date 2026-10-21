@@ -8,18 +8,18 @@
 | --- | --- | --- | --- |
 | release-preflight | mainブランチだけ | なし | 候補のテスト・ビルド、検証環境に同じSHAが配信されているかの読取 |
 | production | mainブランチだけ | papettoTV必須 | 確認済みSHAのmain反映と本番Worker/Pages公開、公開後の回帰確認 |
-| announcement | mainブランチだけ | 初回はpapettoTV必須 | 本番回帰確認成功後のX告知 |
+| announcement（旧設定） | mainブランチだけ | papettoTV必須の設定を保持 | 現在の文面提示ジョブでは利用しない |
 
-3環境とも管理者によるbypassを禁止し、タグやdevelopからは利用できない。開始者本人による手動承認は可能。承認操作を自動処理が代行しない。production/announcementにはリリース鍵、release-preflightには検証用Basic認証2値の登録名を確認済み。他のSecretは未登録。Environmentがあるだけで本番ワークフローが起動することはない。
+3環境とも管理者によるbypassを禁止し、タグやdevelopからは利用できない。開始者本人による手動承認は可能。承認操作を自動処理が代行しない。production/announcementにはリリース鍵、release-preflightには検証用Basic認証2値の登録名を確認済み。productionには本番Basic認証2値と `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` の登録名も確認済み。Cloudflare本番トークンは未登録。Environmentがあるだけで本番ワークフローが起動することはない。
 
 ## 設定を進める順序
 
-1. 実装用とは別のリリース用GitHub Appを作成し、このrepoだけへインストールする。Repository permissionsはContents: Read and write、Workflows: Read and write、Metadata: Read。Workflowsはworkflowファイルを含むコミットのmain反映に必要。Webhookは不要。App IDを `PULBASE_RELEASE_APP_ID`、秘密鍵をproduction/announcementの `PULBASE_RELEASE_APP_PRIVATE_KEY` として登録する。実装用Appやcodex/staging/automationへ本番鍵を渡さない。
+1. 実装用とは別のリリース用GitHub Appを作成し、このrepoだけへインストールする。Repository permissionsはContents: Read and write、Workflows: Read and write、Metadata: Read。Workflowsはworkflowファイルを含むコミットのmain反映に必要。Webhookは不要。App IDを `PULBASE_RELEASE_APP_ID`、秘密鍵をproductionの `PULBASE_RELEASE_APP_PRIVATE_KEY` として登録する（旧announcement環境へ新規登録する必要はない）。実装用Appやcodex/staging/automationへ本番鍵を渡さない。
 2. リリースAppの認証と権限を公開なしで検証し、そのIDを使ってmain保護を設計・設定する。mainには後述の2つのactiveルールセットを適用済み。実装用Appにはmain更新のbypassを付けない。mainのコードを動かす試験は別途明示指示まで行わない。
 3. release-preflightへ検証Basic認証2値を登録する。productionへ本番専用Cloudflareトークンと本番Basic認証2値を登録する。検証と本番のトークン・ユーザー情報を混同しない。
 4. 本番Worker/D1/R2/Service Binding/Google OAuth等の存在・分離・必要Secret・移行・バックアップ・復旧手順を確認する。本番専用D1/R2は作成・対応付け済みだが、DB移行・Worker・Secret・接続は未完了。リソース作成やSecret更新はクラウド反映として別途扱い、ローカルビルド成功で完了にしない。
-5. X Developer Appを用意する。OAuth 1.0aユーザーコンテキストのRead and Write権限で、実際に告知するアカウントの4資格情報をannouncementへ登録する。必要な契約・利用枠はXのConsoleで確認し、投稿試験は今は行わない。
-6. Xの重複投稿防止用 `automation-state` ブランチを公開対象外として準備し、更新権限を本番側のAppに限定する。送信結果不明時は自動再送せず、投稿有無を人が照合する。
+5. Xは手動投稿とし、リリース準備時に日本語の告知案を作成・確認する。X Developer App・投稿資格情報は不要。
+6. 回帰確認成功後、Actionsサマリーとダウンロード用artifactへ告知文面を提示する。投稿は人が行い、投稿済みかどうかもX上で確認する。投稿状態記録用のブランチは作成しない。
 7. 既存の `production-launch-checklist.md` の公開判定を確認する。長時間負荷試験等の未完了事項はCI成功だけで合格に変更しない。
 8. 別途、main反映・本番公開の明示指示を受けてから、main保護・Pages本番自動公開の経路・固定した候補SHAを最終確認し、本番workflowを有効化する。今回はここへ進まない。
 
@@ -31,9 +31,9 @@
 | production | PULBASE_RELEASE_APP_PRIVATE_KEY | リリース専用Appの秘密鍵 |
 | production | CLOUDFLARE_API_TOKEN | 本番専用の必要最小権限トークン |
 | production | PULBASE_CHECK_USERNAME / PULBASE_CHECK_PASSWORD | 本番Basic認証。一般公開への切替は別変更 |
-| announcement | PULBASE_RELEASE_APP_PRIVATE_KEY | 本番側Appの状態記録用認証 |
-| announcement | X_API_KEY / X_API_SECRET | X AppのAPI Key / API Key Secret |
-| announcement | X_ACCESS_TOKEN / X_ACCESS_TOKEN_SECRET | 告知アカウントのAccess Token / Access Token Secret |
+| production | GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET | 本番用OAuthクライアント。保管済み、Worker側への反映は未実施 |
+
+旧announcement環境は不要となった。既存環境や保管済みのリリース鍵はこの変更で削除せず、現在のworkflowからは参照しない。X用Secretの新規登録は不要。
 
 秘密情報をチャット・Issue・Git・Actionsログに貼らない。GitHubのEnvironment Secret欄へ直接登録する。
 
@@ -41,9 +41,11 @@
 
 本番テンプレートは、Worker/Pagesの公開後に両者のSHA一致、HTTPサービス確認、Chromiumのデスクトップ/モバイル回帰確認を行い、結果・HTMLレポート・画面画像を14日保存する。ブラウザ確認では検証用ゲストを作成し、Google実認証やクレジット消費を伴うプレイは行わない。全ゲームの実機性能や既存公開チェックリストを網羅する試験ではない。
 
-回帰確認に失敗した場合はX告知へ進まない。公開の部分失敗時は、main/Worker/Pagesのどこまで反映されたかを調べて復旧を判断する。X投稿の結果不明や投稿後の状態記録失敗も自動再送しない。失敗した告知ジョブだけを扱い、本番公開全体を再実行しない。
+回帰確認に失敗した場合は手動投稿用の成功文面を提示しない。公開の部分失敗時は、main/Worker/Pagesのどこまで反映されたかを調べて復旧を判断する。成功時はActionsサマリーと `manual-release-announcement-<SHA>` artifactのテキスト/Markdownを提示し、運営者がXへ手動投稿する。文面生成に失敗した場合は文面生成ジョブだけを再実行し、本番公開全体を再実行しない。
 
-公式資料：[GitHub Appの権限](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/choosing-permissions-for-a-github-app)、[既存CI/CD手順](codex-cicd-setup.md)。Xの画面・権限・利用枠は設定に進む時点で公式資料とConsoleを再確認する。
+文面提示にX App・APIキー・ユーザートークン・announcement環境・投稿状態記録ブランチは不要。リリース準備時にCodexが用意し人が確認した日本語の告知案を、workflowの `announcement` 入力へ渡す。CIは文面を整形・保存するだけで、Xへ送信しない。
+
+公式資料：[GitHub Appの権限](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/choosing-permissions-for-a-github-app)、[既存CI/CD手順](codex-cicd-setup.md)。Xの開発者設定・課金・投稿API連携は手動投稿への方針変更により準備対象外。
 
 
 ## リリースApp認証とmain保護の記録（2026-10-21）
@@ -99,7 +101,7 @@ Workerのデプロイ、D1リモート移行、Worker Secretの登録、Pages/DN
 - D1移行は適用予定ファイル・対象UUID・復旧手順を確認したうえで別途許可を受ける。現時点でアプリのSQLが動くDBではない。
 - 初回デプロイ前にログのクエリ除去設定、ログ/トレースに保存される認証情報等の範囲、監視と復旧を確認する。トレース有効の宣言だけで秘匿確認済みとはしない。
 - Pages本番Git自動公開の停止とProduction Service Bindingの設定は、mainへの反映・本番公開を明示的に指示された段階で実施する。
-- X資格情報と重複投稿防止用状態ブランチは未準備。投稿は別途許可まで行わない。
+- Xは手動投稿。資格情報や状態ブランチの準備を取りやめ、公開後の回帰成功時に文面だけ提示する。
 
 
 ### 公開を伴わない設定検証
@@ -109,3 +111,8 @@ Workerのデプロイ、D1リモート移行、Worker Secretの登録、Pages/DN
 - 生成した本番設定を指定した `wrangler deploy --dry-run` が正常終了し、DB/R2/DO/Rate Limitingの接続宣言を確認。Workerのuploadは実行していない。
 - 本番Basic認証Secret未登録の警告と既存のThree.js大容量チャンク警告は残る。ビルド合格を本番公開可能の判定にはしない。
 - この準備差分をdevelopへ取り込む間は `PULBASE_STAGING_DEPLOY_ENABLED` を一時falseにし、pushによる検証Worker公開がスキップされたことを確認してからtrueへ戻す。設定準備のために検証Workerもデプロイしない。
+
+
+## Xを手動投稿へ変更（2026-10-21）
+
+ユーザーの指示により、Xへの自動送信とOAuth署名・投稿状態の書込処理を削除した。本番テンプレートは無効のまま。公開前は確認用の告知案、公開・回帰テスト成功後は手動投稿用の文面を提示する。Xへの送信は行わない。文面提示ジョブにはSecretもGitHub書込トークンも渡さない。Workerデプロイ・main反映・本番公開はこの変更では行わない。
