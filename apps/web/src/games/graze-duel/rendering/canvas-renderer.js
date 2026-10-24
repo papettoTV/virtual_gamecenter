@@ -1,5 +1,6 @@
 import { drawPlayerShield, drawLevelUpLightning, shieldAppearance } from "./player-effects";
 import { drawGameOverOverlay } from "./game-over-overlay";
+import { getPausePresentation } from "./pause-presentation";
 import { createCyberCanyonBackground } from "./cyber-canyon-background";
 import { drawPlayerShip } from "./player-ship";
 import { createCanvasBossRenderer } from "./boss-geometry";
@@ -510,20 +511,8 @@ export function createCanvasRenderer(options) {
   function drawPaused() {
     const compact = frame.compact;
     const title = frame.waitingForStart ? "READY" : "PAUSED";
-    const action = compact
-      ? frame.waitingForStart ? "画面下の「ゲーム開始」でスタート" : "画面下の「再開」ボタンでゲーム再開"
-      : frame.waitingForStart ? "Spaceでゲーム開始" : "Spaceで再開";
+    const { action, instructions } = getPausePresentation(frame);
     const instructionX = WIDTH / 2 - (compact ? 165 : 195);
-    const instructions = compact
-      ? [
-        "移動: ゲーム画面をスライド",
-        "ボス攻撃: 無敵シールドを当てる",
-      ]
-      : [
-        "移動: 矢印キー / WASD",
-        "低速移動: Shift",
-        "ボス攻撃: 無敵シールドを当てる",
-      ];
 
     context.fillStyle = "rgba(0,0,0,0.7)";
     context.fillRect(0, 0, WIDTH, HEIGHT);
