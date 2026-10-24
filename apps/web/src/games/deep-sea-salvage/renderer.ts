@@ -570,7 +570,8 @@ export function createRenderer(canvas: HTMLCanvasElement, state: State, queries:
     ctx.save(); ctx.translate(barX - 11, H / 2); ctx.rotate(-Math.PI / 2); ctx.fillStyle = "#efffff"; ctx.textAlign = "center"; ctx.font = "900 12px system-ui"; ctx.fillText(`POWER ${Math.ceil(state.power)}%`, 0, 0); ctx.restore();
     }
     ctx.fillStyle = "rgba(1,10,18,.8)"; ctx.fillRect(0, H - 34, W, 34); ctx.fillStyle = state.messageTimer > 0 ? "#ffe48b" : "#8eb7bd"; ctx.textAlign = "center";
-    ctx.fillText(state.messageTimer > 0 ? state.message : "魚を調査して電力を補充", W / 2, H - 12); ctx.textAlign = "left";
+    const message = isWatching() && state.phase === "ready" ? "プレイヤーの開始を待っています" : state.messageTimer > 0 ? state.message : "魚を調査して電力を補充";
+    ctx.fillText(message, W / 2, H - 12); ctx.textAlign = "left";
   }
 
   function drawCollection(mode: "collection" | "pause" = "collection") {
@@ -587,7 +588,9 @@ export function createRenderer(canvas: HTMLCanvasElement, state: State, queries:
         ctx.fillStyle = species.boss ? "#ffce59" : "#e9b5ff"; ctx.font = "700 10px system-ui"; ctx.fillText(species.boss ? "BOSS" : "RARE", x + cellW / 2, y + 134);
       }
     });
-    const footer = mode === "pause" ? "P / 一時停止ボタンで再開" : state.returnToResult ? "F / クリックでリザルトへ戻る" : "F / 図鑑ボタンで閉じる";
+    const footer = isWatching()
+      ? mode === "pause" ? "プレイヤーの再開を待っています" : "プレイヤーが図鑑を表示しています"
+      : mode === "pause" ? "P / 一時停止ボタンで再開" : state.returnToResult ? "F / クリックでリザルトへ戻る" : "F / 図鑑ボタンで閉じる";
     ctx.fillStyle = "#a9c6ca"; ctx.font = "700 14px system-ui"; ctx.fillText(footer, W / 2, H - 18); ctx.textAlign = "left";
   }
 
@@ -610,6 +613,10 @@ export function createRenderer(canvas: HTMLCanvasElement, state: State, queries:
   }
 
   function drawStartOverlay() {
+    if (isWatching()) {
+      drawOverlay("LIVE", ["プレイヤーの開始を待っています"]);
+      return;
+    }
     const panelX = W / 2 - 300;
     // Center the instructions between the HUD and the sea surface.
     const panelY = Math.max(76, (76 + screenY(0) - 154) / 2);
