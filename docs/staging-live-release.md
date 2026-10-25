@@ -28,3 +28,11 @@ Cloudflareトークンは対象アカウント1件、Individual Workersのpulbas
 準備段階ではダミー認証・差し替えた通信/プロセスで成功経路と部分反映・認証不足・HTTP/ブラウザ失敗時の停止を検証する。実成果物のWorker dry-runとブラウザ定義読込も鍵なしで確認する。これを実公開・実回帰の成功とは扱わない。実環境の確認は制御配置とSecret登録後、人のstaging承認を受けた実行で行う。
 
 公式仕様: [Workersの役割とbindings](https://developers.cloudflare.com/workers/authorization/workers/)、[Pages API](https://developers.cloudflare.com/pages/configuration/api/)、[Playwright CI](https://playwright.dev/docs/ci-intro)。
+
+## 初回実公開の停止と診断改善
+
+実行40191335743はWorker公開段階で停止し、Pages/HTTP/ブラウザは未実行。管理画面では稼働版23dd6983のままで、新しい切替は確認されなかった。読取診断はWorkerのservice/settings/deployments/secretsとPagesすべて200で、必須Secret6つも存在した。これだけでは書込権限やアップロード処理の成功は証明できない。
+
+CLI出力を捨てていたため元のCFエラーは復元できない。修正版は生のstdout/stderrを出さず、既知のエラー分類・数値のCFコード・固定エンドポイント名だけを結果JSONへ残す。環境値は分類前に除去し、失敗結果への任意文字列や応答本文の混入を防ぐ。書込トークンの権限は拡大しない。
+
+修正は人が管理するci-controlへ配置し、一時例外削除と保護版・固定SHAを確認してから準備PRをdevelopへマージする。元の失敗実行を再実行せず、新しい実SHAで通常のstaging承認1回を受ける。再び失敗した場合は数値コードから原因を切り分ける。現時点では根本原因を特定した修正とは扱わない。

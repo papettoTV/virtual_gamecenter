@@ -187,11 +187,11 @@ class BootstrapTests(unittest.TestCase):
     def test_force_and_wrong_parent_are_rejected(self):
         self.assertFalse(M.permitted('PATCH', M.REPO + '/git/refs/heads/ci-control', {'sha': 'a' * 40, 'force': True}))
         self.assertFalse(M.permitted('PATCH', M.REPO + '/git/refs/heads/develop', {'sha': 'a' * 40, 'force': False}))
-        self.assertFalse(M.permitted('POST', M.REPO + '/git/commits', {'message': 'chore: developマージ後の公開1回・回帰1回を鍵なし配置', 'tree': 'a' * 40, 'parents': ['a' * 40]}))
+        self.assertFalse(M.permitted('POST', M.REPO + '/git/commits', {'message': 'chore: staging公開の安全なエラー診断を配置（公開なし）', 'tree': 'a' * 40, 'parents': ['a' * 40]}))
 
     def test_bundle_is_hash_pinned_and_manifest_checked(self):
         entries = {name: b'public-code\n' for name in M.FILES}
-        manifest = {'version': 6, 'mode': 'postmerge-staging-live', 'mergeEnabled': False, 'regressionCount': 1, 'liveTransportConnected': True, 'previousControlSha': M.PREVIOUS_SHA, 'repository': 'papettoTV/virtual_gamecenter',
+        manifest = {'version': 7, 'mode': 'postmerge-staging-live', 'mergeEnabled': False, 'regressionCount': 1, 'liveTransportConnected': True, 'previousControlSha': M.PREVIOUS_SHA, 'repository': 'papettoTV/virtual_gamecenter',
             'branch': 'ci-control', 'deploymentEnabled': True, 'files': {name: hashlib.sha256(data).hexdigest() for name, data in entries.items()}}
         with tempfile.TemporaryDirectory() as tmp:
             archive = Path(tmp) / 'bundle.zip'
