@@ -21,6 +21,7 @@ import { secureResponse } from "./response-security";
 import { WorkerEntrypoint } from "cloudflare:workers";
 import { activateSessionSweeps } from "./session-maintenance";
 import { handleOperatorRequest } from "./operator-dashboard";
+import { handleFeedback } from "./feedback";
 import { settleStartAttempts, recordStartSloCoverage } from "./start-slo";
 
 export { CabinetRoom, AbuseGuard };
@@ -92,6 +93,8 @@ const handler = {
 
     const authorizationError = await authorizeRequest(request, env);
     if (authorizationError) return authorizationError;
+    const feedbackResponse = await handleFeedback(request, env);
+    if (feedbackResponse) return feedbackResponse;
     const operatorResponse = await handleOperatorRequest(request, env);
     if (operatorResponse) return operatorResponse;
     if (url.pathname === "/analytics.js" && request.method === "GET" && env.APP_ENV === "staging") {
