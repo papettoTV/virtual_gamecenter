@@ -1,56 +1,34 @@
-# 鍵なしの公開制御workflow：配置前レビュー
+# 単純なマージ後検証への切り替え準備
 
-2026-10-23。これは公開なしの予行試験用であり、本番・検証公開を有効にするパッケージではない。
+## 採用した流れ
 
-## 実装した範囲
+Issue/手元実装 → PRのCI・Codexレビュー → developへマージ → 実SHAのpush CI・成果物 → 人がstaging承認1回 → 検証公開1回 → 回帰1回。失敗したら結果を記録して停止し、修正PRで対応する。候補公開、マージ後の再公開、回帰の再実行、自動巻き戻しは行わない。
 
-- 保護されたci-controlの実行SHAだけをcheckoutし、制御コードはそこから実行する。ActionはGitHub公式リポジトリで照合した完全SHAへ固定した。
-- 事前ジョブは、stagingの承認者・管理者bypass禁止・Branch型ci-control限定・制御/mainルールの公開情報とSHAをGitHub GETで確認する。読取APIがbypass一覧を省略する場合があり、省略を空とは扱わない。承認後に、人が詳細を確認した設定版と照合する。
-- stagingの承認を要求するジョブは1つだけで、その中で「候補公開・回帰・マージ・実SHAのCI・再公開・再確認」の状態遷移を模擬実行する。承認後も設定を再読取し、同じrun/control SHAの事前確認だけを採用する。
-- 模擬結果にはmode=rehearsal-only、simulated=true、realMergeExecuted=false、realDeploymentExecuted=falseを明記する。合成PR番号・SHAを実公開の成功証跡として出さない。
-- Cloudflare・OpenAI・App秘密鍵を参照しない。利用する認証はGitHubがジョブへ発行する一時読取GITHUB_TOKENだけで、権限はContents/Actions read。長期鍵の登録は不要である。
-- GitHub書込・実マージ・Cloudflare操作・候補コードの実行・npm install・self-hosted runner・候補由来のキャッシュは含まない。
+本番は別の人の承認を維持する。main反映・本番公開・X投稿は今回行わない。本番後の短い確認と告知文提示は本番接続時に整理する。
 
-## 実装していない範囲
+## 今回の準備
 
-実PR/レビュー/CI成果物の照合、実公開用のadapters、実マージ、ブラウザ回帰、自動dispatchの開発側接続は未接続である。模擬試験の成功をIssueからの通し試験や実公開の成功と扱わない。本番処理は含まない。
+- 旧候補方式の起動を停止定義に変更し、旧候補公開の承認ループを準備コードから削除した。以前のGitコミットとActions実行履歴は残す。
+- PR前段のpremerge-decisionは同じPR・CI・Codexレビューと固定された定義を確認し、develop merge要求のデータだけを作る。develop-mergeは前段専用の明示transportで同じheadのsquashだけを要求する。どちらも現時点では実鍵・active workflowへ未接続。
+- postmerge-stagingはPR番号を受け取らず、developの最新初回push CI runだけを使う。同じSHAのCI・固定定義・実コミットtree・成果物を照合し、staging承認前に固定、承認後に再照合する。手元PR・自動PRどちらのマージ結果も扱える。
+- runPostmergeStagingは公開1回・回帰1回だけを直列に呼ぶ。途中でdevelopや成果物が変わる場合も最新へ切り替えず停止する。公開途中の処理は強制中断せず、待機中の古いSHAは起動時の照合で拒否する。
+- postmerge-runnerの現在の副作用は模擬のみ。実CI成果物の照合と保護設定の読取は行うが、実公開・実回帰・実マージは行わない。
+- 起動元はdevelopへのWeb checks成功をきっかけにci-controlをdispatchする。定義はdisabledで準備し、人による制御配置と固定SHAの更新前には有効化しない。起動側は共通ロックを保持せず、制御側だけで保持する。
 
-## ファイル
+## 実処理の鍵なし準備
 
-- .github/workflows/staging-control-rehearsal.yml：GitHubへ配置するworkflow。開発用原本ではworkflow-templates内の.disabledとして保管し、まだ有効化しない。
-- ci/control/protection-check.mjs：固定されたGitHub GETだけを使う保護確認。
-- ci/control/single-approval.mjs：特定のPR/候補/実行に限定された承認スコープと状態遷移。
-- ci/control/rehearsal.mjs：実APIを使わない明示的な模擬処理。
-- ci/tests/single-approval.test.mjs、ci/tests/control-protection.test.mjs：外部依存なしの20試験。
+staging-publicationは既存stagingだけの固定Worker/D1/R2/DO設定とゲートウェイで公開命令を組み立てる。staging-regressionは検証URLと両SHA、desktop/mobileの8件を必須とする。ブラウザへCloudflare/GitHub/OpenAI鍵を継承しない。これらのlive transportはまだ接続しない。
 
-Node.js 22で `node --test ci/tests/*.test.mjs` を実行すれば、GitHub認証も外部接続も不要で停止条件を検証できる。
+Wrangler4.114.0とPlaywright1.61.1の専用toolchain lockを用意し、鍵を扱う処理から依存取得を分離する。実成果物でのWrangler dry-runはパッケージング確認であり、実環境の回帰合格ではない。
 
-## 初期配置の方針（まだ実行しない）
+## 次の操作
 
-ci-controlは作成自体も保護されている。管理者やpapettoTVをbypassに追加すると開発PATも同じ本人として通過できるため採用しない。ルール全体の無効化も行わない。
+1. 通常CI後にdevelopの登録定義と旧候補起動停止を反映する。
+2. 人が管理するAppの一時例外・既存鍵で、鍵なしの新しいci-controlパッケージを配置し、例外を削除する。
+3. stagingの保護設定版と固定control SHAを更新する。
+4. developの成功CIから新経路を自動起動し、staging承認1回で実証跡を再照合して模擬公開1回・模擬回帰1回を確認する。
+5. その後にPR自動マージと実公開・実回帰の鍵/transportを接続する。未検証の鍵を先に置かない。
 
-代わりに、既に鍵を人の管理下へ分離したpulbase-release（App ID 5405029）だけを、ci-controlルールの初期配置用bypassへ一時追加する案とする。まずそのAppの権限と新鍵の保管状態を確認し、初期配置スクリプトをレビューしてから個別に案内する。main側のbypassは空のままで、AppにAdministration/Environments/Secrets/DeploymentsのWriteを与えない。既存のAI用App/PATはci-controlへ引き続き書けない。
+## 現在の限界
 
-人は管理用の別端末・別OSユーザーで、レビュー済みパッケージだけを配置する。App秘密鍵をCodex・チャット・Git・パッケージ・Actionsへ新規登録しない。一時的なAppトークンは対象リポジトリと必要最小限に絞り、配置後に失効させる。配置したcommit/treeとファイルの一致を確認してからbypassを空へ戻す。bypassが空へ戻ったことをAPIで確認するまで予行workflowを実行しない。
-
-これは後続の配置手順の案であり、一時例外の追加・Appの増権・ブランチ作成を今行う指示ではない。人が管理するAppのWorkflows権限が未確認であるため、この段階で適用済みとは扱わない。
-
-## 人が確認した設定版の固定
-
-GitHub APIは呼出元によってbypass_actorsを省略する。確認のためにActionsへAdministration writeを付けたり、管理用PATを渡したりしない。代わりに、人が例外一覧を確認したルールのupdated_atを、stagingのEnvironment variable `PULBASE_CONTROL_RULE_VERSIONS` にJSONで固定する。
-
-値は `{"ciControl":"ルール25676153のupdated_at","main":"ルール25520943のupdated_at"}` の形式で、秘密情報ではない。初期配置後にApp例外を空へ戻し、APIで詳細一覧を照合してから正確な値を案内する。今は登録しない。
-
-承認前の公開情報確認だけではprotectionVerified=trueとしない。承認後のジョブは必ず固定値と公開APIの更新版を照合し、変数未登録・不一致・例外が見えていて空でない場合は停止する。管理者がルールを変更した後は、詳細一覧を確認してこの非秘密変数も更新しないと実行できない。GitHubが更新時刻を返さない場合も停止する。
-
-この変数を変更できるEnvironment管理権限はAI用PAT/Appへ与えない。初期配置ツールも人が詳細を確認した更新版を固定し、例外追加後の版を独立確認するまでapplyを無効にする。配置後のApp例外削除によって版が変わるので、その後の最終値を使う。
-
-## GitHub上での予行試験
-
-workflow_dispatchの登録には既定ブランチにも同じworkflowファイルが必要になる。develop側には鍵なしの登録用定義だけを別途準備し、通常CIを通して反映する。実行時にはci-controlを選ぶ。developやTagからの起動は事前チェックで失敗し、staging承認へ進まない。
-
-ci-control配置とロック、登録用定義の準備後、公開なしの実行URLを示してstaging承認を1回だけ案内する。VS Codeの認可変更や無関係なサービスの監査は先行条件にしない。
-
-## 後続の実公開版
-
-予行試験で保護境界を確認した後、同じ単一承認ジョブに実PRの独立検証と固定公開adaptersを接続する。開発側の自動起動は鍵なしで固定workflowをci-control指定でdispatchし、排他は制御側だけで保持する。旧経路の二重公開・二度目の承認を切替時に止める。鍵登録・検証公開の試験は対象SHAと固定コードを明示した別の段階で、人へ順番に案内する。main反映・本番公開・X投稿は今回行わない。
+新しいci-controlの配置は人の操作待ち。現行ci-controlの旧予行コードを新経路の成功と扱わない。実自動マージ・実公開・実回帰は未接続。本番workflowは無効テンプレートのまま、production有効フラグもfalseを維持する。

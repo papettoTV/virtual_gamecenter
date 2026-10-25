@@ -18,7 +18,7 @@ export function execution(env) {
 export function apiRead(token, request = fetch) {
   need(token, '読取認証なし');
   return async path => {
-    need(/^(?:actions\/runs\/[1-9][0-9]*(?:\/(?:jobs\?filter=latest&per_page=100|artifacts\?per_page=100))?|actions\/workflows\/(?:web-checks|codex-pr)\.yml\/runs\?head_sha=[a-f0-9]{40}&event=pull_request&per_page=100|pulls\/[1-9][0-9]*|issues\/[1-9][0-9]*|git\/ref\/heads\/(?:develop|ci-control|main)|git\/commits\/[a-f0-9]{40})$/.test(path), '対象外API');
+    need(/^(?:actions\/runs\/[1-9][0-9]*(?:\/(?:jobs\?filter=latest&per_page=100|artifacts\?per_page=100))?|actions\/workflows\/(?:web-checks|codex-pr)\.yml\/runs\?head_sha=[a-f0-9]{40}&event=pull_request&per_page=100|pulls\/[1-9][0-9]*|issues\/[1-9][0-9]*|git\/ref\/heads\/(?:develop|ci-control|main)|git\/commits\/[a-f0-9]{40}|git\/trees\/[a-f0-9]{40}\?recursive=1)$/.test(path), '対象外API');
     try {
       const response = await request(`https://api.github.com/repos/${repo}/${path}`, { method: 'GET', redirect: 'error',
         headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }, signal: AbortSignal.timeout(15000) });
@@ -41,7 +41,7 @@ export async function receiptArtifact(api, runId) {
   need(matches.length === 1 && matches[0].size_in_bytes > 0 && matches[0].size_in_bytes < 65536, 'レビュー証跡なし・重複・期限切れ');
   return matches[0];
 }
-export async function liveEvidence(api, r, expectedRun) {
+export async function liveEvidence(api, r, expectedRun, { requireDryRunLabel = true } = {}) {
   need(r?.version === 1 && r.repository === repo && r.pass === true && Array.isArray(r.findings) && !r.findings.length
     && ['head','base','candidate','tree'].every(k => sha(r[k])) && ['pullNumber','reviewRun','buildRun','buildArtifact'].every(k => id(r[k]))
     && r.reviewAttempt === '1' && r.buildAttempt === '1' && String(r.reviewRun) === String(expectedRun), 'レビュー結果・SHA・runの結合が不正');
@@ -51,7 +51,7 @@ export async function liveEvidence(api, r, expectedRun) {
     && pr.head.sha === r.head && pr.base.sha === r.base && pr.merge_commit_sha === r.candidate, '古いPR・候補は拒否');
   const issue = await api(`issues/${pr.head.ref.slice('codex/issue-'.length)}`);
   const labels = (issue.labels ?? []).map(x => typeof x === 'string' ? x : x.name);
-  need(issue.state === 'open' && labels.includes('実装:自動') && labels.includes('検証:公開なし') && !labels.includes('実装:手元'), '公開なし自動実装Issue以外は拒否');
+  need(issue.state === 'open' && labels.includes('実装:自動') && (!requireDryRunLabel || labels.includes('検証:公開なし')) && !labels.includes('実装:手元'), '公開なし自動実装Issue以外は拒否');
   need((await api('git/ref/heads/develop')).object?.sha === r.base, '古いbaseは拒否');
   const candidate = await api(`git/commits/${r.candidate}`);
   need(candidate.tree?.sha === r.tree && candidate.parents?.length === 2 && candidate.parents[0].sha === r.base && candidate.parents[1].sha === r.head, '候補の親・tree不一致');
@@ -73,7 +73,7 @@ export async function liveEvidence(api, r, expectedRun) {
   need(matches.length === 1 && String(a.id) === String(r.buildArtifact) && !a.expired && a.size_in_bytes > 0 && a.size_in_bytes <= 250*1024*1024
     && String(a.workflow_run?.id) === String(r.buildRun) && a.workflow_run?.head_sha === r.head, '成果物の出所不一致');
   return { pullNumber: String(r.pullNumber), head: r.head, base: r.base, candidate: r.candidate, tree: r.tree,
-    buildRun: String(r.buildRun), artifactId: String(a.id), reviewRun: String(r.reviewRun) };
+    buildRun: String(r.buildRun), artifactId: String(a.id), reviewRun: String(r.reviewRun), evidenceOnly: labels.includes('検証:公開なし') };
 }
 export async function checkBuild(directory, r) {
   const manifestPath = join(directory, 'manifest.json');
