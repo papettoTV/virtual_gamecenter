@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "mode": "rehearsal-only",
+  "repository": "papettoTV/virtual_gamecenter",
+  "branch": "ci-control",
+  "deploymentEnabled": false,
+  "files": {
+    ".github/workflows/staging-control-rehearsal.yml": "5e553949ad6fb8b8588fc162b186ecf0f387dc01b916e33651fe8c7c8f68477e",
+    "README.md": "cfafaa81652d40e67a529e6952a0f18bf341ae6d6ca5e8ab3f166a0b2a320a95",
+    "ci/control/protection-check.mjs": "5e7b3e857ce982026169beea10db74b88e19ea2e2e7a3582694cc73146937697",
+    "ci/control/rehearsal.mjs": "2691d6c34a7577f07cdda2d8f2b06a00faa1fbfad8944938f388dfb61df4365b",
+    "ci/control/single-approval.mjs": "ec6f142b7c347bb583cb43e4cc35b505f9280bc523bd7d9dfa3ded10f580b016",
+    "ci/tests/control-protection.test.mjs": "81aca47df3675b2437a2b5969ceedea4b118575187b95bb7d16166f861899739",
+    "ci/tests/single-approval.test.mjs": "d8146cdd4111eefe44d654efde4944e39e4671a629ec60b5d20dc56ef52c5ee3"
+  }
+}

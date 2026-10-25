@@ -1,8 +1,0 @@
-{
-  "source": "same real local PvP capture as approved ending",
-  "sourceStart": 10.8,
-  "duration": 6.5,
-  "fps": 30,
-  "sourceFpsApprox": 9.8,
-  "resample": "nearest timestamp; no interpolation or playback speed change"
-}
