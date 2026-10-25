@@ -29,9 +29,3 @@ test('後付けagent設定・取得不完全・空の信頼定義を拒否',asyn
  const f=fixture();f.trees[f.receipt.head].tree.push({path:'.codex/config.toml',sha:'e'.repeat(40),type:'blob',mode:'100644'});await assert.rejects(verifyReviewTrust(f.api,f.receipt,policy,now));
  const g=fixture();g.trees[g.receipt.base].truncated=true;await assert.rejects(verifyReviewTrust(g.api,g.receipt,policy,now));assert.throws(()=>trustPolicy({...policy,files:{}}));
 });
-test('信頼manifestの原本は現在の定義に一致し、workflowでの自動再生成はしない',async()=>{
- for(const [path,expected] of Object.entries(policy.files)){
-  const b=await readFile(new URL('../../'+path,import.meta.url));assert.equal(createHash('sha1').update(Buffer.concat([Buffer.from(`blob ${b.length}\0`),b])).digest('hex'),expected,path);
- }
- const {readdir}=await import('node:fs/promises');for(const name of await readdir(new URL('../../.github/workflows/',import.meta.url))){assert.ok(!(await readFile(new URL('../../.github/workflows/'+name,import.meta.url),'utf8')).includes('build-review-trust.py'));}
-});

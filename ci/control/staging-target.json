@@ -1,0 +1,140 @@
+{
+  "account_id": "60e5472a284dc71bbafbbfac8aa2a940",
+  "compatibility_date": "2026-07-26",
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "CabinetRoom"
+      ]
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": [
+        "AbuseGuard"
+      ]
+    }
+  ],
+  "name": "pulbase-staging",
+  "no_bundle": true,
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [],
+  "assets": {
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": true
+  },
+  "observability": {
+    "enabled": true
+  },
+  "triggers": {
+    "crons": [
+      "0 * * * *",
+      "0,15,30,45 * * * *"
+    ]
+  },
+  "vars": {
+    "APP_ENV": "staging",
+    "USAGE_MONITOR_ENABLED": "true",
+    "METRICS_ACCOUNT_ID": "60e5472a284dc71bbafbbfac8aa2a940",
+    "DEVELOPER_AUTH_ENABLED": "false",
+    "CREDIT_PURCHASES_ENABLED": "false"
+  },
+  "secrets": {
+    "required": [
+      "BASIC_AUTH_USERNAME",
+      "BASIC_AUTH_PASSWORD",
+      "GOOGLE_CLIENT_ID",
+      "GOOGLE_CLIENT_SECRET",
+      "CLOUDFLARE_METRICS_TOKEN",
+      "OPERATOR_ACCOUNT_IDS"
+    ]
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CABINET_ROOMS",
+        "class_name": "CabinetRoom"
+      },
+      {
+        "name": "ABUSE_GUARDS",
+        "class_name": "AbuseGuard"
+      }
+    ]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "pulbase-staging",
+      "database_id": "c49b03c7-e616-4acb-96a8-2837ff62034f",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "DELETION_AUDIT",
+      "bucket_name": "pulbase-staging-deletion-audit"
+    }
+  ],
+  "ratelimits": [
+    {
+      "name": "API_READ_LIMITER",
+      "namespace_id": "2026101411",
+      "simple": {
+        "limit": 600,
+        "period": 60
+      }
+    },
+    {
+      "name": "API_WRITE_LIMITER",
+      "namespace_id": "2026101412",
+      "simple": {
+        "limit": 120,
+        "period": 60
+      }
+    },
+    {
+      "name": "BOOTSTRAP_LIMITER",
+      "namespace_id": "2026101413",
+      "simple": {
+        "limit": 60,
+        "period": 60
+      }
+    },
+    {
+      "name": "BENEFIT_LIMITER",
+      "namespace_id": "2026101414",
+      "simple": {
+        "limit": 30,
+        "period": 60
+      }
+    },
+    {
+      "name": "SOCKET_LIMITER",
+      "namespace_id": "2026101415",
+      "simple": {
+        "limit": 120,
+        "period": 60
+      }
+    },
+    {
+      "name": "AUTH_LIMITER",
+      "namespace_id": "2026101416",
+      "simple": {
+        "limit": 60,
+        "period": 60
+      }
+    }
+  ],
+  "analytics_engine_datasets": [
+    {
+      "binding": "USAGE_METRICS",
+      "dataset": "pulbase_account_usage"
+    },
+    {
+      "binding": "SECURITY_EVENTS",
+      "dataset": "pulbase_service_health"
+    }
+  ]
+}

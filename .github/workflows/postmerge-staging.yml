@@ -1,0 +1,18 @@
+name: developマージ後の検証（鍵なし）
+on:
+  workflow_dispatch:
+    inputs:
+      ci_run_id:
+        description: developのWeb checks初回成功run ID
+        required: true
+        type: string
+permissions: {}
+jobs:
+  registration-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    steps:
+      - name: 制御ブランチ以外では停止
+        run: |
+          echo '登録専用です。保護済みci-controlを指定してください。'
+          exit 1
