@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Human-only fast-forward ci-control update. No main/develop writes or deployments."""
+from datetime import datetime
 import base64
 import getpass
 import hashlib
@@ -17,17 +18,17 @@ import zipfile
 
 REPO = '/repos/papettoTV/virtual_gamecenter'
 APP = 5405029
-BUNDLE_SHA = 'b78049d4b726911cf8aaa1c1dc4484a4fd9dacf0145f18b7909c88ca04d1c8f2'
-PREVIOUS_SHA = '90cfba234ec84aee19f0e19e3827a9939a5de6a3'
+BUNDLE_SHA = '2255193c174be3e3ce3cb2e76eb066f2e434db2d33a6a1ecc1735e18982aef1c'
+PREVIOUS_SHA = '58e009bc732d92e2899ff9dc15bce82bf4d21019'
 MAIN_SHA = '73cb5d9267c56f06f9f1150327ec6b8b3caa2bb9'
 # These metadata-only versions were read with the limited owner PAT and its full
 # bypass list checked. Apply stays disabled until the human adds the sole App
 # bypass and the resulting version is independently read and pinned here.
-PLAN_CONTROL_VERSION = '2026-10-25T01:25:04.730Z'
+PLAN_CONTROL_VERSION = '2026-10-25T06:18:00.177Z'
 APPLY_CONTROL_VERSION = None
 MAIN_RULE_VERSION = '2026-10-21T20:32:35.191Z'
 SHA = re.compile(r'^[a-f0-9]{40}$')
-FILES = {'ci/control/toolchain/package.json', 'ci/tests/review-trust.test.mjs', 'ci/control/develop-merge.mjs', 'ci/tests/staging-runtime.test.mjs', 'ci/tests/postmerge-staging.test.mjs', 'ci/control/staging-publication.mjs', '.github/workflows/postmerge-staging.yml', 'ci/control/toolchain/staging-browser.config.mjs', 'ci/tests/control-protection.test.mjs', 'ci/control/staging-target.json', 'ci/control/review-trust.mjs', 'ci/control/postmerge-staging.mjs', 'ci/control/review-trust.json', 'ci/control/toolchain/package-lock.json', 'ci/control/postmerge-runner.mjs', 'ci/control/protection-check.mjs', 'README.md', 'ci/control/toolchain/browser/regression.spec.mjs', 'ci/control/staging-gateway.mjs', 'ci/control/candidate-evidence.mjs', 'ci/control/premerge-decision.mjs', 'ci/control/staging-regression.mjs'}
+FILES = {'ci/control/fixed-process.mjs', 'ci/control/fixed-staging-operations.mjs', 'ci/tests/fixed-staging-operations.test.mjs', 'ci/control/toolchain/package.json', 'ci/tests/review-trust.test.mjs', 'ci/control/develop-merge.mjs', 'ci/tests/staging-runtime.test.mjs', 'ci/tests/postmerge-staging.test.mjs', 'ci/control/staging-publication.mjs', '.github/workflows/postmerge-staging.yml', 'ci/control/toolchain/staging-browser.config.mjs', 'ci/tests/control-protection.test.mjs', 'ci/control/staging-target.json', 'ci/control/review-trust.mjs', 'ci/control/postmerge-staging.mjs', 'ci/control/review-trust.json', 'ci/control/toolchain/package-lock.json', 'ci/control/postmerge-runner.mjs', 'ci/control/protection-check.mjs', 'README.md', 'ci/control/toolchain/browser/regression.spec.mjs', 'ci/control/staging-gateway.mjs', 'ci/control/candidate-evidence.mjs', 'ci/control/premerge-decision.mjs', 'ci/control/staging-regression.mjs'}
 
 
 class Stop(RuntimeError):
@@ -56,12 +57,12 @@ def permitted(method, path, body):
         return body == {'repositories': ['virtual_gamecenter'], 'permissions': {'contents': 'write', 'workflows': 'write'}}
     if path == REPO + '/git/trees':
         entries = body.get('tree')
-        return set(body) == {'tree'} and isinstance(entries, list) and len(entries) == 23 and all(
+        return set(body) == {'tree'} and isinstance(entries, list) and len(entries) == len(FILES) + 1 and all(
             set(item) == {'path', 'mode', 'type', 'content'} and item['path'] in FILES | {'bundle-manifest.json'}
             and item['mode'] == '100644' and item['type'] == 'blob' and isinstance(item['content'], str)
-            for item in entries) and len({item['path'] for item in entries}) == 23
+            for item in entries) and len({item['path'] for item in entries}) == len(FILES) + 1
     if path == REPO + '/git/commits':
-        return set(body) == {'message', 'tree', 'parents'} and body['message'] == 'chore: developマージ後の公開1回・回帰1回を鍵なし配置' and bool(
+        return set(body) == {'message', 'tree', 'parents'} and body['message'] == 'chore: 固定公開・HTTPとブラウザ回帰への接続を鍵なし配置' and bool(
             SHA.fullmatch(body.get('tree', ''))) and body.get('parents') == [PREVIOUS_SHA]
     return False
 
@@ -107,11 +108,11 @@ def bundle(path):
     if hashlib.sha256(raw).hexdigest() != BUNDLE_SHA:
         raise Stop('レビュー対象のZIPとSHA-256が一致しません。')
     with zipfile.ZipFile(path) as archive:
-        if len(archive.infolist()) != 23 or set(archive.namelist()) != FILES | {'bundle-manifest.json'}:
+        if len(archive.infolist()) != len(FILES) + 1 or set(archive.namelist()) != FILES | {'bundle-manifest.json'}:
             raise Stop('配置ファイルの集合が一致しません。')
         entries = {name: archive.read(name) for name in archive.namelist()}
     manifest = json.loads(entries['bundle-manifest.json'])
-    if (manifest.get('version') != 4 or manifest.get('mode') != 'postmerge-staging-keyless' or manifest.get('mergeEnabled') is not False or manifest.get('regressionCount') != 1 or manifest.get('liveTransportConnected') is not False or manifest.get('previousControlSha') != PREVIOUS_SHA or manifest.get('deploymentEnabled') is not False
+    if (manifest.get('version') != 5 or manifest.get('mode') != 'postmerge-connected-keyless' or manifest.get('mergeEnabled') is not False or manifest.get('regressionCount') != 1 or manifest.get('liveTransportConnected') is not False or manifest.get('previousControlSha') != PREVIOUS_SHA or manifest.get('deploymentEnabled') is not False
         or manifest.get('repository') != 'papettoTV/virtual_gamecenter' or manifest.get('branch') != 'ci-control'
         or set(manifest.get('files', {})) != FILES):
         raise Stop('公開なしの配置manifestではありません。')
@@ -119,6 +120,14 @@ def bundle(path):
         if hashlib.sha256(entries[name]).hexdigest() != manifest['files'][name]:
             raise Stop('配置ファイルのハッシュが一致しません。')
     return entries
+
+
+def same_version(actual, expected):
+    try:
+        a, b = (datetime.fromisoformat(x.replace('Z', '+00:00')) for x in (actual, expected))
+        return a.tzinfo is not None and b.tzinfo is not None and a == b
+    except (TypeError, ValueError, AttributeError):
+        return False
 
 
 def guards(api, applying, auth=None):
@@ -129,7 +138,7 @@ def guards(api, applying, auth=None):
     if not expected_version:
         raise Stop('配置用例外の設定版は未確認です。まだ配置を実行できません。')
     if (rule.get('target') != 'branch' or rule.get('enforcement') != 'active' or rule.get('name') != 'ci-control-human-managed'
-        or rule.get('updated_at') != expected_version
+        or not same_version(rule.get('updated_at'), expected_version)
         or ('bypass_actors' in rule and rule['bypass_actors'] != expected_bypass) or refs.get('include') != ['refs/heads/ci-control']
         or any(ref not in ('refs/heads/main', 'refs/heads/develop') for ref in refs.get('exclude', []))
         or not {'creation', 'update', 'deletion', 'non_fast_forward'}.issubset({item['type'] for item in rule.get('rules', [])})
@@ -141,7 +150,7 @@ def guards(api, applying, auth=None):
         or main.get('conditions', {}).get('ref_name') != {'include': ['refs/heads/main'], 'exclude': []}
         or not any(item['type'] == 'update' for item in main.get('rules', []))):
         raise Stop('mainの保護が想定と一致しません。')
-    if main.get('updated_at') != MAIN_RULE_VERSION:
+    if not same_version(main.get('updated_at'), MAIN_RULE_VERSION):
         raise Stop('mainの保護設定版が変わっています。')
     env = ok(api, 'GET', REPO + '/environments/staging', auth)
     reviewers = next((item.get('reviewers') for item in env.get('protection_rules', []) if item['type'] == 'required_reviewers'), None)
@@ -224,7 +233,7 @@ def apply(entries, jwt, api=request):
             raise Stop('配置treeのファイル集合・Gitハッシュが一致しません。')
         report['stage'] = 'create-commit'
         commit = ok(api, 'POST', REPO + '/git/commits', token,
-            {'message': 'chore: developマージ後の公開1回・回帰1回を鍵なし配置', 'tree': tree['sha'], 'parents': [parent]})
+            {'message': 'chore: 固定公開・HTTPとブラウザ回帰への接続を鍵なし配置', 'tree': tree['sha'], 'parents': [parent]})
         if not SHA.fullmatch(commit.get('sha', '')) or commit.get('tree', {}).get('sha') != tree['sha'] or [item.get('sha') for item in commit.get('parents', [])] != [parent]:
             raise Stop('配置commitの親・treeが一致しません。')
         report['commit'] = commit['sha']

@@ -7,7 +7,7 @@ export function regressionEnvironment(sha,credentials={}){
  return {PATH:process.env.PATH,PULBASE_BROWSER_ENVIRONMENT:'staging',PULBASE_EXPECTED_SHA:sha,
   ...(credentials.username?{PULBASE_CHECK_USERNAME:credentials.username,PULBASE_CHECK_PASSWORD:credentials.password}:{})};
 }
-export async function stagingRegression(sha,{request,browser,guard,credentials={}}={}){
+export async function stagingRegression(sha,{request,browser,guard,credentials={},validationOnly=false}={}){
  const env=regressionEnvironment(sha,credentials);
  need(typeof request==='function'&&typeof browser==='function'&&typeof guard==='function','回帰の明示transportとguardが必要');
  await guard();
@@ -19,6 +19,7 @@ export async function stagingRegression(sha,{request,browser,guard,credentials={
  }catch{throw Error('検証環境HTTP回帰が不合格です。認証値・応答本文は表示しません');}
  await guard();let result;
  try{result=await browser({environment:env,config:'ci/control/toolchain/staging-browser.config.mjs'});}catch{throw Error('検証環境ブラウザ回帰が不合格です');}
- need(result?.exitCode===0&&result.stats?.expected===8&&result.stats.unexpected===0&&result.stats.flaky===0&&result.stats.skipped===0,'ブラウザ結果が不完全・不合格');
- await guard();return {passed:true,environment:'staging',sha,httpPassed:true,browserPassed:true};
+ if(validationOnly)need(result?.exitCode===0&&result.listOnly===true&&result.listedTests===8,'ブラウザ定義8件を確認できません');
+ else need(result?.exitCode===0&&result.listOnly!==true&&result.stats?.expected===8&&result.stats.unexpected===0&&result.stats.flaky===0&&result.stats.skipped===0,'ブラウザ結果が不完全・不合格');
+ await guard();return {passed:true,environment:'staging',sha,httpPassed:!validationOnly,browserPassed:!validationOnly,validationOnly};
 }

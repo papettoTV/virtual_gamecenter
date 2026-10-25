@@ -39,10 +39,15 @@ export function releaseScope(evidence,execution,manifestDigest,now=Date.now()){
   &&/^[a-f0-9]{64}$/.test(manifestDigest??'')&&Number.isSafeInteger(now),'承認対象の識別子不正');
  return Object.freeze({evidence:Object.freeze(structuredClone(evidence)),execution:Object.freeze(structuredClone(execution)),manifestDigest,approvedAt:now,expiresAt:now+3600000});
 }
+export function assertReleaseObservation(scope,execution,observation,now=Date.now()) {
+ context(execution);need(JSON.stringify(scope.execution)===JSON.stringify(execution),'別runへの承認流用を拒否');
+ need(now>=scope.approvedAt&&now<scope.expiresAt,'承認期限切れ');
+ need(JSON.stringify(observation)===JSON.stringify(scope.evidence),'承認後にdevelop・CI・成果物が変更');
+}
 export async function runPostmergeStaging({scope,execution,observe,publish,regress,now=Date.now}){
  context(execution);need(JSON.stringify(scope.execution)===JSON.stringify(execution),'別runへの承認流用を拒否');
  let phase='before-publication',publicationAttempted=false;
- async function current(){const t=now();need(t>=scope.approvedAt&&t<scope.expiresAt,'承認期限切れ');need(JSON.stringify(await observe())===JSON.stringify(scope.evidence),'承認後にdevelop・CI・成果物が変更');}
+ async function current(){assertReleaseObservation(scope,execution,await observe(),now());}
  try{
   await current();phase='publication';publicationAttempted=true;await publish(scope.evidence);
   await current();phase='regression';const result=await regress(scope.evidence);
