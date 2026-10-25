@@ -63,3 +63,7 @@ test('前段のマージ判定は通常の自動IssueでもCI・レビューを�
  await assert.rejects(liveEvidence(api,f.r,'20'));
  const d=await premergeDecision(api,f.r,policy,Date.parse('2026-10-25T02:00:00Z'));assert.equal(d.eligible,true);assert.equal(d.stagingRequiredBeforeMerge,false);assert.equal(d.realMergeExecuted,false);assert.equal(d.mergeRequest.body.sha,head);
 });
+test('公開なし試験IssueのPRを前段の実マージ要求へ昇格しない',async()=>{
+ const {premergeDecision}=await import('../control/premerge-decision.mjs');const f=fixture();const policy=JSON.parse(await readFile(new URL('../control/review-trust.json',import.meta.url),'utf8'));
+ await assert.rejects(premergeDecision(f.api,f.r,policy),/公開なし試験Issue/);
+});

@@ -17,7 +17,7 @@ import zipfile
 
 REPO = '/repos/papettoTV/virtual_gamecenter'
 APP = 5405029
-BUNDLE_SHA = 'b880a84313611337033b11ee679d6a26f5fef018ef494dacd2eccc576a816538'
+BUNDLE_SHA = 'b78049d4b726911cf8aaa1c1dc4484a4fd9dacf0145f18b7909c88ca04d1c8f2'
 PREVIOUS_SHA = '90cfba234ec84aee19f0e19e3827a9939a5de6a3'
 MAIN_SHA = '73cb5d9267c56f06f9f1150327ec6b8b3caa2bb9'
 # These metadata-only versions were read with the limited owner PAT and its full

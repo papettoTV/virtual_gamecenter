@@ -73,7 +73,7 @@ export async function liveEvidence(api, r, expectedRun, { requireDryRunLabel = t
   need(matches.length === 1 && String(a.id) === String(r.buildArtifact) && !a.expired && a.size_in_bytes > 0 && a.size_in_bytes <= 250*1024*1024
     && String(a.workflow_run?.id) === String(r.buildRun) && a.workflow_run?.head_sha === r.head, '成果物の出所不一致');
   return { pullNumber: String(r.pullNumber), head: r.head, base: r.base, candidate: r.candidate, tree: r.tree,
-    buildRun: String(r.buildRun), artifactId: String(a.id), reviewRun: String(r.reviewRun) };
+    buildRun: String(r.buildRun), artifactId: String(a.id), reviewRun: String(r.reviewRun), evidenceOnly: labels.includes('検証:公開なし') };
 }
 export async function checkBuild(directory, r) {
   const manifestPath = join(directory, 'manifest.json');
