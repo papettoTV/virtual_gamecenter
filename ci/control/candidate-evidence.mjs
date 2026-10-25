@@ -41,7 +41,7 @@ export async function receiptArtifact(api, runId) {
   need(matches.length === 1 && matches[0].size_in_bytes > 0 && matches[0].size_in_bytes < 65536, 'レビュー証跡なし・重複・期限切れ');
   return matches[0];
 }
-export async function liveEvidence(api, r, expectedRun) {
+export async function liveEvidence(api, r, expectedRun, { requireDryRunLabel = true } = {}) {
   need(r?.version === 1 && r.repository === repo && r.pass === true && Array.isArray(r.findings) && !r.findings.length
     && ['head','base','candidate','tree'].every(k => sha(r[k])) && ['pullNumber','reviewRun','buildRun','buildArtifact'].every(k => id(r[k]))
     && r.reviewAttempt === '1' && r.buildAttempt === '1' && String(r.reviewRun) === String(expectedRun), 'レビュー結果・SHA・runの結合が不正');
@@ -51,7 +51,7 @@ export async function liveEvidence(api, r, expectedRun) {
     && pr.head.sha === r.head && pr.base.sha === r.base && pr.merge_commit_sha === r.candidate, '古いPR・候補は拒否');
   const issue = await api(`issues/${pr.head.ref.slice('codex/issue-'.length)}`);
   const labels = (issue.labels ?? []).map(x => typeof x === 'string' ? x : x.name);
-  need(issue.state === 'open' && labels.includes('実装:自動') && labels.includes('検証:公開なし') && !labels.includes('実装:手元'), '公開なし自動実装Issue以外は拒否');
+  need(issue.state === 'open' && labels.includes('実装:自動') && (!requireDryRunLabel || labels.includes('検証:公開なし')) && !labels.includes('実装:手元'), '公開なし自動実装Issue以外は拒否');
   need((await api('git/ref/heads/develop')).object?.sha === r.base, '古いbaseは拒否');
   const candidate = await api(`git/commits/${r.candidate}`);
   need(candidate.tree?.sha === r.tree && candidate.parents?.length === 2 && candidate.parents[0].sha === r.base && candidate.parents[1].sha === r.head, '候補の親・tree不一致');

@@ -6,7 +6,7 @@ import {tmpdir} from 'node:os';
 import {createHash} from 'node:crypto';
 import {prepareStagingPublication,executeStagingPublication,dryRunStaging,assertStagingPages,validateStagingTarget,publicationCommands} from '../control/staging-publication.mjs';
 import {stagingRegression,regressionEnvironment} from '../control/staging-regression.mjs';
-import {mergeReviewedCandidate,mergedCiEvidence} from '../control/staging-merge.mjs';
+import {mergeReviewedCandidate} from '../control/develop-merge.mjs';
 const sha='a'.repeat(40),tree='b'.repeat(40),base='c'.repeat(40),repo='papettoTV/virtual_gamecenter';
 async function build(){
  const dir=await mkdtemp(join(tmpdir(),'runtime-test-'));await mkdir(join(dir,'worker'));await mkdir(join(dir,'client'));
@@ -56,10 +56,4 @@ test('マージAPI timeoutではunknown、マージ後不一致ではSHAを残�
  await assert.rejects(mergeReviewedCandidate(intent,{api,guard:async()=>{}}),e=>e.outcome==='unknown'&&!e.message.includes('token'));assert.equal(puts,1);
  const broken=async(m,p)=>m==='PUT'?{merged:true,sha:'d'.repeat(40)}:p.startsWith('git/commits')?{tree:{sha:'e'.repeat(40)},parents:[{sha:base}]}:p.startsWith('git/ref')?{object:{sha:'d'.repeat(40)}}:api(m,p);
  await assert.rejects(mergeReviewedCandidate(intent,{api:broken,guard:async()=>{}}),e=>e.outcome==='merged-unverified'&&e.mergedSha==='d'.repeat(40));
-});
-test('実マージSHAの最新push CI・必須ジョブ・成果物だけを受理し候補CI流用を拒否',async()=>{
- const merged={repository:repo,baseRef:'develop',sha,tree,parents:[base]};
- const run={id:10,head_sha:sha,event:'push',status:'completed',conclusion:'success',run_attempt:1,head_branch:'develop',head_repository:{full_name:repo},path:'.github/workflows/web-checks.yml'};
- const api=async(m,p)=>p.includes('/runs?')?{total_count:1,workflow_runs:[run]}:p.includes('/jobs?')?{total_count:2,jobs:['verify','Automation control checks'].map(name=>({name,status:'completed',conclusion:'success'}))}:p.includes('/artifacts?')?{total_count:1,artifacts:[{id:30,name:`staging-build-${sha}-1`,expired:false,size_in_bytes:100,workflow_run:{id:10,head_sha:sha}}]}:p.startsWith('git/ref')?{object:{sha}}:{tree:{sha:tree},parents:[{sha:base}]};
- assert.equal((await mergedCiEvidence(merged,api)).artifactId,'30');run.event='pull_request';assert.equal(await mergedCiEvidence(merged,api),null);run.event='push';run.run_attempt=2;await assert.rejects(mergedCiEvidence(merged,api));
 });

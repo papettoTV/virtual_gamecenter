@@ -11,7 +11,7 @@ import unittest
 from unittest.mock import patch
 import zipfile
 
-SPEC = importlib.util.spec_from_file_location('bootstrap', Path(__file__).resolve().parents[1] / 'update-trusted-runtime.py')
+SPEC = importlib.util.spec_from_file_location('bootstrap', Path(__file__).resolve().parents[1] / 'update-postmerge-staging.py')
 M = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(M)
 
@@ -187,11 +187,11 @@ class BootstrapTests(unittest.TestCase):
     def test_force_and_wrong_parent_are_rejected(self):
         self.assertFalse(M.permitted('PATCH', M.REPO + '/git/refs/heads/ci-control', {'sha': 'a' * 40, 'force': True}))
         self.assertFalse(M.permitted('PATCH', M.REPO + '/git/refs/heads/develop', {'sha': 'a' * 40, 'force': False}))
-        self.assertFalse(M.permitted('POST', M.REPO + '/git/commits', {'message': 'chore: レビュー信頼条件と鍵なし実処理を配置', 'tree': 'a' * 40, 'parents': ['a' * 40]}))
+        self.assertFalse(M.permitted('POST', M.REPO + '/git/commits', {'message': 'chore: developマージ後の公開1回・回帰1回を鍵なし配置', 'tree': 'a' * 40, 'parents': ['a' * 40]}))
 
     def test_bundle_is_hash_pinned_and_manifest_checked(self):
         entries = {name: b'public-code\n' for name in M.FILES}
-        manifest = {'version': 3, 'mode': 'trust-and-runtime-preparation', 'liveTransportConnected': False, 'previousControlSha': M.PREVIOUS_SHA, 'repository': 'papettoTV/virtual_gamecenter',
+        manifest = {'version': 4, 'mode': 'postmerge-staging-keyless', 'mergeEnabled': False, 'regressionCount': 1, 'liveTransportConnected': False, 'previousControlSha': M.PREVIOUS_SHA, 'repository': 'papettoTV/virtual_gamecenter',
             'branch': 'ci-control', 'deploymentEnabled': False, 'files': {name: hashlib.sha256(data).hexdigest() for name, data in entries.items()}}
         with tempfile.TemporaryDirectory() as tmp:
             archive = Path(tmp) / 'bundle.zip'

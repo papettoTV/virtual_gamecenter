@@ -44,13 +44,6 @@ test('レビューreceiptは初回合格のみで、SHAとCIを固定する',()=
  const env={GITHUB_REPOSITORY:repo,PR_NUMBER:'8',PR_HEAD:head,PR_BASE:base,PR_CANDIDATE:candidate,PR_TREE:tree,GITHUB_RUN_ID:'20',GITHUB_RUN_ATTEMPT:'1',BUILD_RUN_ID:'10',BUILD_ATTEMPT:'1',BUILD_ARTIFACT_ID:'30',REVIEW_RESULT:'{"pass":true,"findings":[]}'};
  assert.equal(reviewReceipt(env).candidate,candidate);assert.throws(()=>reviewReceipt({...env,REVIEW_RESULT:'{"pass":false,"findings":[]}'}));assert.throws(()=>reviewReceipt({...env,GITHUB_RUN_ATTEMPT:'2'}));
 });
-test('自動検証workflowはSecret・Environment・書込権限・候補実行を持たない',async()=>{
- const text=await readFile(new URL('../../.github/workflows/candidate-evidence.yml',import.meta.url),'utf8'),w=parse(text);
- assert.deepEqual(w.permissions,{contents:'read',actions:'read'});assert.equal(w.jobs.evidence.environment,undefined);assert.ok(!text.includes('secrets.'));assert.deepEqual(w.on.workflow_run.workflows,['Codex PR verification']);
- assert.equal(w.jobs.evidence.steps[0].with.ref,'${{ github.sha }}');assert.ok(!/npm |deploy|dispatches/.test(text));
- const review=parse(await readFile(new URL('../../.github/workflows/codex-pr.yml',import.meta.url),'utf8'));
- assert.equal(review.jobs.staging,undefined);assert.equal(review.jobs.merge,undefined);
-});
 test('実成果物のSHA刻印と全ファイルハッシュを検査し改変・リンクを拒否',async()=>{
  const {mkdtemp,mkdir,writeFile,symlink,rm}=await import('node:fs/promises');const {tmpdir}=await import('node:os');const {join}=await import('node:path');const {createHash}=await import('node:crypto');const {checkBuild}=await import('../control/candidate-evidence.mjs');
  const dir=await mkdtemp(join(tmpdir(),'evidence-'));try{
@@ -61,4 +54,12 @@ test('実成果物のSHA刻印と全ファイルハッシュを検査し改変�
  assert.equal(await checkBuild(dir,f.r),2);await writeFile(join(dir,'worker/index.js'),'changed');await assert.rejects(checkBuild(dir,f.r));
  await rm(join(dir,'worker/index.js'));await symlink(join(dir,'client/_worker.js'),join(dir,'worker/index.js'));await assert.rejects(checkBuild(dir,f.r));
  }finally{await rm(dir,{recursive:true,force:true});}
+});
+test('前段のマージ判定は通常の自動IssueでもCI・レビューを照合し、staging合格を要求しない',async()=>{
+ const {premergeDecision}=await import('../control/premerge-decision.mjs');const f=fixture();
+ const policy=JSON.parse(await readFile(new URL('../control/review-trust.json',import.meta.url),'utf8'));
+ for(const r of [f.review,f.build])Object.assign(r,{created_at:'2026-10-25T01:00:00Z',pull_requests:[{number:8,base:{ref:'develop',sha:base,repo:{url:`https://api.github.com/repos/${repo}`}},head:{sha:head,repo:{url:`https://api.github.com/repos/${repo}`}}}]});
+ const api=async p=>p==='issues/7'?{state:'open',labels:[{name:'実装:自動'}]}:p==='actions/runs/10'?f.build:p.startsWith('git/trees/')?{truncated:false,tree:Object.entries(policy.files).map(([path,sha])=>({path,sha,type:'blob',mode:'100644'}))}:f.api(p);
+ await assert.rejects(liveEvidence(api,f.r,'20'));
+ const d=await premergeDecision(api,f.r,policy,Date.parse('2026-10-25T02:00:00Z'));assert.equal(d.eligible,true);assert.equal(d.stagingRequiredBeforeMerge,false);assert.equal(d.realMergeExecuted,false);assert.equal(d.mergeRequest.body.sha,head);
 });

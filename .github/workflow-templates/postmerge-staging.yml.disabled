@@ -1,0 +1,85 @@
+name: developマージ後の検証（鍵なし）
+on:
+  workflow_dispatch:
+    inputs:
+      ci_run_id:
+        description: developのWeb checks初回成功run ID
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: pulbase-staging-pipeline
+  cancel-in-progress: false
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CI_RUN_ID: ${{ inputs.ci_run_id }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: マージ済みdevelopのCI・固定定義・成果物を照合
+        id: build
+        run: node ci/control/postmerge-runner.mjs prepare
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          artifact-ids: ${{ steps.build.outputs.artifact_id }}
+          run-id: ${{ steps.build.outputs.build_run }}
+          github-token: ${{ github.token }}
+          path: build
+          merge-multiple: true
+      - name: 公開対象SHAと成果物ハッシュを固定
+        run: node ci/control/postmerge-runner.mjs freeze
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: postmerge-approval-${{ github.run_id }}-1
+          path: postmerge-approval.json
+          if-no-files-found: error
+          retention-days: 7
+  staging:
+    needs: prepare
+    environment: staging
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CI_RUN_ID: ${{ inputs.ci_run_id }}
+      PULBASE_CONTROL_RULE_VERSIONS: ${{ vars.PULBASE_CONTROL_RULE_VERSIONS }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: postmerge-approval-${{ github.run_id }}-1
+      - name: 承認されたdevelopのSHAと保護を再照合
+        id: build
+        run: node ci/control/postmerge-runner.mjs approved-input
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          artifact-ids: ${{ steps.build.outputs.artifact_id }}
+          run-id: ${{ steps.build.outputs.build_run }}
+          github-token: ${{ github.token }}
+          path: build
+          merge-multiple: true
+      - name: 公開1回・回帰1回の鍵なし予行試験
+        run: node ci/control/postmerge-runner.mjs approved
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: postmerge-result-${{ github.run_id }}-1
+          path: postmerge-result.json
+          if-no-files-found: error
+          retention-days: 7

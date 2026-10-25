@@ -1,36 +1,34 @@
-# staging実処理の鍵なし準備
+# 単純なマージ後検証への切り替え準備
 
-## 実装と確認済みの範囲
+## 採用した流れ
 
-PR #45で旧公開・マージ経路を停止し、レビュー生成元の固定を準備した。旧Repository variables PULBASE_STAGING_DEPLOY_ENABLEDとPULBASE_AUTO_MERGE_ENABLEDは人がfalseへ変更し、APIでも確認した。mainは変更していない。
+Issue/手元実装 → PRのCI・Codexレビュー → developへマージ → 実SHAのpush CI・成果物 → 人がstaging承認1回 → 検証公開1回 → 回帰1回。失敗したら結果を記録して停止し、修正PRで対応する。候補公開、マージ後の再公開、回帰の再実行、自動巻き戻しは行わない。
 
-新しいprotected候補検証は、review-trust.jsonの固定定義をbase/head/候補のGit treeと照合し、runのPR snapshot・初回・24時間以内を確認する。承認前のpacketと承認後の再照合に同じpolicy digestを結び付ける。保護ブランチへ配置するまで現行ci-controlの動作は変わらない。
+本番は別の人の承認を維持する。main反映・本番公開・X投稿は今回行わない。本番後の短い確認と告知文提示は本番接続時に整理する。
 
-## 実処理の準備
+## 今回の準備
 
-- staging-publication.mjs：既存stagingの固定Worker/D1/R2/DO設定と固定Pagesゲートウェイを使う。成果物の生成設定やnpm scriptsは採用しない。WorkerとPagesの各書込前に成果物と対象を再検証し、途中の候補変更は停止する。Pagesのmain/preview自動公開停止を確認し、設定の変化は自動PATCH/巻き戻しをせず停止する。
-- staging-regression.mjs：検証URLへのHTTPとWorker/Pages両SHAを照合し、固定のdesktop/mobileテスト8件を必須にする。ブラウザにはBasic認証だけを渡し、Cloudflare/GitHub/OpenAIの鍵を継承しない。実行すると検証用ゲストを作成する既存テストを利用する。
-- staging-merge.mjs：developのstrictな必須チェックと発行元を確認し、同じheadを指定したsquash mergeだけを要求する。timeoutは不明、マージ後照合失敗は既知SHAを記録して止める。実マージSHA自身の初回push CI・成果物と親/treeを確認する。候補CIでは代用しない。
-- 実処理に既定のネットワーク/コマンドtransportはなく、active workflowから呼ばない。今回のテストでは明示した試験transportを使う。実鍵の接続・実回帰・実マージは別の手順。
+- 旧候補方式の起動を停止定義に変更し、旧候補公開の承認ループを準備コードから削除した。以前のGitコミットとActions実行履歴は残す。
+- PR前段のpremerge-decisionは同じPR・CI・Codexレビューと固定された定義を確認し、develop merge要求のデータだけを作る。develop-mergeは前段専用の明示transportで同じheadのsquashだけを要求する。どちらも現時点では実鍵・active workflowへ未接続。
+- postmerge-stagingはPR番号を受け取らず、developの最新初回push CI runだけを使う。同じSHAのCI・固定定義・実コミットtree・成果物を照合し、staging承認前に固定、承認後に再照合する。手元PR・自動PRどちらのマージ結果も扱える。
+- runPostmergeStagingは公開1回・回帰1回だけを直列に呼ぶ。途中でdevelopや成果物が変わる場合も最新へ切り替えず停止する。公開途中の処理は強制中断せず、待機中の古いSHAは起動時の照合で拒否する。
+- postmerge-runnerの現在の副作用は模擬のみ。実CI成果物の照合と保護設定の読取は行うが、実公開・実回帰・実マージは行わない。
+- 起動元はdevelopへのWeb checks成功をきっかけにci-controlをdispatchする。定義はdisabledで準備し、人による制御配置と固定SHAの更新前には有効化しない。起動側は共通ロックを保持せず、制御側だけで保持する。
 
-Wranglerは現行lockと同じ4.114.0、Playwrightは1.61.1の専用toolchain lockを準備する。依存インストール・ブラウザ取得は鍵を扱う処理から分離し、ignore-scriptsで行う設計で、現時点ではactive workflowへ導入しない。
+## 実処理の鍵なし準備
 
-## 鍵なしの実測
+staging-publicationは既存stagingだけの固定Worker/D1/R2/DO設定とゲートウェイで公開命令を組み立てる。staging-regressionは検証URLと両SHA、desktop/mobileの8件を必須とする。ブラウザへCloudflare/GitHub/OpenAI鍵を継承しない。これらのlive transportはまだ接続しない。
 
-PR #44の実CI成果物114ファイルを取得し、全ハッシュ・刻印を検証した。固定staging設定を生成し、認証envを継承しないWrangler deploy --dry-run --no-bundle --autoconfig=falseでパッケージングに成功した。Worker/Pagesのアップロードはなく、実サービスの動作確認成功とは扱わない。
+Wrangler4.114.0とPlaywright1.61.1の専用toolchain lockを用意し、鍵を扱う処理から依存取得を分離する。実成果物でのWrangler dry-runはパッケージング確認であり、実環境の回帰合格ではない。
 
-## 次の管理操作
+## 次の操作
 
-1. 新しい信頼定義を含む制御コードをレビューし、鍵なしの更新ZIPを準備する。
-2. 自動起動を一時停止してから、人が管理するrelease Appの一時例外と鍵でci-controlを更新し、例外を削除する。
-3. stagingの保護設定版、固定control SHAを人が更新し、自動起動を戻す。
-4. 新しい公開なし試験Issueで、固定レビュー定義の照合とstaging承認1回を再検証する。
-5. 合格後に初めて、公開用の最小権限鍵・マージ鍵の配置とlive transportの接続を検討する。
+1. 通常CI後にdevelopの登録定義と旧候補起動停止を反映する。
+2. 人が管理するAppの一時例外・既存鍵で、鍵なしの新しいci-controlパッケージを配置し、例外を削除する。
+3. stagingの保護設定版と固定control SHAを更新する。
+4. developの成功CIから新経路を自動起動し、staging承認1回で実証跡を再照合して模擬公開1回・模擬回帰1回を確認する。
+5. その後にPR自動マージと実公開・実回帰の鍵/transportを接続する。未検証の鍵を先に置かない。
 
-## 未完了・限界
+## 現在の限界
 
-実公開の接続、ブラウザの実環境回帰、新しい経路での実マージ・実SHA再公開は未検証。Pages Writeは同じプロジェクトの本番も書けるため、鍵は人の承認後の固定制御コードだけへ渡す。今回の成功を鍵のアクセス分離完了とみなさない。main反映・本番公開・X投稿は行わない。
-
-参考：
-- https://developers.cloudflare.com/workers/wrangler/configuration/
-- https://developers.cloudflare.com/pages/configuration/preview-deployments/
+新しいci-controlの配置は人の操作待ち。現行ci-controlの旧予行コードを新経路の成功と扱わない。実自動マージ・実公開・実回帰は未接続。本番workflowは無効テンプレートのまま、production有効フラグもfalseを維持する。

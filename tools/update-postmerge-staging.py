@@ -17,7 +17,7 @@ import zipfile
 
 REPO = '/repos/papettoTV/virtual_gamecenter'
 APP = 5405029
-BUNDLE_SHA = '7de64f5070022d6dfcc4a9a297db69b7830610bd5f565853f1eb0c6a2feb12c3'
+BUNDLE_SHA = '232bbc4813f26b2fc7729e9edb60f2df4cad40e827f224a908991cd004c38aa6'
 PREVIOUS_SHA = '90cfba234ec84aee19f0e19e3827a9939a5de6a3'
 MAIN_SHA = '73cb5d9267c56f06f9f1150327ec6b8b3caa2bb9'
 # These metadata-only versions were read with the limited owner PAT and its full
@@ -27,7 +27,7 @@ PLAN_CONTROL_VERSION = '2026-10-25T01:25:04.730Z'
 APPLY_CONTROL_VERSION = None
 MAIN_RULE_VERSION = '2026-10-21T20:32:35.191Z'
 SHA = re.compile(r'^[a-f0-9]{40}$')
-FILES = {'ci/control/protection-check.mjs', 'ci/control/candidate-evidence.mjs', 'ci/control/toolchain/package.json', 'ci/tests/review-trust.test.mjs', 'ci/control/toolchain/package-lock.json', 'ci/control/review-trust.json', '.github/workflows/approved-candidate-evidence.yml', 'ci/tests/staging-runtime.test.mjs', 'ci/control/review-trust.mjs', 'docs/staging-runtime-preparation.md', 'docs/protected-candidate-preparation.md', 'ci/control/single-approval.mjs', 'ci/control/toolchain/staging-browser.config.mjs', 'README.md', 'ci/control/staging-regression.mjs', 'ci/control/staging-publication.mjs', 'ci/tests/control-protection.test.mjs', '.github/workflows/staging-control-rehearsal.yml', 'ci/control/rehearsal.mjs', 'ci/control/toolchain/browser/regression.spec.mjs', 'ci/tests/approved-candidate.test.mjs', 'ci/control/staging-merge.mjs', 'ci/tests/single-approval.test.mjs', 'ci/control/approved-candidate.mjs', 'ci/control/staging-gateway.mjs', 'ci/control/staging-target.json'}
+FILES = {'ci/control/toolchain/package.json', 'ci/tests/review-trust.test.mjs', 'ci/control/develop-merge.mjs', 'ci/tests/staging-runtime.test.mjs', 'ci/tests/postmerge-staging.test.mjs', 'ci/control/staging-publication.mjs', '.github/workflows/postmerge-staging.yml', 'ci/control/toolchain/staging-browser.config.mjs', 'ci/tests/control-protection.test.mjs', 'ci/control/staging-target.json', 'ci/control/review-trust.mjs', 'ci/control/postmerge-staging.mjs', 'ci/control/review-trust.json', 'ci/control/toolchain/package-lock.json', 'ci/control/postmerge-runner.mjs', 'ci/control/protection-check.mjs', 'README.md', 'ci/control/toolchain/browser/regression.spec.mjs', 'ci/control/staging-gateway.mjs', 'ci/control/candidate-evidence.mjs', 'ci/control/premerge-decision.mjs', 'ci/control/staging-regression.mjs'}
 
 
 class Stop(RuntimeError):
@@ -56,12 +56,12 @@ def permitted(method, path, body):
         return body == {'repositories': ['virtual_gamecenter'], 'permissions': {'contents': 'write', 'workflows': 'write'}}
     if path == REPO + '/git/trees':
         entries = body.get('tree')
-        return set(body) == {'tree'} and isinstance(entries, list) and len(entries) == 27 and all(
+        return set(body) == {'tree'} and isinstance(entries, list) and len(entries) == 23 and all(
             set(item) == {'path', 'mode', 'type', 'content'} and item['path'] in FILES | {'bundle-manifest.json'}
             and item['mode'] == '100644' and item['type'] == 'blob' and isinstance(item['content'], str)
-            for item in entries) and len({item['path'] for item in entries}) == 27
+            for item in entries) and len({item['path'] for item in entries}) == 23
     if path == REPO + '/git/commits':
-        return set(body) == {'message', 'tree', 'parents'} and body['message'] == 'chore: レビュー信頼条件と鍵なし実処理を配置' and bool(
+        return set(body) == {'message', 'tree', 'parents'} and body['message'] == 'chore: developマージ後の公開1回・回帰1回を鍵なし配置' and bool(
             SHA.fullmatch(body.get('tree', ''))) and body.get('parents') == [PREVIOUS_SHA]
     return False
 
@@ -107,11 +107,11 @@ def bundle(path):
     if hashlib.sha256(raw).hexdigest() != BUNDLE_SHA:
         raise Stop('レビュー対象のZIPとSHA-256が一致しません。')
     with zipfile.ZipFile(path) as archive:
-        if len(archive.infolist()) != 27 or set(archive.namelist()) != FILES | {'bundle-manifest.json'}:
+        if len(archive.infolist()) != 23 or set(archive.namelist()) != FILES | {'bundle-manifest.json'}:
             raise Stop('配置ファイルの集合が一致しません。')
         entries = {name: archive.read(name) for name in archive.namelist()}
     manifest = json.loads(entries['bundle-manifest.json'])
-    if (manifest.get('version') != 3 or manifest.get('mode') != 'trust-and-runtime-preparation' or manifest.get('liveTransportConnected') is not False or manifest.get('previousControlSha') != PREVIOUS_SHA or manifest.get('deploymentEnabled') is not False
+    if (manifest.get('version') != 4 or manifest.get('mode') != 'postmerge-staging-keyless' or manifest.get('mergeEnabled') is not False or manifest.get('regressionCount') != 1 or manifest.get('liveTransportConnected') is not False or manifest.get('previousControlSha') != PREVIOUS_SHA or manifest.get('deploymentEnabled') is not False
         or manifest.get('repository') != 'papettoTV/virtual_gamecenter' or manifest.get('branch') != 'ci-control'
         or set(manifest.get('files', {})) != FILES):
         raise Stop('公開なしの配置manifestではありません。')
@@ -224,7 +224,7 @@ def apply(entries, jwt, api=request):
             raise Stop('配置treeのファイル集合・Gitハッシュが一致しません。')
         report['stage'] = 'create-commit'
         commit = ok(api, 'POST', REPO + '/git/commits', token,
-            {'message': 'chore: レビュー信頼条件と鍵なし実処理を配置', 'tree': tree['sha'], 'parents': [parent]})
+            {'message': 'chore: developマージ後の公開1回・回帰1回を鍵なし配置', 'tree': tree['sha'], 'parents': [parent]})
         if not SHA.fullmatch(commit.get('sha', '')) or commit.get('tree', {}).get('sha') != tree['sha'] or [item.get('sha') for item in commit.get('parents', [])] != [parent]:
             raise Stop('配置commitの親・treeが一致しません。')
         report['commit'] = commit['sha']
@@ -260,7 +260,7 @@ def apply(entries, jwt, api=request):
 
 def main():
     if len(sys.argv) != 3 or sys.argv[1] not in ('--plan', '--apply'):
-        raise Stop('使い方: python3 update-trusted-runtime.py --plan または --apply 配置ZIPのパス')
+        raise Stop('使い方: python3 update-postmerge-staging.py --plan または --apply 配置ZIPのパス')
     entries = bundle(Path(sys.argv[2]).expanduser().absolute())
     if sys.argv[1] == '--plan':
         develop = guards(request, False)

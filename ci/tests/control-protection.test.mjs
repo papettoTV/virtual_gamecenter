@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { executionContext, verifyProtection as verify, readApi } from '../control/protection-check.mjs';
-import { rehearse } from '../control/rehearsal.mjs';
 const controlSha = 'a'.repeat(40), mainSha = '73cb5d9267c56f06f9f1150327ec6b8b3caa2bb9';
 const versions = { ciControl: '2026-10-23T00:00:00.000Z', main: '2026-10-21T20:32:35.191Z' };
 const verifyProtection = (api, execution, options = { ruleVersions: JSON.stringify(versions) }) => verify(api, execution, options);
@@ -66,17 +65,6 @@ test('読取APIだけを許可し、外部redirect・応答本文・認証値を
   for (const path of ['https://attacker.test', '../other', 'actions/runs/1/approve', 'git/ref/heads/develop']) await assert.rejects(api(path));
   assert.equal(count, 0);
   await assert.rejects(api('environments/staging'), error => !error.message.includes('not-a-real-token') && !error.message.includes('private response'));
-});
-test('予行試験は合成SHAを実公開結果と表示せず、ネットワークも書込もしない', async () => {
-  const previous = globalThis.fetch;
-  globalThis.fetch = () => { throw Error('Network forbidden'); };
-  try {
-    const result = await rehearse(executionContext(env), () => 100000);
-    assert.equal(result.simulated, true); assert.equal(result.rehearsalPassed, true);
-    assert.equal(result.realMergeExecuted, false); assert.equal(result.realDeploymentExecuted, false);
-    assert.equal(result.intendedApprovalCount, 1); assert.equal(result.mergedSha, undefined);
-    assert.ok(result.phases.every(phase => /模擬|再照合/.test(phase)));
-  } finally { globalThis.fetch = previous; }
 });
 test('省略された例外一覧を空と推定せず、人の設定版照合を必須にする', async () => {
   const hidden = () => fixture(s => { delete s['rulesets/1'].bypass_actors; delete s['rulesets/2'].bypass_actors; });
