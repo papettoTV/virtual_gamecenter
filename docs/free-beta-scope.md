@@ -1,6 +1,6 @@
 # 無料ベータ範囲案
 
-端末別・ゲーム別の詳しい受け入れ項目は[公開範囲と実機確認計画](free-beta-scope-and-device-checks.md)を参照する。最新の実施結果は[PC確認記録](pc-play-spectating-verification.md)を正とし、詳細計画の表を一括で合格扱いにしない。
+端末別・ゲーム別の詳しい受け入れ項目は[公開範囲と実機確認計画](free-beta-scope-and-device-checks.md)を参照する。実施結果は[PC確認記録](pc-play-spectating-verification.md)と[iPhone観戦記録](iphone-spectating-verification.md)を参照し、詳細計画の表を一括で合格扱いにしない。[参加案内・不具合報告手順](free-beta-participant-guide.md)は招待準備用の未送信下書き。
 
 2026-10-21のIssue #12の報告では、以下の範囲案はユーザー承認済み。
 公開承認や性能保証を意味しない。
@@ -11,7 +11,7 @@
 - 案内時間帯と招待アクセス境界は未確定。
 
 [PC実機確認記録](pc-play-spectating-verification.md)に3ゲームの報告と残課題を記載。
-Windows/iPhone/Android、切断復帰などの確認、修正後の検証サイトでの実ゲーム確認は残る。
+Windows/Android、iPhoneの横向き・音声・切断復帰など、修正後の検証サイトでの実ゲーム確認は残る。iPhoneの3ゲームのライブ表示・上下スクロール・ゲームオーバー表示は2026-10-25の記録を参照する。
 負荷テストは保留・未合格。対戦申込導線の制御は後続のIssue #26で[UI/API共通の提供モード制限](free-beta-play-modes.md)として対応。検証反映の結果はそのIssue/PRの証跡で確認する。
 BT-01/02/03は対応中とし、[公開前チェックリスト](production-launch-checklist.md)の公開判定を維持する。
 検証への反映SHAとActions証跡は未取得であり、今回push・デプロイは行わない。
