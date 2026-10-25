@@ -1,0 +1,28 @@
+# 保護された実候補検証の配置準備
+
+## 今回の範囲
+
+実PR・CI・Codexレビュー・成果物を検証し、staging承認1回の処理へ接続する。実マージ・公開・実回帰・マージ後CIは模擬のまま。main更新、本番公開、X投稿、公開用Secret登録は行わない。
+
+制御workflowのprepareはci-controlの同じ実行SHAをcheckoutし、保護設定、レビューrunと候補CI、成果物のハッシュを読み取る。実PRのhead/base/merge SHA/treeとrun/attempt/artifact ID、レビュー証跡とmanifestのSHA-256を同じrunの承認対象へ固定する。候補コードは実行しない。
+
+stagingを使うジョブはapprovedの1つだけ。承認後、人が管理するPULBASE_CONTROL_RULE_VERSIONSとの照合、現在の候補・CI・レビューの再取得、同じ成果物の再ダウンロードとハッシュ照合を行う。失効・変更・再実行・別runは停止する。承認後の候補再照合を伴う状態遷移を模擬し、実際の公開やマージとは区別する。
+
+## 配置と起動の順番
+
+1. 鍵なしコード・テスト・配布ZIP・更新ツールをローカルで準備する。既存ci-controlは変更しない。
+2. 管理用端末でci-control-human-managedのBypassへpulbase-releaseだけをAlways allowで一時追加する。mainのルールは変更しない。
+3. Codexが例外・設定版を読取確認して更新ツールのAPPLY_CONTROL_VERSIONを固定する。それまではapplyを無効にする。
+4. 人が管理用端末で新しい更新ツールを実行する。前回の初期配置ツールは使わない。人が保管する既存PEMで1リポジトリ・Contents/Workflows writeだけの一時トークンを発行し、固定旧SHAを親にした通常の早送りでci-controlだけを更新する。force、main/developの更新、workflow起動は禁止。一時トークンは最後に失効する。結果不明時は再試行しない。
+5. 成功・失敗を問わず一時例外を削除。Codexがコードのハッシュと保護を確認する。
+6. 人がstagingのPULBASE_CONTROL_RULE_VERSIONSを例外削除後の版に更新する。
+7. developに権限なしの登録用定義と、自動起動側の定義を通常CI後に登録する。人が確認済み制御SHAと起動フラグを設定するまで自動起動は無効。Actions writeは起動専用に絞れる権限ではないため、固定ref・制御SHA・Environment承認を防御とする。
+8. 新しい小さな公開なしIssueで初回の独立レビューを作る。レビュー完了イベントからci-controlを自動起動し、人はstagingを1回だけ承認する。起動側は共通の公開ロックを保持せず、制御側だけが保持する。
+
+既存PR #40は現在のdevelopに対する証跡として保持しているが、developの登録変更後は古いbaseとなる。新しい証跡として流用せず、新しい試験Issueを使う。既存PRの再実行は拒否する。
+
+## 保護と限界
+
+既存のコード・文書7ファイルを維持して新しい検証コード等5ファイルを追加し、配布manifestを更新する。更新ZIPには鍵やnode_modulesを含めない。コードは配布manifestと固定チェックサム、配置後のGit blobハッシュで確認する。AI用の認証にci-controlの例外は付けない。
+
+実証跡を生むレビュー定義はdevelop上にあり、今回の成功は公開鍵を渡す根拠ではない。実公開への接続前にレビュー定義の信頼基準と制御側の固定、旧公開経路停止、マージ権限の配置を別途確認する。新しい制御workflowは読取権限のみ・Secret参照なしであり、実公開処理は未接続である。
