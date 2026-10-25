@@ -49,7 +49,7 @@ test('自動検証workflowはSecret・Environment・書込権限・候補実行�
  assert.deepEqual(w.permissions,{contents:'read',actions:'read'});assert.equal(w.jobs.evidence.environment,undefined);assert.ok(!text.includes('secrets.'));assert.deepEqual(w.on.workflow_run.workflows,['Codex PR verification']);
  assert.equal(w.jobs.evidence.steps[0].with.ref,'${{ github.sha }}');assert.ok(!/npm |deploy|dispatches/.test(text));
  const review=parse(await readFile(new URL('../../.github/workflows/codex-pr.yml',import.meta.url),'utf8'));
- assert.ok(review.jobs.staging.if.includes("evidence_only != 'true'"));assert.ok(review.jobs.report.if.includes("evidence_only != 'true'"));
+ assert.equal(review.jobs.staging,undefined);assert.equal(review.jobs.merge,undefined);
 });
 test('実成果物のSHA刻印と全ファイルハッシュを検査し改変・リンクを拒否',async()=>{
  const {mkdtemp,mkdir,writeFile,symlink,rm}=await import('node:fs/promises');const {tmpdir}=await import('node:os');const {join}=await import('node:path');const {createHash}=await import('node:crypto');const {checkBuild}=await import('../control/candidate-evidence.mjs');

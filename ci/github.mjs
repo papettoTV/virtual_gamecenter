@@ -47,39 +47,9 @@ export async function preparePr({ github, context, core, bot }) {
   core.setOutput('request', request);
 }
 
-export async function mergePr({ github, context, head, base, verifiedTree, expectedCheck }) {
-  assertSha(head); assertSha(base); assertSha(verifiedTree);
-  const pull_number = context.payload.pull_request.number;
-  const repo = context.repo;
-  const { data: pr } = await github.rest.pulls.get({ ...repo, pull_number });
-  assertAutomatedPr(pr, { repository: `${repo.owner}/${repo.repo}`, bot: process.env.AUTOMATION_BOT });
-  if (pr.head.sha !== head || pr.base.sha !== base) throw Error('PR changed after verification; rerun against current develop');
-  const { data: protection } = await github.rest.repos.getBranchProtection({ ...repo, branch: 'develop' });
-  const required = protection.required_status_checks;
-  const contexts = new Set([...(required?.contexts ?? []), ...(required?.checks ?? []).map(check => check.context)]);
-  if (!required?.strict || !['verify', 'Automation control checks'].every(name => contexts.has(name))) {
-    throw Error('Strict develop protection with required Web checks is mandatory');
-  }
-  // GitHub enforces the unchanged base atomically through strict branch protection.
-  const checks = await github.paginate(github.rest.checks.listForRef, { ...repo, ref: head, per_page: 100 });
-  const latest = checks.filter(check => check.name === expectedCheck && check.app?.slug === 'github-actions')
-    .sort((a, b) => b.id - a.id)[0];
-  if (latest?.conclusion !== 'success') throw Error('Required Web checks have not passed for this PR head');
-  await assertAutomaticAssignment({ github, repo, issueNumber: assertIssueNumber(pr.head.ref.replace('codex/issue-', '')), exceptPullNumber: pull_number });
-  const result = await github.rest.pulls.merge({ ...repo, pull_number, sha: head, merge_method: 'merge',
-    commit_message: `Verified candidate tree: ${verifiedTree}` });
-  if (!result.data.merged) throw Error('GitHub refused merge');
-  const { data: commit } = await github.rest.git.getCommit({ ...repo, commit_sha: result.data.sha });
-  if (commit.tree.sha !== verifiedTree) throw Error('Merged tree differs; stop release and inspect merge');
-  const issue_number = assertIssueNumber(pr.head.ref.replace('codex/issue-', ''));
-  await github.rest.issues.update({ ...repo, issue_number, state: 'closed', state_reason: 'completed' });
-  return result.data.sha;
-}
-
-export async function reportMerge({ github, context, head, base, verifiedTree, mergedSha }) {
-  const repo = context.repo;
-  await github.rest.issues.createComment({ ...repo, issue_number: context.payload.pull_request.number,
-    body: `検証合格・developへマージしました。\n\nHead: \`${head}\`\nBase: \`${base}\`\nTree: \`${verifiedTree}\`\nMerge: \`${mergedSha}\`\n証跡: ${context.serverUrl}/${repo.owner}/${repo.repo}/actions/runs/${context.runId}\n\n本番公開・X告知は実施していません。` });
+// Retained as an explicit stop for older callers; never issue a merge API request.
+export async function mergePr() {
+  throw Error('旧マージ経路は停止済みです。保護されたci-controlのみを使用してください。');
 }
 
 export async function report({ github, context, ok, failureJson }) {

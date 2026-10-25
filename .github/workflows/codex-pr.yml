@@ -6,10 +6,6 @@ on:
 permissions:
   contents: read
   actions: read
-# Holds the shared staging environment through testing and merge; no deployment overlaps.
-concurrency:
-  group: pulbase-staging-pipeline
-  cancel-in-progress: false
 jobs:
   gate:
     if: vars.PULBASE_CODEX_ENABLED == 'true' && github.event.pull_request.user.login == vars.PULBASE_AUTOMATION_BOT
@@ -22,11 +18,11 @@ jobs:
       request: ${{ steps.pr.outputs.request }}
       evidence_only: ${{ steps.pr.outputs.evidence_only }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           persist-credentials: false
-      - uses: actions/github-script@v7
+      - uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
         id: pr
         env:
           AUTOMATION_BOT: ${{ vars.PULBASE_AUTOMATION_BOT }}
@@ -46,7 +42,7 @@ jobs:
       attempt: ${{ steps.ci.outputs.attempt }}
       artifact_id: ${{ steps.ci.outputs.artifactId }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: refs/pull/${{ needs.gate.outputs.number }}/merge
           fetch-depth: 2
@@ -61,7 +57,7 @@ jobs:
           test "$(git rev-parse HEAD^2)" = "$EXPECTED_HEAD"
           echo "candidate=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "tree=$(git rev-parse HEAD^{tree})" >> "$GITHUB_OUTPUT"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
       - name: Require successful CI artifact for the identical merge candidate
@@ -82,7 +78,7 @@ jobs:
     outputs:
       result: ${{ steps.codex.outputs.final-message }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ needs.verify.outputs.candidate }}
           fetch-depth: 0
@@ -91,11 +87,12 @@ jobs:
         env:
           ISSUE_REQUEST: ${{ needs.gate.outputs.request }}
         run: node -e 'const fs = require("fs"); fs.writeFileSync("ci/review-request.md", fs.readFileSync("ci/prompts/review.md", "utf8") + "\nUntrusted issue JSON:\n" + process.env.ISSUE_REQUEST)'
-      - uses: openai/codex-action@v1
+      - uses: openai/codex-action@bdf19a4a223ec2549a3e2274a0cf61556bc07675
         id: codex
         env:
           BASE_SHA: ${{ needs.gate.outputs.base }}
         with:
+          codex-version: 0.164.0
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           prompt-file: ci/review-request.md
           allow-users: ${{ vars.PULBASE_AUTOMATION_BOT }}
@@ -107,7 +104,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ needs.gate.outputs.base }}
           persist-credentials: false
@@ -136,143 +133,3 @@ jobs:
           path: review-receipt.json
           if-no-files-found: error
           retention-days: 7
-  staging:
-    needs: [gate, verify, review-gate]
-    if: vars.PULBASE_STAGING_DEPLOY_ENABLED == 'true' && needs.gate.outputs.evidence_only != 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 12
-    environment: staging
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.gate.outputs.base }}
-          persist-credentials: false
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Install locked deploy tools without lifecycle scripts
-        run: npm ci --ignore-scripts
-        working-directory: apps/web
-      - uses: actions/download-artifact@v4
-        with:
-          artifact-ids: ${{ needs.verify.outputs.artifact_id }}
-          run-id: ${{ needs.verify.outputs.run_id }}
-          github-token: ${{ github.token }}
-          path: ci/downloaded-build
-          merge-multiple: true
-      - name: Recheck CI and deploy artifact without executing candidate code
-        env:
-          GH_TOKEN: ${{ github.token }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          PULBASE_DRY_RUN: 'false'
-          PULBASE_CHECK_SHA: ${{ needs.gate.outputs.head }}
-          PULBASE_RELEASE_SHA: ${{ needs.verify.outputs.candidate }}
-          PULBASE_EXPECTED_BASE: ${{ needs.gate.outputs.base }}
-          PULBASE_EXPECTED_TREE: ${{ needs.verify.outputs.tree }}
-          PULBASE_PR_NUMBER: ${{ needs.gate.outputs.number }}
-          PULBASE_CI_EVENT: pull_request
-          PULBASE_CI_RUN_ID: ${{ needs.verify.outputs.run_id }}
-          PULBASE_CI_ATTEMPT: ${{ needs.verify.outputs.attempt }}
-          PULBASE_ARTIFACT_ID: ${{ needs.verify.outputs.artifact_id }}
-        run: node ci/deploy-staging-artifact.mjs
-  regression:
-    needs: [gate, verify, staging]
-    runs-on: ubuntu-latest
-    timeout-minutes: 12
-    environment: staging
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.gate.outputs.base }}
-          persist-credentials: false
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - run: npm ci --ignore-scripts
-        working-directory: ci
-      - run: npx --no-install playwright install --with-deps chromium
-        working-directory: ci
-      - name: HTTP and exact deployed candidate revision
-        env:
-          PULBASE_CHECK_USERNAME: ${{ secrets.PULBASE_CHECK_USERNAME }}
-          PULBASE_CHECK_PASSWORD: ${{ secrets.PULBASE_CHECK_PASSWORD }}
-          PULBASE_EXPECTED_SHA: ${{ needs.verify.outputs.candidate }}
-        run: |
-          mkdir -p ci/results
-          node --experimental-strip-types apps/web/scripts/service-check.mjs --environment staging > ci/results/service.json
-          node ci/check-revision.mjs staging
-      - name: Browser regression on desktop and mobile
-        working-directory: ci
-        env:
-          PULBASE_BROWSER_ENVIRONMENT: staging
-          PULBASE_CHECK_USERNAME: ${{ secrets.PULBASE_CHECK_USERNAME }}
-          PULBASE_CHECK_PASSWORD: ${{ secrets.PULBASE_CHECK_PASSWORD }}
-          PULBASE_EXPECTED_SHA: ${{ needs.verify.outputs.candidate }}
-        run: npm run browser
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: staging-evidence-${{ needs.gate.outputs.head }}
-          path: |
-            ci/results
-            ci/test-results
-            ci/playwright-report
-          retention-days: 14
-          if-no-files-found: warn
-  merge:
-    needs: [gate, verify, staging, regression]
-    if: vars.PULBASE_AUTO_MERGE_ENABLED == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 8
-    environment: automation
-    outputs:
-      sha: ${{ steps.merge.outputs.sha }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.gate.outputs.base }}
-          persist-credentials: false
-      - uses: actions/create-github-app-token@v1
-        id: app
-        with:
-          app-id: ${{ vars.PULBASE_APP_ID }}
-          private-key: ${{ secrets.PULBASE_APP_PRIVATE_KEY }}
-      - name: Merge only the verified head into unchanged develop
-        id: merge
-        uses: actions/github-script@v7
-        env:
-          AUTOMATION_BOT: ${{ vars.PULBASE_AUTOMATION_BOT }}
-          HEAD_SHA: ${{ needs.gate.outputs.head }}
-          BASE_SHA: ${{ needs.gate.outputs.base }}
-          VERIFIED_TREE: ${{ needs.verify.outputs.tree }}
-        with:
-          github-token: ${{ steps.app.outputs.token }}
-          script: |
-            const { mergePr } = await import(`${process.env.GITHUB_WORKSPACE}/ci/github.mjs`);
-            const sha = await mergePr({ github, context, head: process.env.HEAD_SHA, base: process.env.BASE_SHA,
-              verifiedTree: process.env.VERIFIED_TREE, expectedCheck: 'verify' });
-            core.setOutput('sha', sha);
-            const { reportMerge } = await import(`${process.env.GITHUB_WORKSPACE}/ci/github.mjs`);
-            await reportMerge({ github, context, head: process.env.HEAD_SHA, base: process.env.BASE_SHA, verifiedTree: process.env.VERIFIED_TREE, mergedSha: sha });
-  report:
-    needs: [gate, verify, review, review-gate, staging, regression, merge]
-    if: always() && needs.gate.result == 'success' && needs.gate.outputs.evidence_only != 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 3
-    permissions:
-      contents: read
-      issues: write
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.gate.outputs.base }}
-          persist-credentials: false
-      - uses: actions/github-script@v7
-        env:
-          JOB_RESULTS: ${{ toJSON(needs) }}
-        with:
-          script: |
-            const jobs = JSON.parse(process.env.JOB_RESULTS);
-            const { report } = await import(`${process.env.GITHUB_WORKSPACE}/ci/github.mjs`);
-            await report({ github, context, ok: jobs.regression.result === 'success' && !Object.values(jobs).some(j => j.result === 'failure' || j.result === 'cancelled') });

@@ -35,30 +35,24 @@ export async function checkWorkflows() {
   assert.ok(!JSON.stringify(issue).includes('refs/heads/main'));
   const pr = entries.find(item => item.file === 'codex-pr.yml').data;
   assert.deepEqual(pr.on.pull_request.branches, ['develop']);
-  assert.match(pr.jobs.staging.if, /PULBASE_STAGING_DEPLOY_ENABLED/);
-  assert.match(pr.jobs.merge.if, /PULBASE_AUTO_MERGE_ENABLED/);
-  assert.equal(pr.concurrency.group, 'pulbase-staging-pipeline');
-  assert.equal(pr.concurrency['cancel-in-progress'], false);
-  assert.ok(pr.jobs.merge.needs.includes('staging'));
-  assert.ok(pr.jobs.merge.needs.includes('regression'));
-  const develop = entries.find(item => item.file === 'develop-staging.yml').data;
-  assert.deepEqual(develop.on.workflow_run.workflows, ['Web checks']);
-  assert.ok(!develop.on.push);
-  assert.equal(develop.jobs.ready.environment, undefined);
-  for (const flow of [pr, develop]) {
-    const deploy = JSON.stringify(flow.jobs.staging);
-    assert.ok(deploy.includes('deploy-staging-artifact.mjs'));
-    assert.ok(deploy.includes('download-artifact@'));
-    assert.ok(!/npm (?:test|run build|run deploy)/.test(deploy));
-    assert.ok(deploy.includes('npm ci --ignore-scripts'));
-    assert.ok(!JSON.stringify(flow.jobs.regression).includes('CLOUDFLARE_API_TOKEN'));
-    assert.ok(!JSON.stringify(flow.jobs.verify ?? flow.jobs.ready).includes('secrets.'));
+  for (const name of ['staging', 'regression', 'merge', 'report']) assert.equal(pr.jobs[name], undefined);
+  assert.equal(pr.concurrency, undefined);
+  for (const job of Object.values(pr.jobs)) {
+    assert.ok(!JSON.stringify(job).includes('CLOUDFLARE_API_TOKEN'));
+    for (const step of job.steps ?? []) if (step.uses) assert.match(step.uses, /@[a-f0-9]{40}$/);
   }
+  const review = pr.jobs.review.steps.find(step => step.uses?.startsWith('openai/codex-action@'));
+  assert.equal(review.with['codex-version'], '0.164.0');
+  const develop = entries.find(item => item.file === 'develop-staging.yml').data;
+  assert.deepEqual(Object.keys(develop.on), ['workflow_dispatch']);
+  assert.deepEqual(develop.permissions, {});
+  assert.ok(!JSON.stringify(develop).includes('secrets.'));
+  assert.ok(develop.jobs.retired.steps.some(step => step.run?.includes('exit 1')));
   const web = entries.find(item => item.file === 'web-checks.yml').data;
   assert.ok(!JSON.stringify(web).includes('secrets.'));
   assert.ok(JSON.stringify(web.jobs.verify).includes('staging-artifact.mjs'));
 
-  const release = entries.find(item => item.file.endsWith('.disabled')).data;
+  const release = entries.find(item => item.file === 'production-release.yml.disabled').data;
   assert.match(release.jobs.prepare.if, /PULBASE_PRODUCTION_ENABLED/);
   assert.equal(release.jobs.prepare.environment, 'release-preflight');
   assert.equal(release.jobs.release.environment, 'production');
