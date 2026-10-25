@@ -1,0 +1,59 @@
+name: 候補の実証跡検証（公開なし）
+on:
+  workflow_run:
+    workflows: [Codex PR verification]
+    types: [completed]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: candidate-evidence-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
+jobs:
+  evidence:
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      startsWith(github.event.workflow_run.head_branch, 'codex/issue-') &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REVIEW_RUN_ID: ${{ github.event.workflow_run.id }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: 初回レビューrunから証跡を特定
+        id: receipt
+        run: node ci/control/candidate-evidence.mjs locate
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          artifact-ids: ${{ steps.receipt.outputs.receipt_id }}
+          run-id: ${{ env.REVIEW_RUN_ID }}
+          github-token: ${{ github.token }}
+          path: receipt
+          merge-multiple: true
+      - name: 現在のPR・候補・CI・Codexレビューを照合
+        id: candidate
+        run: node ci/control/candidate-evidence.mjs prepare
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          artifact-ids: ${{ steps.candidate.outputs.artifact_id }}
+          run-id: ${{ steps.candidate.outputs.run_id }}
+          github-token: ${{ github.token }}
+          path: candidate-build
+          merge-multiple: true
+      - name: 全ファイルのハッシュ・候補再照合・拒否条件を確認
+        run: node ci/control/candidate-evidence.mjs verify
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: candidate-evidence-${{ github.run_id }}-1
+          path: candidate-evidence.json
+          if-no-files-found: error
+          retention-days: 7

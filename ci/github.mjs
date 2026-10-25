@@ -41,6 +41,7 @@ export async function preparePr({ github, context, core, bot }) {
   core.setOutput('number', pr.number);
   const issue_number = assertIssueNumber(pr.head.ref.replace('codex/issue-', ''));
   const issue = await assertAutomaticAssignment({ github, repo: context.repo, issueNumber: issue_number, exceptPullNumber: pr.number });
+  core.setOutput('evidence_only', issue.labels?.some(label => (typeof label === 'string' ? label : label.name) === '検証:公開なし') ? 'true' : 'false');
   const request = JSON.stringify({ title: issue.title, body: issue.body ?? '' });
   if (Buffer.byteLength(request) > 18000) throw Error('Issue too large for review');
   core.setOutput('request', request);
