@@ -75,7 +75,9 @@ jobs:
           github-token: ${{ github.token }}
           path: build
           merge-multiple: true
-      - name: 公開1回・回帰1回の鍵なし予行試験
+      - name: 固定ツールを鍵なしで取得（install scriptsなし）
+        run: npm ci --ignore-scripts --prefix ci/control/toolchain
+      - name: 固定公開・HTTP・ブラウザへの鍵なし接続試験
         run: node ci/control/postmerge-runner.mjs approved
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
