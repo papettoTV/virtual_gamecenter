@@ -1,4 +1,8 @@
 import { test, expect } from '@playwright/test';
+test.beforeEach(async ({context}) => {
+  await context.route('**/*', route => new URL(route.request().url()).origin === 'https://develop.virtual-gamecenter.pages.dev' ? route.continue() : route.abort());
+  await context.routeWebSocket('**/*', socket => new URL(socket.url()).origin === 'wss://develop.virtual-gamecenter.pages.dev' ? socket.connectToServer() : socket.close());
+});
 const sha = process.env.PULBASE_EXPECTED_SHA;
 test('home renders active games and versioned Worker/Pages', async ({ page }) => {
   const exceptions = [];

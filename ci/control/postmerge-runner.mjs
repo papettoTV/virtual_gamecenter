@@ -1,10 +1,11 @@
-// Real CI/artifact inspection; publication/regression remain simulated in this preparation.
+// Connected fixed operations. This CLI is permanently keyless until a human reviews a new control revision.
 import {readFile,writeFile,appendFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 import {executionContext,readApi,verifyProtection} from './protection-check.mjs';
 import {developEvidence,releaseScope,runPostmergeStaging} from './postmerge-staging.mjs';
 import {checkBuild} from './candidate-evidence.mjs';
+import {connectedStagingOperations} from './fixed-staging-operations.mjs';
 import {trustPolicy} from './review-trust.mjs';
 const policy=JSON.parse(await readFile(new URL('./review-trust.json',import.meta.url),'utf8'));trustPolicy(policy);
 function need(v,m){if(!v)throw Error(m);}
@@ -29,23 +30,27 @@ async function main(){
   const p=await json('postmerge-preflight.json');need(JSON.stringify(p.execution)===JSON.stringify(x),'別実行の事前確認');
   const e=await developEvidence(api,run,policy);need(JSON.stringify(e)===JSON.stringify(p.evidence),'公開候補が変更');
   const files=await checkBuild('build',receipt(e)),digest=hash(await readFile('build/manifest.json'));
-  releaseScope(e,x,digest);await writeFile('postmerge-approval.json',JSON.stringify({...p,version:1,mode:'postmerge-keyless',files,manifestDigest:digest}));
-  if(process.env.GITHUB_STEP_SUMMARY)await appendFile(process.env.GITHUB_STEP_SUMMARY,`## develop公開の承認対象（鍵なし）\nSHA: ${e.sha}\nCI: ${e.runId}\n制御SHA: ${x.controlSha}\n\n承認後は公開1回・回帰1回の模擬処理です。マージや実公開は行いません。\n`);return;
+  releaseScope(e,x,digest);await writeFile('postmerge-approval.json',JSON.stringify({...p,version:2,mode:'postmerge-connected-keyless',files,manifestDigest:digest}));
+  if(process.env.GITHUB_STEP_SUMMARY)await appendFile(process.env.GITHUB_STEP_SUMMARY,`## develop公開の承認対象（鍵なし）\nSHA: ${e.sha}\nCI: ${e.runId}\n制御SHA: ${x.controlSha}\n\n承認後は固定公開処理をWorker dry-run・Pages模擬で確認し、HTTP模擬とブラウザ8件の定義読込を1回行います。実公開・実回帰・マージは行いません。\n`);return;
  }
  need(['approved-input','approved'].includes(mode),'不明なモード');
- const p=await json('postmerge-approval.json');need(p.version===1&&p.mode==='postmerge-keyless'&&JSON.stringify(p.execution)===JSON.stringify(x)
+ const p=await json('postmerge-approval.json');need(p.version===2&&p.mode==='postmerge-connected-keyless'&&JSON.stringify(p.execution)===JSON.stringify(x)
   &&p.protection?.preflightReady===true&&p.evidence.runId===String(run),'別run・別SHAの承認対象');
  await verifyProtection(readApi(process.env.GH_TOKEN),x,{ruleVersions:process.env.PULBASE_CONTROL_RULE_VERSIONS});
  const e=await developEvidence(api,run,policy);need(JSON.stringify(e)===JSON.stringify(p.evidence),'古い承認対象');
  if(mode==='approved-input'){await outputs(e);return;}
  const files=await checkBuild('build',receipt(e));need(files===p.files&&hash(await readFile('build/manifest.json'))===p.manifestDigest,'成果物差替え');
- const scope=releaseScope(e,x,p.manifestDigest),phases=[];
- const result=await runPostmergeStaging({scope,execution:x,observe:()=>developEvidence(api,run,policy),
-  publish:async()=>{phases.push('検証公開の模擬：1回');},regress:async()=>{phases.push('回帰テストの模擬：1回');return {passed:true,sha:e.sha};}});
- await writeFile('postmerge-result.json',JSON.stringify({...result,mode:'postmerge-keyless',controlSha:x.controlSha,ciRunId:e.runId,filesVerified:files,
-  protectionVerified:true,phases,realDeploymentExecuted:false,realRegressionExecuted:false,realMergeExecuted:false},null,2));
+ const scope=releaseScope(e,x,p.manifestDigest);
+ const observe=async()=>{
+  await verifyProtection(readApi(process.env.GH_TOKEN),x,{ruleVersions:process.env.PULBASE_CONTROL_RULE_VERSIONS});
+  return developEvidence(api,run,policy);
+ };
+ const operations=await connectedStagingOperations({mode:'keyless',scope,execution:x,artifactDirectory:'build',guard:observe});
+ const result=await runPostmergeStaging({scope,execution:x,observe,publish:operations.publish,regress:operations.regress});
+ await writeFile('postmerge-result.json',JSON.stringify({...result,mode:'postmerge-connected-keyless',controlSha:x.controlSha,ciRunId:e.runId,filesVerified:files,
+  protectionVerified:true,...operations.report(),realMergeExecuted:false},null,2));
 }
-export function failureReport(error){return {status:'failed',mode:'postmerge-keyless',sha:/^[a-f0-9]{40}$/.test(error?.sha??'')?error.sha:null,
+export function failureReport(error){return {status:'failed',mode:'postmerge-connected-keyless',sha:/^[a-f0-9]{40}$/.test(error?.sha??'')?error.sha:null,
  phase:['before-publication','publication','regression'].includes(error?.phase)?error.phase:'evidence',recovery:'fix-pull-request',
  realDeploymentExecuted:false,realRegressionExecuted:false,realMergeExecuted:false,productionRequested:false};}
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href)main().catch(async e=>{console.error(e.message);await writeFile('postmerge-result.json',JSON.stringify(failureReport(e),null,2));process.exitCode=1;});
