@@ -66,12 +66,25 @@ test('Worker失敗はPages・HTTP・browserへ進まず、再試行しない',as
  const f=await fixture(t);let calls=0;f.ports={process:async()=>{calls++;return {exitCode:1,stdout:'private'};}};
  const ops=await connectedStagingOperations(f);await assert.rejects(runPostmergeStaging({scope:f.scope,execution,observe:f.guard,publish:ops.publish,regress:ops.regress}),e=>e.phase==='publication'&&!e.message.includes('private'));assert.equal(calls,1);assert.equal(ops.report().browserCommandValidated,false);
 });
-test('HTTP不合格はブラウザ起動前で止まり、回帰の実行完了を報告しない',async t=>{
+test('HTTP不合格はブラウザ起動前で止まり、実行済みと不合格を区別する',async t=>{
  const f=await fixture(t);f.mode='live';f.credentials={cloudflareToken:'dummy-cf',username:'dummy',password:'dummy'};let calls=0;
  f.ports={request:async()=>new Response('',{status:302}),process:async()=>{calls++;}};
- const ops=await connectedStagingOperations(f);await assert.rejects(ops.regress());assert.equal(calls,0);assert.equal(ops.report().realRegressionExecuted,false);
+ const ops=await connectedStagingOperations(f);await assert.rejects(ops.regress());assert.equal(calls,0);assert.equal(ops.report().realRegressionExecuted,true);assert.equal(ops.report().regressionPassed,false);
 });
 test('browserは検証originだけにBasicを送り、外部HTTP/WSとService Workerを遮断',async()=>{
  const config=await readFile(new URL('../control/toolchain/staging-browser.config.mjs',import.meta.url),'utf8');const spec=await readFile(new URL('../control/toolchain/browser/regression.spec.mjs',import.meta.url),'utf8');
  assert.ok(config.includes("origin:'https://develop.virtual-gamecenter.pages.dev'"));assert.ok(config.includes("serviceWorkers:'block'"));assert.ok(!config.includes('outputFile:'));assert.ok(spec.includes('routeWebSocket'));assert.ok(spec.includes('route.abort()'));assert.ok(spec.includes('socket.close()'));
+});
+
+test('公開途中で失敗したらWorker反映・Pages結果不明を記録し再試行しない',async t=>{
+ const f=await fixture(t);f.mode='live';f.credentials={cloudflareToken:'dummy-cf',username:'dummy',password:'dummy'};let calls=0;
+ f.ports={request:async()=>Response.json({success:true,result:{name:'virtual-gamecenter',production_branch:'main'}}),process:async()=>({exitCode:++calls===1?0:1,stdout:'private'})};
+ const ops=await connectedStagingOperations(f);await assert.rejects(ops.publish());const s=ops.report();assert.equal(calls,2);assert.equal(s.workerOutcome,'uploaded');assert.equal(s.pagesOutcome,'unknown');assert.equal(s.realDeploymentAttempted,true);assert.equal(s.httpAttempted,false);
+ const {failureReport}=await import('../control/postmerge-runner.mjs');const report=failureReport({phase:'publication',sha,operationStatus:s});assert.equal(report.partialPublicationPossible,true);assert.equal(report.pagesOutcome,'unknown');assert.ok(!JSON.stringify(report).includes('private'));
+});
+test('実公開は認証3項目がそろうまでネットワークもプロセスも起動しない',async t=>{
+ const {liveCredentials}=await import('../control/postmerge-runner.mjs');
+ for(const credentials of [{},{CLOUDFLARE_API_TOKEN:'dummy'}, {CLOUDFLARE_API_TOKEN:'dummy',PULBASE_CHECK_USERNAME:'dummy',PULBASE_CHECK_PASSWORD:' '}])assert.throws(()=>liveCredentials(credentials));
+ const f=await fixture(t);f.mode='live';let calls=0;f.ports={request:async()=>{calls++;},process:async()=>{calls++;}};
+ await assert.rejects(connectedStagingOperations(f));assert.equal(calls,0);
 });

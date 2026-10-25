@@ -1,4 +1,4 @@
-name: developマージ後の検証（鍵なし）
+name: developマージ後の検証公開と回帰
 on:
   workflow_dispatch:
     inputs:
@@ -15,7 +15,7 @@ concurrency:
 jobs:
   prepare:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
     env:
       GH_TOKEN: ${{ github.token }}
       CI_RUN_ID: ${{ inputs.ci_run_id }}
@@ -49,7 +49,7 @@ jobs:
     needs: prepare
     environment: staging
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
     env:
       GH_TOKEN: ${{ github.token }}
       CI_RUN_ID: ${{ inputs.ci_run_id }}
@@ -77,7 +77,13 @@ jobs:
           merge-multiple: true
       - name: 固定ツールを鍵なしで取得（install scriptsなし）
         run: npm ci --ignore-scripts --prefix ci/control/toolchain
-      - name: 固定公開・HTTP・ブラウザへの鍵なし接続試験
+      - name: 公開鍵を渡す前に固定ChromiumとOS依存を取得
+        run: node ci/control/toolchain/node_modules/@playwright/test/cli.js install --with-deps chromium
+      - name: 検証公開1回・HTTPとブラウザ回帰1回
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          PULBASE_CHECK_USERNAME: ${{ secrets.PULBASE_CHECK_USERNAME }}
+          PULBASE_CHECK_PASSWORD: ${{ secrets.PULBASE_CHECK_PASSWORD }}
         run: node ci/control/postmerge-runner.mjs approved
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
