@@ -18,7 +18,7 @@ export function execution(env) {
 export function apiRead(token, request = fetch) {
   need(token, '読取認証なし');
   return async path => {
-    need(/^(?:actions\/runs\/[1-9][0-9]*(?:\/(?:jobs\?filter=latest&per_page=100|artifacts\?per_page=100))?|actions\/workflows\/(?:web-checks|codex-pr)\.yml\/runs\?head_sha=[a-f0-9]{40}&event=pull_request&per_page=100|pulls\/[1-9][0-9]*|issues\/[1-9][0-9]*|git\/ref\/heads\/(?:develop|ci-control|main)|git\/commits\/[a-f0-9]{40})$/.test(path), '対象外API');
+    need(/^(?:actions\/runs\/[1-9][0-9]*(?:\/(?:jobs\?filter=latest&per_page=100|artifacts\?per_page=100))?|actions\/workflows\/(?:web-checks|codex-pr)\.yml\/runs\?head_sha=[a-f0-9]{40}&event=pull_request&per_page=100|pulls\/[1-9][0-9]*|issues\/[1-9][0-9]*|git\/ref\/heads\/(?:develop|ci-control|main)|git\/commits\/[a-f0-9]{40}|git\/trees\/[a-f0-9]{40}\?recursive=1)$/.test(path), '対象外API');
     try {
       const response = await request(`https://api.github.com/repos/${repo}/${path}`, { method: 'GET', redirect: 'error',
         headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }, signal: AbortSignal.timeout(15000) });

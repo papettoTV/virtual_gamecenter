@@ -71,8 +71,8 @@ test('既存の自動PRをレビュー受付でき、手元切替後は受付・
   await assert.rejects(mergePr({ github: f.github, context, head, base, verifiedTree: tree, expectedCheck: 'verify' }));
   assert.equal(f.merges(), 0);
   f.issue.labels = ['実装:自動'];
-  assert.equal(await mergePr({ github: f.github, context, head, base, verifiedTree: tree, expectedCheck: 'verify' }), head);
-  assert.equal(f.merges(), 1);
+  await assert.rejects(mergePr({ github: f.github, context, head, base, verifiedTree: tree, expectedCheck: 'verify' }), /旧マージ経路は停止済み/);
+  assert.equal(f.merges(), 0);
 });
 test('自動実装の受付は両ラベルの競合や手元PRを無視して開始しない', async () => {
   const context = { repo, actor: 'owner', eventName: 'workflow_dispatch', payload: { issue: { number: 1 } } };

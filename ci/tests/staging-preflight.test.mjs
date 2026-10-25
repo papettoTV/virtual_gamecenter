@@ -62,29 +62,14 @@ test('manual service check uses staging approval and separates API and Basic cre
 });
 
 
-test('検証公開はCI成功イベントか運営者の手動実行だけで、ビルドと公開は別ジョブ', async () => {
+test('旧develop公開経路はイベント起動・Environment・Secret・公開命令を持たず必ず停止', async () => {
   const workflow = parse(await readFile(new URL('../../.github/workflows/develop-staging.yml', import.meta.url), 'utf8'));
-  const ready = workflow.jobs.ready;
-  const allowed = new Function('github', 'vars', `return Boolean(${ready.if});`);
-  for (const ref of ['refs/heads/develop', 'refs/heads/main']) {
-    for (const event_name of ['workflow_dispatch', 'workflow_run', 'push']) {
-      for (const actor of ['papettoTV', 'another-user']) {
-        for (const flag of ['false', 'true', undefined]) {
-          for (const conclusion of ['success', 'failure']) {
-            const github = { ref, event_name, actor, repository: 'owner/repo', event: { workflow_run: { event: 'push', head_branch: 'develop', head_repository: { full_name: 'owner/repo' }, conclusion } } };
-            const expected = (event_name === 'workflow_dispatch' && actor === 'papettoTV' && ref === 'refs/heads/develop') || (event_name === 'workflow_run' && flag === 'true' && conclusion === 'success');
-            assert.equal(allowed(github, { PULBASE_STAGING_DEPLOY_ENABLED: flag }), expected);
-          }
-        }
-      }
-    }
+  assert.deepEqual(Object.keys(workflow.on), ['workflow_dispatch']);
+  assert.deepEqual(workflow.permissions, {});
+  assert.ok(!JSON.stringify(workflow).includes('secrets.'));
+  for (const job of Object.values(workflow.jobs)) {
+    assert.equal(job.environment, undefined);
+    assert.ok(job.steps.some(step => step.run?.includes('exit 1')));
+    assert.ok(!JSON.stringify(job).includes('deploy-staging-artifact'));
   }
-  for (const change of [{ event: 'pull_request' }, { head_branch: 'main' }, { head_repository: { full_name: 'fork/repo' } }]) {
-    assert.equal(allowed({ event_name: 'workflow_run', repository: 'owner/repo', event: { workflow_run: { event: 'push', head_branch: 'develop', head_repository: { full_name: 'owner/repo' }, conclusion: 'success', ...change } } }, { PULBASE_STAGING_DEPLOY_ENABLED: 'true' }), false);
-  }
-  assert.equal(ready.environment, undefined);
-  assert.equal(workflow.jobs.staging.environment, 'staging');
-  assert.equal(workflow.jobs.staging.needs, 'ready');
-  assert.deepEqual(workflow.jobs.regression.needs, ['ready', 'staging']);
-  assert.equal(workflow.on.workflow_dispatch.inputs.dry_run.type, 'boolean');
 });

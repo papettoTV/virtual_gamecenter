@@ -66,6 +66,6 @@ export async function deployStagingArtifact(env = process.env, { command = execF
   }
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  try { await deployStagingArtifact(); }
+  try { throw Error('旧develop公開CLIは停止済みです。'); }
   catch { console.error('staging公開を停止しました。CI・成果物・現在のdevelopを確認してください。Worker/Pagesの部分反映がある場合は復旧を判断してください。'); process.exitCode = 1; }
 }

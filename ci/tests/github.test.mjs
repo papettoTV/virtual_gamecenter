@@ -44,15 +44,9 @@ test('管理者の起票・手動実行も自動ラベルがあれば受付し�
   actor = 'other';
   await assert.rejects(intake({ github, context, core: { setOutput() {} } }), /Write access/);
 });
-test('merge refuses stale base/head or failed CI before any merge mutation', async () => {
-  process.env.AUTOMATION_BOT = 'app[bot]';
-  let merges = 0;
-  const pr = { user: { login: 'app[bot]' }, state: 'open', draft: false, base: { ref: 'develop', sha: base },
-    head: { ref: 'codex/issue-1', sha: head, repo: { full_name: 'owner/repo' } } };
-  const github = { rest: { repos: { getBranchProtection: async () => ({ data: { required_status_checks: { strict: true, contexts: ['verify', 'Automation control checks'] } } }) }, pulls: { get: async () => ({ data: pr }), merge: async () => { merges++; } }, checks: { listForRef() {} } }, paginate: async () => [{ name: 'verify', app: { slug: 'github-actions' }, conclusion: 'failure' }] };
-  await assert.rejects(mergePr({ github, context, head, base: 'd'.repeat(40), verifiedTree: tree, expectedCheck: 'verify' }), /changed after/);
-  await assert.rejects(mergePr({ github, context, head, base, verifiedTree: tree, expectedCheck: 'verify' }), /not passed/);
-  github.rest.repos.getBranchProtection = async () => ({ data: {} });
-  await assert.rejects(mergePr({ github, context, head, base, verifiedTree: tree, expectedCheck: 'verify' }), /Strict develop protection/);
-  assert.equal(merges, 0);
+test('旧mergePrはAPIを一切呼ばず、どの入力でも停止する', async () => {
+  let calls = 0;
+  const github = new Proxy({}, { get() { calls++; throw Error('API must not be accessed'); } });
+  await assert.rejects(mergePr({ github, context, head, base, verifiedTree: tree }), /旧マージ経路は停止済み/);
+  assert.equal(calls, 0);
 });
