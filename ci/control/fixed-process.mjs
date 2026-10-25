@@ -12,8 +12,27 @@ export async function runFixedTool(tool,args,{cwd=root,env={},timeout=180000}={}
  const entry=await realpath(resolve(packageRoot,spec.entry));
  if(metadata.name!==spec.package||metadata.version!==spec.version||!entry.startsWith(await realpath(packageRoot)+sep))throw Error('固定ツールの版・パスが不一致');
  const result=spawnSync(process.execPath,[entry,...args],{cwd,env,encoding:'utf8',shell:false,timeout,maxBuffer:8*1024*1024,windowsHide:true});
- if(result.error)throw Error('固定ツールが時間切れまたは起動失敗しました。詳細出力は保存しません');
- return {exitCode:result.status,stdout:result.stdout??''};
+ const diagnostics=result.error?{category:result.error.code==='ETIMEDOUT'?'timeout':'start-failed',apiCodes:[],endpoints:[]}:safeToolDiagnostics((result.stdout??'')+'\n'+(result.stderr??''),Object.values(env));
+ return {exitCode:result.status,stdout:tool==='playwright'?(result.stdout??''):'',diagnostics};
+}
+// Only fixed categories, numeric CF codes and allowlisted endpoint labels escape.
+export function safeToolDiagnostics(raw,secrets=[]){
+ let text=String(raw??'').slice(0,8*1024*1024);
+ for(const value of secrets)if(typeof value==='string'&&value.length>0)text=text.split(value).join('[redacted]');
+ text=text.replace(/\x1b\[[0-9;]*m/g,'');
+ const apiCodes=[...new Set([...text.matchAll(/\[code:\s*([0-9]{3,8})\]/g)].map(x=>Number(x[1])))].slice(0,8);
+ const paths={'worker-service':'/workers/services/pulbase-staging','worker-script':'/workers/scripts/pulbase-staging','asset-upload':'/workers/assets/upload','token-verification':'/user/tokens/verify'};
+ const endpoints=Object.entries(paths).filter(([,path])=>text.includes(path)).map(([label])=>label);
+ const category=/required secrets have not been set|inherit binding.+invalid/i.test(text)?'missing-secret':/Authentication error|Unauthorized|Forbidden|permission|\b10000\b/i.test(text)?'authorization':/Unknown argument|invalid.+config|configuration.+invalid/i.test(text)?'configuration':/fetch failed|ENOTFOUND|ECONNRESET|ETIMEDOUT/i.test(text)?'connection':'command-failed';
+ return {category,apiCodes,endpoints};
+}
+export function sanitizeCommandFailure(value){
+ if(!value)return null;
+ const categories=['missing-secret','authorization','configuration','connection','command-failed','timeout','start-failed'];
+ return {phase:['worker','pages'].includes(value.phase)?value.phase:'unknown',exitCode:Number.isSafeInteger(value.exitCode)?value.exitCode:null,
+  category:categories.includes(value.category)?value.category:'command-failed',
+  apiCodes:Array.isArray(value.apiCodes)?value.apiCodes.filter(v=>Number.isSafeInteger(v)&&v>=100&&v<=99999999).slice(0,8):[],
+  endpoints:Array.isArray(value.endpoints)?value.endpoints.filter(v=>['worker-service','worker-script','asset-upload','token-verification'].includes(v)).slice(0,4):[]};
 }
 export function publicToolEnvironment(){return {PATH:process.env.PATH,CI:'true',WRANGLER_SEND_METRICS:'false',WRANGLER_WRITE_LOGS:'false'};}
 function countTests(suites){return (suites??[]).reduce((n,s)=>n+(s.specs??[]).reduce((m,p)=>m+(p.tests?.length??0),0)+countTests(s.suites),0);}
