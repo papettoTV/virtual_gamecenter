@@ -1,0 +1,61 @@
+name: 検証公開制御の鍵なし予行試験
+run-name: 公開なし・制御workflowの予行試験
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: pulbase-staging-pipeline
+  cancel-in-progress: false
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: 制御ref・人の承認・ブランチ保護を読み取り確認
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node ci/control/protection-check.mjs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: control-protection-${{ github.run_id }}-${{ github.run_attempt }}
+          path: control-protection.json
+          if-no-files-found: error
+          retention-days: 7
+  approved-rehearsal:
+    needs: prepare
+    environment: staging
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: control-protection-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: 同じ承認対象の停止条件を鍵なしで検証
+        run: node --test ci/tests/single-approval.test.mjs
+      - name: 承認1回の処理を模擬実行（マージ・公開しない）
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PULBASE_CONTROL_RULE_VERSIONS: ${{ vars.PULBASE_CONTROL_RULE_VERSIONS }}
+        run: node ci/control/rehearsal.mjs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: control-rehearsal-${{ github.run_id }}-${{ github.run_attempt }}
+          path: control-rehearsal.json
+          if-no-files-found: error
+          retention-days: 7

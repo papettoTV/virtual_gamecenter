@@ -1,0 +1,96 @@
+name: 保護された実候補の承認1回予行試験
+run-name: 公開なし・実候補の保護制御試験
+on:
+  workflow_dispatch:
+    inputs:
+      review_run_id:
+        description: 同一候補をレビューした初回Codex PR verificationのrun ID
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: pulbase-staging-pipeline
+  cancel-in-progress: false
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REVIEW_RUN_ID: ${{ inputs.review_run_id }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: 保護設定を読み取りレビュー証跡を特定
+        id: receipt
+        run: node ci/control/approved-candidate.mjs locate
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          artifact-ids: ${{ steps.receipt.outputs.receipt_id }}
+          run-id: ${{ inputs.review_run_id }}
+          github-token: ${{ github.token }}
+          path: receipt
+          merge-multiple: true
+      - name: 現在の候補と同じCI成果物を特定
+        id: candidate
+        run: node ci/control/approved-candidate.mjs identify
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          artifact-ids: ${{ steps.candidate.outputs.artifact_id }}
+          run-id: ${{ steps.candidate.outputs.build_run }}
+          github-token: ${{ github.token }}
+          path: candidate-build
+          merge-multiple: true
+      - name: 実証跡を検査して承認対象を固定
+        run: node ci/control/approved-candidate.mjs freeze
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: candidate-approval-${{ github.run_id }}-1
+          path: candidate-approval.json
+          if-no-files-found: error
+          retention-days: 7
+  approved:
+    needs: prepare
+    environment: staging
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REVIEW_RUN_ID: ${{ inputs.review_run_id }}
+      PULBASE_CONTROL_RULE_VERSIONS: ${{ vars.PULBASE_CONTROL_RULE_VERSIONS }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: candidate-approval-${{ github.run_id }}-1
+      - name: 保護設定と同じ承認対象を再確認
+        id: candidate
+        run: node ci/control/approved-candidate.mjs approved-input
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          artifact-ids: ${{ steps.candidate.outputs.artifact_id }}
+          run-id: ${{ steps.candidate.outputs.build_run }}
+          github-token: ${{ github.token }}
+          path: candidate-build
+          merge-multiple: true
+      - name: 実証跡を再照合し承認1回の流れを模擬
+        run: node ci/control/approved-candidate.mjs approved
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: approved-candidate-${{ github.run_id }}-1
+          path: approved-candidate-result.json
+          if-no-files-found: error
+          retention-days: 7
