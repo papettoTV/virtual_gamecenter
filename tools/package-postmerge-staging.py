@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""Explicit keyless package. Replaces the superseded candidate/merge/redeploy loop."""
+"""Explicit staging live control package. Packaging does not deploy or contain keys."""
 from pathlib import Path
 import hashlib,json,stat,zipfile
 ROOT=Path(__file__).resolve().parents[1]
-PREVIOUS='58e009bc732d92e2899ff9dc15bce82bf4d21019'
-OUTPUT=Path('/private/tmp/pulbase-connected-staging.zip')
+PREVIOUS='2cd5ba8972b02b18ed74e3e19e6f6fe2ebddd4f6'
+OUTPUT=Path('/private/tmp/pulbase-live-staging.zip')
 FILES={p:p for p in ['ci/control/fixed-process.mjs','ci/control/fixed-staging-operations.mjs','ci/tests/fixed-staging-operations.test.mjs','ci/control/postmerge-staging.mjs','ci/control/postmerge-runner.mjs','ci/control/protection-check.mjs',
  'ci/control/candidate-evidence.mjs','ci/control/review-trust.mjs','ci/control/review-trust.json','ci/control/premerge-decision.mjs','ci/control/develop-merge.mjs',
  'ci/control/staging-publication.mjs','ci/control/staging-regression.mjs','ci/control/staging-target.json','ci/control/staging-gateway.mjs',
  'ci/control/toolchain/package.json','ci/control/toolchain/package-lock.json','ci/control/toolchain/staging-browser.config.mjs','ci/control/toolchain/browser/regression.spec.mjs',
  'ci/tests/control-protection.test.mjs','ci/tests/postmerge-staging.test.mjs','ci/tests/review-trust.test.mjs','ci/tests/staging-runtime.test.mjs']}
 FILES['.github/workflows/postmerge-staging.yml']='.github/workflow-templates/postmerge-staging.yml.disabled'
-FILES['README.md']='docs/staging-runtime-preparation.md'
+FILES['README.md']='docs/staging-live-release.md'
 def build():
  entries={}
  for dst,src in FILES.items():
@@ -20,8 +20,8 @@ def build():
   b=p.read_bytes()
   if len(b)>1024*1024 or b'-----BEGIN PRIVATE KEY-----' in b or b'-----BEGIN RSA PRIVATE KEY-----' in b:raise RuntimeError('不正な配布ファイル')
   entries[dst]=b
- manifest={'version':5,'mode':'postmerge-connected-keyless','repository':'papettoTV/virtual_gamecenter','branch':'ci-control','previousControlSha':PREVIOUS,
-  'deploymentEnabled':False,'liveTransportConnected':False,'mergeEnabled':False,'regressionCount':1,
+ manifest={'version':6,'mode':'postmerge-staging-live','repository':'papettoTV/virtual_gamecenter','branch':'ci-control','previousControlSha':PREVIOUS,
+  'deploymentEnabled':True,'liveTransportConnected':True,'mergeEnabled':False,'regressionCount':1,
   'files':{n:hashlib.sha256(b).hexdigest() for n,b in sorted(entries.items())}}
  entries['bundle-manifest.json']=(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n').encode()
  with zipfile.ZipFile(OUTPUT,'w') as z:

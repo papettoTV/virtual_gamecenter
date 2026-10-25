@@ -1,4 +1,4 @@
-name: developマージ後の検証（鍵なし）
+name: developマージ後の検証公開と回帰
 on:
   workflow_dispatch:
     inputs:

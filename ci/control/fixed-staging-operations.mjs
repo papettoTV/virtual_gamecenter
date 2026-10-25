@@ -16,7 +16,8 @@ export async function connectedStagingOperations({mode,scope,execution,artifactD
  const command=ports.process??runFixedTool,request=ports.request??fetch;
  const expected=scope.evidence,receipt={candidate:expected.sha,tree:expected.tree,buildRun:expected.runId,buildAttempt:expected.attempt};
  const plan=await prepareStagingPublication(artifactDirectory,receipt);
- const commands=publicationCommands(plan),audit=[];let regressionCompleted=false;
+ const commands=publicationCommands(plan),audit=[];let regressionCompleted=false,httpAttempted=false,browserAttempted=false;
+ const outcomes={worker:'not-attempted',pages:'not-attempted'};
  async function authorize(){
   const observation=await guard();assertReleaseObservation(scope,execution,observation);
   need(createHash('sha256').update(await readFile(join(plan.artifact,'manifest.json'))).digest('hex')===scope.manifestDigest,'承認されたmanifestが変更されました');
@@ -36,20 +37,23 @@ export async function connectedStagingOperations({mode,scope,execution,artifactD
     audit.push({tool:'wrangler',phase,simulatedWrite:true,workerDryRunExecuted:phase==='worker'});return;
    }
    const env={...publicToolEnvironment(),CLOUDFLARE_ACCOUNT_ID:'60e5472a284dc71bbafbbfac8aa2a940',CLOUDFLARE_API_TOKEN:secrets.cloudflareToken};
+   outcomes[phase]='unknown';
    const r=await command('wrangler',args,{...options,env,timeout:240000});need(r.exitCode===0,'固定されたstaging公開命令が不合格');
-   audit.push({tool:'wrangler',phase,realWrite:true});
+   outcomes[phase]='uploaded';audit.push({tool:'wrangler',phase,realWrite:true});
   },
  };
  return {
   publish:async()=>executeStagingPublication(plan,{guard:authorize,transport}),
   regress:async()=>{const result=await stagingRegression(expected.sha,{guard:authorize,credentials:mode==='live'?{username:secrets.username,password:secrets.password}:{},validationOnly:mode==='keyless',
-   request:mode==='live'?request:async(url,opts)=>{
+   request:mode==='live'?async(url,opts)=>{httpAttempted=true;return request(url,opts);}:async(url,opts)=>{
     need(url===`https://develop.virtual-gamecenter.pages.dev/?release-check=${expected.sha}`&&opts.method==='GET'&&opts.redirect==='manual','HTTPの固定要求不一致');
     audit.push({phase:'http',simulated:true});return new Response('',{headers:{'x-pulbase-revision':expected.sha,'x-pulbase-gateway-revision':expected.sha}});
    },
-   browser:async options=>{const r=await runFixedBrowser({...options,listOnly:mode==='keyless',process:command});audit.push({phase:'browser',listOnly:mode==='keyless',declaredTests:8});return r;},
+   browser:async options=>{browserAttempted=true;const r=await runFixedBrowser({...options,listOnly:mode==='keyless',process:command});audit.push({phase:'browser',listOnly:mode==='keyless',declaredTests:8});return r;},
   });regressionCompleted=true;return result;},
-  report:()=>({executionMode:mode,commandAudit:structuredClone(audit),realDeploymentExecuted:audit.some(x=>x.realWrite),realRegressionExecuted:mode==='live'&&regressionCompleted,
+  report:()=>({executionMode:mode,commandAudit:structuredClone(audit),realDeploymentExecuted:audit.some(x=>x.realWrite),realRegressionExecuted:mode==='live'&&(httpAttempted||browserAttempted),regressionPassed:regressionCompleted,
+   realDeploymentAttempted:Object.values(outcomes).some(x=>x!=='not-attempted'),workerOutcome:outcomes.worker,pagesOutcome:outcomes.pages,
+   httpAttempted,browserAttempted,
    workerDryRunExecuted:mode==='keyless'&&audit.some(x=>x.workerDryRunExecuted),httpSimulated:mode==='keyless',browserSimulated:mode==='keyless',
    browserCommandValidated:audit.some(x=>x.phase==='browser'),browserTests:8}),
  };
