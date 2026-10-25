@@ -20,3 +20,9 @@ test('公開用ツールのCIは鍵とEnvironmentなしで偽API・sandboxだけ
  const release=parse(await readFile(new URL('../../.github/workflow-templates/postmerge-staging.yml.disabled',import.meta.url),'utf8'));
  const steps=release.jobs.staging.steps;assert.ok(steps.findIndex(s=>s.run?.includes('chromiumSandbox:true'))<steps.findIndex(s=>s.run==='node ci/control/postmerge-runner.mjs approved'));
 });
+
+test('userns許可は固定Chromiumの実体だけで、ワイルドカードや任意実行ファイルを許可しない',async()=>{
+ const {chromiumAppArmorProfile}=await import('../control/toolchain/prepare-browser-sandbox.mjs');
+ const path='/home/runner/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome';const profile=chromiumAppArmorProfile(path);assert.ok(profile.includes('"'+path+'"'));assert.ok(profile.includes('userns,'));assert.ok(!profile.includes('*'));assert.ok(!profile.includes('sysctl'));
+ for(const value of ['/usr/bin/anything',path+'*',path+'"',path+'\n',path.replace('1228','*')])assert.throws(()=>chromiumAppArmorProfile(value));
+});

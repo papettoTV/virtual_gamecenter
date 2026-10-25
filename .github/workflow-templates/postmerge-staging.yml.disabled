@@ -79,11 +79,13 @@ jobs:
         run: npm ci --ignore-scripts --prefix ci/control/toolchain
       - name: 公開鍵を渡す前に固定ChromiumとOS依存を取得
         run: node ci/control/toolchain/node_modules/@playwright/test/cli.js install --with-deps chromium
+      - name: 固定Chromiumだけのuserns許可を設定（sandbox有効のまま）
+        run: node ci/control/toolchain/prepare-browser-sandbox.mjs
       - name: 固定Chromiumのsandbox起動を鍵なしで確認
         run: |
           node --input-type=module <<'JS'
           import {chromium} from './ci/control/toolchain/node_modules/@playwright/test/index.mjs';
-          const browser=await chromium.launch({chromiumSandbox:true});
+          const browser=await chromium.launch({channel:'chromium',chromiumSandbox:true});
           await browser.close();
           JS
       - name: 検証公開1回・HTTPとブラウザ回帰1回
