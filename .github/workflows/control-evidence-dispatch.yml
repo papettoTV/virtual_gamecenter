@@ -1,0 +1,41 @@
+name: 保護された候補検証の自動起動
+on:
+  workflow_run:
+    workflows: [Codex PR verification]
+    types: [completed]
+permissions:
+  contents: read
+  actions: write
+jobs:
+  dispatch:
+    if: >-
+      vars.PULBASE_CONTROL_EVIDENCE_ENABLED == 'true' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      startsWith(github.event.workflow_run.head_branch, 'codex/issue-') &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: 固定workflowを保護されたci-controlで起動
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVIEW_RUN_ID: ${{ github.event.workflow_run.id }}
+          SOURCE_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          THIS_ATTEMPT: ${{ github.run_attempt }}
+          EXPECTED_CONTROL_SHA: ${{ vars.PULBASE_CONTROL_EVIDENCE_SHA }}
+        run: |
+          node --input-type=module <<'JS'
+          const id = process.env.REVIEW_RUN_ID;
+          if (!/^[1-9][0-9]*$/.test(id) || process.env.SOURCE_ATTEMPT !== '1' || process.env.THIS_ATTEMPT !== '1'
+            || !/^[a-f0-9]{40}$/.test(process.env.EXPECTED_CONTROL_SHA)) throw Error('初回実行・固定制御SHAが必要です');
+          const base = 'https://api.github.com/repos/papettoTV/virtual_gamecenter/';
+          const headers = {Authorization:`Bearer ${process.env.GH_TOKEN}`,Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
+          const ref = await fetch(base+'git/ref/heads/ci-control',{headers,redirect:'error',signal:AbortSignal.timeout(15000)});
+          if (!ref.ok || (await ref.json()).object?.sha !== process.env.EXPECTED_CONTROL_SHA) throw Error('制御SHAが未確認または変更されています');
+          const response = await fetch(base+'actions/workflows/approved-candidate-evidence.yml/dispatches',{
+            method:'POST',headers:{...headers,'Content-Type':'application/json'},redirect:'error',signal:AbortSignal.timeout(15000),
+            body:JSON.stringify({ref:'ci-control',inputs:{review_run_id:id}})});
+          if (response.status !== 204) throw Error('制御workflowを起動できません。自動再試行はしません');
+          console.log('固定されたci-controlで公開なし検証を起動しました。人のstaging承認を待ちます。');
+          JS

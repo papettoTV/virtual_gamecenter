@@ -1,0 +1,18 @@
+name: 保護された実候補の承認1回予行試験
+on:
+  workflow_dispatch:
+    inputs:
+      review_run_id:
+        description: 初回Codexレビューrun ID
+        required: true
+        type: string
+permissions: {}
+jobs:
+  registration-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    steps:
+      - name: 登録専用・公開制御の実行はci-controlのみ
+        run: |
+          echo 'ci-controlを指定してください。この登録定義は鍵・Environment・公開処理を持ちません。'
+          exit 1

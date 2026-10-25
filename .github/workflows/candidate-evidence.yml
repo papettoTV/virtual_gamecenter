@@ -12,6 +12,7 @@ concurrency:
 jobs:
   evidence:
     if: >-
+      vars.PULBASE_CONTROL_EVIDENCE_ENABLED != 'true' &&
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.head_repository.full_name == github.repository &&
       startsWith(github.event.workflow_run.head_branch, 'codex/issue-') &&
