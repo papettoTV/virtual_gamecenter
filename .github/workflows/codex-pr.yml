@@ -20,6 +20,7 @@ jobs:
       base: ${{ steps.pr.outputs.base }}
       number: ${{ steps.pr.outputs.number }}
       request: ${{ steps.pr.outputs.request }}
+      evidence_only: ${{ steps.pr.outputs.evidence_only }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -102,7 +103,7 @@ jobs:
           safety-strategy: drop-sudo
           codex-args: '["--output-schema", "ci/schemas/review.json"]'
   review-gate:
-    needs: [gate, review]
+    needs: [gate, verify, review]
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
@@ -114,9 +115,30 @@ jobs:
         env:
           REVIEW_RESULT: ${{ needs.review.outputs.result }}
         run: node --input-type=module -e 'import { assertReview } from "./ci/policy.mjs"; assertReview(JSON.parse(process.env.REVIEW_RESULT))'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: 同じ候補のレビュー証跡を保存
+        env:
+          REVIEW_RESULT: ${{ needs.review.outputs.result }}
+          PR_NUMBER: ${{ needs.gate.outputs.number }}
+          PR_HEAD: ${{ needs.gate.outputs.head }}
+          PR_BASE: ${{ needs.gate.outputs.base }}
+          PR_CANDIDATE: ${{ needs.verify.outputs.candidate }}
+          PR_TREE: ${{ needs.verify.outputs.tree }}
+          BUILD_RUN_ID: ${{ needs.verify.outputs.run_id }}
+          BUILD_ATTEMPT: ${{ needs.verify.outputs.attempt }}
+          BUILD_ARTIFACT_ID: ${{ needs.verify.outputs.artifact_id }}
+        run: node ci/review-receipt.mjs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: codex-review-${{ github.run_id }}-${{ github.run_attempt }}
+          path: review-receipt.json
+          if-no-files-found: error
+          retention-days: 7
   staging:
     needs: [gate, verify, review-gate]
-    if: vars.PULBASE_STAGING_DEPLOY_ENABLED == 'true'
+    if: vars.PULBASE_STAGING_DEPLOY_ENABLED == 'true' && needs.gate.outputs.evidence_only != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 12
     environment: staging
@@ -234,7 +256,7 @@ jobs:
             await reportMerge({ github, context, head: process.env.HEAD_SHA, base: process.env.BASE_SHA, verifiedTree: process.env.VERIFIED_TREE, mergedSha: sha });
   report:
     needs: [gate, verify, review, review-gate, staging, regression, merge]
-    if: always() && needs.gate.result == 'success'
+    if: always() && needs.gate.result == 'success' && needs.gate.outputs.evidence_only != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
