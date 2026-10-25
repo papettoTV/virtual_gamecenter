@@ -54,3 +54,10 @@ test('失敗結果にはSHA・段階・修正PR方針だけを残し、応答や
  const {failureReport}=await import('../control/postmerge-runner.mjs');const e=Error('private token');e.phase='regression';e.sha=revision;
  const r=failureReport(e);assert.equal(r.sha,revision);assert.equal(r.phase,'regression');assert.equal(r.recovery,'fix-pull-request');assert.ok(!JSON.stringify(r).includes('private token'));assert.equal(r.productionRequested,false);
 });
+
+test('鍵なし承認packet・別実行・別制御SHAを実公開承認へ流用できない',async()=>{
+ const {assertLiveApproval}=await import('../control/postmerge-runner.mjs');
+ const packet={version:3,mode:'postmerge-staging-live',execution,protection:{preflightReady:true},evidence:{runId:'10'}};
+ assert.doesNotThrow(()=>assertLiveApproval(packet,execution,'10'));
+ for(const p of [{...packet,version:2,mode:'postmerge-connected-keyless'},{...packet,execution:{...execution,runId:'101'}},{...packet,execution:{...execution,controlSha:'e'.repeat(40)}},{...packet,evidence:{runId:'11'}}])assert.throws(()=>assertLiveApproval(p,execution,'10'));
+});

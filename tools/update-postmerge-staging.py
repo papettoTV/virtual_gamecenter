@@ -18,13 +18,13 @@ import zipfile
 
 REPO = '/repos/papettoTV/virtual_gamecenter'
 APP = 5405029
-BUNDLE_SHA = '2255193c174be3e3ce3cb2e76eb066f2e434db2d33a6a1ecc1735e18982aef1c'
-PREVIOUS_SHA = '58e009bc732d92e2899ff9dc15bce82bf4d21019'
+BUNDLE_SHA = '6eecebc5842f9fde735c6b91811d7455bfa44a52fbb092ad07bf5acd8a093f69'
+PREVIOUS_SHA = '2cd5ba8972b02b18ed74e3e19e6f6fe2ebddd4f6'
 MAIN_SHA = '73cb5d9267c56f06f9f1150327ec6b8b3caa2bb9'
 # These metadata-only versions were read with the limited owner PAT and its full
 # bypass list checked. Apply stays disabled until the human adds the sole App
 # bypass and the resulting version is independently read and pinned here.
-PLAN_CONTROL_VERSION = '2026-10-25T06:18:00.177Z'
+PLAN_CONTROL_VERSION = '2026-10-25T10:44:36.356Z'
 APPLY_CONTROL_VERSION = None
 MAIN_RULE_VERSION = '2026-10-21T20:32:35.191Z'
 SHA = re.compile(r'^[a-f0-9]{40}$')
@@ -62,7 +62,7 @@ def permitted(method, path, body):
             and item['mode'] == '100644' and item['type'] == 'blob' and isinstance(item['content'], str)
             for item in entries) and len({item['path'] for item in entries}) == len(FILES) + 1
     if path == REPO + '/git/commits':
-        return set(body) == {'message', 'tree', 'parents'} and body['message'] == 'chore: 固定公開・HTTPとブラウザ回帰への接続を鍵なし配置' and bool(
+        return set(body) == {'message', 'tree', 'parents'} and body['message'] == 'chore: staging実公開・回帰の制御コードを配置（公開なし）' and bool(
             SHA.fullmatch(body.get('tree', ''))) and body.get('parents') == [PREVIOUS_SHA]
     return False
 
@@ -112,10 +112,10 @@ def bundle(path):
             raise Stop('配置ファイルの集合が一致しません。')
         entries = {name: archive.read(name) for name in archive.namelist()}
     manifest = json.loads(entries['bundle-manifest.json'])
-    if (manifest.get('version') != 5 or manifest.get('mode') != 'postmerge-connected-keyless' or manifest.get('mergeEnabled') is not False or manifest.get('regressionCount') != 1 or manifest.get('liveTransportConnected') is not False or manifest.get('previousControlSha') != PREVIOUS_SHA or manifest.get('deploymentEnabled') is not False
+    if (manifest.get('version') != 6 or manifest.get('mode') != 'postmerge-staging-live' or manifest.get('mergeEnabled') is not False or manifest.get('regressionCount') != 1 or manifest.get('liveTransportConnected') is not True or manifest.get('previousControlSha') != PREVIOUS_SHA or manifest.get('deploymentEnabled') is not True
         or manifest.get('repository') != 'papettoTV/virtual_gamecenter' or manifest.get('branch') != 'ci-control'
         or set(manifest.get('files', {})) != FILES):
-        raise Stop('公開なしの配置manifestではありません。')
+        raise Stop('検証用の実公開制御manifestではありません。')
     for name in FILES:
         if hashlib.sha256(entries[name]).hexdigest() != manifest['files'][name]:
             raise Stop('配置ファイルのハッシュが一致しません。')
@@ -233,7 +233,7 @@ def apply(entries, jwt, api=request):
             raise Stop('配置treeのファイル集合・Gitハッシュが一致しません。')
         report['stage'] = 'create-commit'
         commit = ok(api, 'POST', REPO + '/git/commits', token,
-            {'message': 'chore: 固定公開・HTTPとブラウザ回帰への接続を鍵なし配置', 'tree': tree['sha'], 'parents': [parent]})
+            {'message': 'chore: staging実公開・回帰の制御コードを配置（公開なし）', 'tree': tree['sha'], 'parents': [parent]})
         if not SHA.fullmatch(commit.get('sha', '')) or commit.get('tree', {}).get('sha') != tree['sha'] or [item.get('sha') for item in commit.get('parents', [])] != [parent]:
             raise Stop('配置commitの親・treeが一致しません。')
         report['commit'] = commit['sha']
@@ -280,7 +280,7 @@ def main():
         raise Stop('配置は人の管理用端末から実行してください。')
     # Validate public state before touching the human-held private key.
     guards(request, True)
-    print('レビュー済みの鍵なしworkflowだけをci-controlへ早送り配置します。main/developの更新・公開はしません。')
+    print('レビュー済みのstaging実公開制御workflowをci-controlへ早送り配置します。この操作自体はmain/developの更新・公開をしません。')
     if input('実行する場合だけ ci-control と入力: ') != 'ci-control':
         raise Stop('配置を中止しました。')
     with warnings.catch_warnings():
