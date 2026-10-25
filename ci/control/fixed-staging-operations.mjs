@@ -1,12 +1,12 @@
 import {readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {join} from 'node:path';
-import {prepareStagingPublication,publicationCommands,executeStagingPublication,dryRunStaging} from './staging-publication.mjs';
+import {prepareStagingPublication,publicationCommands,executeStagingPublication,dryRunStaging,PUBLICATION_STOP_REASONS} from './staging-publication.mjs';
 import {stagingRegression} from './staging-regression.mjs';
 import {assertReleaseObservation} from './postmerge-staging.mjs';
 import {runFixedTool,runFixedBrowser,publicToolEnvironment,sanitizeCommandFailure} from './fixed-process.mjs';
 const endpoint='https://api.cloudflare.com/client/v4/accounts/60e5472a284dc71bbafbbfac8aa2a940/pages/projects/virtual-gamecenter';
-const projectFixture=()=>({name:'virtual-gamecenter',production_branch:'main',source:{config:{preview_deployment_setting:'none',production_deployments_enabled:false}},build_config:{mode:'keyless-simulated'}});
+const projectFixture=()=>({name:'virtual-gamecenter',production_branch:'main',source:{config:{preview_deployment_setting:'none',production_deployments_enabled:false}},build_config:{mode:'keyless-simulated',destination_dir:'dist/client'}});
 function need(v,m){if(!v)throw Error(m);}
 export async function connectedStagingOperations({mode,scope,execution,artifactDirectory,guard,credentials={},ports={}}){
  need(['keyless','live'].includes(mode)&&typeof guard==='function','明示モードと保護guardが必要');
@@ -17,7 +17,7 @@ export async function connectedStagingOperations({mode,scope,execution,artifactD
  const expected=scope.evidence,receipt={candidate:expected.sha,tree:expected.tree,buildRun:expected.runId,buildAttempt:expected.attempt};
  const plan=await prepareStagingPublication(artifactDirectory,receipt);
  const commands=publicationCommands(plan),audit=[];let regressionCompleted=false,httpAttempted=false,browserAttempted=false;
- const outcomes={worker:'not-attempted',pages:'not-attempted'};let commandFailure=null;
+ const outcomes={worker:'not-attempted',pages:'not-attempted'};let commandFailure=null,publicationStopReason=null;
  async function authorize(){
   const observation=await guard();assertReleaseObservation(scope,execution,observation);
   need(createHash('sha256').update(await readFile(join(plan.artifact,'manifest.json'))).digest('hex')===scope.manifestDigest,'承認されたmanifestが変更されました');
@@ -43,7 +43,7 @@ export async function connectedStagingOperations({mode,scope,execution,artifactD
   },
  };
  return {
-  publish:async()=>executeStagingPublication(plan,{guard:authorize,transport}),
+  publish:async()=>{try{return await executeStagingPublication(plan,{guard:authorize,transport});}catch(e){publicationStopReason=PUBLICATION_STOP_REASONS.includes(e.stopReason)?e.stopReason:'unknown';throw e;}},
   regress:async()=>{const result=await stagingRegression(expected.sha,{guard:authorize,credentials:mode==='live'?{username:secrets.username,password:secrets.password}:{},validationOnly:mode==='keyless',
    request:mode==='live'?async(url,opts)=>{httpAttempted=true;return request(url,opts);}:async(url,opts)=>{
     need(url===`https://develop.virtual-gamecenter.pages.dev/?release-check=${expected.sha}`&&opts.method==='GET'&&opts.redirect==='manual','HTTPの固定要求不一致');
@@ -53,7 +53,7 @@ export async function connectedStagingOperations({mode,scope,execution,artifactD
   });regressionCompleted=true;return result;},
   report:()=>({executionMode:mode,commandAudit:structuredClone(audit),realDeploymentExecuted:audit.some(x=>x.realWrite),realRegressionExecuted:mode==='live'&&(httpAttempted||browserAttempted),regressionPassed:regressionCompleted,
    realDeploymentAttempted:Object.values(outcomes).some(x=>x!=='not-attempted'),workerOutcome:outcomes.worker,pagesOutcome:outcomes.pages,
-   httpAttempted,browserAttempted,commandFailure,
+   httpAttempted,browserAttempted,commandFailure,publicationStopReason,
    workerDryRunExecuted:mode==='keyless'&&audit.some(x=>x.workerDryRunExecuted),httpSimulated:mode==='keyless',browserSimulated:mode==='keyless',
    browserCommandValidated:audit.some(x=>x.phase==='browser'),browserTests:8}),
  };

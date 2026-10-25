@@ -7,6 +7,7 @@ import {developEvidence,releaseScope,runPostmergeStaging} from './postmerge-stag
 import {checkBuild} from './candidate-evidence.mjs';
 import {connectedStagingOperations} from './fixed-staging-operations.mjs';
 import {sanitizeCommandFailure} from './fixed-process.mjs';
+import {PUBLICATION_STOP_REASONS} from './staging-publication.mjs';
 import {trustPolicy} from './review-trust.mjs';
 const releaseMode='postmerge-staging-live';
 export function liveCredentials(env=process.env){
@@ -71,6 +72,7 @@ export function failureReport(error){
  realDeploymentExecuted:s.realDeploymentExecuted===true,realDeploymentAttempted:s.realDeploymentAttempted===true,
  realRegressionExecuted:s.realRegressionExecuted===true,regressionPassed:false,
  httpAttempted:s.httpAttempted===true,browserAttempted:s.browserAttempted===true,commandFailure:sanitizeCommandFailure(s.commandFailure),
+ publicationStopReason:PUBLICATION_STOP_REASONS.includes(s.publicationStopReason)?s.publicationStopReason:'unknown',
  realMergeExecuted:false,mainUpdated:false,productionRequested:false};
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href)main().catch(async e=>{console.error(e.message);await writeFile('postmerge-result.json',JSON.stringify(failureReport(e),null,2));process.exitCode=1;});
