@@ -45,3 +45,9 @@ Issue #37 / 2026-10-25。利用者からの感想・不具合報告を、ログ�
 - `npm test` の先頭スイートは740件成功・1件失敗。既存の `tests/platform/beta-mode-ui.test.ts` のMochiDuel静的描画が `useRef` のInvalid hook callで失敗する。今回以前にも再現したローカル環境の残課題で、テストの除外・緩和やゲーム修正はしない。全件合格とは記録しない。
 
 クラウドへの反映、実iPhone Safariでのこのフォームの確認、運営者の実Googleセッションでの閲覧は未実施。公開再開時の確認事項として残す。負荷試験は保留のまま。
+
+### 同日追記：既存の描画テスト失敗を解消（Issue #41）
+
+前節の1件は、ゲームに依存しない実Reactフックの静的描画でも再現した。React/react-domは同じ19.2.7で重複インストールはなく、Workersのテスト実行におけるCommonJS描画依存の解決経路が問題だった。`react-dom/server`だけをVitestのSSR依存最適化で事前バンドルし、ゲーム本体・既存テストの期待値・タイムアウトは変更せず解消した。[Cloudflareのモジュール解決の案内](https://developers.cloudflare.com/workers/testing/vitest-integration/known-issues/#module-resolution)に沿ったテスト限定の設定で、本番ビルド設定は変更しない。
+
+`useRef`・`useState`・`useId`をモックせず、複数回の独立した静的描画を検証する回帰テストを追加。`npm test`は先頭742件と後続192件の計934件、制御系50件、型検査・検証用ビルドが成功した。Issue #37の実装時点の失敗記録は履歴として残す。今回もpush・デプロイ・本番操作・負荷試験は実施していない。
