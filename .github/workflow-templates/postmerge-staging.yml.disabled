@@ -78,6 +78,7 @@ jobs:
       - name: 公開1回・回帰1回の鍵なし予行試験
         run: node ci/control/postmerge-runner.mjs approved
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
         with:
           name: postmerge-result-${{ github.run_id }}-1
           path: postmerge-result.json

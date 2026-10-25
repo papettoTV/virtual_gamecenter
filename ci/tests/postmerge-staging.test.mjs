@@ -50,3 +50,7 @@ test('公開中にdevelopが動いたら別SHAへ切り替えず停止し、回�
 test('postmerge APIは固定repoへのGETのみで書込・任意URLを拒否',async()=>{
  let calls=0;const api=postmergeApi('test',async(u,o)=>{calls++;assert.equal(o.method,'GET');assert.equal(o.redirect,'error');return new Response('private',{status:403});});await assert.rejects(api('actions/runs/10'),e=>!e.message.includes('private'));await assert.rejects(api('pulls/44/merge'));await assert.rejects(api('https://elsewhere'));assert.equal(calls,1);
 });
+test('失敗結果にはSHA・段階・修正PR方針だけを残し、応答や秘密値を保存しない',async()=>{
+ const {failureReport}=await import('../control/postmerge-runner.mjs');const e=Error('private token');e.phase='regression';e.sha=revision;
+ const r=failureReport(e);assert.equal(r.sha,revision);assert.equal(r.phase,'regression');assert.equal(r.recovery,'fix-pull-request');assert.ok(!JSON.stringify(r).includes('private token'));assert.equal(r.productionRequested,false);
+});

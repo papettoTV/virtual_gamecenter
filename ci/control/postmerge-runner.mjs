@@ -45,4 +45,7 @@ async function main(){
  await writeFile('postmerge-result.json',JSON.stringify({...result,mode:'postmerge-keyless',controlSha:x.controlSha,ciRunId:e.runId,filesVerified:files,
   protectionVerified:true,phases,realDeploymentExecuted:false,realRegressionExecuted:false,realMergeExecuted:false},null,2));
 }
-if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href)main().catch(e=>{console.error(e.message);process.exitCode=1;});
+export function failureReport(error){return {status:'failed',mode:'postmerge-keyless',sha:/^[a-f0-9]{40}$/.test(error?.sha??'')?error.sha:null,
+ phase:['before-publication','publication','regression'].includes(error?.phase)?error.phase:'evidence',recovery:'fix-pull-request',
+ realDeploymentExecuted:false,realRegressionExecuted:false,realMergeExecuted:false,productionRequested:false};}
+if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href)main().catch(async e=>{console.error(e.message);await writeFile('postmerge-result.json',JSON.stringify(failureReport(e),null,2));process.exitCode=1;});
