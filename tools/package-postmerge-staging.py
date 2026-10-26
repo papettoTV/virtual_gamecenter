@@ -20,7 +20,7 @@ def build():
   b=p.read_bytes()
   if len(b)>1024*1024 or b'-----BEGIN PRIVATE KEY-----' in b or b'-----BEGIN RSA PRIVATE KEY-----' in b:raise RuntimeError('不正な配布ファイル')
   entries[dst]=b
- manifest={'version':8,'mode':'postmerge-staging-live','repository':'papettoTV/virtual_gamecenter','branch':'ci-control','previousControlSha':PREVIOUS,
+ manifest={'version':9,'mode':'postmerge-staging-live','repository':'papettoTV/virtual_gamecenter','branch':'ci-control','previousControlSha':PREVIOUS,
   'deploymentEnabled':True,'liveTransportConnected':True,'mergeEnabled':False,'regressionCount':1,
   'files':{n:hashlib.sha256(b).hexdigest() for n,b in sorted(entries.items())}}
  entries['bundle-manifest.json']=(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n').encode()

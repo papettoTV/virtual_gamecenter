@@ -75,3 +75,41 @@ test('省略された例外一覧を空と推定せず、人の設定版照合�
   assert.equal(approved.bypassSnapshotVerified, true);
   await assert.rejects(verifyProtection(fixture(s => { delete s['rulesets/1'].bypass_actors; s['rulesets/1'].updated_at = '2026-10-24T00:00:00.000Z'; }), executionContext(env)));
 });
+const releaseActor = { actor_id: 5405029, actor_type: 'Integration', bypass_mode: 'always' };
+const construction = { ruleVersions: JSON.stringify({ ...versions, protectionMode: 'construction' }) };
+test('構築中は人の設定版とrelease Appだけの例外を要求し、strictでは同じ例外を拒否する', async () => {
+  const api = fixture(s => { s['rulesets/1'].bypass_actors = [releaseActor]; });
+  const pre = await verifyProtection(api, executionContext(env), { requireSnapshot: false });
+  assert.equal(pre.protectionMode, 'unverified'); assert.equal(pre.protectionVerified, false);
+  const approved = await verifyProtection(api, executionContext(env), construction);
+  assert.equal(approved.protectionMode, 'construction'); assert.equal(approved.protectionVerified, true);
+  await assert.rejects(verifyProtection(api, executionContext(env)));
+  await assert.rejects(verifyProtection(api, executionContext(env), { ruleVersions: JSON.stringify({ ...versions, protectionMode: 'strict' }) }));
+  await assert.rejects(verifyProtection(fixture(), executionContext(env), construction));
+  assert.equal((await verifyProtection(fixture(), executionContext(env))).protectionMode, 'strict');
+});
+test('構築中でも別App・管理者・例外追加・モード不明・mainの例外を拒否する', async () => {
+  for (const actors of [null, [{ ...releaseActor, actor_id: 5403155 }], [{ ...releaseActor, actor_type: 'RepositoryRole' }],
+    [{ ...releaseActor, bypass_mode: 'pull_request' }], [releaseActor, { actor_id: 1 }]]) {
+    const api = fixture(s => { s['rulesets/1'].bypass_actors = actors; });
+    await assert.rejects(verifyProtection(api, executionContext(env), construction));
+    await assert.rejects(verifyProtection(api, executionContext(env), { requireSnapshot: false }));
+  }
+  await assert.rejects(verifyProtection(fixture(s => { s['rulesets/1'].bypass_actors = [releaseActor]; s['rulesets/2'].bypass_actors = [releaseActor]; }), executionContext(env), construction));
+  for (const protectionMode of ['setup', true, null, '', 1]) {
+    await assert.rejects(verifyProtection(fixture(), executionContext(env), { ruleVersions: JSON.stringify({ ...versions, protectionMode }) }));
+  }
+});
+test('例外一覧が省略されても構築モードの完全な人の設定版を照合し、古い版を拒否する', async () => {
+  const api = fixture(s => { delete s['rulesets/1'].bypass_actors; });
+  assert.equal((await verifyProtection(api, executionContext(env), construction)).protectionMode, 'construction');
+  await assert.rejects(verifyProtection(api, executionContext(env), { ruleVersions: JSON.stringify({ ...versions, protectionMode: 'construction', ciControl: '2026-10-24T00:00:00.000Z' }) }));
+  await assert.rejects(verifyProtection(api, executionContext(env), { ruleVersions: JSON.stringify({ ...versions, protectionMode: 'construction', extra: true }) }));
+});
+test('承認後に例外・保護版が変われば次の照合で停止する', async () => {
+  let changed = false;
+  const api = async path => fixture(s => { s['rulesets/1'].bypass_actors = changed ? [] : [releaseActor]; })(path);
+  await verifyProtection(api, executionContext(env), construction);
+  changed = true;
+  await assert.rejects(verifyProtection(api, executionContext(env), construction));
+});

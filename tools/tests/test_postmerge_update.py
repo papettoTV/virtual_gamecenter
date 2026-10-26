@@ -191,7 +191,7 @@ class BootstrapTests(unittest.TestCase):
 
     def test_bundle_is_hash_pinned_and_manifest_checked(self):
         entries = {name: b'public-code\n' for name in M.FILES}
-        manifest = {'version': 8, 'mode': 'postmerge-staging-live', 'mergeEnabled': False, 'regressionCount': 1, 'liveTransportConnected': True, 'previousControlSha': M.PREVIOUS_SHA, 'repository': 'papettoTV/virtual_gamecenter',
+        manifest = {'version': 9, 'mode': 'postmerge-staging-live', 'mergeEnabled': False, 'regressionCount': 1, 'liveTransportConnected': True, 'previousControlSha': M.PREVIOUS_SHA, 'repository': 'papettoTV/virtual_gamecenter',
             'branch': 'ci-control', 'deploymentEnabled': True, 'files': {name: hashlib.sha256(data).hexdigest() for name, data in entries.items()}}
         with tempfile.TemporaryDirectory() as tmp:
             archive = Path(tmp) / 'bundle.zip'

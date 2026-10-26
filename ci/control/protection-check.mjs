@@ -30,6 +30,26 @@ export function readApi(token, request = fetch) {
   };
 }
 export async function verifyProtection(api, execution, { requireSnapshot = true, ruleVersions } = {}) {
+  // This attestation lives only in the human-managed staging Environment.
+  // No workflow input, source artifact or repository variable can select construction.
+  let versions, protectionMode = 'unverified';
+  if (requireSnapshot) {
+    try { versions = JSON.parse(ruleVersions); } catch { throw Error('人が確認した保護設定版が未登録です。'); }
+    if (!versions || typeof versions !== 'object' || Array.isArray(versions)) throw Error('保護設定版の形式が不正です。');
+    const keys = Object.keys(versions).sort().join(',');
+    const requestedMode = Object.hasOwn(versions, 'protectionMode') ? versions.protectionMode : 'strict';
+    if (!['ciControl,main', 'ciControl,main,protectionMode'].includes(keys)
+      || !['strict', 'construction'].includes(requestedMode)) {
+      throw Error('保護モードはstrictまたはconstructionの明示指定だけを許可します。');
+    }
+    protectionMode = requestedMode;
+  }
+  const releaseOnly = actors => Array.isArray(actors) && actors.length === 1
+    && actors[0].actor_id === 5405029 && actors[0].actor_type === 'Integration'
+    && actors[0].bypass_mode === 'always' && Object.keys(actors[0]).sort().join(',') === 'actor_id,actor_type,bypass_mode';
+  const allowedControlBypass = actors => protectionMode === 'construction' ? releaseOnly(actors)
+    : protectionMode === 'strict' ? Array.isArray(actors) && actors.length === 0
+    : Array.isArray(actors) && (actors.length === 0 || releaseOnly(actors));
   const environment = await api('environments/staging');
   const reviewers = environment.protection_rules?.find(rule => rule.type === 'required_reviewers')?.reviewers;
   if (environment.can_admins_bypass !== false || environment.deployment_branch_policy?.custom_branch_policies !== true
@@ -49,12 +69,12 @@ export async function verifyProtection(api, execution, { requireSnapshot = true,
   if (matching.length !== 1 || !Number.isSafeInteger(matching[0].id) || matching[0].id < 1) throw Error('ci-controlルールが一意ではありません。');
   const rule = await api(`rulesets/${matching[0].id}`);
   const include = rule.conditions?.ref_name?.include, exclude = rule.conditions?.ref_name?.exclude;
-  if (rule.target !== 'branch' || rule.enforcement !== 'active' || ('bypass_actors' in rule && rule.bypass_actors?.length !== 0)
+  if (rule.target !== 'branch' || rule.enforcement !== 'active' || ('bypass_actors' in rule && !allowedControlBypass(rule.bypass_actors))
     || include?.length !== 1 || include[0] !== 'refs/heads/ci-control' || !Array.isArray(exclude)
     || exclude.some(ref => !['refs/heads/main', 'refs/heads/develop'].includes(ref))
     || !['creation', 'update', 'deletion', 'non_fast_forward'].every(type => rule.rules?.some(item => item.type === type))
     || rule.rules.some(item => item.type === 'update' && item.parameters?.update_allows_fetch_and_merge === true)) {
-    throw Error('ci-controlの変更禁止と例外なしを確認できません。');
+    throw Error('ci-controlの変更禁止と指定モードの例外条件を確認できません。');
   }
   const mainRules = rules.filter(item => item.name === 'main-release-app-only');
   if (mainRules.length !== 1 || !Number.isSafeInteger(mainRules[0].id) || mainRules[0].id < 1) throw Error('mainの更新禁止ルールを確認できません。');
@@ -68,10 +88,7 @@ export async function verifyProtection(api, execution, { requireSnapshot = true,
   // variable pins versions checked with the full lists; missing data is not [].
   let bypassSnapshotVerified = false;
   if (requireSnapshot) {
-    let versions;
-    try { versions = JSON.parse(ruleVersions); } catch { throw Error('人が確認した保護設定版が未登録です。'); }
-    if (Object.keys(versions ?? {}).sort().join(',') !== 'ciControl,main'
-      || !/^20\d\d-\d\d-\d\dT[0-9:.]+Z$/.test(versions.ciControl ?? '')
+    if (!/^20\d\d-\d\d-\d\dT[0-9:.]+Z$/.test(versions.ciControl ?? '')
       || !/^20\d\d-\d\d-\d\dT[0-9:.]+Z$/.test(versions.main ?? '')
       || rule.updated_at !== versions.ciControl || mainRule.updated_at !== versions.main) {
       throw Error('例外一覧を人が確認した設定版から変更されています。');
@@ -82,7 +99,7 @@ export async function verifyProtection(api, execution, { requireSnapshot = true,
   const mainSha = (await api('git/ref/heads/main')).object?.sha;
   if (mainSha !== '73cb5d9267c56f06f9f1150327ec6b8b3caa2bb9') throw Error('mainが今回の準備開始時のSHAから変わりました。公開せず停止します。');
   return { version: 1, mode: 'rehearsal-only', checkedAt: new Date().toISOString(), execution,
-    preflightReady: true, protectionVerified: bypassSnapshotVerified, bypassSnapshotVerified,
+    protectionMode, preflightReady: true, protectionVerified: bypassSnapshotVerified, bypassSnapshotVerified,
     publicRuleVersions: { ciControl: rule.updated_at, main: mainRule.updated_at },
     mainSha, deploymentRequested: false, secretsRegistered: false };
 }

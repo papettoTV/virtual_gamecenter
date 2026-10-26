@@ -46,7 +46,7 @@ async function main(){
  }
  need(['approved-input','approved'].includes(mode),'不明なモード');
  const p=await json('postmerge-approval.json');assertLiveApproval(p,x,run);
- await verifyProtection(readApi(process.env.GH_TOKEN),x,{ruleVersions:process.env.PULBASE_CONTROL_RULE_VERSIONS});
+ const approvedProtection=await verifyProtection(readApi(process.env.GH_TOKEN),x,{ruleVersions:process.env.PULBASE_CONTROL_RULE_VERSIONS});
  const e=await developEvidence(api,run,policy);need(JSON.stringify(e)===JSON.stringify(p.evidence),'古い承認対象');
  if(mode==='approved-input'){await outputs(e);return;}
  const files=await checkBuild('build',receipt(e));need(files===p.files&&hash(await readFile('build/manifest.json'))===p.manifestDigest,'成果物差替え');
@@ -60,7 +60,7 @@ async function main(){
   operations=await connectedStagingOperations({mode:'live',scope,execution:x,artifactDirectory:'build',guard:observe,credentials:liveCredentials()});
   const result=await runPostmergeStaging({scope,execution:x,observe,publish:operations.publish,regress:operations.regress});
   await writeFile('postmerge-result.json',JSON.stringify({...result,mode:releaseMode,controlSha:x.controlSha,ciRunId:e.runId,filesVerified:files,
-   protectionVerified:true,...operations.report(),realMergeExecuted:false},null,2));
+   protectionVerified:true,protectionMode:approvedProtection.protectionMode,...operations.report(),realMergeExecuted:false},null,2));
  }catch(error){error.sha=e.sha;error.operationStatus=operations?.report();throw error;}
 }
 export function failureReport(error){

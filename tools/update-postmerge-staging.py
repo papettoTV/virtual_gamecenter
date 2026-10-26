@@ -18,7 +18,7 @@ import zipfile
 
 REPO = '/repos/papettoTV/virtual_gamecenter'
 APP = 5405029
-BUNDLE_SHA = 'd2ce4c7a7676279dfa0adc490ef01b13f7921658915a2ccf738b3f96c0713454'
+BUNDLE_SHA = '6e360fd73542100995a4e25779bf384bfb503a9a28824774a06007c6c1d42f5d'
 PREVIOUS_SHA = 'caeaee4f3474bff96a0449f20e434df52765bc98'
 MAIN_SHA = '73cb5d9267c56f06f9f1150327ec6b8b3caa2bb9'
 # These metadata-only versions were read with the limited owner PAT and its full
@@ -112,7 +112,7 @@ def bundle(path):
             raise Stop('配置ファイルの集合が一致しません。')
         entries = {name: archive.read(name) for name in archive.namelist()}
     manifest = json.loads(entries['bundle-manifest.json'])
-    if (manifest.get('version') != 8 or manifest.get('mode') != 'postmerge-staging-live' or manifest.get('mergeEnabled') is not False or manifest.get('regressionCount') != 1 or manifest.get('liveTransportConnected') is not True or manifest.get('previousControlSha') != PREVIOUS_SHA or manifest.get('deploymentEnabled') is not True
+    if (manifest.get('version') != 9 or manifest.get('mode') != 'postmerge-staging-live' or manifest.get('mergeEnabled') is not False or manifest.get('regressionCount') != 1 or manifest.get('liveTransportConnected') is not True or manifest.get('previousControlSha') != PREVIOUS_SHA or manifest.get('deploymentEnabled') is not True
         or manifest.get('repository') != 'papettoTV/virtual_gamecenter' or manifest.get('branch') != 'ci-control'
         or set(manifest.get('files', {})) != FILES):
         raise Stop('検証用の実公開制御manifestではありません。')
@@ -290,7 +290,7 @@ def main():
         raise Stop('通常のPEMファイルではありません。')
     result = apply(entries, sign_jwt(pem))
     print(json.dumps(result, ensure_ascii=False, indent=2))
-    print('次に管理画面でci-controlのpulbase-release一時例外を削除し、bypassを空へ戻してください。')
+    print('構築中はpulbase-releaseだけの例外を維持できます。stagingの保護設定版をconstructionで照合してください。最終確認前に例外を削除しstrictへ戻してください。')
     print('成功・失敗に関係なく、workflowの起動・再実行・例外の追加はまだ行わないでください。')
     if not result['success']:
         sys.exit(1)
