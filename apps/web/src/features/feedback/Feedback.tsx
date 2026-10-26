@@ -100,6 +100,7 @@ export function Feedback({ address }: { address: string }) {
       </fieldset>
       <div className="feedback-message"><label htmlFor="feedback-message">内容</label><textarea id="feedback-message" required minLength={1} maxLength={2000} rows={5} value={message} disabled={pending} onChange={event => setMessage(event.target.value)} /></div>
       <p className="feedback-details">一緒に送る情報：{title} ／ {context.activity === "player" ? "プレイ" : context.activity === "spectator" ? "観戦" : "サイト利用"}</p>
+      <p className="feedback-details">現在のプレイヤー名・端末種別（PC/スマホ等）・ブラウザ種別も運営者向けに記録します。ブラウザのバージョンや端末の詳しい情報は保存しません。</p>
       <p className="feedback-details">本文は非公開で90日保存します。パスワード・連絡先などの個人情報は書かないでください。返信機能はありません。</p>
       {error && <p role="alert">{error}</p>}
       <button className="feedback-send" disabled={pending || !category || !message.trim()} type="submit">{pending ? "送信中…" : "送る"}</button>

@@ -92,7 +92,7 @@ it("accepts anonymous feedback without a session, stores only declared fields, a
   expect((await send(body)).status).toBe(200);
   const saved = await env.DB.prepare("SELECT * FROM feedback WHERE id = ?").bind(body.id).first();
   expect(saved).toMatchObject({ category: body.category, message: body.message, game_id: body.gameId, activity: body.activity });
-  expect(Object.keys(saved!).sort()).toEqual(["activity", "category", "created_at", "game_id", "id", "message"]);
+  expect(Object.keys(saved!).sort()).toEqual(["activity", "browser_type", "category", "created_at", "device_type", "game_id", "id", "message", "player_name"]);
   const quota = await env.DB.prepare("SELECT * FROM feedback_rate_buckets").first();
   expect(quota?.count).toBe(1);
   expect(JSON.stringify(quota)).not.toContain("192.0.2.1");
@@ -178,6 +178,9 @@ it("only lets configured, active Google operators read feedback and escapes all 
   expect(html).toContain("&lt;script&gt;");
   expect(html).not.toContain("<script>");
   expect(html).not.toContain(owner.accountId);
+  expect(html).toContain("日時（日本時間）");
+  expect(html).toContain("JST");
+  expect(html).toContain("未記録");
   expect((await handleFeedback(operatorRequest(owner.cookie, "/api/operator/feedback?page=1"), config))!.status).toBe(200);
   expect((await handleFeedback(operatorRequest(owner.cookie, "/api/operator/feedback?page=0"), config))!.status).toBe(400);
   const crossSite = operatorRequest(owner.cookie); crossSite.headers.set("Sec-Fetch-Site", "cross-site");
