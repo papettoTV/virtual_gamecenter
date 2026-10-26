@@ -7,6 +7,7 @@ import {developEvidence,releaseScope,runPostmergeStaging} from './postmerge-stag
 import {checkBuild} from './candidate-evidence.mjs';
 import {connectedStagingOperations} from './fixed-staging-operations.mjs';
 import {sanitizeCommandFailure} from './fixed-process.mjs';
+import {PUBLICATION_STOP_REASONS} from './staging-publication.mjs';
 import {trustPolicy} from './review-trust.mjs';
 const releaseMode='postmerge-staging-live';
 export function liveCredentials(env=process.env){
@@ -45,7 +46,7 @@ async function main(){
  }
  need(['approved-input','approved'].includes(mode),'不明なモード');
  const p=await json('postmerge-approval.json');assertLiveApproval(p,x,run);
- await verifyProtection(readApi(process.env.GH_TOKEN),x,{ruleVersions:process.env.PULBASE_CONTROL_RULE_VERSIONS});
+ const approvedProtection=await verifyProtection(readApi(process.env.GH_TOKEN),x,{ruleVersions:process.env.PULBASE_CONTROL_RULE_VERSIONS});
  const e=await developEvidence(api,run,policy);need(JSON.stringify(e)===JSON.stringify(p.evidence),'古い承認対象');
  if(mode==='approved-input'){await outputs(e);return;}
  const files=await checkBuild('build',receipt(e));need(files===p.files&&hash(await readFile('build/manifest.json'))===p.manifestDigest,'成果物差替え');
@@ -59,7 +60,7 @@ async function main(){
   operations=await connectedStagingOperations({mode:'live',scope,execution:x,artifactDirectory:'build',guard:observe,credentials:liveCredentials()});
   const result=await runPostmergeStaging({scope,execution:x,observe,publish:operations.publish,regress:operations.regress});
   await writeFile('postmerge-result.json',JSON.stringify({...result,mode:releaseMode,controlSha:x.controlSha,ciRunId:e.runId,filesVerified:files,
-   protectionVerified:true,...operations.report(),realMergeExecuted:false},null,2));
+   protectionVerified:true,protectionMode:approvedProtection.protectionMode,...operations.report(),realMergeExecuted:false},null,2));
  }catch(error){error.sha=e.sha;error.operationStatus=operations?.report();throw error;}
 }
 export function failureReport(error){
@@ -71,6 +72,7 @@ export function failureReport(error){
  realDeploymentExecuted:s.realDeploymentExecuted===true,realDeploymentAttempted:s.realDeploymentAttempted===true,
  realRegressionExecuted:s.realRegressionExecuted===true,regressionPassed:false,
  httpAttempted:s.httpAttempted===true,browserAttempted:s.browserAttempted===true,commandFailure:sanitizeCommandFailure(s.commandFailure),
+ publicationStopReason:PUBLICATION_STOP_REASONS.includes(s.publicationStopReason)?s.publicationStopReason:'unknown',
  realMergeExecuted:false,mainUpdated:false,productionRequested:false};
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href)main().catch(async e=>{console.error(e.message);await writeFile('postmerge-result.json',JSON.stringify(failureReport(e),null,2));process.exitCode=1;});
