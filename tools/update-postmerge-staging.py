@@ -18,17 +18,17 @@ import zipfile
 
 REPO = '/repos/papettoTV/virtual_gamecenter'
 APP = 5405029
-BUNDLE_SHA = '67ce5cfb45e716fea3f9448c19498614f4084af55a666df861ba08c5a8da99fd'
-PREVIOUS_SHA = 'f17a56415d6e8bd59b36d5106a7b2a39bd99ecbd'
+BUNDLE_SHA = '6e360fd73542100995a4e25779bf384bfb503a9a28824774a06007c6c1d42f5d'
+PREVIOUS_SHA = 'caeaee4f3474bff96a0449f20e434df52765bc98'
 MAIN_SHA = '73cb5d9267c56f06f9f1150327ec6b8b3caa2bb9'
 # These metadata-only versions were read with the limited owner PAT and its full
 # bypass list checked. Apply stays disabled until the human adds the sole App
 # bypass and the resulting version is independently read and pinned here.
-PLAN_CONTROL_VERSION = '2026-10-25T11:37:05.795Z'
+PLAN_CONTROL_VERSION = '2026-10-25T13:07:28.889Z'
 APPLY_CONTROL_VERSION = None
 MAIN_RULE_VERSION = '2026-10-21T20:32:35.191Z'
 SHA = re.compile(r'^[a-f0-9]{40}$')
-FILES = {'ci/tests/fixed-tool-diagnostics.test.mjs', 'ci/control/fixed-process.mjs', 'ci/control/fixed-staging-operations.mjs', 'ci/tests/fixed-staging-operations.test.mjs', 'ci/control/toolchain/package.json', 'ci/tests/review-trust.test.mjs', 'ci/control/develop-merge.mjs', 'ci/tests/staging-runtime.test.mjs', 'ci/tests/postmerge-staging.test.mjs', 'ci/control/staging-publication.mjs', '.github/workflows/postmerge-staging.yml', 'ci/control/toolchain/staging-browser.config.mjs', 'ci/tests/control-protection.test.mjs', 'ci/control/staging-target.json', 'ci/control/review-trust.mjs', 'ci/control/postmerge-staging.mjs', 'ci/control/review-trust.json', 'ci/control/toolchain/package-lock.json', 'ci/control/postmerge-runner.mjs', 'ci/control/protection-check.mjs', 'README.md', 'ci/control/toolchain/browser/regression.spec.mjs', 'ci/control/staging-gateway.mjs', 'ci/control/candidate-evidence.mjs', 'ci/control/premerge-decision.mjs', 'ci/control/staging-regression.mjs'}
+FILES = {'ci/control/toolchain/prepare-browser-sandbox.mjs', 'ci/tests/fixed-tool-diagnostics.test.mjs', 'ci/control/fixed-process.mjs', 'ci/control/fixed-staging-operations.mjs', 'ci/tests/fixed-staging-operations.test.mjs', 'ci/control/toolchain/package.json', 'ci/tests/review-trust.test.mjs', 'ci/control/develop-merge.mjs', 'ci/tests/staging-runtime.test.mjs', 'ci/tests/postmerge-staging.test.mjs', 'ci/control/staging-publication.mjs', '.github/workflows/postmerge-staging.yml', 'ci/control/toolchain/staging-browser.config.mjs', 'ci/tests/control-protection.test.mjs', 'ci/control/staging-target.json', 'ci/control/review-trust.mjs', 'ci/control/postmerge-staging.mjs', 'ci/control/review-trust.json', 'ci/control/toolchain/package-lock.json', 'ci/control/postmerge-runner.mjs', 'ci/control/protection-check.mjs', 'README.md', 'ci/control/toolchain/browser/regression.spec.mjs', 'ci/control/staging-gateway.mjs', 'ci/control/candidate-evidence.mjs', 'ci/control/premerge-decision.mjs', 'ci/control/staging-regression.mjs'}
 
 
 class Stop(RuntimeError):
@@ -62,7 +62,7 @@ def permitted(method, path, body):
             and item['mode'] == '100644' and item['type'] == 'blob' and isinstance(item['content'], str)
             for item in entries) and len({item['path'] for item in entries}) == len(FILES) + 1
     if path == REPO + '/git/commits':
-        return set(body) == {'message', 'tree', 'parents'} and body['message'] == 'chore: staging公開の安全なエラー診断を配置（公開なし）' and bool(
+        return set(body) == {'message', 'tree', 'parents'} and body['message'] == 'chore: Pages共有設定保持とsandbox起動の修正を配置（公開なし）' and bool(
             SHA.fullmatch(body.get('tree', ''))) and body.get('parents') == [PREVIOUS_SHA]
     return False
 
@@ -112,7 +112,7 @@ def bundle(path):
             raise Stop('配置ファイルの集合が一致しません。')
         entries = {name: archive.read(name) for name in archive.namelist()}
     manifest = json.loads(entries['bundle-manifest.json'])
-    if (manifest.get('version') != 7 or manifest.get('mode') != 'postmerge-staging-live' or manifest.get('mergeEnabled') is not False or manifest.get('regressionCount') != 1 or manifest.get('liveTransportConnected') is not True or manifest.get('previousControlSha') != PREVIOUS_SHA or manifest.get('deploymentEnabled') is not True
+    if (manifest.get('version') != 9 or manifest.get('mode') != 'postmerge-staging-live' or manifest.get('mergeEnabled') is not False or manifest.get('regressionCount') != 1 or manifest.get('liveTransportConnected') is not True or manifest.get('previousControlSha') != PREVIOUS_SHA or manifest.get('deploymentEnabled') is not True
         or manifest.get('repository') != 'papettoTV/virtual_gamecenter' or manifest.get('branch') != 'ci-control'
         or set(manifest.get('files', {})) != FILES):
         raise Stop('検証用の実公開制御manifestではありません。')
@@ -233,7 +233,7 @@ def apply(entries, jwt, api=request):
             raise Stop('配置treeのファイル集合・Gitハッシュが一致しません。')
         report['stage'] = 'create-commit'
         commit = ok(api, 'POST', REPO + '/git/commits', token,
-            {'message': 'chore: staging公開の安全なエラー診断を配置（公開なし）', 'tree': tree['sha'], 'parents': [parent]})
+            {'message': 'chore: Pages共有設定保持とsandbox起動の修正を配置（公開なし）', 'tree': tree['sha'], 'parents': [parent]})
         if not SHA.fullmatch(commit.get('sha', '')) or commit.get('tree', {}).get('sha') != tree['sha'] or [item.get('sha') for item in commit.get('parents', [])] != [parent]:
             raise Stop('配置commitの親・treeが一致しません。')
         report['commit'] = commit['sha']
@@ -290,7 +290,7 @@ def main():
         raise Stop('通常のPEMファイルではありません。')
     result = apply(entries, sign_jwt(pem))
     print(json.dumps(result, ensure_ascii=False, indent=2))
-    print('次に管理画面でci-controlのpulbase-release一時例外を削除し、bypassを空へ戻してください。')
+    print('構築中はpulbase-releaseだけの例外を維持できます。stagingの保護設定版をconstructionで照合してください。最終確認前に例外を削除しstrictへ戻してください。')
     print('成功・失敗に関係なく、workflowの起動・再実行・例外の追加はまだ行わないでください。')
     if not result['success']:
         sys.exit(1)

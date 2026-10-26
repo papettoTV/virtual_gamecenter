@@ -43,7 +43,7 @@ test('鍵なし接続は公開1回・回帰1回、Worker dry-runとbrowser list�
 });
 test('live transportはダミー認証の注入試験だけで、CF鍵とBasicを別プロセスへ限定',async t=>{
  const f=await fixture(t);f.mode='live';f.credentials={cloudflareToken:'dummy-cf',username:'dummy-user',password:'dummy-password'};const commands=[];
- f.ports={request:async(url,opts)=>{if(url.startsWith('https://api.cloudflare.com/')){assert.equal(opts.method,'GET');assert.ok(url.endsWith('/pages/projects/virtual-gamecenter'));assert.equal(opts.headers.Authorization,'Bearer dummy-cf');return Response.json({success:true,result:{name:'virtual-gamecenter',production_branch:'main',source:{config:{preview_deployment_setting:'none',production_deployments_enabled:false}},build_config:{}}});}
+ f.ports={request:async(url,opts)=>{if(url.startsWith('https://api.cloudflare.com/')){assert.equal(opts.method,'GET');assert.ok(url.endsWith('/pages/projects/virtual-gamecenter'));assert.equal(opts.headers.Authorization,'Bearer dummy-cf');return Response.json({success:true,result:{name:'virtual-gamecenter',production_branch:'main',source:{config:{preview_deployment_setting:'none',production_deployments_enabled:false}},build_config:{destination_dir:'dist/client'}}});}
  assert.equal(opts.redirect,'manual');assert.equal(opts.headers.Authorization,'Basic '+Buffer.from('dummy-user:dummy-password').toString('base64'));return new Response('',{headers:{'x-pulbase-revision':sha,'x-pulbase-gateway-revision':sha}});},
  process:async(tool,args,opts)=>{commands.push({tool,args});assert.equal(opts.env.GH_TOKEN,undefined);assert.equal(opts.env.OPENAI_API_KEY,undefined);
  if(tool==='wrangler'){assert.equal(opts.env.CLOUDFLARE_API_TOKEN,'dummy-cf');assert.equal(opts.env.PULBASE_CHECK_PASSWORD,undefined);assert.ok(!args.includes('--dry-run'));}
@@ -78,7 +78,7 @@ test('browserは検証originだけにBasicを送り、外部HTTP/WSとService Wo
 
 test('公開途中で失敗したらWorker反映・Pages結果不明を記録し再試行しない',async t=>{
  const f=await fixture(t);f.mode='live';f.credentials={cloudflareToken:'dummy-cf',username:'dummy',password:'dummy'};let calls=0;
- f.ports={request:async()=>Response.json({success:true,result:{name:'virtual-gamecenter',production_branch:'main'}}),process:async()=>({exitCode:++calls===1?0:1,stdout:'private'})};
+ f.ports={request:async()=>Response.json({success:true,result:{name:'virtual-gamecenter',production_branch:'main',build_config:{destination_dir:'dist/client'}}}),process:async()=>({exitCode:++calls===1?0:1,stdout:'private'})};
  const ops=await connectedStagingOperations(f);await assert.rejects(ops.publish());const s=ops.report();assert.equal(calls,2);assert.equal(s.workerOutcome,'uploaded');assert.equal(s.pagesOutcome,'unknown');assert.equal(s.realDeploymentAttempted,true);assert.equal(s.httpAttempted,false);
  const {failureReport}=await import('../control/postmerge-runner.mjs');const report=failureReport({phase:'publication',sha,operationStatus:s});assert.equal(report.partialPublicationPossible,true);assert.equal(report.pagesOutcome,'unknown');assert.ok(!JSON.stringify(report).includes('private'));
 });

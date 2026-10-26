@@ -1,6 +1,6 @@
 // Preparation only: no default live transport, no CLI entry point, no credential discovery.
-import {readFile,mkdtemp,mkdir,writeFile} from 'node:fs/promises';
-import {resolve,join} from 'node:path';
+import {readFile,mkdtemp,mkdir,writeFile,realpath} from 'node:fs/promises';
+import {resolve,join,isAbsolute,posix} from 'node:path';
 import {tmpdir} from 'node:os';
 import {checkBuild} from './candidate-evidence.mjs';
 const account='60e5472a284dc71bbafbbfac8aa2a940';
@@ -40,22 +40,43 @@ export function publicationCommands(plan){
  return {worker:['deploy','--config',plan.workerConfig,'--no-bundle','--autoconfig=false'],
   pages:['pages','deploy',join(plan.artifact,'client'),'--cwd',plan.pagesDirectory,'--project-name','virtual-gamecenter','--branch','develop','--commit-hash',plan.sha,'--commit-dirty=true','--no-bundle']};
 }
+// The positional deploy directory remains the verified artifact. This field is
+// project-wide metadata: sending an ephemeral runner path mutates Git settings.
+export async function preservePagesBuildMetadata(plan,project){
+ const directory=project?.build_config?.destination_dir;
+ need(typeof directory==='string'&&directory.length>0&&directory.length<1024&&!isAbsolute(directory)&&!directory.includes('\\')&&!/[\x00-\x1f]/.test(directory),'Pagesの共有出力先メタデータが不正');
+ const path=join(plan.pagesDirectory,'wrangler.jsonc');
+ const config=JSON.parse(await readFile(path,'utf8'));
+ config.pages_build_output_dir=resolve(await realpath(plan.pagesDirectory),directory);
+ await writeFile(path,JSON.stringify(config));
+}
+function canonical(value){
+ if(Array.isArray(value))return value.map(canonical);
+ if(value&&typeof value==='object')return Object.fromEntries(Object.keys(value).sort().map(k=>[k,canonical(value[k])]));
+ return value;
+}
+export function samePagesConfiguration(before,after){
+ const normalized=p=>({source:p.source,production:p.deployment_configs?.production,build_config:{...p.build_config,...(typeof p.build_config?.destination_dir==='string'?{destination_dir:(posix.normalize(p.build_config.destination_dir).replace(/\/+$/,'')||'.')}:{})}});
+ return JSON.stringify(canonical(normalized(before)))===JSON.stringify(canonical(normalized(after)));
+}
+export const PUBLICATION_STOP_REASONS=Object.freeze(['evidence','pages-target','pages-build-metadata','worker-command','pages-command','pages-postflight','pages-config-drift','unknown']);
 export class PublicationStopped extends Error{
- constructor(phase,workerOutcome){super('staging公開を停止しました。部分反映の可能性を確認してください。');this.phase=phase;this.workerOutcome=workerOutcome;}
+ constructor(phase,workerOutcome,stopReason='unknown'){super('staging公開を停止しました。部分反映の可能性を確認してください。');this.phase=phase;this.workerOutcome=workerOutcome;this.stopReason=PUBLICATION_STOP_REASONS.includes(stopReason)?stopReason:'unknown';}
 }
 export async function executeStagingPublication(plan,{guard,transport}={}){
  need(typeof guard==='function'&&typeof transport?.project==='function'&&typeof transport.execute==='function','保護されたguardと明示transportが必要');
- let phase='preflight',workerOutcome='not-attempted';
+ let phase='preflight',workerOutcome='not-attempted',stopReason='evidence';
  const commands=publicationCommands(plan);
- async function recheck(){await checkBuild(plan.artifact,plan.receipt);await guard();}
+ async function recheck(){stopReason='evidence';await checkBuild(plan.artifact,plan.receipt);await guard();}
  try{
-  await recheck();const before=await transport.project();assertStagingPages(before);
-  await recheck();phase='worker';workerOutcome='unknown';await transport.execute(commands.worker,{cwd:plan.prepared});workerOutcome='uploaded';
-  await recheck();assertStagingPages(await transport.project());phase='pages';await transport.execute(commands.pages,{cwd:plan.prepared});
-  const after=await transport.project();assertStagingPages(after);
-  need(JSON.stringify(before.source)===JSON.stringify(after.source)&&JSON.stringify(before.build_config)===JSON.stringify(after.build_config),'Pages設定が変わりました。自動修復せず停止');
+  await recheck();stopReason='pages-target';const before=await transport.project();assertStagingPages(before);
+  stopReason='pages-build-metadata';await preservePagesBuildMetadata(plan,before);
+  await recheck();phase='worker';workerOutcome='unknown';stopReason='worker-command';await transport.execute(commands.worker,{cwd:plan.prepared});workerOutcome='uploaded';
+  await recheck();stopReason='pages-target';assertStagingPages(await transport.project());phase='pages';stopReason='pages-command';await transport.execute(commands.pages,{cwd:plan.prepared});
+  stopReason='pages-postflight';const after=await transport.project();assertStagingPages(after);
+  stopReason='pages-config-drift';need(samePagesConfiguration(before,after),'Pages設定が変わりました。自動修復せず停止');
   await recheck();return {passed:true,environment:'staging',sha:plan.sha,files:plan.files};
- }catch{throw new PublicationStopped(phase,workerOutcome);}
+ }catch{throw new PublicationStopped(phase,workerOutcome,stopReason);}
 }
 export async function dryRunStaging(plan,command){
  need(typeof command==='function','dry-run commandが必要');

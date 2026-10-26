@@ -1,10 +1,10 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,mkdir,writeFile,readFile,rm} from 'node:fs/promises';
-import {join} from 'node:path';
+import {mkdtemp,mkdir,writeFile,readFile,rm,realpath,symlink} from 'node:fs/promises';
+import {join,relative} from 'node:path';
 import {tmpdir} from 'node:os';
 import {createHash} from 'node:crypto';
-import {prepareStagingPublication,executeStagingPublication,dryRunStaging,assertStagingPages,validateStagingTarget,publicationCommands} from '../control/staging-publication.mjs';
+import {prepareStagingPublication,executeStagingPublication,dryRunStaging,assertStagingPages,validateStagingTarget,publicationCommands,preservePagesBuildMetadata,samePagesConfiguration} from '../control/staging-publication.mjs';
 import {stagingRegression,regressionEnvironment} from '../control/staging-regression.mjs';
 import {mergeReviewedCandidate} from '../control/develop-merge.mjs';
 const sha='a'.repeat(40),tree='b'.repeat(40),base='c'.repeat(40),repo='papettoTV/virtual_gamecenter';
@@ -15,7 +15,7 @@ async function build(){
  await writeFile(join(dir,'manifest.json'),JSON.stringify({version:1,environment:'staging',sha,tree,runId:'10',attempt:'1',files}));
  return {dir,receipt:{candidate:sha,tree,buildRun:'10',buildAttempt:'1'},cleanup:()=>rm(dir,{recursive:true,force:true})};
 }
-const project=()=>({name:'virtual-gamecenter',production_branch:'main',source:{config:{preview_deployment_setting:'none',production_deployments_enabled:false}},build_config:{build_command:'existing'}});
+const project=()=>({name:'virtual-gamecenter',production_branch:'main',source:{config:{preview_deployment_setting:'none',production_deployments_enabled:false}},build_config:{build_command:'existing',destination_dir:'dist/client'}});
 test('固定staging設定から計画を作り、候補の設定/公開先/命令を受け入れない',async()=>{
  const f=await build();try{const p=await prepareStagingPublication(f.dir,f.receipt);const c=publicationCommands(p);assert.ok(c.pages.includes('develop'));assert.ok(c.worker.includes('--no-bundle'));assert.equal(p.worker,'pulbase-staging');assert.ok(Object.isFrozen(p));const config=JSON.parse(await readFile(p.workerConfig));assert.equal(config.name,'pulbase-staging');assert.equal(config.build,undefined);assert.deepEqual(config.routes,[]);await rm(p.prepared,{recursive:true,force:true});}finally{await f.cleanup();}
  const t=JSON.parse(await readFile(new URL('../control/staging-target.json',import.meta.url)));assert.throws(()=>validateStagingTarget({...t,name:'pulbase-production'}));assert.throws(()=>validateStagingTarget({...t,build:{command:'malicious'}}));
@@ -56,4 +56,30 @@ test('マージAPI timeoutではunknown、マージ後不一致ではSHAを残�
  await assert.rejects(mergeReviewedCandidate(intent,{api,guard:async()=>{}}),e=>e.outcome==='unknown'&&!e.message.includes('token'));assert.equal(puts,1);
  const broken=async(m,p)=>m==='PUT'?{merged:true,sha:'d'.repeat(40)}:p.startsWith('git/commits')?{tree:{sha:'e'.repeat(40)},parents:[{sha:base}]}:p.startsWith('git/ref')?{object:{sha:'d'.repeat(40)}}:api(m,p);
  await assert.rejects(mergeReviewedCandidate(intent,{api:broken,guard:async()=>{}}),e=>e.outcome==='merged-unverified'&&e.mergedSha==='d'.repeat(40));
+});
+
+test('Pagesの既存メタデータを保ち、実アップロード先は検証済みartifactのままにする',async()=>{
+ const f=await build(),scratch=await mkdtemp(join(tmpdir(),'metadata-scratch-'));let p;
+ try{
+  await mkdir(join(scratch,'physical'));await symlink(join(scratch,'physical'),join(scratch,'alias'));
+  p=await prepareStagingPublication(f.dir,f.receipt,{scratch:join(scratch,'alias')});const before=project();before.build_config.destination_dir='apps/web/dist/client';
+  const calls=[];await executeStagingPublication(p,{guard:async()=>{},transport:{project:async()=>structuredClone(before),execute:async a=>calls.push(a)}});
+  const config=JSON.parse(await readFile(join(p.pagesDirectory,'wrangler.jsonc')));
+  assert.equal(relative(await realpath(p.pagesDirectory),config.pages_build_output_dir),'apps/web/dist/client');
+  assert.equal(calls[1][2],join(f.dir,'client'));assert.equal(config.services[0].service,'pulbase-staging');assert.equal(calls.length,2);
+ }finally{if(p)await rm(p.prepared,{recursive:true,force:true});await rm(scratch,{recursive:true,force:true});await f.cleanup();}
+});
+test('Pages設定のキー順序と同義の出力パスだけを正規化し、実際の共有設定変更は拒否',()=>{
+ const before=project(),after={build_config:{destination_dir:'./dist/client/',build_command:'existing'},source:before.source};
+ assert.equal(samePagesConfiguration(before,after),true);
+ after.build_config.build_command='changed';assert.equal(samePagesConfiguration(before,after),false);
+ const changed=project();changed.source.config.preview_deployment_setting='all';assert.equal(samePagesConfiguration(before,changed),false);
+ const production=project();production.deployment_configs={production:{env_vars:{APP_ENV:{value:'production'}}}};const drift=structuredClone(production);drift.deployment_configs.production.env_vars.APP_ENV.value='staging';assert.equal(samePagesConfiguration(production,drift),false);
+});
+test('不正な共有メタデータはWorker公開前に止め、公開後ドリフトも固有の停止理由で記録',async()=>{
+ const f=await build();let p;try{
+  p=await prepareStagingPublication(f.dir,f.receipt);let calls=0;
+  for(const destination_dir of ['/unsafe','dist\\client','dist\nclient'])await assert.rejects(executeStagingPublication(p,{guard:async()=>{},transport:{project:async()=>({...project(),build_config:{destination_dir}}),execute:async()=>{calls++;}}}),e=>e.stopReason==='pages-build-metadata'&&e.workerOutcome==='not-attempted');assert.equal(calls,0);
+  let reads=0;await assert.rejects(executeStagingPublication(p,{guard:async()=>{},transport:{project:async()=>{const x=project();if(++reads===3)x.build_config.destination_dir='changed';return x;},execute:async()=>{calls++;}}}),e=>e.stopReason==='pages-config-drift'&&e.workerOutcome==='uploaded');assert.equal(calls,2);
+ }finally{if(p)await rm(p.prepared,{recursive:true,force:true});await f.cleanup();}
 });
