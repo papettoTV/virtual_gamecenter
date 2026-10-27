@@ -90,3 +90,36 @@ test('opening manually cancels the invitation queued for the same return', async
   await page.waitForTimeout(1200);
   await expect(modal(page)).not.toBeVisible();
 });
+
+test('sends with a valid UUID when randomUUID is unavailable over HTTP', async ({ page }) => {
+  const submissions = [];
+  await page.route('**/api/feedback', route => {
+    submissions.push(route.request().postDataJSON());
+    return route.fulfill({ status: 200, contentType: 'application/json', body: '{"accepted":true}' });
+  });
+  await open(page);
+  await page.evaluate(() => Object.defineProperty(window.crypto, 'randomUUID', { configurable: true, value: undefined }));
+  await modal(page).getByRole('radio', { name: '不具合', exact: true }).check();
+  await modal(page).getByLabel('内容', { exact: true }).fill('HTTP LAN送信確認');
+  await modal(page).getByRole('button', { name: '送る', exact: true }).click();
+  await expect(modal(page)).not.toBeVisible();
+  expect(submissions).toHaveLength(1);
+  expect(submissions[0].id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+});
+
+test('clears the sending state and preserves the draft when UUID preparation throws', async ({ page }) => {
+  let requests = 0;
+  await page.route('**/api/feedback', route => { requests++; return route.fulfill({ status: 200, body: '{}' }); });
+  await open(page);
+  await page.evaluate(() => {
+    Object.defineProperty(window.crypto, 'randomUUID', { configurable: true, value: undefined });
+    Object.defineProperty(window.crypto, 'getRandomValues', { configurable: true, value: () => { throw Error('synthetic UUID failure'); } });
+  });
+  await modal(page).getByRole('radio', { name: '不具合', exact: true }).check();
+  await modal(page).getByLabel('内容', { exact: true }).fill('入力を保持する');
+  await modal(page).getByRole('button', { name: '送る', exact: true }).click();
+  await expect(modal(page).getByRole('alert')).toContainText('内容は残っています');
+  await expect(modal(page).getByRole('button', { name: '送る', exact: true })).toBeEnabled();
+  await expect(modal(page).getByLabel('内容', { exact: true })).toHaveValue('入力を保持する');
+  expect(requests).toBe(0);
+});

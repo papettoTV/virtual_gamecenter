@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { getGameDefinition } from "../../domain/game";
+import { createUuid } from "../../shared/id";
 import { liveSharing } from "../sharing/share-service";
 import { notifications } from "../notifications/notifications";
 import { canPrompt, FEEDBACK_HISTORY_KEY, FEEDBACK_RETURN_KEY, FeedbackVisit, japanDay, readHistory, takeReturn, type FeedbackContext } from "./prompt-policy";
@@ -70,10 +71,10 @@ export function Feedback({ address }: { address: string }) {
     event.preventDefault();
     if (sending.current) return;
     sending.current = true; setPending(true); setError("");
-    const key = JSON.stringify({ category, message: message.trim(), ...context });
-    if (key !== payloadKey.current || !submission.current) { submission.current = crypto.randomUUID(); payloadKey.current = key; }
     let failureMessage = "送信できませんでした。内容は残っています。もう一度お試しください。";
     try {
+      const key = JSON.stringify({ category, message: message.trim(), ...context });
+      if (key !== payloadKey.current || !submission.current) { submission.current = createUuid(); payloadKey.current = key; }
       const response = await fetch("/api/feedback", {
         method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: submission.current, category, message: message.trim(), ...context }), signal: AbortSignal.timeout(10000),
