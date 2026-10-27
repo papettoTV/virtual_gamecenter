@@ -11,3 +11,5 @@
 .feedback-details { color: #aab4d6; font-size: .85rem; }
 .feedback-send { width: 100%; background: #1c5361; color: #f4f7ff; border: 1px solid #69f7ff; border-radius: 10px; font: inherit; font-weight: 700; }
 .feedback-send:disabled { opacity: .5; }
+.result-feedback { margin: 10px auto; width: 100%; max-width: 360px; }
+.result-feedback > button { width: 100%; min-height: 44px; padding: 10px 14px; border: 1px solid #47717d; border-radius: 10px; color: #8debf0; background: #142634; cursor: pointer; font: inherit; touch-action: manipulation; }

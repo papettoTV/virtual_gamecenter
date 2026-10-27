@@ -1,4 +1,5 @@
 import { notifications } from "../../../features/notifications/notifications";
+import { ResultFeedbackButton } from "../../../features/feedback/ResultFeedbackButton";
 import { navigate } from "../../../shared/navigation";
 import type { DotWaveRoster } from "../../../domain/cabinet";
 import { isGameModeAvailable } from "../../../domain/play-mode-policy";
@@ -402,6 +403,7 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
         </>}
         {cleared && !next && !replica && !holdResult && e.score && <DotWaveRanking score={e.score} elapsedTimeMs={e.elapsedPlayMs ?? 1} playerName={name(0)} />}
         {resultPanel}
+        {!next && !spectator && <ResultFeedbackButton />}
         {!holdResult && !replica && !network?.matchId && (next
           ? <button className="duel-primary" disabled={Boolean(network && !network.connected)} onClick={nextStage}>NEXT / {CPU_STAGES[next].label}へ</button>
           : <button className="duel-primary" onClick={() => { sound.current?.stop(); heldInputs.current.forEach(held => held.clear()); engine.current = fresh(e.mode, e.match.ending); render(); }}>{e.mode === "cpu" ? "RETRY / 1st STAGEから" : "RETRY / もう一度"}</button>)}

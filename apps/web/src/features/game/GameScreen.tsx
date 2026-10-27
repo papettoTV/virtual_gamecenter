@@ -3,6 +3,7 @@ import { isGameModeAvailable } from "../../domain/play-mode-policy";
 import { DebugPanel, getGameUI } from "../../games/ui-registry";
 import { navigate } from "../../shared/navigation";
 import { LiveShareButton, ResultShareButton } from "../sharing/ShareActions";
+import { ResultFeedbackButton } from "../feedback/ResultFeedbackButton";
 
 export interface GameScreenProps {
   game: GameDefinition;
@@ -75,6 +76,7 @@ export function GameScreen({ game }: GameScreenProps) {
           <h2 id="ranking-submit-heading">ランキング登録</h2>
           <ResultPresentation game={game} />
           <ResultShareButton />
+          <ResultFeedbackButton />
           <div className="ranking-result-summary">
             <p id="ranking-result">ゲーム終了時にスコアを登録できます。</p>
             <ResultSummaryAction game={game} />
