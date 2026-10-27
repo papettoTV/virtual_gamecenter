@@ -23,6 +23,7 @@ for (const filename of ['docs/example.md', 'apps/web/src/games/graze-duel/render
     await writeFile(result, JSON.stringify({ patch, summary: '説明を追加' }));
     const allowed = spawnSync(process.execPath, [publisher], { cwd, env, encoding: 'utf8' });
     assert.equal(allowed.status, 0, allowed.stderr);
+    assert.match(await readFile(env.PR_BODY_FILE, 'utf8'), /Closes #123/);
     assert.equal(git(cwd, 'show', `HEAD:${filename}`), 'hello');
     assert.ok(git(temporary, '--git-dir', remote, 'rev-parse', 'refs/heads/codex/issue-123'));
     git(cwd, 'checkout', '-B', 'develop', base);
