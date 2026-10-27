@@ -1,18 +1,17 @@
 # Codex・GitHub CI/CD の準備と設定
 
-更新日：2026-10-21。develop向け自動化を通常運用へ切替。Issue #5 / PR #6の通し試験では、Codex実装・PR作成・独立レビュー・検証公開・develop自動マージ・Issue完了・実マージSHAの検証公開が成功した。codex/stagingの人手承認要件を解除し、自動実装・検証公開・自動マージの3フラグをtrueに設定。本番/Xは明示的にfalseで、本番用テンプレートは無効。mainへの反映・本番公開・X投稿は行っていない。
+更新日：2026-10-27。検証公開はマージ後に1回・回帰1回へ単純化し、保護されたci-controlから人のstaging承認1回で実行する。strict・bypassゼロでの実公開/HTTP/ブラウザ回帰は実行40417675639で成功した。mainへの反映・本番公開・X投稿は行っていない。
 
-## 現在の通常運用
+## 現在の運用と自動マージ再接続
 
-- `実装:自動` ラベル付きIssueだけを対象に、Codex実装 → GitHub Appによるdevelop向けPR → 必須CIと候補テスト → 独立Codexレビュー → staging公開とSHA/HTTP/ブラウザ確認 → develop自動マージ → Issue完了 → 実マージSHAのCI成功後のstaging再公開まで、人のEnvironment承認なしで進む。
-- 自動実装を希望する場合だけ、書込権限を持つ運営者が `実装:自動` を付ける。ラベルなしは手元実装。`実装:手元` は任意。旧 `codex:run` は起動条件にしない。Issueには期待する変更と受け入れ条件を明記する。初期運用は1件ずつ進め、並行変更で古いbaseになったPRは確認して最新developで再実行する。
-- `codex` / `automation` / `staging` はdevelopと `refs/pull/*/merge` だけを許可。main・タグからは利用不可。required reviewersとwait timerはなく、管理者bypassも禁止。
-- developはPR必須、GitHub Actionsの `verify` / `Automation control checks` 必須、最新baseへの追従、管理者も保護対象。独立レビュー不合格・テスト失敗・保護パス変更・公開SHA不一致等では自動マージを停止する。
-- `PULBASE_CODEX_ENABLED` / `PULBASE_STAGING_DEPLOY_ENABLED` / `PULBASE_AUTO_MERGE_ENABLED` はtrue。`PULBASE_PRODUCTION_ENABLED` / `PULBASE_X_ENABLED` はfalse。PagesのProduction branchはmainのまま、PreviewのGit自動公開はNoneを維持する。
-- 通常運用を止めるときは3つのdevelop用フラグをfalseにする。進行中の処理がある場合、フラグ変更だけで停止済みとせずActionsの状態を確認する。失敗時はPRの実行リンクと成果物を確認して修正する。
+- 公開経路はdevelopの初回push CI成功 → 固定ci-controlから自動起動 → 人のstaging承認1回 → Worker/Pages公開1回・HTTP/ブラウザ回帰1回。失敗時は修正PRで対応する。
+- stagingはBranch型ci-controlだけ、papettoTV承認必須、管理者bypass禁止。ci-control/mainのbypassは空で、stagingの保護設定版はstrictを維持する。
+- Issue実装と独立レビューは既存経路を使う。レビューからdevelop自動マージへの再接続は[新経路の設定と信頼条件](develop-auto-merge.md)に従い、専用フラグ登録と小さなIssueで通し試験を行ってから通常運用の確認済みとする。
+- `実装:自動` だけがActions上のCodex担当。ラベルなしは手元実装とし、両方で同じIssueの実装・PR作成を開始しない。
+- `PULBASE_CODEX_ENABLED` と `PULBASE_CONTROL_EVIDENCE_ENABLED` はtrue。旧 `PULBASE_STAGING_DEPLOY_ENABLED` / `PULBASE_AUTO_MERGE_ENABLED` とproduction/Xのフラグはfalseのまま。新しい自動マージは `PULBASE_DEVELOP_AUTO_MERGE_ENABLED` だけで有効化する。
+- developはPR必須、GitHub Actions発行のverify / Automation control checks必須、最新baseへの追従、管理者も保護対象を維持する。再実行や古い候補の強制マージは行わない。
 
-設定開始時からの手順・検証履歴は以下に残す。初期の承認付き試験とフラグfalseの記述は、その時点の履歴であり、現在の設定は本節を参照する。
-
+以下は構築初期の履歴であり、古い3フラグの一括有効化、候補の検証公開、staging承認なし、マージ後の再公開は適用しない。現在の設定は本節とリンク先を参照する。
 
 ## 構成と実装範囲
 

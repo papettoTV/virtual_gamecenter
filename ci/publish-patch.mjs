@@ -36,7 +36,7 @@ try {
   git('config', 'user.email', 'pulbase-automation@users.noreply.github.com');
   git('commit', '-m', `Issue #${issue} の対応`);
   git('push', 'origin', branch);
-  await writeFile(process.env.PR_BODY_FILE, `Issue #${issue} の自動実装候補です。\n\n${result.summary}\n\nRefs #${issue}\n\n検証結果はこのPRのチェック・実行証跡を参照してください。本番公開は含みません。\n`);
+  await writeFile(process.env.PR_BODY_FILE, `Issue #${issue} の自動実装候補です。\n\n${result.summary}\n\nCloses #${issue}\n\n検証結果はこのPRのチェック・実行証跡を参照してください。本番公開は含みません。\n`);
 } catch (error) {
   const failure = publicationFailure(error);
   if (process.env.GITHUB_OUTPUT) await writeFile(process.env.GITHUB_OUTPUT, `failure=${JSON.stringify(failure)}\n`, { flag: 'a' });
