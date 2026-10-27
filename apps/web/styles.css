@@ -1231,6 +1231,9 @@ body.is-game-screen:has(.ranking-overlay.is-visible) .platform-profile { positio
 .ranking-secondary-actions .result-share-button,
 .ranking-secondary-actions .result-feedback > button { width: auto; min-height: 44px; margin: 0; padding: 6px 0; background: none; border: none; border-radius: 0; color: var(--muted); font-size: 12px; text-decoration: underline; text-underline-offset: 4px; }
 .ranking-overlay #ranking-status:empty { display: none; }
+.ranking-overlay .ranking-result-collection-button { min-height: 44px; margin: 0 0 4px; padding: 8px 18px; }
+.salvage-screen .result-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.salvage-screen .result-metrics > div { min-width: 0; overflow-wrap: anywhere; }
 
 .ranking-form button:disabled {
   cursor: not-allowed;

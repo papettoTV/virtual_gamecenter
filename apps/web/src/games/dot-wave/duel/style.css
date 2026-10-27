@@ -895,3 +895,25 @@
 .dot-ranking th:first-child { width:40px; }
 .dot-ranking th:last-child { width:85px; }
 .dot-ranking td:last-child { text-align:right; color:#ffd166; }
+
+.duel-board.has-final-result { min-height: 0; }
+.duel-board.has-final-result > .duel-rhythm { display: none; }
+.duel-choice-panel.is-final-result { position: relative; inset: auto; overflow: visible; padding: 20px 12px; background: #090e1c; }
+.dot-result-card { box-sizing: border-box; width: min(100%, 520px); margin: auto; color: #f3f5ff; }
+.dot-result-card h2 { position: static; margin: 0 0 14px; font-size: 24px; }
+.dot-result-card .result-score { color: #f3f5ff; font-size: clamp(36px, 8vw, 52px); }
+.dot-result-card .result-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.dot-result-card .result-metrics > div { min-width: 0; overflow-wrap: anywhere; }
+.dot-result-card .result-metrics dt { font-size: 11px; color: #aab4d6; }
+.dot-result-card .result-metrics dd { margin: 4px 0 0; font-size: 15px; font-weight: 700; }
+.dot-result-actions { display: grid; gap: 10px; margin-top: 20px; padding-top: 18px; border-top: 1px solid #293344; }
+.dot-result-actions > button { width: 100%; min-width: 0; min-height: 48px; margin: 0; font: inherit; }
+.dot-result-actions .dot-result-back { color: #f3f5ff; background: #202536; border: 1px solid #465068; border-radius: 10px; }
+.dot-result-actions .dot-result-back:hover:enabled { background: #293144; border-color: #68738a; }
+.dot-result-card .dot-ranking { margin: 20px 0 0; padding-top: 18px; border-top: 1px solid #293344; text-align: left; }
+.dot-result-card .dot-ranking h3 { margin: 0 0 10px; font-size: 14px; color: #aab4d6; }
+.dot-result-card .dot-ranking .ranking-name-summary strong { color: #f3f5ff; font-size: 16px; }
+.dot-result-card .dot-ranking > button { width: 100%; min-width: 0; margin: 8px 0 0; }
+.duel-controls[hidden] { display: none; }
+body:has(.dot-result-card) .platform-profile { position: absolute; }
+body:has(.dot-result-card[data-player-result]) .dot-cabinet-actions > button { display: none; }

@@ -1,7 +1,7 @@
 export function SalvageResultCollection() {
   return (
     <button id="salvage-result-collection" className="ranking-result-collection-button" type="button">
-      図鑑
+      図鑑を見る
     </button>
   );
 }

@@ -231,11 +231,12 @@ export function mountGame(context: GameContext): GameInstance {
     renderResultSummary({ title, score: state.finalScore, details: [
       ["図鑑", `${state.discovered.size}/21`], ["レア", `${rareCount}/5`],
       ["最大深度", `${Math.floor(state.maxDepth).toLocaleString()}m`],
+      ["TIME", `${state.elapsed.toFixed(2)}s`],
       ["適用前スコア", state.finalSubtotal.toLocaleString()], ["倍率", `${(multiplier * 100).toFixed(0)}%`],
     ] });
     rankingPanel?.classList.add("is-visible"); rankingPanel?.classList.remove("is-submitted");
     if (rankingSubmit) rankingSubmit.disabled = !rankingName?.value.trim() || state.finalScore <= 0;
-    if (rankingRetry) rankingRetry.textContent = state.cleared ? "もう一度遊ぶ" : "1クレジットでリトライ";
+    if (rankingRetry) rankingRetry.textContent = state.cleared ? "1クレジットでもう一度" : "1クレジットでリトライ";
   }
 
   function retryFromResult() {

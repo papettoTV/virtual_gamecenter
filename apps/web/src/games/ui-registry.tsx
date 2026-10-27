@@ -51,6 +51,7 @@ const defaultGameUI: GameUIConfig = {
 const gameUIRegistry: Readonly<Record<GameId, Partial<GameUIConfig>>> = {
   "dot-wave": {},
   "deep-sea-salvage": {
+    screenClassName: "salvage-screen",
     debugPanelHidden: true,
     ResultSummaryAction: SalvageResultCollection,
     AfterFrame: SalvageTerrainEditor,
