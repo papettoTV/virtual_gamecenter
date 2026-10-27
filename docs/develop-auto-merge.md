@@ -11,7 +11,7 @@ Issueへの自動ラベル付与、実装、PR作成、レビュー、developマ
 - `PULBASE_CODEX_ENABLED=true`。
 - 新経路専用のRepository variable `PULBASE_DEVELOP_AUTO_MERGE_ENABLED=true`。未登録・falseなら自動マージしない。
 - `PULBASE_CONTROL_EVIDENCE_ENABLED=true`、固定制御SHA `2c883a1cdd961510a0557742f74294739752f445` を維持する。
-- 旧経路の `PULBASE_AUTO_MERGE_ENABLED` と `PULBASE_STAGING_DEPLOY_ENABLED` はfalseのまま。
+- 旧経路の `PULBASE_AUTO_MERGE_ENABLED` と `PULBASE_STAGING_DEPLOY_ENABLED` は未使用。削除してよい。
 - production・Xのフラグはfalseのまま。
 
 automation Environmentに既存のpulbase-codex（App ID 5403155）の鍵を保管する。今回、新しい鍵や権限追加は不要。自動マージ用トークンはvirtual_gamecenterだけを対象に発行し、ジョブ終了時にActionが失効させる。release Appの鍵・Cloudflare鍵・OpenAIキーは自動マージジョブに渡さない。

@@ -41,9 +41,9 @@ npm run service:check -- --environment production --confirm-production
 
 ## GitHubからの確認
 
-`.github/workflows/service-check.yml` は手動実行専用。develop以外では実行しない。検証専用のBasic認証をGitHub Secretsの `PULBASE_CHECK_USERNAME` / `PULBASE_CHECK_PASSWORD` に登録してから実行する。Cloudflare APIトークンやGoogleの秘密鍵は渡さない。
+旧service-check workflowは削除した。GitHub上の検証は、developの同じSHAのCI成功後、保護されたci-controlから起動する検証公開とHTTP/ブラウザ回帰の実行結果で確認する。stagingはci-controlだけを許可し、人の承認は1回。developから直接stagingの鍵を使う経路は設けない。詳細は[CI/CD設定](codex-cicd-setup.md)を参照する。
 
-Actionsの自動スケジュールは未設定。通常の自動監視は以下の専用Workerが担当する。Actionsの失敗通知はGitHubの個人通知設定に依存するため、ファイル追加だけでメール通知済みとは扱わない。
+公開を伴わない手元の疎通チェックは前節のコマンドを使う。専用Workerによる定期監視はこの整理では停止・変更しない。GitHubの失敗通知は個人通知設定に依存する。
 
 ## 定期監視と集約通知
 

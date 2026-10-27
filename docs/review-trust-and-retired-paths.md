@@ -2,9 +2,9 @@
 
 ## 旧経路の停止
 
-Codex PR verificationは受付・同一候補CI・独立レビュー・証跡保存までとする。staging公開・回帰・merge・旧reportジョブを削除し、公開用の共通ロックも保持しない。develop-stagingは自動イベント・Environment・Secretのない停止専用定義とする。旧mergePrと旧develop公開CLIも常に停止する。旧有効フラグがtrueでもこれらの経路から公開・マージはできない。
+Codex PR verificationは受付・同一候補CI・独立レビュー・証跡保存までとする。staging公開・回帰・merge・旧reportジョブを削除し、公開用の共通ロックも保持しない。develop-stagingは自動イベント・Environment・Secretのない停止専用定義とする。旧mergePrは停止関数のまま保持し、旧develop公開CLIは削除した。旧有効フラグがtrueでもこれらの経路から公開・マージはできない。
 
-取り込み後、人がRepository variablesのPULBASE_STAGING_DEPLOY_ENABLEDとPULBASE_AUTO_MERGE_ENABLEDをfalseへ変更して残設定を整理する。新経路のPULBASE_CONTROL_EVIDENCE_ENABLEDとは別物であり、後者と固定制御SHAを維持する。
+2026-10-28の整理で不要な旧起動workflow・旧公開CLIを削除した。Repository variablesのPULBASE_STAGING_DEPLOY_ENABLEDとPULBASE_AUTO_MERGE_ENABLEDは参照がなく削除してよい。新経路のPULBASE_CONTROL_EVIDENCE_ENABLEDとは別物であり、後者と固定制御SHAを維持する。
 
 ## 固定する信頼条件
 
@@ -16,6 +16,6 @@ Codex PR verificationは受付・同一候補CI・独立レビュー・証跡保
 
 ## 現在の範囲
 
-この変更で旧経路を停止し、固定されたレビュー生成元と信頼検証コードを準備する。保護されたci-controlは現在90cfba2の公開なし試験版のままであり、新しい信頼条件の実行時への接続は、次の人による配置後となる。鍵登録・実公開・実マージはまだ行わない。
+通常運用は固定制御SHA `2c883a1cdd961510a0557742f74294739752f445` を使い、自動Issueからdevelopマージ、staging承認1回後の公開/回帰まで実証済み。strict・bypassゼロを維持する。レビューと実マージの運用は[自動マージ](develop-auto-merge.md)、公開は[CI/CD設定](codex-cicd-setup.md)を参照する。
 
-モデルのレビュー合格は、コードに欠陥がない保証ではない。固定するのは判定の生成元と対象の同一性であり、人の公開承認、決定的なCI、回帰確認を置き換えない。
+停止用develop-staging定義は固定信頼定義のcheck-workflowsが検査するため残す。default branchのpostmerge-staging定義もGitHubのdispatch登録に必要。どちらも直接公開のための鍵・Environment・権限を持たない。稼働経路に影響する固定25ファイルは今回変更しない。本番テンプレートとその依存コードも保持し、まだ有効化しない。

@@ -14,14 +14,11 @@ staging承認後、固定lockからinstall scriptsなしでツールを取得し
 
 Cloudflareトークンは対象アカウント1件、Individual Workersのpulbase-stagingにEditor、Pages Writeを必要範囲で付与する。既存Workerのbindingsだけのデプロイには、D1/R2への独立した直接操作権限は追加しない。Pagesと本番が同じプロジェクトのため、Pages鍵自体でブランチ単位の分離はできない。人のstaging承認と変更不能の制御コードでdevelopだけへの使用を制限する。鍵は管理用端末で作成し、staging Environmentだけへ保管する。AIの手元・repository共通Secret・codex Environmentには保管しない。
 
-## 最短の配置順序
+## 運用と制御コードの更新
 
-1. 準備PRのCIを確認する。自動起動は停止せず、PRをdevelopへマージする前に次の準備を完了する。
-2. 人がci-controlだけにpulbase-releaseの一時例外を追加し、確認済みの設定版に固定した更新ツールを管理用端末から実行する。配置ツールは制御コードの配置だけで、公開やworkflow起動をしない。構築中はpulbase-releaseだけの例外を残し、修正のたびに付け外ししない。
-3. 配置内容と保護設定を確認し、stagingの保護設定版とRepositoryの固定制御SHAを更新する。
-4. 管理用端末で最小権限のCloudflareトークンを作り、stagingに登録する。既存BasicのSecret名を確認する。値はチャットへ貼らない。
-5. 準備PRをdevelopへマージする。同じSHAのCI成功から新制御が自動起動する。承認前に公開対象と証跡を確認し、人がstaging承認1回を行う。
-6. 公開結果・HTTP両SHA・ブラウザ8件・main据え置きを確認する。旧公開・旧自動マージとproductionフラグはfalseを維持する。
+通常運用の設定と成功記録は[CI/CD設定](codex-cicd-setup.md)を参照する。ci-controlは配置済みであり、通常のアプリ変更にbypassの付け外しや制御コードの再配置は不要。
+
+構築当時の旧親SHAと設定版に固定された配置/ZIP作成ツールは削除した。現在のci-controlにそのまま使える更新ツールではない。将来、固定コードや信頼定義を変更する場合は、その時点の制御SHA・保護設定版・レビュー済みの差分に対して管理手順を別途準備する。鍵なしで検証し、人が配置と保護状態を確認する。過去のツールやGit履歴を、そのまま実行する手順として流用しない。
 
 ## 検証と現時点の範囲
 
@@ -43,7 +40,7 @@ CLI出力を捨てていたため元のCFエラーは復元できない。修正
 
 修正は公開前に取得した共有出力先の現在値をメタデータとして保持し、実際のアップロード先は検証済みartifactの位置引数へ固定する。Macのパス別名もrealpathで正規化する。JSONのキー順序・同義パスだけを正規化し、source/build_config/production側設定の実変更は引き続き拒否する。自動PATCH修復や検査の削除は行わない。停止理由も固定の分類で保存する。
 
-PRでは鍵なしのStaging toolchain checksで、実Wranglerとローカル偽APIの再現・修正確認と、固定Chromiumのsandbox起動だけを検証する。制御側も公開鍵を渡す前にsandbox起動を確認する。検証URLを開くアプリ回帰は、staging承認後の1回だけ。
+初回修正のPRでは鍵なしのStaging toolchain checksで、実Wranglerとローカル偽APIの再現・修正確認と、固定Chromiumのsandbox起動だけを検証する。制御側も公開鍵を渡す前にsandbox起動を確認する。検証URLを開くアプリ回帰は、staging承認後の1回だけ。
 
 Ubuntu 24.04のAppArmor制限によるsandbox起動失敗も公開なしCIで検出した。固定Playwrightが示すChromium実行ファイルの実体だけにuserns許可profileを設定する。ワイルドカード、全体のsysctl変更、Chromium sandbox無効化は使用しない。使い捨てのGitHub Ubuntu runner上・公開鍵を渡す前だけに実施し、MacやCloudflareは変更しない。CIで共有メタデータ保持とsandbox起動が成功した。
 
