@@ -80,3 +80,13 @@ test('自動実装の受付は両ラベルの競合や手元PRを無視して開
     await assert.rejects(intake({ github: f.github, context, core: { setOutput() {} } }));
   }
 });
+
+
+test('自動実装の起動はラベル付与1つに限定し、作成時との二重受付を防ぐ', async () => {
+  const {readFile}=await import('node:fs/promises'); const {parse}=await import('yaml');
+  const workflow=parse(await readFile(new URL('../../.github/workflows/codex-issue.yml',import.meta.url),'utf8'));
+  assert.deepEqual(workflow.on.issues.types,['labeled']);
+  assert.ok(workflow.on.workflow_dispatch);assert.ok(workflow.jobs.intake.if.includes("github.event.label.name == '実装:自動'"));
+  assert.ok(!workflow.jobs.intake.if.includes("action == 'opened'"));
+  assert.equal(workflow.concurrency['cancel-in-progress'],false);
+});

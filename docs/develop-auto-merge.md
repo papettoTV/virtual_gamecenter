@@ -4,7 +4,7 @@
 
 `実装:自動` だけを付けたIssue → GitHub Actions上のCodex実装 → 同じIssue用のPR作成 → 必須CIと独立Codexレビュー → 固定されたci-controlの証跡照合・develop保護確認 → 開発用Appでdevelopへsquashマージ → 同じ実マージSHAの初回push CI → ci-controlの公開処理が自動起動 → 人がstaging承認1回 → 検証公開1回・HTTP/ブラウザ回帰1回。
 
-Issueの作成、実装、PR作成、レビュー、developマージには追加承認を要求しない。`実装:自動` がないIssueは手元実装とし、既存PRや担当を確認してチャットから扱う。`実装:手元` との併用は禁止する。公開なし試験ラベルのIssueは実マージしない。
+Issueへの自動ラベル付与、実装、PR作成、レビュー、developマージには追加承認を要求しない。自動実装workflowのIssueイベントはlabeledだけを購読し、作成時に自動ラベルを付けた場合のopened/labeled二重受付を防ぐ。既存Issueへの後付けも同じラベル付与で起動する。明示的な手動起動でもラベルと重複PR確認は必須。`実装:自動` がないIssueは手元実装とし、既存PRや担当を確認してチャットから扱う。`実装:手元` との併用は禁止する。公開なし試験ラベルのIssueは実マージしない。
 
 ## 有効化する設定
 
