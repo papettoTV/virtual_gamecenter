@@ -89,7 +89,7 @@
 - `apps/web/.dev.vars`はGit除外を確認し、端末上の権限を644から600へ変更した（値は変更せず、所有者のみ読み書き可）。このパーミッション変更はGit管理外。
 - 同ファイルのMetrics/Observabilityトークン2件は検証APIでactive、Stripe秘密キーのモードはtestと確認した。これはトークンの全権限・対象制限やStripe決済の成功確認ではない。値・トークンID・認証応答本文は出力しなかった。
 - Pages公開スクリプトにもWranglerの認証値取得が診断ログへ出力される経路が残っていたため、既存のログ/メトリクス抑止オプションを共用した。壊れたCLI JSONから秘密値が例外文へ混ざらないよう解析エラーも固定文言に統一し、テストを追加した。公開スクリプト自体は実行していない。
-- GitHubの読み取り点検でActions既定権限read・PR承認false、リポジトリActions Secret 0件、deploy key 0件を確認した。現行2 workflowも`contents: read`。手動の`service-check.yml`が参照する認証Secret 2件はこの一覧に存在しないため、GitHub側で使う場合の資格情報準備は残す。Cloudflareの定期監視は別構成であり、今回停止・変更していない。
+- GitHubの読み取り点検でActions既定権限read・PR承認false、リポジトリActions Secret 0件、deploy key 0件を確認した。現行2 workflowも`contents: read`。当時の手動`service-check.yml`（2026-10-28の整理で削除済み）が参照する認証Secret 2件はこの一覧に存在しないため、GitHub側で使う場合の資格情報準備は残す。Cloudflareの定期監視は別構成であり、今回停止・変更していない。
 - Cloudflare/Google全トークン・SSO・サービスアカウントの権限/用途/失効予定・復旧手段の最終確認、外部ログ・過去のCLI診断ログの網羅点検は未完了。権限を拡張したり、SecretをGitHubへ複製したりしていない。
 
 今回のローカル検証は全733テスト（通常596、DO補助30、復旧3、解析11、公開設定/素材19、利用量監視6、死活/復元/ログ/履歴51、負荷ツール単体17）、型検査・stagingビルド成功。検証/本番へのデプロイ、push、履歴書換え、鍵の交換、負荷試験は実施していない。既存の大きなJSチャンク警告は残る。EN-03全体を完了にしない。

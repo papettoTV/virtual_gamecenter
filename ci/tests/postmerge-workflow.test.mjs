@@ -11,7 +11,7 @@ test('staging承認ジョブ1つ、公開/回帰の実行ステップ1つ、実�
  const install=steps.findIndex(s=>s.run?.includes('install --with-deps chromium'));assert.ok(install>=0&&install<steps.indexOf(approved));assert.ok(!JSON.stringify(w).includes('review_run_id'));assert.equal(w.concurrency['cancel-in-progress'],false);
  assert.ok(w.jobs.staging.steps.some(s=>s.run==='npm ci --ignore-scripts --prefix ci/control/toolchain'));
  const runner=await readFile(new URL('../control/postmerge-runner.mjs',import.meta.url),'utf8');assert.ok(runner.includes("connectedStagingOperations({mode:'live'"));assert.ok(!runner.includes('PULBASE_PRODUCTION'));assert.ok(!runner.includes('process.env.RELEASE_MODE'));
- const d=parse(await readFile(new URL('../../.github/workflow-templates/postmerge-dispatch.yml.disabled',import.meta.url),'utf8'));assert.deepEqual(d.on.workflow_run.workflows,['Web checks']);assert.equal(d.concurrency,undefined);assert.ok(d.jobs.dispatch.if.includes("event == 'push'"));
+ const d=parse(await readFile(new URL('../../.github/workflows/postmerge-staging-dispatch.yml',import.meta.url),'utf8'));assert.deepEqual(d.on.workflow_run.workflows,['Web checks']);assert.equal(d.concurrency,undefined);assert.ok(d.jobs.dispatch.if.includes("event == 'push'"));
 });
 
 test('公開用ツールのCIは鍵とEnvironmentなしで偽API・sandboxだけを検証する',async()=>{
