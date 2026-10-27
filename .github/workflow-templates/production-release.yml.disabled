@@ -1,3 +1,6 @@
+# LEGACY DRAFT ONLY: main currently has no update bypass.
+# Complete fixed-control/human-approval/first-Worker/DB preparation before redesigning activation.
+# This template is retained for reference; production-preparation.yml never invokes it.
 # INACTIVE TEMPLATE. Do not move into workflows until separately authorized.
 name: Production release (human approved)
 on:
