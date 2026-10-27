@@ -35,3 +35,10 @@ ci-controlとmainのbypassは空、保護モードstrictのまま。固定した
 この構成のCI合格・develop取り込みと専用フラグの登録後、新しい小さな文書Issueを `実装:自動` で起票する。手元では実装せず、AppによるPR作成、独立レビュー、develop自動マージとIssue完了、実マージSHAのCI・公開前照合を確認する。設定PRに対する古い承認待ちが残っている場合は、その実行を公開せず終了させ、最終的な自動マージSHAのstaging承認だけを行う。
 
 本番リリースはこの経路に接続しない。mainへの反映・本番公開には別途人の明示的な判断が必要。X告知は手動で投稿する文面を提示する方針を維持する。
+
+
+## 初回の実証跡と二重受付の修正
+
+[Issue #57](https://github.com/papettoTV/virtual_gamecenter/issues/57) → [PR #58](https://github.com/papettoTV/virtual_gamecenter/pull/58) → [独立レビュー40492268045](https://github.com/papettoTV/virtual_gamecenter/actions/runs/40492268045) → [自動マージ40492733851](https://github.com/papettoTV/virtual_gamecenter/actions/runs/40492733851)が成功した。Appがdevelopへsquashマージし、Issueも自動完了した。実SHAは `17e47c5fde9a0746455992951aab670c1a78bd1d`、制御SHAは `2c883a1cdd961510a0557742f74294739752f445`。人による実装/レビュー/マージの承認はなく、strict・bypassゼロで実行した。この記録は公開後の回帰成功を意味しない。
+
+同じIssueのopenedとlabeledが別々に届き、後続受付40491990647は既存PR検知で停止した。重複PRは作られていないが、通常運用で不要な失敗表示を出さないようissuesの購読をlabeledだけへ変更する。実装担当と既存PRの再確認はそのまま維持する。修正後は新しい自動Issueで、受付runが1件だけとなることも確認する。
