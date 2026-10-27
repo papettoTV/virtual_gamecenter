@@ -1,4 +1,5 @@
 import { notifications } from "../../features/notifications/notifications";
+import { renderResultSummary } from "../../features/game/result-summary";
 import { resultSharing } from "../../features/sharing/result-sharing";
 import { setLiveContext } from "../../features/sharing/share-service";
 import { createCabinetSession } from "../../game-sdk/cabinet-session";
@@ -40,8 +41,6 @@ export function mountGame(context: GameContext): GameInstance {
   const cabinetScreen = document.querySelector<HTMLElement>("#cabinet-screen");
   const gameScreen = document.querySelector<HTMLElement>("#game-screen");
   const rankingPanel = document.querySelector<HTMLElement>("#ranking-submit-panel");
-  const rankingResult = document.querySelector<HTMLElement>("#ranking-result");
-  const rankingHeading = document.querySelector<HTMLElement>("#ranking-submit-heading");
   const rankingSubmit = document.querySelector<HTMLButtonElement>("#ranking-submit");
   const rankingName = document.querySelector<HTMLInputElement>("#ranking-name");
   const rankingList = document.querySelector<HTMLElement>("#ranking-list");
@@ -229,8 +228,11 @@ export function mountGame(context: GameContext): GameInstance {
       });
     }
     const rareCount = [...state.discovered].filter((id) => speciesById.get(id)?.rare).length;
-    if (rankingHeading) rankingHeading.textContent = "ランキング登録";
-    if (rankingResult) rankingResult.textContent = `${title} / SCORE ${state.finalScore.toLocaleString()}（適用前 ${state.finalSubtotal.toLocaleString()}・倍率 ${(multiplier * 100).toFixed(0)}%） / 図鑑 ${state.discovered.size}/21 / レア ${rareCount}/5 / 最大 ${Math.floor(state.maxDepth).toLocaleString()}m`;
+    renderResultSummary({ title, score: state.finalScore, details: [
+      ["図鑑", `${state.discovered.size}/21`], ["レア", `${rareCount}/5`],
+      ["最大深度", `${Math.floor(state.maxDepth).toLocaleString()}m`],
+      ["適用前スコア", state.finalSubtotal.toLocaleString()], ["倍率", `${(multiplier * 100).toFixed(0)}%`],
+    ] });
     rankingPanel?.classList.add("is-visible"); rankingPanel?.classList.remove("is-submitted");
     if (rankingSubmit) rankingSubmit.disabled = !rankingName?.value.trim() || state.finalScore <= 0;
     if (rankingRetry) rankingRetry.textContent = state.cleared ? "もう一度遊ぶ" : "1クレジットでリトライ";
@@ -297,7 +299,7 @@ export function mountGame(context: GameContext): GameInstance {
     try {
       await submitRankingEntry({ gameId: DEEP_SEA_SALVAGE.id, elapsedTimeMs: Math.round(state.elapsed * 1000), cleared: state.cleared, score: state.finalScore, maxLevel: Math.floor(state.maxDepth), defeatedBossCount: state.cleared ? 1 : 0, clientVersion: DEEP_SEA_SALVAGE.currentVersion });
       if (scope.disposed) return;
-      rankingPanel?.classList.add("is-submitted"); if (rankingHeading) rankingHeading.textContent = "スコアランキング"; await loadRanking();
+      rankingPanel?.classList.add("is-submitted"); await loadRanking();
     } catch { if (!scope.disposed) rankingSubmit.disabled = false; }
   }
 

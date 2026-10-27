@@ -2,6 +2,7 @@ import { createCabinetSession } from "../../game-sdk/cabinet-session";
 import { GameLifetime } from "../../game-sdk/lifetime";
 import { gameHost } from "../../game-sdk/game-host";
 import { createUuid } from "../../shared/id";
+import { renderResultSummary } from "../../features/game/result-summary";
 import { resultSharing } from "../../features/sharing/result-sharing";
 import { setLiveContext } from "../../features/sharing/share-service";
 import { notifications } from "../../features/notifications/notifications";
@@ -76,7 +77,6 @@ export function mountGame(context) {
   const rankingNameInput = document.querySelector("#ranking-name");
   const rankingSubmitButton = document.querySelector("#ranking-submit");
   const rankingSubmitPanel = document.querySelector("#ranking-submit-panel");
-  const rankingSubmitHeading = document.querySelector("#ranking-submit-heading");
   const rankingSubmitList = document.querySelector("#ranking-submit-list");
   const rankingResult = document.querySelector("#ranking-result");
   const rankingList = document.querySelector("#ranking-list");
@@ -2645,19 +2645,25 @@ export function mountGame(context) {
     }
     rankingSubmittedForResult = false;
     rankingSubmitPanel?.classList.remove("is-submitted");
-    if (rankingSubmitHeading) rankingSubmitHeading.textContent = "ランキング登録";
     if (rankingSubmitList) rankingSubmitList.innerHTML = "";
-    if (rankingResult) {
-      const prefix = debugMessage ? `${debugMessage} ` : "";
-      rankingResult.textContent = cleared
-        ? `${prefix}SCORE ${formatScore(totalScore)} ` +
-          `（プレイ ${formatScore(playScore)} + タイムボーナス ${formatScore(timeBonus)}）`
-        : `${prefix}GAME OVER / SCORE ${formatScore(totalScore)} ` +
-          `（ボス撃破 ${defeatedBossCount} / LV ${players[0].level} / TIME ${formatRankingTime(elapsedTimeMs)}）`;
-    }
+    renderBuzzResult(lastRankingResult, debugMessage);
     rankingSubmitPanel?.classList.add("is-visible");
     guardRankingInput();
     updateRankingSubmitState();
+  }
+
+  function renderBuzzResult(result, note = "") {
+    renderResultSummary({
+      title: result.cleared ? "ALL CLEAR" : "GAME OVER",
+      score: result.score,
+      details: [
+        ["ボス撃破", String(result.defeatedBossCount)],
+        ["LEVEL", String(result.maxLevel)],
+        ["TIME", formatRankingTime(result.elapsedTimeMs)],
+        ...(result.cleared ? [["プレイスコア", formatScore(result.playScore)], ["タイムボーナス", formatScore(result.timeBonus)]] : []),
+      ],
+      note,
+    });
   }
 
   function guardRankingInput() {
@@ -2682,9 +2688,7 @@ export function mountGame(context) {
         else resultSharing.setResult(restored.sharedResult);
       }
       rankingSubmittedForResult = false;
-      if (rankingResult && typeof restored.message === "string") {
-        rankingResult.textContent = restored.message;
-      }
+      renderBuzzResult(lastRankingResult);
       rankingSubmitPanel?.classList.remove("is-submitted");
       rankingSubmitPanel?.classList.add("is-visible");
       gameSessionActive = false;
@@ -2742,7 +2746,6 @@ export function mountGame(context) {
       rankingSubmittedForResult = true;
       setRankingMessage("");
       rankingSubmitPanel?.classList.add("is-submitted");
-      if (rankingSubmitHeading) rankingSubmitHeading.textContent = "スコアランキング";
       updateRankingSubmitState();
       await loadRanking();
     } catch (error) {
@@ -2850,7 +2853,8 @@ export function mountGame(context) {
   }
 
   function setRankingMessage(message) {
-    if (rankingResult) rankingResult.textContent = message;
+    const status = document.querySelector("#ranking-status");
+    if (status) status.textContent = message;
   }
 
   function formatRankingTime(milliseconds) {

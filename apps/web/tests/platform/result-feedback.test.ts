@@ -7,7 +7,7 @@ import MochiDuel from "../../src/games/dot-wave/duel/MochiDuel";
 import type { DuelLink } from "../../src/games/dot-wave/duel/network";
 
 const state = vi.hoisted(() => ({ phase: "finished", winner: 1, stage: 1 }));
-vi.mock("../../src/features/sharing/ShareActions", () => ({ LiveShareButton: () => null, ResultShareButton: () => null }));
+vi.mock("../../src/features/sharing/ShareActions", () => ({ LiveShareButton: () => null, ResultShareButton: () => createElement("button", null, "結果を共有") }));
 vi.mock("../../src/games/dot-wave/duel/campaign", async importOriginal => {
   const original = await importOriginal<typeof import("../../src/games/dot-wave/duel/campaign")>();
   return { ...original, freshDuel: (...args: Parameters<typeof original.freshDuel>) => {
@@ -19,11 +19,14 @@ vi.mock("../../src/games/dot-wave/duel/campaign", async importOriginal => {
   } };
 });
 
-it.each(GAME_CATALOG)("places a shared feedback action near the top of $id result registration", game => {
+it.each(GAME_CATALOG)("places secondary actions after $id result and retry actions", game => {
   const html = renderToStaticMarkup(createElement(GameScreen, { game }));
   const panel = html.slice(html.indexOf('id="ranking-submit-panel"'), html.indexOf('class="spectator-game-actions"'));
   expect(panel).toContain('class="result-feedback"');
-  expect(panel.indexOf("感想・不具合を送る")).toBeLessThan(panel.indexOf('id="ranking-submit"'));
+  expect(panel.indexOf("感想・不具合を送る")).toBeGreaterThan(panel.indexOf('id="ranking-submit"'));
+  expect(panel.indexOf('id="ranking-retry"')).toBeLessThan(panel.indexOf('id="ranking-another-game"'));
+  expect(panel.indexOf("感想・不具合を送る")).toBeGreaterThan(panel.indexOf('id="ranking-another-game"'));
+  expect(panel.indexOf("結果を共有")).toBeGreaterThan(panel.indexOf('id="ranking-another-game"'));
 });
 
 it("offers feedback on DOT WAVE game over and final clear, but not between stages or during play", () => {

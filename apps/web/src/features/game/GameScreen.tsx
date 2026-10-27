@@ -73,38 +73,43 @@ export function GameScreen({ game }: GameScreenProps) {
           <ResultShareButton placement="versus-result" />
         </div>
         <div className="ranking-submit ranking-overlay" id="ranking-submit-panel">
-          <h2 id="ranking-submit-heading">ランキング登録</h2>
+          <h2 id="ranking-submit-heading">プレイ結果</h2>
           <ResultPresentation game={game} />
-          <ResultShareButton />
-          <ResultFeedbackButton />
           <div className="ranking-result-summary">
-            <p id="ranking-result">ゲーム終了時にスコアを登録できます。</p>
+            <div id="ranking-result">ゲーム終了時にスコアを登録できます。</div>
             <ResultSummaryAction game={game} />
           </div>
-          <div className="ranking-form">
-            <input id="ranking-name" type="hidden" />
-            <div className="ranking-name-summary">
-              <span>登録名</span>
-              <strong id="ranking-name-display">読み込み中</strong>
+          <p id="ranking-status" role="status" />
+          <div className="ranking-registration-section">
+            <h3>ランキング</h3>
+            <div className="ranking-form">
+              <input id="ranking-name" type="hidden" />
+              <div className="ranking-name-summary">
+                <span>登録名</span>
+                <strong id="ranking-name-display">読み込み中</strong>
+              </div>
+              <button id="ranking-submit" type="button" disabled>ランキングに登録</button>
             </div>
-            <button id="ranking-submit" type="button" disabled>登録</button>
-          </div>
-          <div className="ranking-user-registration" id="ranking-user-registration" hidden>
-            <p>ユーザー登録すると、ランキング名を自由に設定できます。</p>
-            <button
-              id="ranking-user-register"
-              type="button"
-              onClick={() => window.dispatchEvent(new Event("request-user-registration"))}
-            >
-              ユーザー登録
-            </button>
-          </div>
-          <div className="ranking-submit-list">
-            <RankingTable bodyId="ranking-submit-list" label="登録後のスコアランキング" />
+            <div className="ranking-user-registration" id="ranking-user-registration" hidden>
+              <button
+                id="ranking-user-register"
+                type="button"
+                onClick={() => window.dispatchEvent(new Event("request-user-registration"))}
+              >
+                ユーザー登録で名前を変更できます ›
+              </button>
+            </div>
+            <div className="ranking-submit-list">
+              <RankingTable bodyId="ranking-submit-list" label="登録後のスコアランキング" />
+            </div>
           </div>
           <div className="ranking-next-actions">
-            <button id="ranking-another-game" className="clear-restart-button" type="button" onClickCapture={event => { event.stopPropagation(); navigate("/"); }}>別のゲームをする</button>
             <RetryAction game={game} />
+            <button id="ranking-another-game" className="clear-restart-button" type="button" onClickCapture={event => { event.stopPropagation(); navigate("/"); }}>別のゲームを探す</button>
+          </div>
+          <div className="ranking-secondary-actions">
+            <ResultShareButton />
+            <ResultFeedbackButton />
           </div>
         </div>
       </div>
