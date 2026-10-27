@@ -28,6 +28,7 @@ export function Feedback({ address }: { address: string }) {
     const manual = () => {
       if (dialog.current?.open) return;
       manualOpened.current = true;
+      visit.current.openedManually();
       setContext(visit.current.current); setError(""); dialog.current?.showModal();
     };
     const unsubscribe = liveSharing.subscribe(update);

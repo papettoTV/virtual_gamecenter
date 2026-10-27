@@ -5,8 +5,6 @@ import { AccountRegistrationDialog } from "./AccountRegistrationDialog";
 import { ConsentDialog } from "./ConsentDialog";
 import { WelcomeCreditDialog } from "./WelcomeCreditDialog";
 import { CreditPurchaseDialogs } from "./CreditPurchaseDialogs";
-import { PlatformPolicies } from "./PlatformPolicies";
-import type { PolicyKind } from "./platform-types";
 import type { PlayAction } from "../../game-sdk/contracts";
 import { gameHost } from "../../game-sdk/game-host";
 import { executePlay } from "./play-service";
@@ -34,7 +32,6 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
   const [platform, setPlatform] = useState<PlatformBootstrap | null>(null);
   const purchasesEnabled = platform?.creditPolicy?.purchasesEnabled === true;
 
-  const [policy, setPolicy] = useState<PolicyKind | null>(null);
   const [pendingAction, setPendingAction] = useState<PlayAction | null>(null);
   const [playDialog, setPlayDialog] = useState<"confirm" | "insufficient" | null>(null);
   const [busy, setBusy] = useState(false);
@@ -377,11 +374,6 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
         handlePurchase={handlePurchase}
         closePurchaseComplete={closePurchaseComplete}
         requestUserRegistration={requestUserRegistration}
-      />
-
-      <PlatformPolicies
-        policy={policy}
-        setPolicy={setPolicy}
       />
 
     </>

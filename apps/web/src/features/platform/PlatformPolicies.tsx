@@ -1,4 +1,4 @@
-import type { Dispatch, SetStateAction } from "react";
+import { useState, type Dispatch, type SetStateAction } from "react";
 import type { PolicyKind } from "./platform-types";
 import { BRAND } from "../../domain/brand";
 import { openAnalyticsSettings } from "../analytics/AnalyticsConsent";
@@ -7,6 +7,11 @@ import { openFeedback } from "../feedback/Feedback";
 export interface PlatformPoliciesProps {
   policy: PolicyKind | null;
   setPolicy: Dispatch<SetStateAction<PolicyKind | null>>;
+}
+
+export function SiteFooter() {
+  const [policy, setPolicy] = useState<PolicyKind | null>(null);
+  return <PlatformPolicies policy={policy} setPolicy={setPolicy} />;
 }
 
 export function PlatformPolicies({ policy, setPolicy }: PlatformPoliciesProps) {

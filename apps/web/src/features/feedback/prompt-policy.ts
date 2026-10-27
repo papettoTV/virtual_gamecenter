@@ -37,7 +37,7 @@ export function readHistory(storage: Pick<Storage, "getItem">): PromptHistory | 
 }
 
 export class FeedbackVisit {
-  private visit: { context: FeedbackContext; watched: number; finished: boolean } | null = null;
+  private visit: { context: FeedbackContext; watched: number; finished: boolean; manual: boolean } | null = null;
   private activeSince: number | null = null;
   private cabinet = false;
   current: FeedbackContext = { gameId: null, activity: "site" };
@@ -46,11 +46,15 @@ export class FeedbackVisit {
     this.flush(now);
     if (!context) return;
     if (!this.visit || this.visit.context.gameId !== context.gameId || this.visit.context.activity !== context.role) {
-      this.visit = { context: { gameId: context.gameId, activity: context.role }, watched: 0, finished: false };
+      this.visit = { context: { gameId: context.gameId, activity: context.role }, watched: 0, finished: false, manual: false };
     }
     this.current = this.visit.context;
     this.visit.finished ||= context.role === "player" && context.phase === "finished";
     if (visible && context.role === "spectator" && context.phase === "playing") this.activeSince = now;
+  }
+
+  openedManually() {
+    if (this.visit) this.visit.manual = true;
   }
 
   route(address: string, now: number): FeedbackContext | null {
@@ -62,13 +66,13 @@ export class FeedbackVisit {
     if (cabinet) return null;
     this.flush(now);
     this.visit = null;
-    if (returned && visit && (visit.finished || visit.watched >= 60000)) return visit.context;
+    if (returned && visit && !visit.manual && (visit.finished || visit.watched >= 60000)) return visit.context;
     return null;
   }
 
   leaving(now: number): FeedbackContext | null {
     this.flush(now);
-    return this.cabinet && this.visit && (this.visit.finished || this.visit.watched >= 60000) ? this.visit.context : null;
+    return this.cabinet && this.visit && !this.visit.manual && (this.visit.finished || this.visit.watched >= 60000) ? this.visit.context : null;
   }
 
   private flush(now: number) {

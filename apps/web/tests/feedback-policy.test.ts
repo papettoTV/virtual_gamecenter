@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { canPrompt, FeedbackVisit, japanDay, readHistory, takeReturn } from "../src/features/feedback/prompt-policy";
 import type { LiveShareContext } from "../src/features/sharing/share-service";
+import { GAME_CATALOG } from "../src/domain/game";
 
 const now = Date.parse("2026-10-25T12:00:00Z");
 const context = (role: LiveShareContext["role"], phase: LiveShareContext["phase"]): LiveShareContext => ({ gameId: "graze-duel", cabinetId: "cabinet", role, phase });
@@ -28,6 +29,26 @@ describe("feedback frequency", () => {
 });
 
 describe("feedback visit", () => {
+  it.each(GAME_CATALOG)("invites a completed $id play after top return but not during play", game => {
+    const visit = new FeedbackVisit();
+    visit.route(`/cabinets/check?game=${game.id}`, now);
+    visit.live({ ...context("player", "playing"), gameId: game.id }, now, true);
+    expect(visit.leaving(now + 10000)).toBeNull();
+    visit.live({ ...context("player", "finished"), gameId: game.id }, now + 10000, true);
+    visit.live(null, now + 11000, true);
+    expect(visit.route("/", now + 12000)).toEqual({ gameId: game.id, activity: "player" });
+  });
+  it.each(GAME_CATALOG)("does not re-invite $id after opening manually in the game", game => {
+    const visit = new FeedbackVisit();
+    visit.route(`/cabinets/check?game=${game.id}`, now);
+    visit.live({ ...context("player", "finished"), gameId: game.id }, now, true);
+    visit.openedManually();
+    expect(visit.leaving(now + 1000)).toBeNull();
+    expect(visit.route("/", now + 2000)).toBeNull();
+    visit.route(`/cabinets/next?game=${game.id}`, now + 3000);
+    visit.live({ ...context("player", "finished"), gameId: game.id }, now + 4000, true);
+    expect(visit.route("/", now + 5000)).toEqual({ gameId: game.id, activity: "player" });
+  });
   it("preserves only eligible return context across a full page navigation", () => {
     const visit = new FeedbackVisit();
     visit.route(cabinet, now);

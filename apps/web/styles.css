@@ -2007,7 +2007,9 @@ body.is-game-screen:has(.ranking-overlay.is-visible) .platform-profile { positio
   align-items: center;
   justify-content: center;
   gap: 8px 16px;
-  margin-top: 28px;
+  max-width: 1200px;
+  margin: 28px auto 24px;
+  padding: 0 16px;
   color: var(--muted);
   font-size: 12px;
 }

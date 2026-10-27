@@ -20,6 +20,7 @@ import { sharePanel } from "../features/sharing/share-service";
 import { AnalyticsConsent } from "../features/analytics/AnalyticsConsent";
 import { installLeaveGameConfirmation } from "../features/game/leave-game";
 import { Feedback } from "../features/feedback/Feedback";
+import { SiteFooter } from "../features/platform/PlatformPolicies";
 
 const ThreeBulletLab = lazy(async () => {
   const module = await import("../features/labs/ThreeBulletLab");
@@ -66,7 +67,7 @@ export function App() {
         {selection ? <StartGameRedirect game={game} /> : <ArcadeScreen onSelectGame={startNewGame} />}
         <PlatformExperience standaloneCredits />
       </main>
-  }</>;
+  }{!preview && !(import.meta.env.DEV && url.searchParams.get("promoCapture") === "1") && <SiteFooter key={address} />}</>;
 }
 
 function StartGameRedirect({ game }: { game: GameDefinition }) {
