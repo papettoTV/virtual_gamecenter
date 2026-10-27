@@ -179,6 +179,8 @@ it("only lets configured, active Google operators read feedback and escapes all 
   expect(html).not.toContain("<script>");
   expect(html).not.toContain(owner.accountId);
   expect(html).toContain("日時（日本時間）");
+  expect(html).toContain("<th>日時（日本時間）</th><th>内容</th><th>プレイヤー名</th><th>端末 / ブラウザ</th><th>種別</th><th>対象</th>");
+  expect(html).toMatch(/<td>[^<]+ JST<\/td><td style="white-space:pre-wrap;overflow-wrap:anywhere">&lt;script&gt;/);
   expect(html).toContain("JST");
   expect(html).toContain("未記録");
   expect((await handleFeedback(operatorRequest(owner.cookie, "/api/operator/feedback?page=1"), config))!.status).toBe(200);
