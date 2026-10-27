@@ -32,6 +32,8 @@ jobs:
         run: |
           npm ci --prefix apps/web
           npm ci --prefix ci
+      - name: 本番DBへ接続しない移行リハーサルの拒否条件を確認
+        run: python3 -B -m unittest discover -s tools/tests -p test_production_migrations.py
       - name: 本番構成・空DB移行・ビルド・Worker dry-run・ブラウザ定義だけを確認
         run: node ci/production-preparation.mjs build
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
