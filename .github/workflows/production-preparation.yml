@@ -1,0 +1,45 @@
+name: 本番準備の検査（公開なし）
+on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - '.github/workflows/production-preparation.yml'
+      - '.github/workflow-templates/production-release.yml.disabled'
+      - 'ci/production-preparation.mjs'
+      - 'ci/tests/production-preparation.test.mjs'
+      - 'tools/check-production-migrations.py'
+      - 'tools/tests/test_production_migrations.py'
+      - 'apps/web/wrangler.jsonc'
+      - 'apps/web/pages/wrangler.jsonc'
+      - 'apps/web/config/pages-targets.json'
+      - 'apps/web/migrations/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  prepare:
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: 公開鍵なしで固定依存を取得
+        run: |
+          npm ci --prefix apps/web
+          npm ci --prefix ci
+      - name: 本番DBへ接続しない移行リハーサルの拒否条件を確認
+        run: python3 -B -m unittest discover -s tools/tests -p test_production_migrations.py
+      - name: 本番構成・空DB移行・ビルド・Worker dry-run・ブラウザ定義だけを確認
+        run: node ci/production-preparation.mjs build
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: production-preparation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ci/results/production-preparation.json
+          if-no-files-found: error
+          retention-days: 14
