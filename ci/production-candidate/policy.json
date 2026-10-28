@@ -7,7 +7,7 @@
   "maxAgeMs": 86400000,
   "reviewPolicyDigest": "ae2eee1c3f7cf086fa660ca14997bd55b2bbf0361af3bb6b14802f33ba75ee57",
   "preparationFiles": {
-    ".github/workflows/production-preparation.yml": "bb0947d099f91e8124512ae83be02a5ce6f67336",
+    ".github/workflows/production-preparation.yml": "58f013383684b30c01c4630a15747284a52ec47c",
     "ci/production-preparation.mjs": "ee6b726ab90a1aa6865c7220af1c720283385851",
     "tools/check-production-migrations.py": "eb0b255033cf17c8fb2724af6b6e830704f0c8b0",
     "ci/playwright.config.mjs": "b06cd710c98d8743e4dbf9e764f2f71801ffaabe",

@@ -60,7 +60,9 @@ jobs:
       - name: 人用配置ツールの書込範囲・失敗時停止・トークン失効を偽APIで確認
         run: python3 -B -m unittest discover -s tools/tests -p test_install_production_inspection.py
       - name: 鍵を使わず配置ZIP単独の検査コードをテスト
-        run: python3 -B tools/package-production-inspection.py /tmp/pulbase-production-inspection
+        run: |
+          git fetch --no-tags --depth=1 https://github.com/papettoTV/virtual_gamecenter.git 2c883a1cdd961510a0557742f74294739752f445
+          python3 -B tools/package-production-inspection.py /tmp/pulbase-production-inspection
       - name: 本番構成・空DB移行・ビルド・Worker dry-run・ブラウザ定義だけを確認
         run: node ci/production-preparation.mjs build
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
