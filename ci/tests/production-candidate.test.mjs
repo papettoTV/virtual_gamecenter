@@ -36,6 +36,7 @@ function fixture(){
   [`git/commits/${revision}`]:{tree:{sha:treeSha}},
   [`git/trees/${revision}?recursive=1`]:{truncated:false,tree:Object.entries({...reviewPolicy.files,...policy.preparationFiles})
    .map(([path,sha])=>({path,sha,mode:'100644',type:'blob'}))},
+  [`git/trees/${policy.controlSha}?recursive=1`]:{truncated:false,tree:Object.entries(policy.controlFiles).map(([path,sha])=>({path,sha,mode:'100644',type:'blob'}))},
   [`compare/${policy.mainSha}...${revision}`]:{status:'ahead',merge_base_commit:{sha:policy.mainSha}},
  };
  for(const [runId,names]of [[100,['verify','Automation control checks']],[200,['prepare','staging']],[300,['prepare']]]){
@@ -121,4 +122,16 @@ test('実ZIPを展開せずJSONだけを読む',()=>{
 });
 test('固定された本番準備ファイルのblobを現在のソースと照合する',()=>{
  for(const [path,expected]of Object.entries(policy.preparationFiles))assert.equal(execFileSync('git',['hash-object',path],{encoding:'utf8',cwd:fileURLToPath(new URL('../../',import.meta.url))}).trim(),expected,path);
+});
+test('既存の制御を保持した追加配置後は、新SHAと旧SHAの検証証跡を扱える',async()=>{
+ for(const newReceipt of [false,true]){
+  const f=fixture(),next='e'.repeat(40);
+  f.data['git/ref/heads/ci-control'].object.sha=next;
+  f.data[`git/trees/${next}?recursive=1`]=f.data[`git/trees/${policy.controlSha}?recursive=1`];
+  if(newReceipt){f.data['actions/runs/200'].head_sha=next;f.approval.execution.controlSha=next;f.result.controlSha=next;f.refresh();}
+  const plan=await productionCandidate(f.options);assert.equal(plan.identity.controlSha,next);
+  assert.equal(plan.identity.stagingControlSha,newReceipt?next:policy.controlSha);
+ }
+ const f=fixture();f.data[`git/trees/${policy.controlSha}?recursive=1`].tree[0].sha='f'.repeat(40);
+ await assert.rejects(productionCandidate(f.options));
 });

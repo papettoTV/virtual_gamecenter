@@ -11,6 +11,9 @@ on:
       - 'tools/check-production-migrations.py'
       - 'tools/read-production-evidence.py'
       - 'tools/tests/test_production_evidence.py'
+      - 'tools/install-production-inspection.py'
+      - 'tools/package-production-inspection.py'
+      - 'tools/tests/test_install_production_inspection.py'
   pull_request:
     branches: [develop]
     paths:
@@ -22,6 +25,9 @@ on:
       - 'ci/tests/production-candidate.test.mjs'
       - 'tools/read-production-evidence.py'
       - 'tools/tests/test_production_evidence.py'
+      - 'tools/install-production-inspection.py'
+      - 'tools/package-production-inspection.py'
+      - 'tools/tests/test_install_production_inspection.py'
       - 'tools/check-production-migrations.py'
       - 'tools/tests/test_production_migrations.py'
       - 'apps/web/wrangler.jsonc'
@@ -51,6 +57,10 @@ jobs:
         run: python3 -B -m unittest discover -s tools/tests -p test_production_migrations.py
       - name: 証跡ZIPの危険な入力をファイル展開なしで拒否
         run: python3 -B -m unittest discover -s tools/tests -p test_production_evidence.py
+      - name: 人用配置ツールの書込範囲・失敗時停止・トークン失効を偽APIで確認
+        run: python3 -B -m unittest discover -s tools/tests -p test_install_production_inspection.py
+      - name: 鍵を使わず配置ZIP単独の検査コードをテスト
+        run: python3 -B tools/package-production-inspection.py /tmp/pulbase-production-inspection
       - name: 本番構成・空DB移行・ビルド・Worker dry-run・ブラウザ定義だけを確認
         run: node ci/production-preparation.mjs build
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
