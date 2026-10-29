@@ -2,6 +2,7 @@ import { createUuid } from "../../shared/id";
 import { getGameDefinition } from "../../domain/game";
 import type { SharedResult, SharedResultDraft } from "../../domain/shared-result";
 import { presentResult } from "./result-presenters";
+import { shareTags } from "./share-tags";
 import { recordSharingEvent } from "./sharing-events";
 
 export interface LiveShareContext {
@@ -51,11 +52,12 @@ function updatePanel(state: SharePanelState) {
 
 export function liveShareText(context: LiveShareContext): string {
   const title = getGameDefinition(context.gameId)?.localizedTitle ?? context.gameId;
-  if (context.phase === "finished") return `${title}のプレイは終了しました。この筐体の状況はこちら。\n#PULBASE`;
-  if (context.role === "spectator") return `${title}のライブを観戦中。一緒に見ませんか？\n#PULBASE`;
-  if (context.phase === "ready") return `これから${title}に挑戦！ここから観戦できます。\n#PULBASE`;
-  if (context.phase === "paused") return `${title}に挑戦中。ただいま休憩中です。続きの観戦はこちら。\n#PULBASE`;
-  return `${title}に挑戦中！ライブ観戦はこちら。\n#PULBASE`;
+  const tags = shareTags(context.gameId);
+  if (context.phase === "finished") return `${title}のプレイは終了しました。この筐体の状況はこちら。\n${tags}`;
+  if (context.role === "spectator") return `${title}のライブを観戦中。一緒に見ませんか？\n${tags}`;
+  if (context.phase === "ready") return `これから${title}に挑戦！ここから観戦できます。\n${tags}`;
+  if (context.phase === "paused") return `${title}に挑戦中。ただいま休憩中です。続きの観戦はこちら。\n${tags}`;
+  return `${title}に挑戦中！ライブ観戦はこちら。\n${tags}`;
 }
 
 export async function getShareOrigin(): Promise<string> {
@@ -88,7 +90,7 @@ export async function shareLive(context: LiveShareContext) {
 
 export function resultShareText(result: SharedResult, viewer = false): string {
   const presentation = presentResult(result);
-  return viewer ? `${result.playerName}さんの${presentation.title}のプレイ結果。${presentation.headline} / ${presentation.details.join(" / ")}\n#PULBASE` : presentation.text;
+  return viewer ? `${result.playerName}さんの${presentation.title}のプレイ結果。${presentation.headline} / ${presentation.details.join(" / ")}\n${shareTags(result.gameId)}` : presentation.text;
 }
 
 export async function openResultShare(draft: SharedResultDraft, save: () => Promise<SharedResult>, viewer = false) {
