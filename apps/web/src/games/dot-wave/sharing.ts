@@ -1,3 +1,4 @@
+import { shareTags } from "../../features/sharing/share-tags";
 import type { ResultPresentation, SharedResultDraft } from "../../domain/shared-result";
 import { resultMetric } from "../../features/sharing/result-format";
 
@@ -8,7 +9,7 @@ export function presentDotWaveResult(result: SharedResultDraft): ResultPresentat
   return {
     title: "DOT WAVE", headline, accent: "#ff6eb4",
     details: [mode, `${resultMetric(result, "turns")}ターン`, `残りHP ${resultMetric(result, "remainingHp")}`],
-    text: `DOT WAVE${mode}${outcome === "win" ? "で勝利！" : outcome === "draw" ? "は引き分け！" : "に挑戦！"} ${resultMetric(result, "turns")}ターンのバトル。\n#DOTWAVE #PULBASE`,
+    text: `DOT WAVE${mode}${outcome === "win" ? "で勝利！" : outcome === "draw" ? "は引き分け！" : "に挑戦！"} ${resultMetric(result, "turns")}ターンのバトル。\n${shareTags("dot-wave")}`,
     imageLines: [outcome === "win" ? "VICTORY" : outcome === "draw" ? "DRAW" : "BATTLE RESULT", result.metrics.mode === "versus" ? "VERSUS PLAYER" : "VERSUS CPU", `${resultMetric(result, "turns")} TURNS / HP ${resultMetric(result, "remainingHp")}`],
   };
 }
