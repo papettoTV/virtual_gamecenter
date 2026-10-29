@@ -153,6 +153,7 @@ describe("BUZZ BARRIER instance lifecycle", () => {
       gameId: BUZZ_BARRIER.id, cleared: false, score: 0, metrics: { maxLevel: 7, defeatedBossCount: 0 },
     });
     expect(mocks.setResult.mock.calls[0]![0].elapsedTimeMs).toBeGreaterThan(0);
+    expect(mocks.setLiveContext).toHaveBeenCalledWith(expect.objectContaining({ gameId: BUZZ_BARRIER.id, role: "player", phase: "finished" }));
     mocks.clearResult.mockClear();
     await instance.play("retry", "reservation");
     expect(mocks.clearResult).toHaveBeenCalledWith(BUZZ_BARRIER.id);

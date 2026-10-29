@@ -94,6 +94,10 @@ describe("深海サルベージのmount契約", () => {
     state.phase = "result"; state.elapsed = 0; state.finalScore = 0;
     state.maxDepth = 123; state.discovered = new Set([SPECIES[0]!.id]);
     mocks.finishes[0]!("Finished", 1);
+    const [handle, frame] = [...frames.entries()][0]!;
+    frames.delete(handle);
+    frame(performance.now() + 16);
+    expect(mocks.setLiveContext).toHaveBeenLastCalledWith(expect.objectContaining({ gameId: DEEP_SEA_SALVAGE.id, role: "player", phase: "finished" }));
     const first = mocks.setResult.mock.calls[0]![0];
     expect(first).toMatchObject({
       gameId: DEEP_SEA_SALVAGE.id, elapsedTimeMs: 1, score: 0, cleared: false,

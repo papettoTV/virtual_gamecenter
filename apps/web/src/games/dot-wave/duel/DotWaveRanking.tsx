@@ -28,13 +28,15 @@ export function DotWaveRanking({ score, elapsedTimeMs, playerName }: { score: Sc
     finally { pending.current = false; }
   }
   return <div className="dot-ranking">
-    <p className="dot-ranking-score">SCORE <strong>{score.total.toLocaleString()}</strong></p>
-    <button onClick={() => void submit()} disabled={status !== 'ready'}>
-      {status === 'sending' ? '登録中…' : status === 'submitted' ? '登録済み' : 'ランキングに登録'}
-    </button>
-    <small className="dot-ranking-name">{playerName} として登録</small>
+    <h3>ランキング</h3>
+    {status !== 'submitted' && <>
+      <div className="ranking-name-summary"><span>登録名</span><strong>{playerName}</strong></div>
+      <button onClick={() => void submit()} disabled={status !== 'ready'}>
+        {status === 'sending' ? '登録中…' : 'ランキングに登録'}
+      </button>
+    </>}
     {entries.length > 0 && <table aria-label="DOT WAVEスコアランキング">
-      <thead><tr><th>順位</th><th>プレイヤー</th><th>スコア</th></tr></thead>
+      <thead><tr><th scope="col">順位</th><th scope="col">プレイヤー</th><th scope="col">スコア</th></tr></thead>
       <tbody>{entries.map((entry, index) => <tr key={`${entry.created_at}-${index}`}>
         <td>{index + 1}</td><td title={entry.player_name}>{entry.player_name}</td><td>{entry.score.toLocaleString()}</td>
       </tr>)}</tbody>

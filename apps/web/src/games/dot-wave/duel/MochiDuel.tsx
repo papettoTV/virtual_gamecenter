@@ -1,4 +1,5 @@
 import { notifications } from "../../../features/notifications/notifications";
+import { DotWaveResult } from "./DotWaveResult";
 import { navigate } from "../../../shared/navigation";
 import type { DotWaveRoster } from "../../../domain/cabinet";
 import { isGameModeAvailable } from "../../../domain/play-mode-policy";
@@ -10,7 +11,7 @@ import { NeonRail } from "./NeonRail";
 import { musicStages, visibleMusicStage, type MusicStage } from "./musicMood";
 import { DuelAudio } from "./audio";
 import { DotWaveRanking } from "./DotWaveRanking";
-import { actorAt, BEAT, beatAt, levelAt, randomMove, cpuGrades, createExchange, END_BEAT, expire, exchangeLimit, MAX_HP, MOVES, resolve, tap, release, type Match, type Side } from "./core";
+import { actorAt, BEAT, beatAt, levelAt, randomMove, cpuGrades, createExchange, END_BEAT, expire, exchangeLimit, MOVES, resolve, tap, release, type Match, type Side } from "./core";
 import { INPUT_GRACE, validRemoteTap, type DuelLink, type DuelFrame } from "./network";
 import { CPU_STAGES, advanceCampaign, freshDuel as fresh, nextCpuStage, randomCpuMove } from "./campaign";
 import { freshScore, scoreChart, awardBossBonus, readBest, saveBest } from "./score";
@@ -20,7 +21,7 @@ import type { Engine, Phase } from "./engine";
 export type { Engine } from "./engine";
 
 
-export default function MochiDuel({ players, network, sharedAudio, boardNotice, resultPanel, challengeNotice, challengePending = false, holdResult = false }: { players?: DotWaveRoster; network?: DuelLink; sharedAudio?: RefObject<DuelAudio | null>; boardNotice?: ReactNode; resultPanel?: ReactNode; challengeNotice?: ReactNode; holdResult?: boolean; challengePending?: boolean } = {}) {
+export default function MochiDuel({ players, network, sharedAudio, boardNotice, resultPanel, resultShare, onResultRetry, challengeNotice, challengePending = false, holdResult = false }: { players?: DotWaveRoster; network?: DuelLink; sharedAudio?: RefObject<DuelAudio | null>; boardNotice?: ReactNode; resultPanel?: ReactNode; resultShare?: ReactNode; onResultRetry?: () => void; challengeNotice?: ReactNode; holdResult?: boolean; challengePending?: boolean } = {}) {
   const engine = useRef(fresh(network?.matchId ? "online" : "cpu"));
   const ownSound = useRef<DuelAudio | null>(null);
   const sound = sharedAudio ?? ownSound;
@@ -355,9 +356,9 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
       {e.mode === "cpu" && <span className="duel-inline-score" aria-label="通算スコア">SCORE {(e.score?.total ?? 0).toLocaleString()}</span>}
     </div>
 
-    <section className="duel-board" onClick={event => { if (e.phase === "paused" && !replica && !(event.target instanceof Element && event.target.closest("button, a, input, select, [role=dialog]"))) void pause(); }}>
-      {e.phase !== "intro" && <h2 className={busy.current || e.phase === "countdown" || e.phase === "playing" || e.phase === "impact" ? "dot-sr-only" : undefined} aria-live="polite">{heading}</h2>}
-      <DotScene engine={e} viewSide={viewSide} players={players} musicOverride={musicOverride.current} />
+    <section className={`duel-board${e.phase === "finished" && !next ? " has-final-result" : ""}`} onClick={event => { if (e.phase === "paused" && !replica && !(event.target instanceof Element && event.target.closest("button, a, input, select, [role=dialog]"))) void pause(); }}>
+      {e.phase !== "intro" && <h2 className={busy.current || e.phase === "countdown" || e.phase === "playing" || e.phase === "impact" || (e.phase === "finished" && !next) ? "dot-sr-only" : undefined} aria-live="polite">{heading}</h2>}
+      {!(e.phase === "finished" && !next) && <DotScene engine={e} viewSide={viewSide} players={players} musicOverride={musicOverride.current} />}
       <div className="duel-board-notice">{boardNotice}</div>
       {e.phase === "countdown" && <div className="duel-start-countdown" role="status" aria-label={`開始まで${Math.max(1, Math.ceil(-e.seconds))}秒`}><strong key={Math.ceil(-e.seconds)}>{Math.max(1, Math.min(3, Math.ceil(-e.seconds)))}</strong></div>}
       {e.phase === "intro" && !busy.current && <div className="duel-state-overlay duel-start-panel">
@@ -388,28 +389,34 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
         <NeonRail exchange={e.exchange ?? createExchange(0, e.selected)} seconds={e.seconds} viewSide={viewSide} /></div>
 
       {e.phase === "paused" && <div className="duel-choice-panel duel-state-overlay"><div className="duel-paused-challenge">{challengeNotice}</div><p>音と判定を同じ位置で止めています。</p>{!replica && <p>画面をタップ / Pキーで再開</p>}</div>}
-      {e.phase === "finished" && <div className={`duel-choice-panel duel-state-overlay${next ? " is-stage-clear" : ""}`}>
+      {e.phase === "finished" && <div className={`duel-choice-panel duel-state-overlay${next ? " is-stage-clear" : " is-final-result"}`}>
         <div className="duel-result-challenge">{challengeNotice}</div>
-        {!next && <>
-          {!cleared && <><p>{e.match.hp.includes(0) ? "エネルギーが尽きた。バトル終了！" : "FINAL WAVE完了。残りエネルギーで決着！"}</p>
-          <strong>{name(0)} {e.match.hp[0]} : {e.match.hp[1]} {name(1)}</strong>
-          <p>与えたダメージ：{MAX_HP - e.match.hp[1]} ／ 受けたダメージ：{MAX_HP - e.match.hp[0]}</p></>}
-          {e.mode === "cpu" && <div className="dot-score-result">
-            <span>最大コンボ <strong>{e.score?.maxCombo ?? 0}</strong></span>
-            <span>体力ボーナス累計 <strong>+{(e.score?.bossBonus ?? 0).toLocaleString()}</strong></span>
-            {!spectator && <span>自己ベスト（このブラウザ） <strong>{Math.max(best, e.score?.total ?? 0).toLocaleString()}</strong></span>}
-          </div>}
-        </>}
-        {cleared && !next && !replica && !holdResult && e.score && <DotWaveRanking score={e.score} elapsedTimeMs={e.elapsedPlayMs ?? 1} playerName={name(0)} />}
-        {resultPanel}
-        {!holdResult && !replica && !network?.matchId && (next
-          ? <button className="duel-primary" disabled={Boolean(network && !network.connected)} onClick={nextStage}>NEXT / {CPU_STAGES[next].label}へ</button>
-          : <button className="duel-primary" onClick={() => { sound.current?.stop(); heldInputs.current.forEach(held => held.clear()); engine.current = fresh(e.mode, e.match.ending); render(); }}>{e.mode === "cpu" ? "RETRY / 1st STAGEから" : "RETRY / もう一度"}</button>)}
+        {!next && <DotWaveResult spectator={spectator} summary={{
+          title: e.mode === "cpu" ? cleared ? "ALL CLEAR" : "GAME OVER" : heading,
+          score: e.score?.total ?? 0,
+          details: e.mode === "cpu" ? [
+            ["STAGE", `${stage} / 3`], ["最大コンボ", String(e.score?.maxCombo ?? 0)], ["TIME", `${((e.elapsedPlayMs ?? 0) / 1000).toFixed(2)}s`],
+            ["体力ボーナス", (e.score?.bossBonus ?? 0).toLocaleString()],
+            ...(!spectator ? [["自己ベスト（ブラウザ）", Math.max(best, e.score?.total ?? 0).toLocaleString()] as [string, string]] : []),
+          ] : [[name(0), String(e.match.hp[0])], [name(1), String(e.match.hp[1])]],
+          note: spectator ? "プレイヤーが続けるか終了するかを選んでいます。" : undefined,
+        }} ranking={<>
+          {cleared && !replica && !holdResult && e.score && <DotWaveRanking score={e.score} elapsedTimeMs={e.elapsedPlayMs ?? 1} playerName={name(0)} />}
+          {resultPanel}
+        </>} share={resultShare} actions={<>
+          {!replica && !network?.matchId && (!holdResult || onResultRetry) && <button className="duel-primary" onClick={() => {
+            sound.current?.stop(); heldInputs.current.forEach(held => held.clear());
+            if (holdResult && onResultRetry) onResultRetry();
+            else { engine.current = fresh(e.mode, e.match.ending); render(); }
+          }}>{network && network.startCost > 0 ? "1クレジットでリトライ" : "もう一度遊ぶ"}</button>}
+          <button className="dot-result-back" onClick={() => navigate("/")}>別のゲームを探す</button>
+        </>} />}
+        {next && !holdResult && !replica && !network?.matchId && <button className="duel-primary" disabled={Boolean(network && !network.connected)} onClick={nextStage}>NEXT / {CPU_STAGES[next].label}へ</button>}
       </div>}
 
     </section>
     {e.phase !== "paused" && <p className="duel-feedback dot-sr-only" role="status">{replica && viewSide === null ? e.phase === "intro" ? "プレイヤーの開始を待っています。" : "観戦中" : warning ? `${name(warning.side)}：${warning.message} 自分の番までリズムを聞こう。` : e.feedback || "相手の攻撃をよく聞いて、自分の番にリズムを返そう。"}</p>}
-    <div className="duel-controls">{e.phase === "playing" && challengePending && <span className="duel-challenge-indicator" role="status">対戦申込あり · 一時停止で確認</span>}<button className="duel-sound-toggle" aria-label={sound.current?.audible ? "音を消す" : "音を出す"} aria-pressed={Boolean(sound.current?.audible)} onClick={() => void toggleSound().catch(() => { notifications.show({ id: "game-audio", scope: "dot-wave", type: "error", message: "音を開始できませんでした。スピーカーをもう一度押してください。" }); render(); })}><BattleIcon kind={sound.current?.audible ? "sound" : "sound-off"}/></button>{([0, 1] as Side[]).filter((side) => e.mode === "local" || side === viewSide).map((side) => <button key={side} aria-label={`${name(side)}のリズムボタン`} className={`duel-tap player-${side} ${e.phase === "playing" && cue.next === side && cue.current !== side ? "is-upcoming" : ""} ${currentActor !== side ? "is-waiting" : ""} ${warning?.side === side ? "is-wrong-turn" : ""}`} disabled={e.phase !== "playing" || Boolean(network && (!network.connected || (network.startsAt && network.now() < network.startsAt)))} onPointerDown={(event) => { if (!event.isPrimary || event.button !== 0) return; event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); press(side, `pointer-${event.pointerId}`); }} onPointerUp={event => lift(side, `pointer-${event.pointerId}`)} onPointerCancel={event => lift(side, `pointer-${event.pointerId}`)} onLostPointerCapture={event => lift(side, `pointer-${event.pointerId}`)} onClick={(event) => { if (event.detail === 0) { press(side, "accessible"); lift(side, "accessible"); } }}><BattleIcon kind={warning?.side === side ? "wait" : "tap"}/><small>{network || e.mode === "cpu" ? "SPACE / F" : side === 0 ? "F" : "J"}</small></button>)}</div>
+    <div className="duel-controls" hidden={e.phase === "finished" && !next}>{e.phase === "playing" && challengePending && <span className="duel-challenge-indicator" role="status">対戦申込あり · 一時停止で確認</span>}<button className="duel-sound-toggle" aria-label={sound.current?.audible ? "音を消す" : "音を出す"} aria-pressed={Boolean(sound.current?.audible)} onClick={() => void toggleSound().catch(() => { notifications.show({ id: "game-audio", scope: "dot-wave", type: "error", message: "音を開始できませんでした。スピーカーをもう一度押してください。" }); render(); })}><BattleIcon kind={sound.current?.audible ? "sound" : "sound-off"}/></button>{([0, 1] as Side[]).filter((side) => e.mode === "local" || side === viewSide).map((side) => <button key={side} aria-label={`${name(side)}のリズムボタン`} className={`duel-tap player-${side} ${e.phase === "playing" && cue.next === side && cue.current !== side ? "is-upcoming" : ""} ${currentActor !== side ? "is-waiting" : ""} ${warning?.side === side ? "is-wrong-turn" : ""}`} disabled={e.phase !== "playing" || Boolean(network && (!network.connected || (network.startsAt && network.now() < network.startsAt)))} onPointerDown={(event) => { if (!event.isPrimary || event.button !== 0) return; event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); press(side, `pointer-${event.pointerId}`); }} onPointerUp={event => lift(side, `pointer-${event.pointerId}`)} onPointerCancel={event => lift(side, `pointer-${event.pointerId}`)} onLostPointerCapture={event => lift(side, `pointer-${event.pointerId}`)} onClick={(event) => { if (event.detail === 0) { press(side, "accessible"); lift(side, "accessible"); } }}><BattleIcon kind={warning?.side === side ? "wait" : "tap"}/><small>{network || e.mode === "cpu" ? "SPACE / F" : side === 0 ? "F" : "J"}</small></button>)}</div>
     {import.meta.env.DEV && <div className="dot-music-debug" data-debug-controls>
       <label>盛り上がりテスト：{musicOverride.current === null ? "自動" : "手動"} · {["通常", "ベース追加", "伴奏追加"][musicOverride.current ?? visibleMusicStage(e.match.history, beat)]}
         <input type="range" min="0" max="2" step="1" aria-label="盛り上がりモード" aria-valuetext={["通常", "ベース追加", "伴奏追加"][musicOverride.current ?? visibleMusicStage(e.match.history, beat)]} value={musicOverride.current ?? visibleMusicStage(e.match.history, beat)} onChange={event => {

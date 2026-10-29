@@ -1150,8 +1150,7 @@ canvas {
 }
 
 .ranking-submit.is-submitted .ranking-form,
-.ranking-submit.is-submitted .ranking-user-registration,
-.ranking-submit.is-submitted #ranking-result {
+.ranking-submit.is-submitted .ranking-user-registration {
   display: none;
 }
 
@@ -1189,6 +1188,52 @@ canvas {
   border-color: rgba(105, 247, 255, 0.42);
   background: rgba(105, 247, 255, 0.18);
 }
+
+.game-frame:has(> .ranking-overlay.is-visible) { display: grid; place-items: start center; }
+.game-frame:has(> .ranking-overlay.is-visible) > canvas { grid-area: 1 / 1; visibility: hidden; }
+.game-frame:has(> .ranking-overlay.is-visible) > .game-share-button,
+.game-frame:has(> .ranking-overlay.is-visible) > .safe-live-share,
+.game-screen:has(.ranking-overlay.is-visible) > .touch-controls { display: none; }
+body.is-game-screen:has(.ranking-overlay.is-visible) .platform-profile { position: absolute; }
+.game-frame > .ranking-overlay.is-visible {
+  grid-area: 1 / 1;
+  position: relative;
+  top: auto;
+  left: auto;
+  transform: none;
+  width: min(100%, 560px);
+  max-height: none;
+  box-sizing: border-box;
+  margin: 12px 0;
+  padding: 24px;
+  z-index: 4;
+  background: #090e1c;
+}
+.ranking-overlay h2 { margin: 0 0 12px; font-size: 24px; letter-spacing: .05em; }
+.ranking-overlay .ranking-result-summary { display: block; }
+.ranking-overlay #ranking-result { margin: 0; }
+.result-score { display: block; color: var(--text); font-size: clamp(36px, 8vw, 52px); line-height: 1.15; overflow-wrap: anywhere; }
+.result-score-label { display: block; margin-top: 4px; font-size: 11px; color: var(--muted); letter-spacing: .18em; }
+.result-metrics { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px 24px; margin: 18px 0; }
+.result-metrics dt { font-size: 11px; color: var(--muted); }
+.result-metrics dd { margin: 4px 0 0; color: var(--text); font-size: 15px; font-weight: 700; }
+.ranking-registration-section { margin-top: 20px; padding-top: 18px; border-top: 1px solid #293344; }
+.ranking-registration-section h3 { margin: 0 0 10px; font-size: 14px; text-align: left; color: var(--muted); }
+.ranking-overlay .ranking-form { flex-direction: column; }
+.ranking-overlay .ranking-form button { min-height: 44px; }
+.ranking-overlay .ranking-user-registration { margin: 8px 0 0; padding: 0; border: none; background: none; text-align: left; }
+.ranking-overlay .ranking-user-registration button { min-height: 44px; padding: 4px 0; font-size: 12px; font-weight: 400; text-align: left; }
+.ranking-overlay .ranking-next-actions { grid-template-columns: 1fr; gap: 10px; margin-top: 20px; padding-top: 18px; border-top: 1px solid #293344; }
+.ranking-overlay .clear-restart-button { margin: 0; min-height: 48px; }
+.ranking-overlay .ranking-retry-button { background: #25596a; border-color: #62d8e5; }
+.ranking-secondary-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 4px 20px; margin-top: 12px; }
+.ranking-secondary-actions .result-feedback { margin: 0; width: auto; max-width: none; }
+.ranking-secondary-actions .result-share-button,
+.ranking-secondary-actions .result-feedback > button { width: auto; min-height: 44px; margin: 0; padding: 6px 0; background: none; border: none; border-radius: 0; color: var(--muted); font-size: 12px; text-decoration: underline; text-underline-offset: 4px; }
+.ranking-overlay #ranking-status:empty { display: none; }
+.ranking-overlay .ranking-result-collection-button { min-height: 44px; margin: 0 0 4px; padding: 8px 18px; }
+.salvage-screen .result-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.salvage-screen .result-metrics > div { min-width: 0; overflow-wrap: anywhere; }
 
 .ranking-form button:disabled {
   cursor: not-allowed;
@@ -1962,7 +2007,9 @@ canvas {
   align-items: center;
   justify-content: center;
   gap: 8px 16px;
-  margin-top: 28px;
+  max-width: 1200px;
+  margin: 28px auto 24px;
+  padding: 0 16px;
   color: var(--muted);
   font-size: 12px;
 }
