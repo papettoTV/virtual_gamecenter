@@ -2,7 +2,7 @@
 
 ## 目的と現在の境界
 
-developのCI、承認済み検証公開の実結果、同じSHAの本番ビルドを結合する候補検査を準備する。`ci/production-candidate`はdevelop向けの準備コードであり、まだ保護されたci-controlへ配置していない。成功結果も人による本番承認・公開許可として使わない。実行可能な本番公開workflow・GitHub書込API・Cloudflare通信・X投稿・公開用の鍵は接続していない。
+developのCI、承認済み検証公開の実結果、同じSHAの本番ビルドを結合する候補検査。2026-10-29に人の管理操作で保護されたci-controlの`7dd7b4c`へ追加配置し、既存制御保持・追加ファイル・bypass空をAPI確認した。配置内容と復帰手順は[配置記録](install-production-inspection.md)を参照する。成功結果も人による本番承認・公開許可として使わない。実行可能な本番公開workflow・GitHub書込API・Cloudflare通信・X投稿・公開用の鍵は接続していない。
 
 旧production-releaseテンプレートは引き続き無効。production Environmentのmain限定・人の承認必須、main/ci-controlのbypass空、本番フラグfalseを維持する。候補検査のためにproductionをdevelopへ開放しない。
 
@@ -40,7 +40,7 @@ production-preparationは対象ファイルを変更したdevelopへのpushで�
 - 既存run 40494784321のapproval/resultの実ZIP2件で、digest/サイズ照合とJSON読取に成功した。これは以前のSHA 4368ea5の記録であり、現在のdevelopの本番候補成功には流用しない。
 - 現在のdevelopについての実証跡一式の合格は未確認。古いrunは鮮度/現在SHAの条件で拒否する。新しい検証公開・HTTP/ブラウザ回帰を今回勝手に起動しない。
 - CLIへ古い検証run 40494784321を指定した実GETでも、鮮度条件で終了コード1となり、成功JSONを生成しないことを確認した。これは拒否条件の実証であり、現在候補の合格ではない。
-- 本番の固定制御への配置、Environmentの許可元とmain昇格権限の設計、初回Worker/D1/Secret/Pages準備、実公開用成果物の固定・ハッシュ照合、本番回帰・復旧・成功後の告知文提示への接続は残る。
+- 検査コードの固定制御への配置は完了。Environmentの許可元とmain昇格権限の設計、初回Worker/D1/Secret/Pages準備、実公開用成果物の固定・ハッシュ照合、本番回帰・復旧・成功後の告知文提示への接続は残る。
 - 実公開用の処理と権限を接続する前に人が保護されたコードを配置し、承認前後の同一候補・成果物・設定の再照合を実行する必要がある。今回の候補JSONや模擬承認のbooleanをその代わりにしない。
 
 Worker作成・デプロイ、本番DB書込、main反映、本番公開、X投稿の指示としてこの資料を扱わない。

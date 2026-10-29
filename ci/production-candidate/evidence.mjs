@@ -38,9 +38,18 @@ export async function productionCandidate({api,load,parse,stagingRunId,preparati
  need(id(stagingRunId)&&id(preparationRunId)&&Number.isSafeInteger(now),'実行IDが不正です');
  const current=await api('git/ref/heads/develop'),revision=current.object?.sha;need(sha(revision),'develop SHA不正');
  need((await api('git/ref/heads/main')).object?.sha===policy.mainSha,'mainが準備開始時から変わっています');
- need((await api('git/ref/heads/ci-control')).object?.sha===policy.controlSha,'制御SHAが固定版と不一致です');
+ const controlSha=(await api('git/ref/heads/ci-control')).object?.sha;
+ need(sha(controlSha)&&Object.keys(policy.controlFiles??{}).length===28&&Object.values(policy.controlFiles).every(sha),'制御コードの固定定義が不完全です');
+ const controlTree=await api(`git/trees/${controlSha}?recursive=1`);
+ need(controlTree.truncated===false&&Array.isArray(controlTree.tree)&&controlTree.tree.length<20000,'制御treeが不完全です');
+ for(const [path,expected]of Object.entries(policy.controlFiles)){
+  const items=controlTree.tree.filter(x=>x.path===path);
+  need(items.length===1&&items[0].type==='blob'&&items[0].mode==='100644'&&items[0].sha===expected,'既存の保護された制御が変更されています: '+path);
+ }
  const staging=await api(`actions/runs/${stagingRunId}`);
- runIdentity(staging,stagingRunId,'postmerge-staging','ci-control',policy.controlSha,now,policy);
+ const stagingControlSha=staging?.head_sha;
+ need([policy.controlSha,controlSha].includes(stagingControlSha),'検証公開の制御SHAが固定版と不一致です');
+ runIdentity(staging,stagingRunId,'postmerge-staging','ci-control',stagingControlSha,now,policy);
  need(staging.event==='workflow_dispatch','検証公開の起動元が不正です');
  await jobs(api,stagingRunId,['prepare','staging']);
  const approvalArchive=await receipt(api,load,staging,'postmerge-approval','postmerge-approval.json');
@@ -49,14 +58,14 @@ export async function productionCandidate({api,load,parse,stagingRunId,preparati
  const e=approval?.evidence,x=approval?.execution;
  need(approval.version===3&&approval.mode==='postmerge-staging-live'&&e?.sha===revision
   &&x?.repository===repo&&x.ref==='refs/heads/ci-control'&&x.event==='workflow_dispatch'&&x.environment==='staging'
-  &&x.controlSha===policy.controlSha&&x.runId===String(stagingRunId)&&x.attempt==='1'
+  &&x.controlSha===stagingControlSha&&x.runId===String(stagingRunId)&&x.attempt==='1'
   &&/^[a-f0-9]{64}$/.test(approval.manifestDigest??'')&&Number.isSafeInteger(approval.files)&&approval.files>0,
  '検証承認対象のSHA・制御実行・成果物が不一致です');
  const build=await developEvidence(api,e.runId,reviewPolicy,now);
  need(JSON.stringify(build)===JSON.stringify(e),'検証公開と現在のCI・成果物が一致しません');
  need(Date.parse(staging.created_at)>=Date.parse((await api(`actions/runs/${e.runId}`)).updated_at),'CI完了前の検証公開を拒否します');
  need(result?.status==='passed'&&result.mode==='postmerge-staging-live'&&result.executionMode==='live'
-  &&result.sha===revision&&result.controlSha===policy.controlSha&&result.ciRunId===e.runId&&result.filesVerified===approval.files
+  &&result.sha===revision&&result.controlSha===stagingControlSha&&result.ciRunId===e.runId&&result.filesVerified===approval.files
   &&result.approvalCount===1&&result.publicationCount===1&&result.regressionCount===1
   &&result.protectionVerified===true&&result.protectionMode==='strict'&&result.regressionPassed===true
   &&result.realDeploymentExecuted===true&&result.realRegressionExecuted===true
@@ -91,13 +100,13 @@ export async function productionCandidate({api,load,parse,stagingRunId,preparati
  // Recheck mutable identities after downloading all receipts. Never infer approval.
  need((await api('git/ref/heads/develop')).object?.sha===revision,'証跡照合中にdevelopが進みました');
  need((await api('git/ref/heads/main')).object?.sha===policy.mainSha
-  &&(await api('git/ref/heads/ci-control')).object?.sha===policy.controlSha,'証跡照合中にmain・制御SHAが変わりました');
+  &&(await api('git/ref/heads/ci-control')).object?.sha===controlSha,'証跡照合中にmain・制御SHAが変わりました');
  need(JSON.stringify(await developEvidence(api,e.runId,reviewPolicy,now))===JSON.stringify(build),'証跡照合中にCI・成果物が変わりました');
  for(const [runId,original]of [[stagingRunId,staging],[preparationRunId,prep]]){
   const again=await api(`actions/runs/${runId}`);need(again.run_attempt===1&&again.status==='completed'
    &&again.conclusion==='success'&&again.head_sha===original.head_sha,'証跡照合中の再実行・変更を拒否します');
  }
- const identity={sha:revision,tree:build.tree,mainSha:policy.mainSha,controlSha:policy.controlSha,
+ const identity={sha:revision,tree:build.tree,mainSha:policy.mainSha,controlSha,stagingControlSha,
   ciRunId:e.runId,buildArtifactId:e.artifactId,manifestDigest:approval.manifestDigest,
   stagingRunId:String(stagingRunId),preparationRunId:String(preparationRunId),
   receipts:[approvalArchive.artifact,resultArchive.artifact,prepArchive.artifact]};

@@ -11,6 +11,7 @@ const head='a'.repeat(40),base='b'.repeat(40),tree='c'.repeat(40),merged='d'.rep
 const env={GITHUB_REPOSITORY:'papettoTV/virtual_gamecenter',GITHUB_REF:'refs/heads/develop',GITHUB_EVENT_NAME:'workflow_run',GITHUB_RUN_ATTEMPT:'1',SOURCE_ATTEMPT:'1',GITHUB_RUN_ID:'100',REVIEW_RUN_ID:'90',GITHUB_SHA:base,PULBASE_CODEX_ENABLED:'true',PULBASE_DEVELOP_AUTO_MERGE_ENABLED:'true',EXPECTED_CONTROL_SHA:CONTROL_SHA};
 test('developの初回レビュー完了イベント・専用フラグ・固定制御SHAを必須にする',()=>{
  assert.equal(context(env).environment,'automation');
+ assert.throws(()=>context({...env,EXPECTED_CONTROL_SHA:'2c883a1cdd961510a0557742f74294739752f445'}));
  for(const patch of [{GITHUB_REF:'refs/heads/main'},{GITHUB_REF:'refs/heads/ci-control'},{GITHUB_EVENT_NAME:'workflow_dispatch'},{GITHUB_RUN_ATTEMPT:'2'},{SOURCE_ATTEMPT:'2'},{PULBASE_DEVELOP_AUTO_MERGE_ENABLED:'false'},{EXPECTED_CONTROL_SHA:head},{REVIEW_RUN_ID:'90\nanything'}])assert.throws(()=>context({...env,...patch}));
 });
 test('書込transportは同じPR・headのsquashだけを許し、main更新・dispatch・別PR・forceを拒否する',async()=>{
