@@ -696,8 +696,20 @@
   align-items: center;
   gap: 10px;
   margin-bottom: 0;
-  padding-top: 55px;
+  /* Keep the fixed account button's space beside the bar, not above it. */
+  padding-top: max(16px, env(safe-area-inset-top));
+  padding-right: calc(64px + env(safe-area-inset-right));
   display: flex
+}
+.dot-cabinet-bar + main.dot-wave {
+  margin-top: 10px;
+}
+@media (max-width: 820px) {
+  .dot-cabinet-bar {
+    margin-top: 0;
+    padding-top: max(10px, env(safe-area-inset-top));
+    padding-right: calc(60px + env(safe-area-inset-right));
+  }
 }
 .dot-cabinet-bar>p {
   overflow-wrap: anywhere;
