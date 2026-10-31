@@ -296,13 +296,21 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
 
       <AccountRegistrationDialog
         accountDialogOpen={accountDialogOpen}
-        setAccountDialogOpen={setAccountDialogOpen}
+        setAccountDialogOpen={(value) => {
+          const open = typeof value === "function" ? value(accountDialogOpen) : value;
+          setAccountDialogOpen(open);
+          if (!open) cancelPlay();
+        }}
         platform={platform}
       />
 
       <ConsentDialog
         consentPurpose={consentPurpose}
-        setConsentPurpose={setConsentPurpose}
+        setConsentPurpose={(value) => {
+          const purpose = typeof value === "function" ? value(consentPurpose) : value;
+          setConsentPurpose(purpose);
+          if (!purpose) cancelPlay();
+        }}
         busy={busy}
         handleConsent={handleConsent}
       />
