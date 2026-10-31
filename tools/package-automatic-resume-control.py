@@ -9,9 +9,9 @@ import importlib.util
 import re
 
 ROOT = Path(__file__).resolve().parents[1]
-BASE = '1919c95b933d9b820b6db7bc54572020923c9849'
+BASE = 'ddc92cdf2193a68674a1c8ec2451c7ca71990ff4'
 FILES = ('ci/control/review-trust.mjs', 'ci/control/review-trust.json',
-         'ci/production-candidate/policy.json')
+         'ci/production-candidate/policy.json', 'ci/control/toolchain/browser/regression.spec.mjs')
 
 
 def git(*args):
