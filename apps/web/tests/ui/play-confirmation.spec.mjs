@@ -60,7 +60,10 @@ for (const game of games) {
         window.dialogKeysAtDocument = [];
         document.addEventListener('keydown', event => window.dialogKeysAtDocument.push(event.code));
       });
-      await page.keyboard.press(game.key);
+      // DOT WAVE focuses Cancel: Space there is a native button activation.
+      // F is also a real game input, but must stay inside the local dialog.
+      if (game.id === 'dot-wave') await expect(dialog.getByRole('button', { name: 'キャンセル', exact: true })).toBeFocused();
+      await page.keyboard.press(game.id === 'dot-wave' ? 'f' : game.key);
       await expect(dialog).toBeVisible();
       await page.keyboard.press('Escape');
       expect(await page.evaluate(() => window.dialogKeysAtDocument)).toEqual([]);
@@ -68,6 +71,18 @@ for (const game of games) {
       expect(await wallet(page)).toBe(balance);
       await page.keyboard.press('Shift');
       expect(await page.evaluate(() => window.dialogKeysAtDocument)).toContain('ShiftLeft');
+      if (game.id === 'dot-wave') {
+        for (const key of ['Space', 'Enter']) {
+          await intent();
+          const cancel = dialog.getByRole('button', { name: 'キャンセル', exact: true });
+          await expect(cancel).toBeFocused();
+          await page.keyboard.press(key);
+          await expect(dialog).toBeHidden();
+          await expect.poll(() => phase(page, game.id)).toBe(ready);
+          expect(await wallet(page)).toBe(balance);
+          expect(writes).toHaveLength(0);
+        }
+      }
       await intent();
       await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
       await expect(dialog).toBeHidden();
@@ -79,7 +94,25 @@ for (const game of games) {
         await new Promise(resolve => setTimeout(resolve, 250));
         await route.continue();
       });
-      await dialog.getByRole('button', { name: '1クレジットで開始', exact: true }).evaluate(button => { button.click(); button.click(); });
+      const approve = dialog.getByRole('button', { name: '1クレジットで開始', exact: true });
+      if (game.id === 'dot-wave') {
+        await approve.focus();
+        await expect(approve).toBeFocused();
+        // Repeated Enter normally activates a focused button on keydown.
+        // It must neither authorize play nor create a reservation.
+        for (const key of ['Space', 'Enter']) {
+          expect(await approve.evaluate((button, code) => button.dispatchEvent(new KeyboardEvent('keydown', { code, key: code === 'Space' ? ' ' : code, repeat: true, bubbles: true, cancelable: true })), key)).toBe(false);
+        }
+        await expect(dialog).toBeVisible();
+        expect(writes).toHaveLength(0);
+        expect(await wallet(page)).toBe(balance);
+        await expect.poll(() => phase(page, game.id)).toBe(ready);
+        const key = input === 'primary' ? 'Space' : 'Enter';
+        await page.keyboard.press(key);
+        await page.keyboard.press(key);
+      } else {
+        await approve.evaluate(button => { button.click(); button.click(); });
+      }
       await page.keyboard.press(game.key);
       await expect.poll(async () => ['playing', 'countdown', 'paused'].includes(await phase(page, game.id))).toBe(true);
       await expect(dialog).toBeHidden();

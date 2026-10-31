@@ -358,7 +358,7 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
 
   return <main className="dot-wave" data-phase={e.phase}>
     {creditConfirmation.current && <div className="platform-overlay" role="dialog" aria-modal="true" aria-label="ゲームを開始しますか？"
-      onKeyDown={event => { event.stopPropagation(); if (event.code === "Escape") { event.preventDefault(); creditConfirmation.current = false; render(); } }}>
+      onKeyDown={event => { event.stopPropagation(); if (event.repeat && ["Space", "Enter"].includes(event.code)) event.preventDefault(); if (event.code === "Escape") { event.preventDefault(); creditConfirmation.current = false; render(); } }}>
       <div className="platform-dialog platform-dialog-small">
         <h2>ゲームを開始しますか？</h2><p>開始時に1クレジットを使用します。</p>
         <div className="platform-dialog-actions">
