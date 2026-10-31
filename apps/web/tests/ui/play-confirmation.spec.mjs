@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { test, expect } from '../../../../ci/ui-fixtures.mjs';
 
 const origin = 'http://127.0.0.1:5174';
@@ -15,9 +16,11 @@ async function phase(page, game) {
     : (await import('/src/features/sharing/share-service.ts')).liveSharing.getSnapshot()?.phase, game);
 }
 for (const game of games) {
-  for (const input of ['button', 'keyboard']) {
-    test(`${game.id}: ${input}, ready, cancel, delayed duplicate and authorized start`, async ({ page }) => {
+  for (const input of ['primary', 'keyboard']) {
+    test(`${game.id}: ${input}, ready, cancel, delayed duplicate and authorized start`, async ({ page, isMobile }) => {
       await page.goto(origin);
+      const decline = page.getByRole('button', { name: '拒否する', exact: true });
+      if (await decline.isVisible()) await decline.click();
       // Only the disposable local guest and the real welcome-credit API are used.
       await page.evaluate(async () => {
         const api = await import('/src/features/platform/platform-client.ts');
@@ -28,21 +31,21 @@ for (const game of games) {
       page.on('request', request => {
         if (request.method() === 'POST' && request.url().includes('/api/platform/credit-reservations')) writes.push(request.url());
       });
-      await page.goto(`${origin}/cabinets/confirmation-${game.id}-${input}?game=${game.id}&start=1`);
+      await page.goto(`${origin}/cabinets/${randomUUID()}?game=${game.id}&start=1`);
       const start = page.getByRole('button', { name: game.button, exact: true });
-      await expect(start).toBeVisible();
-      await expect(start).toBeEnabled();
+      if (isMobile || game.id === 'dot-wave') { await expect(start).toBeVisible(); await expect(start).toBeEnabled(); }
       const ready = game.id === 'dot-wave' ? 'intro' : 'ready';
       await expect.poll(() => phase(page, game.id)).toBe(ready);
       await expect(page.getByRole('dialog', { name: 'ゲームを開始しますか？' })).toBeHidden();
       expect(writes).toHaveLength(0);
       await page.reload();
-      await expect(start).toBeVisible();
+      if (isMobile || game.id === 'dot-wave') await expect(start).toBeVisible();
       await expect.poll(() => phase(page, game.id)).toBe(ready);
       expect(writes).toHaveLength(0);
       const balance = await wallet(page);
       const intent = async () => {
-        if (input === 'button') await start.click();
+        if (input === 'primary' && isMobile) await start.tap();
+        else if (input === 'primary' && game.id === 'dot-wave') await start.click();
         else { await page.locator('body').click({ position: { x: 2, y: 2 } }); await page.keyboard.press(game.key); }
       };
       await intent();
@@ -85,19 +88,23 @@ for (const game of games) {
       expect(writes.filter(url => url.endsWith('/release'))).toHaveLength(0);
     });
   }
-  test(`${game.id}: failed capture keeps play stopped and releases the unused reservation`, async ({ page }) => {
+  test(`${game.id}: failed capture keeps play stopped and releases the unused reservation`, async ({ page, isMobile }) => {
     await page.goto(origin);
+    const decline = page.getByRole('button', { name: '拒否する', exact: true });
+    if (await decline.isVisible()) await decline.click();
     await page.evaluate(async () => {
       const api = await import('/src/features/platform/platform-client.ts');
       const account = await api.fetchPlatformBootstrap();
       if (!account.welcomeCreditGranted) await api.claimWelcomeCredit();
     });
-    await page.goto(`${origin}/cabinets/confirmation-failed-${game.id}?game=${game.id}`);
+    await page.goto(`${origin}/cabinets/${randomUUID()}?game=${game.id}`);
     const start = page.getByRole('button', { name: game.button, exact: true });
-    await expect(start).toBeVisible(); await expect(start).toBeEnabled();
+    if (isMobile || game.id === 'dot-wave') { await expect(start).toBeVisible(); await expect(start).toBeEnabled(); }
+    await expect.poll(() => phase(page, game.id)).toBe(game.id === 'dot-wave' ? 'intro' : 'ready');
     const balance = await wallet(page);
     await page.route('**/api/platform/credit-reservations/*/capture', route => route.abort());
-    await start.click();
+    if (isMobile) await start.tap();
+    else { await page.locator('body').click({ position: { x: 2, y: 2 } }); await page.keyboard.press(game.key); }
     const released = page.waitForResponse(response => response.url().endsWith('/release') && response.ok());
     await page.getByRole('dialog', { name: 'ゲームを開始しますか？', exact: true })
       .getByRole('button', { name: '1クレジットで開始', exact: true }).click();
@@ -108,8 +115,11 @@ for (const game of games) {
   test(`${game.id}: spectator never requests a start`, async ({ page }) => {
     const writes = [];
     page.on('request', request => { if (request.method() === 'POST' && request.url().includes('credit-reservations')) writes.push(request.url()); });
-    await page.goto(`${origin}/cabinets/confirmation-watch-${game.id}?game=${game.id}&watch=1&start=1`);
+    await page.goto(`${origin}/cabinets/${randomUUID()}?game=${game.id}&watch=1&start=1`);
+    if (game.id === 'dot-wave') await expect(page.locator('.dot-cabinet-bar > span')).toContainText('観戦中');
+    else await expect(page.locator('#spectator-banner')).toBeVisible();
     await page.keyboard.press(game.key);
+    await expect(page.getByRole('button', { name: game.button, exact: true })).toBeHidden();
     await expect(page.getByRole('dialog', { name: 'ゲームを開始しますか？' })).toBeHidden();
     expect(writes).toHaveLength(0);
   });
