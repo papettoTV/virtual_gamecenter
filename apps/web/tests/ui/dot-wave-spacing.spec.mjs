@@ -79,6 +79,31 @@ for (const size of sizes) {
     const referenceTop = await page.locator('.shell').evaluate(el => el.getBoundingClientRect().top + parseFloat(getComputedStyle(el).paddingTop));
     await evidence(page, info, `${size.name}-buzz-barrier`, { referenceTop, viewport: size });
 
+    // Transform only the browser's game module, never production source. This
+    // event arms a one-shot fixture consumed by the live animation loop, rather
+    // than freshDuel (which also runs during React renders/reinitialization).
+    await page.route('**/src/games/dot-wave/duel/MochiDuel.tsx*', async route => {
+      const response = await route.fetch();
+      const source = await response.text();
+      const loopEntry = /const current = engine\.current;\s*if \(network\?\.matchId && network\.startsAt/;
+      expect(source.match(new RegExp(loopEntry.source, 'g'))).toHaveLength(1);
+      const body = source.replace(loopEntry, `
+        const current = engine.current;
+        if (layoutFinishRequested && current.phase === 'playing' && current.mode === 'cpu') {
+          layoutFinishRequested = false;
+          current.phase = 'impact'; current.impactElapsed = 0; current.cpuStage = 3;
+          current.match.winner = 0; current.match.hp = [100, 0];
+          current.elapsedPlayMs = 180000;
+          current.score = { total: 54820, maxCombo: 42, combo: 0, bossBonus: 1200 };
+          sound.current?.stop();
+        }
+        if (network?.matchId && network.startsAt`) + `
+        let layoutFinishRequested = false;
+        window.addEventListener('dot-wave-layout-finish', () => { layoutFinishRequested = true; });
+      `;
+      await route.fulfill({ response, body });
+    });
+
     await enter(page, 'dot-wave');
     const main = page.locator('main.dot-wave');
     await expect(main).toHaveAttribute('data-phase', 'intro');
@@ -92,30 +117,10 @@ for (const size of sizes) {
     await tap.click();
     await evidence(page, info, `${size.name}-playing`, await geometry(page, referenceTop));
 
-    // Seed only the game engine's first render, without altering platform,
-    // authentication, credits, ranking endpoints, or production source files.
-    // The full cabinet page and real result/ranking/retry components still render.
-    await page.route('**/src/games/dot-wave/duel/campaign.ts*', async route => {
-      const response = await route.fetch();
-      const source = await response.text();
-      expect(source).toContain('function freshDuel(');
-      const body = source.replace('function freshDuel(', 'function originalFreshDuel(') + `
-        let seeded = false;
-        export function freshDuel(...args) {
-          const engine = originalFreshDuel(...args);
-          if (!seeded) {
-            seeded = true;
-            engine.phase = 'finished'; engine.cpuStage = 3;
-            engine.match.winner = 0; engine.match.hp = [100, 0];
-            engine.elapsedPlayMs = 180000;
-            engine.score = { total: 54820, maxCombo: 42, combo: 0, bossBonus: 1200 };
-          }
-          return engine;
-        }
-      `;
-      await route.fulfill({ response, body });
-    });
-    await enter(page, 'dot-wave');
+    // Finish the engine already playing in this cabinet. The normal impact ->
+    // finished transition must notify soloEnded; keep the real start receipt,
+    // authentication, credits and ranking API untouched.
+    await page.evaluate(() => window.dispatchEvent(new Event('dot-wave-layout-finish')));
     await expect(main).toHaveAttribute('data-phase', 'finished');
     await expect(page.locator('.dot-result-card h2')).toHaveText('ALL CLEAR');
     await expect(page.locator('.dot-result-card .result-score')).toContainText('54,820');
