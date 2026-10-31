@@ -31,7 +31,7 @@ test('既存PRの修正は同じブランチへのfast-forwardだけで履歴を
   assert.equal(git(cwd,'show',`${updated}:README.md`),'new trusted base');
  }finally{await rm(temporary,{recursive:true,force:true});}
 });
-for (const filename of ['docs/example.md', 'apps/web/src/games/graze-duel/rendering/example.js']) test(`publisher accepts only a regular-file patch: ${filename}`, async () => {
+for (const filename of ['docs/example.md', 'apps/web/src/games/graze-duel/rendering/example.js', 'apps/web/src/features/platform/PlatformExperience.tsx', 'apps/web/src/worker/auth.ts', 'apps/web/src/games/graze-duel/input.js']) test(`publisher accepts only a regular-file patch: ${filename}`, async () => {
   const temporary = await mkdtemp(join(tmpdir(), 'pulbase-patch-'));
   try {
     const remote = join(temporary, 'remote.git'); const cwd = join(temporary, 'work');

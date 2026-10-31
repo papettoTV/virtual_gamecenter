@@ -16,7 +16,7 @@ def build():
   p=ROOT/name
   if not p.is_file() or p.is_symlink():raise RuntimeError('通常ファイルでない定義')
   b=p.read_bytes();hashes[name]=hashlib.sha1(b'blob '+str(len(b)).encode()+b'\0'+b).hexdigest()
- value={'version':1,'policyId':'review-trust-2026-10-31-v2','repository':'papettoTV/virtual_gamecenter',
+ value={'version':1,'policyId':'review-trust-2026-10-31-v3','repository':'papettoTV/virtual_gamecenter',
   'maxEvidenceAgeMs':86400000,'files':hashes,
   'codexAction':'openai/codex-action@bdf19a4a223ec2549a3e2274a0cf61556bc07675','codexVersion':'0.164.0'}
  (ROOT/'ci/control/review-trust.json').write_text(json.dumps(value,ensure_ascii=False,indent=2)+'\n')

@@ -16,9 +16,9 @@ function fixture(){
   paginate:async method=>method===list?[pr]:[{filename:'apps/web/src/games/dot-wave/duel/style.css'}]};
  return {issue,pr,github};
 }
-test('同意処理やplatform実装を開放せずCSSと関連テストだけを許可する',()=>{
- for(const path of ['apps/web/src/features/analytics/analytics-consent.css','apps/web/tests/analytics-consent-layout.test.ts','apps/web/tests/platform/leave-game.test.ts','apps/web/tests/ui/dot-wave-layout.spec.mjs'])assert.equal(allowedPath(path),true,path);
- for(const path of ['apps/web/src/features/analytics/AnalyticsConsent.tsx','apps/web/src/features/analytics/analytics-runtime.ts','apps/web/src/features/platform/PlatformExperience.tsx','apps/web/tests/platform/credit.test.ts','apps/web/tests/platform/leave-game.test.ts.bak','apps/web/tests/ui/auth.spec.mjs','apps/web/src/features/analytics/../analytics/analytics-consent.css'])assert.equal(allowedPath(path),false,path);
+test('自動再開もアプリコード全般を許可し、公開制御の保護は維持する',()=>{
+ for(const path of ['apps/web/src/features/analytics/AnalyticsConsent.tsx','apps/web/src/features/platform/PlatformExperience.tsx','apps/web/tests/platform/credit.test.ts','apps/web/tests/ui/auth.spec.mjs','apps/web/src/worker/platform.ts','apps/web/src/games/graze-duel/input.js'])assert.equal(allowedPath(path),true,path);
+ for(const path of ['ci/policy.mjs','.github/workflows/codex-issue.yml','apps/web/src/pages/gateway.mjs','apps/web/public/_worker.js','apps/web/tests/platform/leave-game.test.ts.bak','apps/web/src/features/analytics/../analytics/analytics-consent.css'])assert.equal(allowedPath(path),false,path);
 });
 test('既存の自動PRだけを再開し、別PR・担当変更・古いbase・未確定候補を拒否する',async()=>{
  const f=fixture(),target=await resumeTarget({github:f.github,repo,issueNumber:82,bot,base});

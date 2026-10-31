@@ -17,12 +17,12 @@ import warnings
 import zipfile
 
 REPO = '/repos/papettoTV/virtual_gamecenter'
-BASE = '2fa516c94538d3ed434c3195de1c2063a1e7789f'
+BASE = '1919c95b933d9b820b6db7bc54572020923c9849'
 MAIN = '73cb5d9267c56f06f9f1150327ec6b8b3caa2bb9'
 APP = 5405029
 BUNDLE_DIGEST = 'PACKAGED_BUNDLE_DIGEST'
 APPLY_RULE_VERSION = None  # Pin only after the sole human-managed App bypass is verified.
-STRICT_RULE_VERSION = '2026-10-31T00:30:20.881Z'
+STRICT_RULE_VERSION = '2026-10-31T01:19:50.549Z'
 MAIN_RULE_VERSION = '2026-10-21T20:32:35.191Z'
 MANIFEST = 'automatic-resume-installation.json'
 FILES = {'ci/control/review-trust.mjs', 'ci/control/review-trust.json', 'ci/production-candidate/policy.json'}
