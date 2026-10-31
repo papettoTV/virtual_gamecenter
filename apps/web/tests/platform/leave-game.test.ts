@@ -29,7 +29,7 @@ describe("leaving a paid game", () => {
       const cleanup = installLeaveGameConfirmation();
       const event = { target: new Target(), preventDefault: vi.fn(), stopImmediatePropagation: vi.fn() };
       handler(event);
-      expect(confirm).toHaveBeenCalledWith(expect.stringContaining("クレジットは戻りません"));
+      expect(confirm).toHaveBeenCalledWith("ほかのゲームを探しに行きますか？\n今のプレイはここで終了します。使用済みのクレジットはそのまま消費されます。");
       expect(event.preventDefault).toHaveBeenCalledTimes(accepted ? 0 : 1);
       expect(event.stopImmediatePropagation).toHaveBeenCalledTimes(accepted ? 0 : 1);
       cleanup();
