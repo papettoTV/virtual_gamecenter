@@ -51,18 +51,26 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 664 
   });
 }
 
-test('低いビューポートでも本文と全操作に到達できる', async ({ page }) => {
+test('低いビューポートでも本文と全操作に到達できる', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 568, height: 240 });
   await page.goto('/');
   await expectDocked(page);
   const panel = panelFor(page);
   await panel.evaluate(element => { element.scrollTop = 0; });
   await expect(panel.getByText('Google Analyticsによるアクセス解析', { exact: true })).toBeInViewport();
+  await testInfo.attach('低い画面・パネル本文', {
+    body: await page.screenshot(),
+    contentType: 'image/png',
+  });
   for (const name of ['拒否する', '同意する', '閉じる']) {
     const button = panel.getByRole('button', { name, exact: true });
     await button.scrollIntoViewIfNeeded();
     await expect(button).toBeInViewport();
     await button.click({ trial: true });
+    await testInfo.attach(`低い画面・${name}に到達`, {
+      body: await page.screenshot(),
+      contentType: 'image/png',
+    });
   }
   await panel.getByRole('button', { name: '閉じる', exact: true }).click();
   await expect(panel).toHaveCount(0);
