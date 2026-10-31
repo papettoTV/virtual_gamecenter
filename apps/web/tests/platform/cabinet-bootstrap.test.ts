@@ -35,7 +35,7 @@ it.each(["graze-duel", "deep-sea-salvage", "dot-wave"])("shares guest creation a
   session.join("first", game);
   const ready = vi.fn(); const waiting = session.waitForPlayer().then(ready);
   session.send({ type: "joinCabinet", gameId: game, watch: false });
-  await vi.advanceTimersByTimeAsync(6000);
+  await vi.advanceTimersByTimeAsync(6500);
   expect(sockets).toHaveLength(0); expect(ready).not.toHaveBeenCalled(); expect(fetch).toHaveBeenCalledTimes(1);
   finish(); await initial; await vi.advanceTimersByTimeAsync(0);
   expect(sockets).toHaveLength(1);
@@ -50,6 +50,8 @@ it.each(["graze-duel", "deep-sea-salvage", "dot-wave"])("shares guest creation a
 it.each(["leave", "dispose", "move"])("invalidates pending guest connection on %s", async action => {
   const { session, lifetime, finish } = await setup();
   session.join("old", "graze-duel"); const waiting = session.waitForPlayer();
+  await vi.advanceTimersByTimeAsync(6500);
+  expect(sockets).toHaveLength(0);
   if (action === "dispose") lifetime.dispose();
   else if (action === "leave") session.leave();
   else session.join("new", "dot-wave", true);
@@ -78,7 +80,7 @@ it("starts the existing admission budget only after bootstrap, and still times o
   const { session, finish } = await setup();
   session.join("first", "graze-duel");
   const settled = vi.fn(); const waiting = session.waitForPlayer().then(settled);
-  await vi.advanceTimersByTimeAsync(6000);
+  await vi.advanceTimersByTimeAsync(6500);
   expect(settled).not.toHaveBeenCalled();
   finish(); await vi.advanceTimersByTimeAsync(4999);
   expect(settled).not.toHaveBeenCalled();
