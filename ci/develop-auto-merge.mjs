@@ -2,8 +2,8 @@
 import {readFile,writeFile,appendFile,lstat,readdir} from 'node:fs/promises';
 import {pathToFileURL} from 'node:url';
 import {resolve} from 'node:path';
-export const CONTROL_SHA='b0d2ff949dfb5ea3470a8ec943bfad9e55e2f89c';
-export const RULE_VERSIONS={ciControl:'2026-10-31T10:35:45.400Z',main:'2026-10-21T20:32:35.191Z',protectionMode:'strict'};
+export const CONTROL_SHA='8e2fc0128bc53c20626c81f44e1187c8de38d641';
+export const RULE_VERSIONS={ciControl:'2026-10-31T21:38:03.915Z',main:'2026-10-21T20:32:35.191Z',protectionMode:'strict'};
 const repository='papettoTV/virtual_gamecenter',sha=v=>/^[a-f0-9]{40}$/.test(v??''),id=v=>/^[1-9][0-9]*$/.test(String(v??''));
 function need(v,m){if(!v)throw Error(m);}
 export function context(env=process.env){
