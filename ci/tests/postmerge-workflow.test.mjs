@@ -17,6 +17,7 @@ test('staging承認ジョブ1つ、公開/回帰の実行ステップ1つ、実�
 test('公開用ツールのCIは鍵とEnvironmentなしで偽API・sandboxだけを検証する',async()=>{
  const w=parse(await readFile(new URL('../../.github/workflows/staging-toolchain-check.yml',import.meta.url),'utf8'));
  assert.deepEqual(w.permissions,{contents:'read'});assert.deepEqual(w.on.pull_request.branches,['develop']);assert.equal(w.jobs['verify-toolchain'].environment,undefined);assert.ok(!JSON.stringify(w).includes('secrets.'));assert.ok(JSON.stringify(w).includes('node tools/check-pages-metadata.mjs'));assert.ok(JSON.stringify(w).includes('chromiumSandbox:true'));
+ assert.ok(w.jobs['verify-toolchain'].steps.some(s=>s.run==='node tools/check-browser-process.mjs'));
  const release=parse(await readFile(new URL('../../.github/workflow-templates/postmerge-staging.yml.disabled',import.meta.url),'utf8'));
  const steps=release.jobs.staging.steps;assert.ok(steps.findIndex(s=>s.run?.includes('chromiumSandbox:true'))<steps.findIndex(s=>s.run==='node ci/control/postmerge-runner.mjs approved'));
 });

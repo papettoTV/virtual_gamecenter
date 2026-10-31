@@ -5,6 +5,7 @@ on:
     paths:
       - 'ci/control/**'
       - 'tools/check-pages-metadata.mjs'
+      - 'tools/check-browser-process.mjs'
       - 'tools/install-automatic-resume-control.py'
       - 'tools/package-automatic-resume-control.py'
       - 'tools/tests/test_install_automatic_resume_control.py'
@@ -39,3 +40,5 @@ jobs:
           const browser=await chromium.launch({channel:'chromium',chromiumSandbox:true});
           await browser.close();
           JS
+      - name: 公開処理と同じ隔離envでsandboxとローカル描画を確認（鍵・実サイトなし）
+        run: node tools/check-browser-process.mjs

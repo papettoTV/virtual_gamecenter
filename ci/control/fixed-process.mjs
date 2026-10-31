@@ -49,10 +49,68 @@ export function parseBrowserReport(raw,{listOnly=false}={}){
  if(s?.expected!==8||s.unexpected!==0||s.flaky!==0||s.skipped!==0)throw Error('ブラウザ回帰に失敗・skipがあります');
  return {listOnly:false,stats:{expected:8,unexpected:0,flaky:0,skipped:0}};
 }
+// Never retain Playwright config, error text, attachments, URLs or arbitrary titles.
+const browserCases=new Map([
+ ['home renders active games and versioned Worker/Pages','home'],
+ ['legal navigation /legal/terms','terms'],
+ ['legal navigation /legal/privacy','privacy'],
+ ['game navigation allows declining credit and returning before play','game-navigation'],
+]);
+const browserStatuses=['passed','failed','timedOut','skipped','interrupted'];
+const browserCategories=['timeout','assertion','locator','browser-start','other'];
+function boundedInteger(v,max){return Number.isSafeInteger(v)&&v>=0&&v<=max?v:null;}
+function browserError(error){
+ const text=String(error?.message??'').slice(0,65536),stack=String(error?.stack??'').slice(0,65536);
+ const category=/timeout|timed out/i.test(text)?'timeout':/strict mode violation|resolved to .*elements/i.test(text)?'locator':/expect\(|Expected:|Received:/i.test(text)?'assertion':/browserType\.launch|executable doesn't exist|browser closed/i.test(text)?'browser-start':'other';
+ const file=String(error?.location?.file??'');
+ const match=stack.match(/(?:^|\/)regression\.spec\.mjs:(\d{1,4}):\d{1,4}(?:\D|$)/);
+ const line=file.endsWith('/regression.spec.mjs')?boundedInteger(error.location.line,9999):match?Number(match[1]):null;
+ return {category,line};
+}
+export function browserDiagnostics(raw,exitCode){
+ const fallback={version:1,kind:'invalid-report',exitCode:boundedInteger(exitCode,255),cases:[],errors:[]};
+ if(typeof raw!=='string'||Buffer.byteLength(raw)>8*1024*1024)return fallback;
+ let report;try{report=JSON.parse(raw);}catch{return {...fallback,kind:'process-failure'};}
+ const cases=[],seen=new Set();let invalid=false;
+ function visit(suites,depth=0){
+  if(!Array.isArray(suites)||depth>12||suites.length>32){invalid=true;return;}
+  for(const suite of suites){
+   if(!suite||!Array.isArray(suite.specs??[])||(suite.specs??[]).length>8){invalid=true;return;}
+   for(const spec of suite.specs??[]){
+    const id=browserCases.get(spec?.title);
+    if(!id||!Array.isArray(spec.tests)||spec.tests.length>2){invalid=true;return;}
+    for(const test of spec.tests){
+     const project=test?.projectName,key=`${project}/${id}`;
+     if(!['desktop','mobile'].includes(project)||seen.has(key)||!Array.isArray(test.results)||test.results.length!==1){invalid=true;return;}
+     seen.add(key);const result=test.results[0];
+     if(!browserStatuses.includes(result?.status)||!Array.isArray(result.errors??[])||(result.errors??[]).length>16){invalid=true;return;}
+     cases.push({case:id,project,status:result.status,durationMs:boundedInteger(result.duration,240000),errors:(result.errors??[]).slice(0,4).map(browserError)});
+    }
+   }
+   if(suite.suites)visit(suite.suites,depth+1);
+  }
+ }
+ visit(report?.suites);
+ if(invalid||cases.length>8||!Array.isArray(report?.errors)||report.errors.length>16)return fallback;
+ // An interrupted launch may produce fewer than eight results; keep it incomplete.
+ return {version:1,kind:cases.length===8?'test-results':'incomplete-report',exitCode:boundedInteger(exitCode,255),cases,errors:report.errors.slice(0,4).map(browserError)};
+}
+export function sanitizeBrowserFailure(value){
+ if(!value||value.version!==1)return null;
+ const kind=['invalid-report','process-failure','incomplete-report','test-results'].includes(value.kind)?value.kind:'invalid-report';
+ const errors=items=>Array.isArray(items)?items.slice(0,4).map(e=>({category:browserCategories.includes(e?.category)?e.category:'other',line:boundedInteger(e?.line,9999)})):[];
+ const cases=Array.isArray(value.cases)?value.cases.slice(0,8).filter(c=>[...browserCases.values()].includes(c?.case)&&['desktop','mobile'].includes(c?.project)&&browserStatuses.includes(c?.status)).map(c=>({case:c.case,project:c.project,status:c.status,durationMs:boundedInteger(c.durationMs,240000),errors:errors(c.errors)})):[];
+ return {version:1,kind,exitCode:boundedInteger(value.exitCode,255),cases,errors:errors(value.errors)};
+}
 export async function runFixedBrowser({environment,listOnly=false,process=runFixedTool}){
  const config=resolve(root,'staging-browser.config.mjs');
  const args=['test','--config',config,'--reporter=json',...(listOnly?['--list']:[])];
  const r=await process('playwright',args,{cwd:root,env:environment,timeout:240000});
- if(r.exitCode!==0)throw Error('ブラウザ起動または回帰が不合格です。元出力は保存しません');
- return {exitCode:0,...parseBrowserReport(r.stdout,{listOnly})};
+ try{
+  if(r.exitCode!==0)throw Error();
+  return {exitCode:0,...parseBrowserReport(r.stdout,{listOnly})};
+ }catch{
+  const error=Error('ブラウザ起動または回帰が不合格です。元出力は保存しません');
+  error.browserFailure=browserDiagnostics(r.stdout,r.exitCode);throw error;
+ }
 }
