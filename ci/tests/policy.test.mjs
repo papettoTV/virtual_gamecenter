@@ -4,21 +4,41 @@ import { assertChanges, allowedPath, assertReview, assertAutomatedPr, assertProd
 import { checkRevision } from '../check-revision.mjs';
 import { checkWorkflows } from '../check-workflows.mjs';
 const sha = 'a'.repeat(40);
-test('automation allows UI changes and rejects infrastructure, security, path tricks and renames', () => {
-  assertChanges([{ filename: 'apps/web/src/games/dot-wave/game.ts' }, { filename: 'apps/web/tests/game.test.mjs' }]);
-  assertChanges([{ filename: 'apps/web/src/games/graze-duel/rendering/canvas-renderer.js' },
-    { filename: 'apps/web/src/games/graze-duel/rendering/game-over-overlay.js' }, { filename: 'docs/pc-play-spectating-verification.md' }]);
-  for (const filename of ['.github/workflows/x.yml', 'ci/policy.mjs', 'apps/web/package.json', 'apps/web/src/worker/index.ts',
-    'apps/web/src/features/platform/PlatformExperience.tsx', 'docs/../AGENTS.md', 'docs/AGENTS.md', 'docs/a b.md', '/docs/a.md', 'docs//a.md',
-    'apps/web/src/games/graze-duel/game.js', 'apps/web/src/shared/rendering/client.js', 'apps/web/src/worker/rendering/renderer.js',
-    'apps/web/src/games/graze-duel/rendering/auth.js', 'apps/web/src/games/graze-duel/rendering/../game.js',
-    'apps/web/src/games/graze-duel/rendering/config.json', 'docs/SKILL.md', 'docs/CLAUDE.md', 'docs/GEMINI.md', 'docs/agents.md',
-    'AGENTS.md', 'README.md', 'apps/web/src/games/graze-duel/rendering/README.md']) {
-    assert.equal(allowedPath(filename), false, filename);
-  }
+test('アプリの認証・課金・バックエンドも編集でき、制御パスとrename迂回は拒否する', () => {
+  const allowed = [
+    'apps/web/src/features/platform/PlatformExperience.tsx',
+    'apps/web/src/features/platform/use-credit-purchase.ts',
+    'apps/web/src/features/analytics/AnalyticsConsent.tsx',
+    'apps/web/src/worker/auth.ts', 'apps/web/src/worker/credit-reservations.ts',
+    'apps/web/src/games/graze-duel/input.js', 'apps/web/src/games/graze-duel/legacy-runtime.js',
+    'apps/web/src/shared/client.mjs', 'apps/web/src/shared/protocol.json',
+    'apps/web/tests/platform/credit.test.ts', 'apps/web/tests/ui/auth.spec.mjs',
+    'apps/web/public/analytics.js', 'apps/web/public/legal/privacy.html',
+    'apps/web/public/brand/logo.svg', 'apps/web/index.html', 'docs/credit-platform-auth.md',
+  ];
+  assertChanges(allowed.map(filename => ({ filename })));
+  for (const filename of [
+    '.github/workflows/x.yml', 'ci/policy.mjs', 'tools/install.py',
+    'apps/web/package.json', 'apps/web/package-lock.json', 'apps/web/.env',
+    'apps/web/wrangler.jsonc', 'apps/web/pages/wrangler.jsonc',
+    'apps/web/config/pages-targets.json', 'apps/web/scripts/release.mjs',
+    'apps/web/src/pages/gateway.mjs', 'apps/web/src/pages/new-gateway.ts',
+    'apps/web/migrations/0016_credit.sql', 'apps/web/vite.config.ts',
+    'apps/web/src/games/dot-wave/duel/vitest.config.ts', 'apps/web/tests/vitest.config.ts',
+    'apps/web/public/_worker.js', 'apps/web/public/_worker.js/index.js',
+    'apps/web/public/_routes.json', 'apps/web/public/_redirects', 'apps/web/public/_headers',
+    'apps/web/src/.agents/hook.ts', 'apps/web/tests/.codex/instructions.js',
+    'docs/../AGENTS.md', 'docs/AGENTS.md', 'docs/SKILL.md', 'docs/CLAUDE.md', 'docs/GEMINI.md',
+    'docs/nested/agents.md', 'docs/a b.md', '/docs/a.md', 'docs//a.md',
+    'apps/web/src/games/../worker/index.ts', 'apps/web/src/worker/index.ts.bak',
+    'AGENTS.md', 'README.md', 'apps/web/public/promo.mp4',
+  ]) assert.equal(allowedPath(filename), false, filename);
   assert.throws(() => assertChanges([]));
-  assert.throws(() => assertChanges([{ filename: 'docs/a.md', previous_filename: 'ci/policy.mjs' }]));
-  assert.throws(() => assertChanges([{ filename: 'apps/web/src/games/graze-duel/rendering/a.js', previous_filename: 'apps/web/src/worker/index.js' }]));
+  assert.throws(() => assertChanges(Array.from({length:61}, () => ({filename:'docs/a.md'}))));
+  for (const previous_filename of ['ci/policy.mjs','apps/web/src/pages/gateway.mjs','apps/web/vite.config.ts']) {
+    assert.throws(() => assertChanges([{filename:'apps/web/src/worker/index.js',previous_filename}]));
+  }
+  assert.throws(() => assertChanges([{filename:'ci/policy.mjs',previous_filename:'apps/web/src/worker/index.ts'}]));
 });
 test('review fails closed on malformed/negative findings', () => {
   assertReview({ pass: true, findings: [] });
