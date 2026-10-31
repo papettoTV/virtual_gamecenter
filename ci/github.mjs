@@ -1,8 +1,9 @@
 import { assertAutomatedPr, assertChanges, assertIssueNumber, assertSha } from './policy.mjs';
 import { publicationFailureText } from './publication-result.mjs';
 import { automaticIssueLabel, issueImplementationMode, assertAutomaticIssue, assertNoIssuePr, assertAutomaticAssignment } from './issue-routing.mjs';
+import {resumeLabel,resumeTarget} from './automatic-resume.mjs';
 
-export async function intake({ github, context, core, issueInput }) {
+export async function intake({ github, context, core, issueInput, resumeInput, bot }) {
   const issue_number = assertIssueNumber(issueInput || context.payload.issue?.number);
   const repo = context.repo;
   const { data: issue } = await github.rest.issues.get({ ...repo, issue_number });
@@ -17,17 +18,23 @@ export async function intake({ github, context, core, issueInput }) {
   if (!['admin', 'maintain', 'write'].includes(actor.permission)) throw Error('Write access required');
   if (context.eventName !== 'workflow_dispatch') {
     const { data: author } = await github.rest.repos.getCollaboratorPermissionLevel({ ...repo, username: issue.user.login });
-    const labelled = context.payload.action === 'labeled' && context.payload.label?.name === automaticIssueLabel;
+    const labelled = context.payload.action === 'labeled' && [automaticIssueLabel,resumeLabel].includes(context.payload.label?.name);
     if (!labelled && !['admin', 'maintain', 'write'].includes(author.permission)) throw Error('Maintainer must label this issue');
   }
-  await assertNoIssuePr({ github, repo, issueNumber: issue_number });
   const { data: branch } = await github.rest.repos.getBranch({ ...repo, branch: 'develop' });
   const sha = assertSha(branch.commit.sha);
-  const text = JSON.stringify({ number: issue_number, title: issue.title, body: issue.body ?? '' });
+  const resuming=resumeInput==='true'||context.payload.label?.name===resumeLabel;
+  const target=resuming?await resumeTarget({github,repo,issueNumber:issue_number,bot,base:sha}):null;
+  if(!target)await assertNoIssuePr({ github, repo, issueNumber: issue_number });
+  const text = JSON.stringify({ number: issue_number, title: issue.title, body: issue.body ?? '',
+    resume:target?{pullNumber:target.pull,existingHead:target.head}:null });
   if (Buffer.byteLength(text) > 18000) throw Error('Issue exceeds automation input limit');
   core.setOutput('eligible', 'true');
   core.setOutput('issue', issue_number);
-  core.setOutput('base', sha);
+  core.setOutput('base', target?.candidate??sha);
+  core.setOutput('trusted_base',sha);
+  core.setOutput('pull',target?.pull??'');
+  core.setOutput('head',target?.head??'');
   core.setOutput('request', text);
 }
 

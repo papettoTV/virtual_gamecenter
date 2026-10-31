@@ -9,6 +9,10 @@ on:
         description: 実装:自動ラベル付きの開いているIssue番号（developで実行）
         required: true
         type: string
+      resume:
+        description: 既存の自動PRがあれば同じPRを修正する
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -19,7 +23,7 @@ jobs:
     if: >-
       vars.PULBASE_CODEX_ENABLED == 'true' &&
       (github.event_name == 'workflow_dispatch' ||
-       (github.event.action == 'labeled' && github.event.label.name == '実装:自動'))
+       (github.event.action == 'labeled' && (github.event.label.name == '実装:自動' || github.event.label.name == '実装:再開')))
     runs-on: ubuntu-latest
     timeout-minutes: 3
     outputs:
@@ -27,19 +31,24 @@ jobs:
       issue: ${{ steps.request.outputs.issue }}
       base: ${{ steps.request.outputs.base }}
       request: ${{ steps.request.outputs.request }}
+      trusted_base: ${{ steps.request.outputs.trusted_base }}
+      pull: ${{ steps.request.outputs.pull }}
+      head: ${{ steps.request.outputs.head }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: develop
           persist-credentials: false
-      - uses: actions/github-script@v7
+      - uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
         id: request
         env:
           ISSUE_INPUT: ${{ inputs.issue }}
+          RESUME_INPUT: ${{ inputs.resume }}
+          AUTOMATION_BOT: ${{ vars.PULBASE_AUTOMATION_BOT }}
         with:
           script: |
             const { intake } = await import(`${process.env.GITHUB_WORKSPACE}/ci/github.mjs`);
-            await intake({ github, context, core, issueInput: process.env.ISSUE_INPUT });
+            await intake({ github, context, core, issueInput: process.env.ISSUE_INPUT, resumeInput: process.env.RESUME_INPUT, bot: process.env.AUTOMATION_BOT });
   implement:
     needs: intake
     if: needs.intake.outputs.eligible == 'true'
@@ -49,11 +58,11 @@ jobs:
     outputs:
       result: ${{ steps.codex.outputs.final-message }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ needs.intake.outputs.base }}
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
       - run: npm ci
@@ -65,9 +74,10 @@ jobs:
           node -e 'const fs = require("fs"); fs.writeFileSync("ci/request.md", fs.readFileSync("ci/prompts/implement.md", "utf8") + "\nUntrusted issue JSON:\n" + process.env.ISSUE_REQUEST)'
           printf '%s\n' 'GOOGLE_CLIENT_ID=ci-example.apps.googleusercontent.com' 'GOOGLE_CLIENT_SECRET=ci-example' 'STRIPE_SECRET_KEY=sk_test_ci_example' 'STRIPE_WEBHOOK_SECRET=whsec_ci_example' > apps/web/.dev.vars
       # Last step: do not run code in a runner modified by Codex afterward.
-      - uses: openai/codex-action@v1
+      - uses: openai/codex-action@bdf19a4a223ec2549a3e2274a0cf61556bc07675
         id: codex
         with:
+          codex-version: '0.164.0'
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           prompt-file: ci/request.md
           sandbox: workspace-write
@@ -81,31 +91,36 @@ jobs:
     outputs:
       failure: ${{ steps.publish.outputs.failure }}
     steps:
-      - uses: actions/create-github-app-token@v1
+      - uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547
         id: app
         with:
           app-id: ${{ vars.PULBASE_APP_ID }}
           private-key: ${{ secrets.PULBASE_APP_PRIVATE_KEY }}
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: ${{ needs.intake.outputs.base }}
+          ref: ${{ needs.intake.outputs.trusted_base }}
           token: ${{ steps.app.outputs.token }}
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
       - name: Recheck automatic assignment and existing PRs immediately before publication
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
         env:
           ISSUE_NUMBER: ${{ needs.intake.outputs.issue }}
+          PULL_NUMBER: ${{ needs.intake.outputs.pull }}
         with:
           script: |
             const { assertAutomaticAssignment } = await import(`${process.env.GITHUB_WORKSPACE}/ci/issue-routing.mjs`);
-            await assertAutomaticAssignment({ github, repo: context.repo, issueNumber: process.env.ISSUE_NUMBER });
+            await assertAutomaticAssignment({ github, repo: context.repo, issueNumber: process.env.ISSUE_NUMBER, exceptPullNumber: process.env.PULL_NUMBER ? Number(process.env.PULL_NUMBER) : undefined });
       - name: Validate and publish text patch without executing candidate code
         id: publish
         env:
           CODEX_RESULT: ${{ needs.implement.outputs.result }}
           BASE_SHA: ${{ needs.intake.outputs.base }}
+          TRUSTED_BASE_SHA: ${{ needs.intake.outputs.trusted_base }}
+          PULL_NUMBER: ${{ needs.intake.outputs.pull }}
+          PR_HEAD_SHA: ${{ needs.intake.outputs.head }}
+          AUTOMATION_BOT: ${{ vars.PULBASE_AUTOMATION_BOT }}
           ISSUE_NUMBER: ${{ needs.intake.outputs.issue }}
           RESULT_FILE: ${{ runner.temp }}/codex-result.json
           PATCH_FILE: ${{ runner.temp }}/codex.patch
@@ -115,7 +130,9 @@ jobs:
         run: |
           node -e 'require("fs").writeFileSync(process.env.RESULT_FILE, process.env.CODEX_RESULT)'
           node ci/publish-patch.mjs
-          gh pr create --base develop --head "codex/issue-$ISSUE_NUMBER" --title "Issue #$ISSUE_NUMBER の対応" --body-file "$PR_BODY_FILE"
+          if [ -z "$PULL_NUMBER" ]; then
+            gh pr create --base develop --head "codex/issue-$ISSUE_NUMBER" --title "Issue #$ISSUE_NUMBER の対応" --body-file "$PR_BODY_FILE"
+          fi
   failure:
     needs: [intake, implement, publish]
     if: always() && vars.PULBASE_CODEX_ENABLED == 'true' && contains(needs.*.result, 'failure')
@@ -125,11 +142,11 @@ jobs:
       contents: read
       issues: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: develop
           persist-credentials: false
-      - uses: actions/github-script@v7
+      - uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
         env:
           ISSUE_NUMBER: ${{ inputs.issue }}
           PUBLICATION_FAILURE: ${{ needs.publish.outputs.failure }}

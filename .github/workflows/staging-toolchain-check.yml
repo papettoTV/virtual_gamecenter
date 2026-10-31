@@ -5,6 +5,9 @@ on:
     paths:
       - 'ci/control/**'
       - 'tools/check-pages-metadata.mjs'
+      - 'tools/install-automatic-resume-control.py'
+      - 'tools/package-automatic-resume-control.py'
+      - 'tools/tests/test_install_automatic_resume_control.py'
       - '.github/workflow-templates/postmerge-staging.yml.disabled'
       - '.github/workflows/staging-toolchain-check.yml'
 permissions:
@@ -21,6 +24,8 @@ jobs:
         with:
           node-version: '22'
       - run: npm ci --ignore-scripts --prefix ci/control/toolchain
+      - name: 人用の信頼定義更新を偽APIで確認（鍵・公開なし）
+        run: python3 -B -m unittest discover -s tools/tests -p test_install_automatic_resume_control.py
       - name: 実CLIと偽APIで共有設定の保持を確認（実Cloudflare通信なし）
         run: node tools/check-pages-metadata.mjs
       - name: 固定ChromiumとOS依存を取得

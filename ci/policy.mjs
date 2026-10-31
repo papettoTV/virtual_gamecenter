@@ -11,10 +11,17 @@ export function assertIssueNumber(value) {
 export function allowedPath(path) {
   if (typeof path !== 'string' || !/^[a-zA-Z0-9_./-]+$/.test(path)
     || path.split('/').some(p => !p || p === '.' || p === '..')) return false;
+  // Exact presentation/test exceptions only. Consent processing and platform
+  // application code remain protected; a matching substring is never enough.
+  if (['apps/web/src/features/analytics/analytics-consent.css',
+    'apps/web/tests/analytics-consent-layout.test.ts',
+    'apps/web/tests/platform/leave-game.test.ts'].includes(path)) return true;
+  if (path.startsWith('apps/web/src/features/analytics/')) return false;
   if (/(?:AGENTS|SKILL|CLAUDE|GEMINI)\.md|(?:auth|secret|payment|stripe|consent|credit|platform)/i.test(path)) return false;
   return /^apps\/web\/src\/(?:app|brand|games|game-sdk|shared|features)\/.+\.(?:ts|tsx|css)$/.test(path)
     || /^apps\/web\/src\/games\/[a-z0-9-]+\/rendering\/.+\.js$/.test(path)
     || /^apps\/web\/tests\/.+\.(?:test\.mjs|test\.ts)$/.test(path)
+    || /^apps\/web\/tests\/ui\/[a-z0-9-]+\.spec\.mjs$/.test(path)
     || /^docs\/.+\.md$/.test(path);
 }
 export function assertChanges(files) {
