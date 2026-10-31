@@ -8,6 +8,7 @@ for (const game of ['graze-duel', 'deep-sea-salvage', 'dot-wave']) {
       let bootstraps = 0;
       const earlySockets = [];
       const sockets = [];
+      const playerAdmissions = [];
       const admissionErrors = [];
       const accounting = [];
       // Delay only the request. The real local Worker creates the guest and
@@ -30,23 +31,31 @@ for (const game of ['graze-duel', 'deep-sea-salvage', 'dot-wave']) {
         socket.on('framereceived', ({ payload }) => {
           const message = JSON.parse(String(payload));
           if (message.type === 'error') admissionErrors.push(message.type);
+          if (message.type === 'joinedCabinet' && message.role === 'player') playerAdmissions.push(socket.url());
         });
       });
       const url = `http://127.0.0.1:5174/cabinets/${randomUUID()}?game=${game}`;
       await page.goto(url);
-      // Six seconds deliberately exceeds the former five-second admission
-      // budget. This deadline includes guest setup as well as actual admission.
-      await expect.poll(() => page.evaluate(async gameId => gameId === 'dot-wave'
-        ? document.querySelector('main.dot-wave[data-phase]')?.dataset.phase
-        : (await import('/src/features/sharing/share-service.ts')).liveSharing.getSnapshot()?.phase, game), { timeout: 10000 })
-        .toBe(game === 'dot-wave' ? 'intro' : 'ready');
-      if (game === 'dot-wave') await expect(page.locator('.dot-cabinet-bar > span')).toContainText('あなたの筐体');
-      else await expect(page.locator('#game-screen')).toBeVisible();
+      // Intro / liveSharing.ready can appear before guest setup or admission.
+      // Use one acceptance deadline for real server admission AND the ready UI,
+      // including the deliberate six-second bootstrap delay. Do not start a
+      // separate default five-second UI wait while initialization is pending.
+      await expect.poll(async () => {
+        if (playerAdmissions.length === 0) return false;
+        const phase = await page.evaluate(async gameId => gameId === 'dot-wave'
+          ? document.querySelector('main.dot-wave[data-phase]')?.dataset.phase
+          : (await import('/src/features/sharing/share-service.ts')).liveSharing.getSnapshot()?.phase, game);
+        const readyUi = game === 'dot-wave'
+          ? (await page.locator('.dot-cabinet-bar > span').textContent())?.includes('あなたの筐体')
+          : await page.locator('#game-screen').isVisible();
+        return phase === (game === 'dot-wave' ? 'intro' : 'ready') && readyUi;
+      }, { timeout: 10000, message: 'real player admission and ready UI after guest bootstrap' }).toBe(true);
       expect(initialized).toBe(true);
       expect(bootstraps).toBe(1);
       expect(earlySockets).toEqual([]);
       expect(admissionErrors).toEqual([]);
       expect(sockets).toHaveLength(1);
+      expect(playerAdmissions).toEqual(sockets);
       await expect(page).toHaveURL(url);
       expect(accounting).toEqual([]);
       await expect(page.getByRole('dialog', { name: 'ゲームを開始しますか？' })).toBeHidden();
