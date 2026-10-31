@@ -87,6 +87,9 @@ for (const size of sizes) {
     await page.setViewportSize({ width: size.width, height: size.height });
     // Use the real local server, guest bootstrap and cabinet connection.
     await enter(page, 'graze-duel');
+    await expect(page.locator('#game-screen')).toBeVisible();
+    if (size.width <= 820) await page.getByRole('button', { name: 'ゲーム開始', exact: true }).click();
+    else await page.keyboard.press('Space');
     await claimGift(page);
     await page.getByRole('button', { name: '1クレジットで開始', exact: true }).click();
     await expect(page.locator('#game-screen')).toBeVisible();
@@ -132,7 +135,8 @@ for (const size of sizes) {
     await expect(page.locator('.dot-cabinet-bar > span')).toContainText('あなたの筐体');
     await accountWorks(page);
     await evidence(page, info, `${size.name}-intro`, await geometry(page, referenceTop));
-    await page.getByRole('button', { name: /START.*1クレジットで開始/ }).click();
+    await page.getByRole('button', { name: 'START / ゲーム開始', exact: true }).click();
+    await page.getByRole('dialog', { name: 'ゲームを開始しますか？', exact: true }).getByRole('button', { name: '1クレジットで開始', exact: true }).click();
     await expect(main).toHaveAttribute('data-phase', 'playing', { timeout: 12000 });
     const tap = page.locator('.duel-tap');
     await expect(tap).toBeEnabled();

@@ -25,6 +25,17 @@ describe("game lifecycle", () => {
     lifetime.own(cleanup); expect(cleanup).toHaveBeenCalledTimes(2);
   });
 
+  it("prepares solo without requesting or authorizing a paid start", async () => {
+    const host = new GameHost();
+    const prepareSolo = vi.fn(); const play = vi.fn(); const requested = vi.fn();
+    host.attach({ prepareSolo, play, dispose() {} }); host.subscribe(requested);
+    await host.selectSolo();
+    expect(prepareSolo).toHaveBeenCalledOnce();
+    expect(requested).not.toHaveBeenCalled(); expect(play).not.toHaveBeenCalled();
+    host.requestPlay("start"); expect(requested).toHaveBeenCalledExactlyOnceWith("start");
+    expect(play).not.toHaveBeenCalled();
+  });
+
   it("rejects a late game-start completion after a game has been replaced", async () => {
     const host = new GameHost();
     let finish: (value: boolean) => void = () => {};
@@ -33,6 +44,36 @@ describe("game lifecycle", () => {
     detach(); host.attach({ play: () => true, dispose() {} }); finish(true);
     await expect(starting).resolves.toBe(false);
     await expect(host.play("retry")).resolves.toBe(true);
+  });
+
+  it("waits through an earlier watch acknowledgement and requires solo authorization", async () => {
+    vi.stubGlobal("window", globalThis);
+    let handlers: CabinetClientHandlers = {};
+    const send = vi.fn(() => true);
+    const session = createCabinetSession({ gameId: "deep-sea-salvage" }, incoming => {
+      handlers = incoming;
+      return { join() {}, leave() {}, send, getBufferedAmount: () => 0 };
+    });
+    session.join("cabinet", "deep-sea-salvage", true);
+    session.join("cabinet", "deep-sea-salvage");
+    const ready = vi.fn();
+    const waiting = session.waitForPlayer().then(ready);
+    handlers.onMessage?.({ type: "joinedCabinet", clientId: "host", role: "spectator" });
+    await Promise.resolve();
+    expect(ready).not.toHaveBeenCalled();
+    handlers.onMessage?.({ type: "joinedCabinet", clientId: "host", role: "player" });
+    await waiting;
+    expect(ready).toHaveBeenCalledWith(true);
+    const authorized = vi.fn();
+    const starting = session.startSolo("reservation").then(authorized);
+    expect(send).toHaveBeenCalledExactlyOnceWith({ type: "startSolo", reservationId: "reservation" });
+    handlers.onMessage?.({ type: "soloStarted", reservationId: "other" });
+    await Promise.resolve();
+    expect(authorized).not.toHaveBeenCalled();
+    handlers.onMessage?.({ type: "soloStarted", reservationId: "reservation" });
+    await starting;
+    expect(authorized).toHaveBeenCalledWith(true);
+    session.leave();
   });
 
   it("tracks cabinet role and releases pending starts and transport on exit", async () => {
