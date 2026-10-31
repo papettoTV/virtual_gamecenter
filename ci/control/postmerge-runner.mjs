@@ -6,7 +6,7 @@ import {executionContext,readApi,verifyProtection} from './protection-check.mjs'
 import {developEvidence,releaseScope,runPostmergeStaging} from './postmerge-staging.mjs';
 import {checkBuild} from './candidate-evidence.mjs';
 import {connectedStagingOperations} from './fixed-staging-operations.mjs';
-import {sanitizeCommandFailure} from './fixed-process.mjs';
+import {sanitizeCommandFailure,sanitizeBrowserFailure} from './fixed-process.mjs';
 import {PUBLICATION_STOP_REASONS} from './staging-publication.mjs';
 import {trustPolicy} from './review-trust.mjs';
 const releaseMode='postmerge-staging-live';
@@ -71,7 +71,7 @@ export function failureReport(error){
  partialPublicationPossible:s.workerOutcome==='unknown'||s.pagesOutcome==='unknown'||(s.workerOutcome==='uploaded'&&s.pagesOutcome!=='uploaded')||(s.pagesOutcome==='uploaded'&&s.workerOutcome!=='uploaded'),
  realDeploymentExecuted:s.realDeploymentExecuted===true,realDeploymentAttempted:s.realDeploymentAttempted===true,
  realRegressionExecuted:s.realRegressionExecuted===true,regressionPassed:false,
- httpAttempted:s.httpAttempted===true,browserAttempted:s.browserAttempted===true,commandFailure:sanitizeCommandFailure(s.commandFailure),
+ httpAttempted:s.httpAttempted===true,browserAttempted:s.browserAttempted===true,commandFailure:sanitizeCommandFailure(s.commandFailure),browserFailure:sanitizeBrowserFailure(s.browserFailure),
  publicationStopReason:PUBLICATION_STOP_REASONS.includes(s.publicationStopReason)?s.publicationStopReason:'unknown',
  realMergeExecuted:false,mainUpdated:false,productionRequested:false};
 }
