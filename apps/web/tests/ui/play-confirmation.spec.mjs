@@ -232,7 +232,12 @@ for (const game of games) {
   }
 }
 
-for (const game of games) {
+// Registration cancellation exercises PlatformExperience's shared pending state:
+// BUZZ represents that flow (also used by deep-sea-salvage) on PC and mobile.
+// DOT WAVE uses standaloneCredits and its own confirmation, not this welcome flow.
+// Keep the three-game start/accounting/spectator coverage above unchanged; the
+// real account/consent hook regression is in registration-play-recovery.test.ts.
+for (const game of games.filter(game => game.id === 'graze-duel')) {
   for (const closeAt of ['consent', 'registration']) {
     test(`${game.id}: insufficient credit registration cancellation at ${closeAt} recovers without reload`, async ({ page, isMobile }) => {
       // Keep the welcome grant unclaimed so it can fund the final authorized play.
