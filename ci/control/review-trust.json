@@ -6,7 +6,7 @@
   "files": {
     "AGENTS.md": "462572401ca3b44d2998f26e4855bde6b5130fb7",
     ".github/workflows/codex-pr.yml": "6f3d33fc65ee2d455c024b64c1d920a269180c78",
-    ".github/workflows/web-checks.yml": "362c6e29e4330b0f20ce8ce2a1d0666800e22c1f",
+    ".github/workflows/web-checks.yml": "763279dcfa7478db4f31b7849f509d4eb6259522",
     "ci/prompts/review.md": "7064c0c05d2634ba4f1966b9a33873dfe7d2b492",
     "ci/schemas/review.json": "7fdca2655ec7103d6886bc64d11a0c5db1690657",
     "ci/review-receipt.mjs": "8100fe44e4c7b7c8e85183d70951b93d05c2cc9b",
@@ -34,7 +34,7 @@
     "ci/automatic-resume.mjs": "5d1394653aa6518497e38cf20d78b69291f5a04e",
     "ci/publish-patch.mjs": "79284d668fd7a406d606cef1dd4808d8786f13fe",
     "ci/ui-tests.mjs": "e4566aebea0590421b1052a92da2c14ef3480114",
-    "ci/ui-local.config.mjs": "2e9901925562a47ef2503a2131e3151513f2ed7e",
+    "ci/ui-local.config.mjs": "2fba8e7eb7a8fd87c8f19b5bb5b57c2afc14fea2",
     "ci/ui-fixtures.mjs": "46aa8deefc3d98ce810ffdce2ca5ac8eb9766c77"
   },
   "codexAction": "openai/codex-action@bdf19a4a223ec2549a3e2274a0cf61556bc07675",
