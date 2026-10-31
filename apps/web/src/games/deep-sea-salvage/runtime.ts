@@ -252,7 +252,7 @@ export function mountGame(context: GameContext): GameInstance {
   function togglePause() {
     if (watching) return;
     if (state.collectionOpen) { toggleCollection(); return; }
-    if (state.phase === "ready") startDive(); else if (state.phase === "dive") state.paused = !state.paused;
+    if (state.phase === "ready") gameHost.requestPlay("start"); else if (state.phase === "dive") state.paused = !state.paused;
     updateButtons();
   }
 
@@ -320,7 +320,8 @@ export function mountGame(context: GameContext): GameInstance {
   function escapeHtml(value: string) { const element = document.createElement("span"); element.textContent = value; return element.innerHTML; }
 
   scope.listen(window, "keydown", (event) => {
-    if (watching || document.querySelector(".share-overlay")) return;
+    if (watching || event.repeat || (document.querySelector(".share-overlay") || document.querySelector(".platform-overlay"))) return;
+    if (event.target instanceof Element && event.target.closest("input, textarea, select, button, [role=dialog]")) return;
     keys.add(event.code); if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(event.code)) event.preventDefault();
     if (event.code === "KeyP") togglePause();
     if (event.code === "KeyF") toggleCollection();
@@ -372,7 +373,7 @@ export function mountGame(context: GameContext): GameInstance {
   }
 
   function syncInitialScreen() {
-    showScreen(cabinetId ? watching ? "game" : "cabinet" : "arcade");
+    showScreen(cabinetId ? "game" : "arcade");
     if (cabinetId) cabinetClient.join(cabinetId, DEEP_SEA_SALVAGE.id, true);
   }
   function loop(now: number) {
@@ -428,6 +429,7 @@ export function mountGame(context: GameContext): GameInstance {
       }
       if (cabinetClient.role !== "player") cabinetClient.join(cabinetId, DEEP_SEA_SALVAGE.id);
       const ready = await cabinetClient.waitForPlayer();
+      if (ready && !scope.disposed && generation === actionGeneration) { showScreen("game"); updateButtons(); }
       return ready && !scope.disposed && generation === actionGeneration;
     })();
     try { return await preparePending; } finally { preparePending = null; }
@@ -446,7 +448,7 @@ export function mountGame(context: GameContext): GameInstance {
       if (!await cabinetClient.waitForPlayer() || scope.disposed || generation !== actionGeneration) return false;
       if (!reservationId || !await cabinetClient.startSolo(reservationId) || scope.disposed || generation !== actionGeneration) return false;
       watching = false; playing = true;
-      if (action === "retry") retryFromResult(); else resetRun();
+      if (action === "retry") retryFromResult(); else { resetRun(); startDive(); }
       showScreen("game"); lastTime = performance.now();
       return true;
     } finally { playPending = false; }
