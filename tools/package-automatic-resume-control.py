@@ -9,7 +9,7 @@ import importlib.util
 import re
 
 ROOT = Path(__file__).resolve().parents[1]
-BASE = '7dd7b4cab720d6f268cd406932475f1cce5dcc3d'
+BASE = '2fa516c94538d3ed434c3195de1c2063a1e7789f'
 FILES = ('ci/control/review-trust.mjs', 'ci/control/review-trust.json',
          'ci/production-candidate/policy.json')
 
@@ -27,8 +27,8 @@ def package(destination):
     data = {path: git('show', source + ':' + path) for path in FILES}
     blobs = {path: hashlib.sha1(b'blob ' + str(len(raw)).encode() + b'\0' + raw).hexdigest()
              for path, raw in data.items()}
-    if any(blobs[path] == baseline[path] for path in FILES):
-        raise RuntimeError('更新対象3件の差分を確認できません。')
+    if all(blobs[path] == baseline[path] for path in FILES):
+        raise RuntimeError('信頼定義の差分がありません。')
     plan = {'mode': 'review-only', 'parent': BASE, 'sourceSha': source,
             'baselineFiles': baseline, 'replacementBlobs': blobs,
             'workflowChanged': False, 'deploymentRequested': False,
@@ -79,8 +79,9 @@ def package_installer(destination, plan, data, rule_version):
     if checked != data or baseline != plan['baselineFiles'] or installer.APPLY_RULE_VERSION != rule_version:
         raise RuntimeError('生成した単独配置ツールの検査が不一致です。')
     print(json.dumps({'mode': 'installer-packaged-not-executed', 'sourceSha': plan['sourceSha'],
-                      'ruleVersion': rule_version, 'replacedFiles': len(checked),
-                      'preservedFiles': len(baseline) - len(checked),
+                      'ruleVersion': rule_version, 'targetFiles': len(checked),
+                      'changedFiles': sum(blobs != baseline[path] for path, blobs in plan['replacementBlobs'].items()),
+                      'preservedFiles': len(baseline) - sum(blobs != baseline[path] for path, blobs in plan['replacementBlobs'].items()),
                       'archiveSha256': bundle_digest,
                       'installerSha256': hashlib.sha256(script_path.read_bytes()).hexdigest(),
                       'writeRequested': False}, ensure_ascii=False))
