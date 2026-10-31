@@ -1,3 +1,4 @@
+import { ensurePlatformSession } from "../features/platform/platform-client";
 import type { ClientMessage, ServerMessage } from "../shared/protocol";
 import { publishCabinetPresence } from "./cabinet-presence";
 
@@ -32,9 +33,25 @@ export function createCabinetClient(handlers: CabinetClientHandlers = {}): Cabin
     reconnectTimer = window.setTimeout(connect, delay);
   }
 
-  function connect() {
-    if (!cabinetId || (socket && socket.readyState <= WebSocket.OPEN)) return;
+  let generation = 0;
+  let connecting = false;
+  async function connect() {
+    if (!wantsCabinet || connecting || !cabinetId || (socket && socket.readyState <= WebSocket.OPEN)) return;
     if (reconnectTimer) clearTimeout(reconnectTimer);
+    const attempt = generation;
+    connecting = true;
+    try {
+      await ensurePlatformSession();
+    } catch {
+      if (attempt === generation) {
+        handlers.onConnectionChange?.(false);
+        handlers.onError?.("プレイヤー情報を初期化できませんでした。");
+      }
+      return;
+    } finally {
+      if (attempt === generation) connecting = false;
+    }
+    if (attempt !== generation || !wantsCabinet || !cabinetId) return;
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     try {
       socket = new WebSocket(
@@ -95,6 +112,8 @@ export function createCabinetClient(handlers: CabinetClientHandlers = {}): Cabin
     const params = new URLSearchParams(window.location.search);
     watch = asViewer || params.get("watch") === "1";
     if (cabinetId !== nextCabinetId || gameId !== nextGameId) {
+      generation++;
+      connecting = false;
       wantsCabinet = false;
       socket?.close();
       socket = null;
@@ -106,6 +125,8 @@ export function createCabinetClient(handlers: CabinetClientHandlers = {}): Cabin
   }
 
   function leave() {
+    generation++;
+    connecting = false;
     wantsCabinet = false;
     if (reconnectTimer) clearTimeout(reconnectTimer);
     if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "leaveCabinet" }));

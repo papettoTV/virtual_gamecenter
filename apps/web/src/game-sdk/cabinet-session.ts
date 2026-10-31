@@ -1,3 +1,4 @@
+import { ensurePlatformSession } from "../features/platform/platform-client";
 import { createCabinetClient, type CabinetClient, type CabinetClientHandlers } from "../realtime/cabinet-client";
 import type { CabinetRole, CabinetState } from "../domain/cabinet";
 import type { ServerMessage } from "../shared/protocol";
@@ -71,9 +72,13 @@ export function createCabinetSession(options: SessionOptions, createClient: (han
     waitForPlayer(timeoutMs = 5000) {
       if (role === "player") return Promise.resolve(true);
       return new Promise(resolve => {
-        const timer = window.setTimeout(() => complete(false), timeoutMs);
+        let timer: number | undefined;
         const complete = (ready: boolean) => { window.clearTimeout(timer); waiters.delete(complete); resolve(ready); };
         waiters.add(complete);
+        // The admission timeout measures server participation, not guest creation.
+        void ensurePlatformSession().then(() => {
+          if (waiters.has(complete)) timer = window.setTimeout(() => complete(false), timeoutMs);
+        }, () => complete(false));
       });
     },
   };
