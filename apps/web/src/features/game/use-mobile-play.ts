@@ -11,7 +11,8 @@ export function useMobilePlay(screen: RefObject<HTMLElement | null>) {
   const [mobile, setMobile] = useState(false);
   const [active, setActive] = useState(false);
   const dismissed = useRef(false);
-  const available = mobile && context?.role === "player" && ["playing", "paused"].includes(context.phase);
+  const playing = context?.role === "player" && ["playing", "paused"].includes(context.phase);
+  const available = mobile && playing;
 
   useEffect(() => {
     const query = matchMedia("(max-width: 820px), (pointer: coarse)");
@@ -23,9 +24,11 @@ export function useMobilePlay(screen: RefObject<HTMLElement | null>) {
 
   useEffect(() => {
     if (!context || context.phase === "ready" || context.phase === "finished") dismissed.current = false;
-    if (!available) setActive(false);
-    else if (context.phase === "playing" && !dismissed.current) setActive(true);
-  }, [available, context]);
+    // Rotation can change the media query without ending the play session.
+    // Keep an active presentation until dismissal or the session ends.
+    if (!playing) setActive(false);
+    else if (available && context.phase === "playing" && !dismissed.current) setActive(true);
+  }, [available, playing, context]);
 
   useEffect(() => {
     const root = screen.current;

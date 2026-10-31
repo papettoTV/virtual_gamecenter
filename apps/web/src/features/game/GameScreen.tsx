@@ -119,7 +119,7 @@ export function GameScreen({ game }: GameScreenProps) {
       </div>
 
       <LiveShareButton />
-      {play.available && <button className="mobile-play-toggle touch-button" type="button" onKeyDown={event => event.stopPropagation()} onKeyUp={event => event.stopPropagation()} onPointerDown={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); play.toggle(); }}>
+      {(play.active || play.available) && <button className="mobile-play-toggle touch-button" type="button" onKeyDown={event => event.stopPropagation()} onKeyUp={event => event.stopPropagation()} onPointerDown={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); play.toggle(); }}>
         {play.active ? "通常表示に戻る" : "全画面でプレイ"}
       </button>}
 

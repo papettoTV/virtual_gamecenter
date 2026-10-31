@@ -51,13 +51,18 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 412, height: 915 }
     await page.mouse.move(100, 200); await page.mouse.wheel(0, 400);
     expect(await page.evaluate(() => scrollY)).toBe(scroll);
     await page.setViewportSize({ width: viewport.height, height: viewport.width });
+    await expect(screen).toHaveAttribute('data-mobile-play', 'true');
     const canvas = await screen.locator('#game').boundingBox();
     const exit = screen.getByRole('button', { name: '通常表示に戻る' });
+    await expect(exit).toBeVisible();
     expect(canvas.height).toBeGreaterThan(0);
     expect(canvas.y + canvas.height).toBeLessThanOrEqual((await exit.boundingBox()).y);
     await exit.click();
     await expect(screen).not.toHaveAttribute('data-mobile-play');
     expect(await page.evaluate(() => document.body.style.position)).not.toBe('fixed');
+    // Return to portrait to offer mobile entry again on fine-pointer projects.
+    // The rotated presentation and its exit were verified above.
+    await page.setViewportSize(viewport);
     await phase(page, 'graze-duel', 'paused'); await phase(page, 'graze-duel', 'playing');
     await expect(screen).not.toHaveAttribute('data-mobile-play');
     await screen.getByRole('button', { name: '全画面でプレイ' }).click();
