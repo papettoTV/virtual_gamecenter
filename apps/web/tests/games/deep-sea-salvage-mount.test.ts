@@ -67,6 +67,7 @@ let lifetime: GameLifetime;
 let selectors: Map<string, unknown>;
 
 beforeEach(() => {
+  vi.stubGlobal("Element", class {});
   vi.clearAllMocks(); mocks.sessions.length = 0; mocks.renderers.length = 0; mocks.states.length = 0;
   mocks.finishes.length = 0; mocks.messages.length = 0;
   lifetime = new GameLifetime(); frames = new Map(); let nextFrame = 1;
