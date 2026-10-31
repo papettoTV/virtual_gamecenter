@@ -25,6 +25,17 @@ describe("game lifecycle", () => {
     lifetime.own(cleanup); expect(cleanup).toHaveBeenCalledTimes(2);
   });
 
+  it("prepares solo without requesting or authorizing a paid start", async () => {
+    const host = new GameHost();
+    const prepareSolo = vi.fn(); const play = vi.fn(); const requested = vi.fn();
+    host.attach({ prepareSolo, play, dispose() {} }); host.subscribe(requested);
+    await host.selectSolo();
+    expect(prepareSolo).toHaveBeenCalledOnce();
+    expect(requested).not.toHaveBeenCalled(); expect(play).not.toHaveBeenCalled();
+    host.requestPlay("start"); expect(requested).toHaveBeenCalledExactlyOnceWith("start");
+    expect(play).not.toHaveBeenCalled();
+  });
+
   it("rejects a late game-start completion after a game has been replaced", async () => {
     const host = new GameHost();
     let finish: (value: boolean) => void = () => {};
