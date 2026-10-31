@@ -10,7 +10,7 @@ export function installLeaveGameConfirmation() {
     if (!(event.target instanceof Element)
       || !event.target.closest("#game-back-to-arcade, #ranking-another-game")) return;
     if (!needsLeaveConfirmation(liveSharing.getSnapshot())) return;
-    if (window.confirm("プレイを終了して、別のゲームを選びますか？\n使用したクレジットは戻りません。")) return;
+    if (window.confirm("ほかのゲームを探しに行きますか？\n今のプレイはここで終了します。使用済みのクレジットはそのまま消費されます。")) return;
     event.preventDefault();
     event.stopImmediatePropagation();
   };
