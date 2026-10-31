@@ -16,7 +16,7 @@ spec.loader.exec_module(M)
 
 class Fixture:
     def __init__(self):
-        self.baseline = {'old/' + str(i): 'a' * 40 for i in range(31)} | {p: 'e' * 40 for p in M.FILES}
+        self.baseline = {'old/' + str(i): 'a' * 40 for i in range(34 - len(M.FILES))} | {p: 'e' * 40 for p in M.FILES}
         self.data = {p: b'content' for p in M.FILES}
         self.ref = M.BASE
         self.calls = []
@@ -89,7 +89,7 @@ class InstallTests(unittest.TestCase):
             archive.writestr(M.MANIFEST, json.dumps(manifest))
         return output.getvalue(), f
 
-    def test_bundle_replaces_three_files_without_installing_manifest(self):
+    def test_bundle_replaces_pinned_files_without_installing_manifest(self):
         raw, f = self.archive()
         with tempfile.TemporaryDirectory() as root:
             p = Path(root) / 'bundle.zip'
@@ -99,7 +99,7 @@ class InstallTests(unittest.TestCase):
                 self.assertEqual(data, f.data)
                 self.assertEqual(set(data), M.FILES)
                 self.assertEqual(len(baseline), 34)
-                self.assertEqual(len(set(baseline) - set(data)), 31)
+                self.assertEqual(len(set(baseline) - set(data)), 34 - len(M.FILES))
                 p.write_bytes(raw + b'tampered')
                 with self.assertRaises(M.Stop):
                     M.bundle(p)
@@ -120,7 +120,7 @@ class InstallTests(unittest.TestCase):
         with patch.object(M, 'APPLY_RULE_VERSION', '2026-10-29T00:00:00.000Z'):
             return M.apply(f.data, f.baseline, 'fake-jwt', f.api)
 
-    def test_only_three_trust_files_replaced_and_token_revoked(self):
+    def test_only_pinned_files_replaced_and_token_revoked(self):
         f = Fixture()
         result = self.apply(f)
         self.assertTrue(result['success'])
