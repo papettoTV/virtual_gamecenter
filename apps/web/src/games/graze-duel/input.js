@@ -9,6 +9,8 @@ export function createInputController({ lifetime, canvas, keyboardTarget, getSta
   let pointerId = null;
 
   scope.listen(keyboardTarget, "keydown", (event) => {
+    if (event.repeat || (document.querySelector(".platform-overlay") || document.querySelector(".share-overlay"))) return;
+    if (event.target?.closest?.("input, textarea, select, button, [role=dialog]")) return;
     const state = getState();
     if (state.spectator && !state.versusParticipant) return;
     if (event.code === "Space") {

@@ -21,7 +21,6 @@ import {
   type WalletSummary,
 } from "./platform-client";
 import { resolveGameDefinition } from "../../domain/game";
-import { navigate } from "../../shared/navigation";
 import {
   recordPlayStartedFromWatch,
 } from "../engagement/engagement-client";
@@ -37,10 +36,8 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
   const [busy, setBusy] = useState(false);
   const [welcomeDialogOpen, setWelcomeDialogOpen] = useState(false);
   const declinedCreditRequest = useRef<(() => void) | null>(null);
-  const returningFromFlow = useRef(
-    new URLSearchParams(window.location.search).has("account")
-      || new URLSearchParams(window.location.search).has("purchase"),
-  );
+  const confirmingPlay = useRef(false);
+  const playRequested = useRef(false);
 
   const loadPlatform = useCallback(async () => {
     notifications.dismiss("platform-load");
@@ -102,7 +99,8 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
   }, [standaloneCredits, platform, purchasesEnabled]);
 
   const requestPlay = useCallback((action: PlayAction) => {
-    if (!platform) return;
+    if (!platform || pendingAction || busy || confirmingPlay.current || playRequested.current) return;
+    playRequested.current = true;
     setPendingAction(action);
     if (!platform.welcomeCreditGranted) {
       setWelcomeDialogOpen(true);
@@ -118,22 +116,47 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
       if (updated.creditPolicy?.refilledAmount) notifications.show({ id: "daily-credit", type: "success", message: `本日の無料クレジットを${updated.creditPolicy.refilledAmount}枚補充しました。` });
       setPlayDialog(updated.wallet.availableTotal >= getCurrentGame().creditCost ? "confirm" : "insufficient");
     }).catch(() => {
+      playRequested.current = false;
+      setPendingAction(null);
       notifications.show({ id: "platform-credit", type: "error", message: "クレジットを確認できませんでした。もう一度お試しください。" });
     }).finally(() => setBusy(false));
-  }, [platform]);
+  }, [platform, pendingAction, busy]);
 
   useEffect(() => gameHost.subscribe(requestPlay), [requestPlay]);
 
   useEffect(() => {
-    if (!platform || standaloneCredits) return;
+    if (standaloneCredits || !window.location.pathname.startsWith("/cabinets/")) return;
     const url = new URL(window.location.href);
-    if (url.searchParams.get("start") !== "1") return;
-    url.searchParams.delete("start");
-    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
-    if (returningFromFlow.current || pendingAction || playDialog || welcomeDialogOpen || purchaseDialog
-      || window.sessionStorage.getItem("vgc_pending_play_action")) return;
-    requestPlay("start");
-  }, [platform, standaloneCredits, requestPlay, pendingAction, playDialog, welcomeDialogOpen, purchaseDialog]);
+    if (url.searchParams.get("watch") === "1") return;
+    if (url.searchParams.has("start")) {
+      url.searchParams.delete("start");
+      window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    }
+    void gameHost.selectSolo().catch(() => {
+      notifications.show({ id: "platform", type: "error", message: "ゲームの準備に失敗しました。再読み込みしてください。" });
+    });
+  }, [standaloneCredits]);
+
+  const cancelPlay = useCallback(() => {
+    if (confirmingPlay.current || busy) return;
+    window.sessionStorage.removeItem("vgc_pending_play_action");
+    setPlayDialog(null);
+    setPendingAction(null);
+    playRequested.current = false;
+  }, [busy]);
+
+  useEffect(() => {
+    if (!playDialog && !welcomeDialogOpen && !purchaseDialog) return;
+    const blockGameInput = (event: KeyboardEvent) => {
+      if (event.code === "Escape" && playDialog) {
+        event.preventDefault(); cancelPlay();
+      }
+      // Keep native button activation, but never forward a dialog key to a game.
+      event.stopPropagation();
+    };
+    window.addEventListener("keydown", blockGameInput, true);
+    return () => window.removeEventListener("keydown", blockGameInput, true);
+  }, [playDialog, welcomeDialogOpen, purchaseDialog, cancelPlay]);
 
   const handleConsent = async () => {
     if (!platform) return;
@@ -197,7 +220,8 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
   };
 
   const handlePlayConfirm = async () => {
-    if (!platform || !pendingAction) return;
+    if (!platform || !pendingAction || confirmingPlay.current) return;
+    confirmingPlay.current = true;
     setBusy(true);
     notifications.dismiss("platform");
     const gameId = getCurrentGame().id;
@@ -218,6 +242,7 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
       notifications.show({ id: "platform", type: "success", message: "1クレジットを使用しました。" });
       setPlayDialog(null);
       setPendingAction(null);
+      playRequested.current = false;
     } catch (error) {
       if (error instanceof PlatformApiError && error.code === "insufficient_credit") {
         if (error.wallet) updateWallet(error.wallet);
@@ -228,6 +253,7 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
         notifications.show({ id: "platform", type: "error", message: "ゲーム開始処理に失敗しました。もう一度お試しください。" });
       }
     } finally {
+      confirmingPlay.current = false;
       setBusy(false);
     }
   };
@@ -270,13 +296,21 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
 
       <AccountRegistrationDialog
         accountDialogOpen={accountDialogOpen}
-        setAccountDialogOpen={setAccountDialogOpen}
+        setAccountDialogOpen={(value) => {
+          const open = typeof value === "function" ? value(accountDialogOpen) : value;
+          setAccountDialogOpen(open);
+          if (!open) cancelPlay();
+        }}
         platform={platform}
       />
 
       <ConsentDialog
         consentPurpose={consentPurpose}
-        setConsentPurpose={setConsentPurpose}
+        setConsentPurpose={(value) => {
+          const purpose = typeof value === "function" ? value(consentPurpose) : value;
+          setConsentPurpose(purpose);
+          if (!purpose) cancelPlay();
+        }}
         busy={busy}
         handleConsent={handleConsent}
       />
@@ -322,15 +356,7 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
                   </svg>
                 </button>
               )}
-              <button className="platform-cancel-button" type="button" onClick={() => {
-                if (playDialog === "insufficient") {
-                  window.sessionStorage.removeItem("vgc_pending_play_action");
-                }
-                setPlayDialog(null);
-                setPendingAction(null);
-                if (!standaloneCredits && location.pathname.startsWith("/cabinets/")
-                  && !document.body.classList.contains("is-game-screen")) navigate("/");
-              }}>
+              <button className="platform-cancel-button" type="button" disabled={busy} onClick={cancelPlay}>
                 {playDialog === "confirm" ? "キャンセル" : purchasesEnabled ? "いいえ" : "閉じる"}
               </button>
               {playDialog === "confirm" && (

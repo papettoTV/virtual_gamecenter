@@ -140,7 +140,7 @@ describe("BUZZ BARRIER instance lifecycle", () => {
     const instance = mountGame({ game: BUZZ_BARRIER, lifetime });
     await instance.prepareSolo?.(); await instance.play("start", "reservation");
     expect(mocks.setResult).not.toHaveBeenCalled();
-    keyboard.dispatchEvent(keyEvent("Space"));
+    expect(mocks.setLiveContext).toHaveBeenCalledWith(expect.objectContaining({ phase: "playing" }));
     mocks.state!.players[0]!.lives = 0;
     mocks.state!.players[0]!.level = 7;
     let time = performance.now();
