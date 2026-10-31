@@ -1,0 +1,336 @@
+import { randomUUID } from 'node:crypto';
+import { test, expect } from '../../../../ci/ui-fixtures.mjs';
+import { localUiUrl } from '../../../../ci/ui-tests.mjs';
+
+const origin = 'http://127.0.0.1:5174';
+const games = [
+  { id: 'graze-duel', button: 'ゲーム開始', key: 'Space' },
+  { id: 'deep-sea-salvage', button: '潜航開始', key: 'p' },
+  { id: 'dot-wave', button: 'START / ゲーム開始', key: 'Space' },
+];
+// Wait for the rendered wallet without spending the bootstrap endpoint's budget.
+async function wallet(page) {
+  const badge = page.locator('.platform-credit-badge');
+  await expect(badge).toHaveText(/^\d+$/);
+  return Number(await badge.textContent());
+}
+async function persistedWallet(page) {
+  return page.evaluate(async () => (await (await import('/src/features/platform/platform-client.ts')).fetchPlatformBootstrap()).wallet.availableTotal);
+}
+async function prepareGuest(page) {
+  // Reuse the application's initial real bootstrap instead of requesting it again.
+  const loaded = page.waitForResponse(response => response.url().endsWith('/api/platform/bootstrap'));
+  await page.goto(origin);
+  const response = await loaded;
+  expect(response.ok()).toBe(true);
+  const account = await response.json();
+  const decline = page.getByRole('button', { name: '拒否する', exact: true });
+  if (await decline.isVisible()) await decline.click();
+  if (!account.welcomeCreditGranted) {
+    return (await page.evaluate(async () => (await import('/src/features/platform/platform-client.ts')).claimWelcomeCredit())).wallet;
+  }
+  return account.wallet;
+}
+async function phase(page, game) {
+  return page.evaluate(async game => game === 'dot-wave'
+    ? document.querySelector('main.dot-wave[data-phase]')?.dataset.phase
+    : (await import('/src/features/sharing/share-service.ts')).liveSharing.getSnapshot()?.phase, game);
+}
+for (const game of games) {
+  for (const input of ['primary', 'keyboard']) {
+    test(`${game.id}: ${input}, ready, cancel, delayed duplicate and authorized start`, async ({ page, isMobile }) => {
+      // Only the disposable local guest and the real welcome-credit API are used.
+      await prepareGuest(page);
+      const writes = [];
+      page.on('request', request => {
+        if (request.method() === 'POST' && request.url().includes('/api/platform/credit-reservations')) writes.push(request.url());
+      });
+      await page.goto(`${origin}/cabinets/${randomUUID()}?game=${game.id}&start=1`);
+      const start = page.getByRole('button', { name: game.button, exact: true });
+      if (isMobile || game.id === 'dot-wave') { await expect(start).toBeVisible(); await expect(start).toBeEnabled(); }
+      const ready = game.id === 'dot-wave' ? 'intro' : 'ready';
+      await expect.poll(() => phase(page, game.id)).toBe(ready);
+      await expect(page.getByRole('dialog', { name: 'ゲームを開始しますか？' })).toBeHidden();
+      expect(writes).toHaveLength(0);
+      await page.reload();
+      if (isMobile || game.id === 'dot-wave') await expect(start).toBeVisible();
+      await expect.poll(() => phase(page, game.id)).toBe(ready);
+      expect(writes).toHaveLength(0);
+      const balance = await wallet(page);
+      const intent = async () => {
+        if (input === 'primary' && isMobile) await start.tap();
+        else if (input === 'primary' && game.id === 'dot-wave') await start.click();
+        else { await page.locator('body').click({ position: { x: 2, y: 2 } }); await page.keyboard.press(game.key); }
+      };
+      await intent();
+      const dialog = page.getByRole('dialog', { name: 'ゲームを開始しますか？', exact: true });
+      await expect(dialog).toBeVisible();
+      await page.evaluate(code => window.dispatchEvent(new KeyboardEvent('keydown', { code, repeat: true, bubbles: true })), game.key === 'p' ? 'KeyP' : 'Space');
+      await expect.poll(() => phase(page, game.id)).toBe(ready);
+      expect(writes).toHaveLength(0);
+      // A document listener sees real game keys only after the window capture guard.
+      await page.evaluate(() => {
+        window.dialogKeysAtDocument = [];
+        document.addEventListener('keydown', event => window.dialogKeysAtDocument.push(event.code));
+      });
+      // DOT WAVE focuses Cancel: Space there is a native button activation.
+      // F is also a real game input, but must stay inside the local dialog.
+      if (game.id === 'dot-wave') await expect(dialog.getByRole('button', { name: 'キャンセル', exact: true })).toBeFocused();
+      await page.keyboard.press(game.id === 'dot-wave' ? 'f' : game.key);
+      await expect(dialog).toBeVisible();
+      await page.keyboard.press('Escape');
+      expect(await page.evaluate(() => window.dialogKeysAtDocument)).toEqual([]);
+      await expect(dialog).toBeHidden();
+      expect(await wallet(page)).toBe(balance);
+      await page.keyboard.press('Shift');
+      expect(await page.evaluate(() => window.dialogKeysAtDocument)).toContain('ShiftLeft');
+      if (game.id === 'dot-wave') {
+        for (const key of ['Space', 'Enter']) {
+          await intent();
+          const cancel = dialog.getByRole('button', { name: 'キャンセル', exact: true });
+          await expect(cancel).toBeFocused();
+          await page.keyboard.press(key);
+          await expect(dialog).toBeHidden();
+          await expect.poll(() => phase(page, game.id)).toBe(ready);
+          expect(await wallet(page)).toBe(balance);
+          expect(writes).toHaveLength(0);
+        }
+      }
+      await intent();
+      await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
+      await expect(dialog).toBeHidden();
+      await expect.poll(() => phase(page, game.id)).toBe(ready);
+      expect(await wallet(page)).toBe(balance);
+      await intent();
+      expect(await persistedWallet(page)).toBe(balance);
+      // Delay the real request, without replacing credit or authorization responses.
+      await page.route('**/api/platform/credit-reservations', async route => {
+        await new Promise(resolve => setTimeout(resolve, 250));
+        await route.continue();
+      });
+      // Observe actual accounting responses; never replace reservation or capture.
+      const reserved = page.waitForResponse(response => response.request().method() === 'POST' && response.url().endsWith('/credit-reservations'));
+      const captured = page.waitForResponse(response => response.request().method() === 'POST' && response.url().endsWith('/capture'));
+      const approve = dialog.getByRole('button', { name: '1クレジットで開始', exact: true });
+      if (game.id === 'dot-wave') {
+        await approve.focus();
+        await expect(approve).toBeFocused();
+        // Repeated Enter normally activates a focused button on keydown.
+        // It must neither authorize play nor create a reservation.
+        for (const key of ['Space', 'Enter']) {
+          expect(await approve.evaluate((button, code) => button.dispatchEvent(new KeyboardEvent('keydown', { code, key: code === 'Space' ? ' ' : code, repeat: true, bubbles: true, cancelable: true })), key)).toBe(false);
+        }
+        await expect(dialog).toBeVisible();
+        expect(writes).toHaveLength(0);
+        expect(await wallet(page)).toBe(balance);
+        await expect.poll(() => phase(page, game.id)).toBe(ready);
+        const key = input === 'primary' ? 'Space' : 'Enter';
+        await page.keyboard.press(key);
+        await page.keyboard.press(key);
+      } else {
+        await approve.evaluate(button => { button.click(); button.click(); });
+      }
+      await page.keyboard.press(game.key);
+      await expect.poll(async () => ['playing', 'countdown', 'paused'].includes(await phase(page, game.id))).toBe(true);
+      await expect(dialog).toBeHidden();
+      const reservationResponse = await reserved;
+      const captureResponse = await captured;
+      expect(reservationResponse.ok()).toBe(true);
+      expect(captureResponse.ok()).toBe(true);
+      const reservation = await reservationResponse.json();
+      const capture = await captureResponse.json();
+      expect(reservation.wallet.availableTotal).toBe(balance - 1);
+      expect(capture.status).toBe('captured');
+      expect(capture.wallet.availableTotal).toBe(balance - 1);
+      expect(capture.wallet.reservedFree + capture.wallet.reservedPurchased).toBe(0);
+      await expect(page.locator('.platform-credit-badge')).toHaveText(String(balance - 1));
+      expect(await persistedWallet(page)).toBe(balance - 1);
+      expect(writes.filter(url => url.endsWith('/credit-reservations'))).toHaveLength(1);
+      expect(writes.filter(url => url.endsWith('/capture'))).toHaveLength(1);
+      expect(writes.filter(url => url.endsWith('/release'))).toHaveLength(0);
+    });
+  }
+  test(`${game.id}: failed capture keeps play stopped and releases the unused reservation`, async ({ page, isMobile }) => {
+    await prepareGuest(page);
+    await page.goto(`${origin}/cabinets/${randomUUID()}?game=${game.id}`);
+    const start = page.getByRole('button', { name: game.button, exact: true });
+    if (isMobile || game.id === 'dot-wave') { await expect(start).toBeVisible(); await expect(start).toBeEnabled(); }
+    await expect.poll(() => phase(page, game.id)).toBe(game.id === 'dot-wave' ? 'intro' : 'ready');
+    const balance = await wallet(page);
+    await page.route('**/api/platform/credit-reservations/*/capture', route => route.abort());
+    if (isMobile) await start.tap();
+    else { await page.locator('body').click({ position: { x: 2, y: 2 } }); await page.keyboard.press(game.key); }
+    const released = page.waitForResponse(response => response.url().endsWith('/release') && response.ok());
+    await page.getByRole('dialog', { name: 'ゲームを開始しますか？', exact: true })
+      .getByRole('button', { name: '1クレジットで開始', exact: true }).click();
+    const releaseResponse = await released;
+    expect((await releaseResponse.json()).wallet.availableTotal).toBe(balance);
+    await expect.poll(() => phase(page, game.id)).toBe(game.id === 'dot-wave' ? 'intro' : 'ready');
+    expect(await wallet(page)).toBe(balance);
+    expect(await persistedWallet(page)).toBe(balance);
+  });
+  for (const occupied of [false, true]) {
+    test(`${game.id}: spectator never requests a start (${occupied ? 'live player' : 'empty cabinet'})`, async ({ page, browser }) => {
+      const cabinet = `${origin}/cabinets/${randomUUID()}?game=${game.id}`;
+      const playerContext = occupied ? await browser.newContext() : null;
+      try {
+        if (playerContext) {
+          // Extra contexts need the same local-only network boundary as the fixture.
+          await playerContext.route('**/*', route => localUiUrl(route.request().url()) ? route.continue() : route.abort());
+          await playerContext.routeWebSocket('**/*', socket => localUiUrl(socket.url()) ? socket.connectToServer() : socket.close());
+          const player = await playerContext.newPage();
+          await prepareGuest(player);
+          await player.goto(cabinet);
+          await expect.poll(() => phase(player, game.id)).toBe(game.id === 'dot-wave' ? 'intro' : 'ready');
+          const playerBalance = await wallet(player);
+          await player.locator('body').click({ position: { x: 2, y: 2 } });
+          await player.keyboard.press(game.key);
+          const captured = player.waitForResponse(response => response.request().method() === 'POST' && response.url().endsWith('/capture'));
+          await player.getByRole('dialog', { name: 'ゲームを開始しますか？', exact: true })
+            .getByRole('button', { name: '1クレジットで開始', exact: true }).click();
+          await expect.poll(async () => ['playing', 'countdown', 'paused'].includes(await phase(player, game.id))).toBe(true);
+          const captureResponse = await captured;
+          expect(captureResponse.ok()).toBe(true);
+          const capture = await captureResponse.json();
+          expect(capture.status).toBe('captured');
+          expect(capture.wallet.availableTotal).toBe(playerBalance - 1);
+          await expect(player.locator('.platform-credit-badge')).toHaveText(String(playerBalance - 1));
+          expect(await persistedWallet(player)).toBe(playerBalance - 1);
+        }
+        const balance = (await prepareGuest(page)).availableTotal;
+        const writes = [];
+        page.on('request', request => { if (request.method() === 'POST' && request.url().includes('credit-reservations')) writes.push(request.url()); });
+        await page.goto(`${cabinet}&watch=1&start=1`);
+        const waiting = page.getByRole('region', { name: 'プレイの開始待ち・終了', exact: true });
+        if (!occupied) {
+          await expect(waiting).toBeVisible();
+          await expect(page.locator('.spectator-offline')).toBeAttached();
+        } else {
+          await expect(waiting).toBeHidden();
+          if (game.id === 'dot-wave') await expect(page.locator('.dot-cabinet-bar > span')).toContainText('観戦中');
+          else await expect(page.locator('#spectator-banner')).toBeVisible();
+        }
+        const start = page.getByRole('button', { name: game.button, exact: true });
+        const dialog = page.getByRole('dialog', { name: 'ゲームを開始しますか？' });
+        await expect(start).toBeHidden();
+        await expect(dialog).toBeHidden();
+        await page.locator('body').click({ position: { x: 2, y: 2 } });
+        await page.keyboard.press(game.key);
+        await page.keyboard.down(game.key);
+        await page.keyboard.down(game.key);
+        await page.keyboard.up(game.key);
+        await expect(start).toBeHidden();
+        await expect(dialog).toBeHidden();
+        expect(await wallet(page)).toBe(balance);
+        expect(await persistedWallet(page)).toBe(balance);
+        expect(writes).toHaveLength(0);
+        if (!occupied) await expect(waiting).toBeVisible();
+      } finally {
+        await playerContext?.close();
+      }
+    });
+  }
+}
+
+// Registration cancellation exercises PlatformExperience's shared pending state:
+// BUZZ represents that flow (also used by deep-sea-salvage) on PC and mobile.
+// DOT WAVE uses standaloneCredits and its own confirmation, not this welcome flow.
+// Keep the three-game start/accounting/spectator coverage above unchanged; the
+// real account/consent hook regression is in registration-play-recovery.test.ts.
+for (const game of games.filter(game => game.id === 'graze-duel')) {
+  for (const closeAt of ['consent', 'registration']) {
+    test(`${game.id}: insufficient credit registration cancellation at ${closeAt} recovers without reload`, async ({ page, isMobile }) => {
+      // Keep the welcome grant unclaimed so it can fund the final authorized play.
+      const loaded = page.waitForResponse(response => response.url().endsWith('/api/platform/bootstrap'));
+      await page.goto(origin);
+      const initial = await (await loaded).json();
+      expect(initial.accountRegistered).toBe(false);
+      expect(initial.consent.accepted).toBe(false);
+      expect(initial.welcomeCreditGranted).toBe(false);
+      const decline = page.getByRole('button', { name: '拒否する', exact: true });
+      if (await decline.isVisible()) await decline.click();
+      // Exhaust only this disposable guest's local credits with real accounting APIs.
+      await page.evaluate(async ({ balance, gameId }) => {
+        const api = await import('/src/features/platform/platform-client.ts');
+        for (let index = 0; index < balance; index++) {
+          const reservation = await api.reservePlayCredit(crypto.randomUUID(), gameId);
+          const result = await api.capturePlayCredit(reservation.reservationId);
+          if (result.status !== 'captured') throw new Error('Local guest setup capture failed');
+        }
+      }, { balance: initial.wallet.availableTotal, gameId: game.id });
+      await page.goto(`${origin}/cabinets/${randomUUID()}?game=${game.id}`);
+      const ready = game.id === 'dot-wave' ? 'intro' : 'ready';
+      await expect.poll(() => phase(page, game.id)).toBe(ready);
+      expect(await wallet(page)).toBe(0);
+      const writes = [];
+      page.on('request', request => {
+        if (request.method() === 'POST' && request.url().includes('/api/platform/credit-reservations')) writes.push(request.url());
+      });
+      const intent = async () => {
+        if (isMobile) await page.getByRole('button', { name: game.button, exact: true }).tap();
+        else {
+          await page.locator('body').click({ position: { x: 2, y: 2 } });
+          await page.keyboard.press(game.key);
+        }
+      };
+      const insufficient = page.getByRole('dialog', { name: 'クレジットが不足しています', exact: true });
+      const skipWelcome = async () => {
+        const welcome = page.getByRole('dialog', { name: '無料5クレジット', exact: true });
+        // Use the real welcome dialog's skip control, leaving the grant untouched.
+        await page.getByRole('button', { name: '受け取らない', exact: true }).click();
+        await expect(welcome).toBeHidden();
+        await expect(insufficient).toBeVisible();
+      };
+      await intent();
+      await skipWelcome();
+      await insufficient.getByRole('button', { name: 'ユーザー登録で5枚を受け取る', exact: true }).click();
+      const consent = page.getByRole('dialog', { name: 'サービスを利用する前に', exact: true });
+      await expect(consent).toBeVisible();
+      if (closeAt === 'consent') {
+        await consent.getByRole('button', { name: '規約確認を閉じる', exact: true }).click();
+      } else {
+        await consent.getByRole('button', { name: '同意して続ける', exact: true }).click();
+        const account = page.getByRole('dialog', { name: 'ユーザー登録', exact: true });
+        await expect(account).toBeVisible();
+        await account.getByRole('button', { name: 'ユーザー登録を閉じる', exact: true }).click();
+      }
+      await expect.poll(() => phase(page, game.id)).toBe(ready);
+      expect(await wallet(page)).toBe(0);
+      expect(writes).toHaveLength(0);
+      // No navigation or reload: the actual game's next intent must work again.
+      await intent();
+      await skipWelcome();
+      await insufficient.getByRole('button', { name: '閉じる', exact: true }).click();
+      const grant = await page.evaluate(async () => {
+        const result = await (await import('/src/features/platform/platform-client.ts')).claimWelcomeCredit();
+        window.dispatchEvent(new Event('platform-wallet-changed'));
+        return result.wallet;
+      });
+      await expect(page.locator('.platform-credit-badge')).toHaveText(String(grant.availableTotal));
+      await intent();
+      const confirm = page.getByRole('dialog', { name: 'ゲームを開始しますか？', exact: true });
+      await expect(confirm).toBeVisible();
+      await expect.poll(() => phase(page, game.id)).toBe(ready);
+      expect(writes).toHaveLength(0);
+      expect(await wallet(page)).toBe(grant.availableTotal);
+      await page.route('**/api/platform/credit-reservations', async route => {
+        await new Promise(resolve => setTimeout(resolve, 250));
+        await route.continue();
+      });
+      const captured = page.waitForResponse(response => response.request().method() === 'POST' && response.url().endsWith('/capture'));
+      await confirm.getByRole('button', { name: '1クレジットで開始', exact: true }).evaluate(button => { button.click(); button.click(); });
+      await page.keyboard.press(game.key);
+      const response = await captured;
+      expect(response.ok()).toBe(true);
+      const capture = await response.json();
+      expect(capture.status).toBe('captured');
+      expect(capture.wallet.availableTotal).toBe(grant.availableTotal - 1);
+      expect(capture.wallet.reservedFree + capture.wallet.reservedPurchased).toBe(0);
+      await expect.poll(async () => ['playing', 'countdown', 'paused'].includes(await phase(page, game.id))).toBe(true);
+      await expect(confirm).toBeHidden();
+      await expect(page.locator('.platform-credit-badge')).toHaveText(String(grant.availableTotal - 1));
+      expect(writes.filter(url => url.endsWith('/credit-reservations'))).toHaveLength(1);
+      expect(writes.filter(url => url.endsWith('/capture'))).toHaveLength(1);
+    });
+  }
+}
