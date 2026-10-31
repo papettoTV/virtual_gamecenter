@@ -11,3 +11,7 @@ Issue #97。#91のアプリ修正はActionsのPR #96で担当し、この保守�
 ## 公開なしの検査
 
 PR #96の4d63077を使い捨てコピーへ展開し、Basic・Google・Stripeはダミー値、DBはローカル、HTTP/WSはIPv6ループバックだけに制限して変更対象ケースを実行した。Desktop ChromeとPixel 7の2ケースが成功。最初の検査で見つけたゲーム準備完了の待機不足とstartクエリ除去への追従も修正した。実staging・Cloudflare・本番は使用していない。
+
+## 配置記録
+
+人用ツールでci-controlを `b0d2ff949dfb5ea3470a8ec943bfad9e55e2f89c` へ更新した。親は `ddc92cdf2193a68674a1c8ec2451c7ca71990ff4`。固定ブラウザ回帰1件だけの更新と他33件の保持を確認した。一時例外削除後のUTC設定版は `2026-10-31T10:35:45.400Z`、bypassは空。Repositoryの固定SHAとstagingのstrict設定版の更新、developへの反映、PR #96の同期は別途確認する。公開は行っていない。
