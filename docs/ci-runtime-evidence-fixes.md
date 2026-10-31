@@ -22,14 +22,14 @@ JSON／HTML reporterの出力先は設定ファイルの位置から相対解決
 一時コピーのPC・スマホ相当の実ブラウザ2件を実行し、古い期待先のファイルを削除した状態から、JSON・HTML・画面2件が正しいフォルダへ新規生成されることを確認した。
 これはIssue固有の受け入れ確認や本番での回帰ではない。
 
-## 保護側への同期は未実施
+## 保護側への配置記録と復帰条件
 
-workflowとUI検査設定は固定レビュー定義の対象なので、修正をdevelopへ取り込む前に、人が保護側の信頼定義を同期する必要がある。
-現在のci-controlは `2fa516c94538d3ed434c3195de1c2063a1e7789f`、strict設定版は `2026-10-31T00:30:20.881Z`。
-配置ツールの親SHA・既存34ファイルの照合もこの状態に合わせる。
-APIで更新する対象は信頼定義3ファイルに限定し、内容が変わるのはreview-trust.jsonと本番候補policy.jsonの2件だけ。
-残り32ファイルを保持し、公開workflowと鍵は変更しない。
+2026-10-31、人の保守操作でci-controlを `2fa516c94538d3ed434c3195de1c2063a1e7789f` から
+`1919c95b933d9b820b6db7bc54572020923c9849` へ更新した。
+全34ファイルを固定計画と照合し、review-trust.jsonと本番候補policy.jsonの2件だけの変更、残り32件の保持を確認した。
+公開workflowと鍵は変更していない。配置ツールは一時トークン失効成功を報告した。
 
-bypassの追加・配置・管理変数の更新はまだ行っていない。
-main・本番・Xは対象外で、staging承認必須・strict・bypass空を維持している。
-配置後に管理変数と起動コードを同期し、developへ反映してから既存PRへ新しいdevelopを取り込んで検査を更新する。
+例外削除後の保護はActive・禁止4件・bypass空で、UTC設定版は `2026-10-31T01:19:50.549Z`。
+mainは `73cb5d9267c56f06f9f1150327ec6b8b3caa2bb9` のまま。本番・Xは対象外で、staging承認必須を維持している。
+管理変数2件と起動コードを同期し、developへ反映してから既存PRへ新しいdevelopを取り込んで検査を更新する。
+Repository variableの `PULBASE_CONTROL_EVIDENCE_SHA` は新制御SHA、stagingの `PULBASE_CONTROL_RULE_VERSIONS` は新設定版とstrictに合わせる。
