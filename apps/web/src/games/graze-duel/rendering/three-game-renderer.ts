@@ -81,7 +81,7 @@ export function createThreeGameRenderer(width: number, height: number): GameScen
         "border-radius:20px",
         "background:transparent",
         "box-shadow:none",
-        "object-fit:cover",
+        "object-fit:var(--game-canvas-fit, cover)",
         "object-position:center",
         "pointer-events:none",
       ].join(";");
