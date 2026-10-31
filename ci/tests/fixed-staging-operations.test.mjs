@@ -88,3 +88,13 @@ test('実公開は認証3項目がそろうまでネットワークもプロセ�
  const f=await fixture(t);f.mode='live';let calls=0;f.ports={request:async()=>{calls++;},process:async()=>{calls++;}};
  await assert.rejects(connectedStagingOperations(f));assert.equal(calls,0);
 });
+test('ブラウザ失敗診断を回帰処理から失敗成果物まで伝え、JSONの認証設定を保存しない',async t=>{
+ const f=await fixture(t);f.mode='live';f.credentials={cloudflareToken:'dummy-cf',username:'dummy-user',password:'dummy-password'};
+ const titles=['home renders active games and versioned Worker/Pages','legal navigation /legal/terms','legal navigation /legal/privacy','game navigation allows declining credit and returning before play'];
+ const raw={config:{httpCredentials:f.credentials},errors:[],stats:{expected:7,unexpected:1,flaky:0,skipped:0},suites:[{specs:titles.map(title=>({title,tests:['desktop','mobile'].map(projectName=>({projectName,results:[{status:title===titles[3]&&projectName==='mobile'?'timedOut':'passed',duration:20,errors:[]}]}))}))}]};
+ f.ports={request:async()=>new Response('',{headers:{'x-pulbase-revision':sha,'x-pulbase-gateway-revision':sha}}),process:async()=>({exitCode:1,stdout:JSON.stringify(raw)})};
+ const ops=await connectedStagingOperations(f);await assert.rejects(ops.regress());
+ const {failureReport}=await import('../control/postmerge-runner.mjs');
+ const r=failureReport({phase:'regression',sha,operationStatus:ops.report()});
+ assert.equal(r.browserFailure.cases.at(-1).case,'game-navigation');assert.equal(r.browserFailure.cases.at(-1).project,'mobile');assert.equal(r.browserFailure.cases.at(-1).status,'timedOut');assert.doesNotMatch(JSON.stringify(r),/dummy-|httpCredentials/);
+});

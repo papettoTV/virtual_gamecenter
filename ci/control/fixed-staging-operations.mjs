@@ -4,7 +4,7 @@ import {join} from 'node:path';
 import {prepareStagingPublication,publicationCommands,executeStagingPublication,dryRunStaging,PUBLICATION_STOP_REASONS} from './staging-publication.mjs';
 import {stagingRegression} from './staging-regression.mjs';
 import {assertReleaseObservation} from './postmerge-staging.mjs';
-import {runFixedTool,runFixedBrowser,publicToolEnvironment,sanitizeCommandFailure} from './fixed-process.mjs';
+import {runFixedTool,runFixedBrowser,publicToolEnvironment,sanitizeCommandFailure,sanitizeBrowserFailure} from './fixed-process.mjs';
 const endpoint='https://api.cloudflare.com/client/v4/accounts/60e5472a284dc71bbafbbfac8aa2a940/pages/projects/virtual-gamecenter';
 const projectFixture=()=>({name:'virtual-gamecenter',production_branch:'main',source:{config:{preview_deployment_setting:'none',production_deployments_enabled:false}},build_config:{mode:'keyless-simulated',destination_dir:'dist/client'}});
 function need(v,m){if(!v)throw Error(m);}
@@ -17,7 +17,7 @@ export async function connectedStagingOperations({mode,scope,execution,artifactD
  const expected=scope.evidence,receipt={candidate:expected.sha,tree:expected.tree,buildRun:expected.runId,buildAttempt:expected.attempt};
  const plan=await prepareStagingPublication(artifactDirectory,receipt);
  const commands=publicationCommands(plan),audit=[];let regressionCompleted=false,httpAttempted=false,browserAttempted=false;
- const outcomes={worker:'not-attempted',pages:'not-attempted'};let commandFailure=null,publicationStopReason=null;
+ const outcomes={worker:'not-attempted',pages:'not-attempted'};let commandFailure=null,publicationStopReason=null,browserFailure=null;
  async function authorize(){
   const observation=await guard();assertReleaseObservation(scope,execution,observation);
   need(createHash('sha256').update(await readFile(join(plan.artifact,'manifest.json'))).digest('hex')===scope.manifestDigest,'承認されたmanifestが変更されました');
@@ -49,11 +49,11 @@ export async function connectedStagingOperations({mode,scope,execution,artifactD
     need(url===`https://develop.virtual-gamecenter.pages.dev/?release-check=${expected.sha}`&&opts.method==='GET'&&opts.redirect==='manual','HTTPの固定要求不一致');
     audit.push({phase:'http',simulated:true});return new Response('',{headers:{'x-pulbase-revision':expected.sha,'x-pulbase-gateway-revision':expected.sha}});
    },
-   browser:async options=>{browserAttempted=true;const r=await runFixedBrowser({...options,listOnly:mode==='keyless',process:command});audit.push({phase:'browser',listOnly:mode==='keyless',declaredTests:8});return r;},
+   browser:async options=>{browserAttempted=true;try{const r=await runFixedBrowser({...options,listOnly:mode==='keyless',process:command});audit.push({phase:'browser',listOnly:mode==='keyless',declaredTests:8});return r;}catch(e){browserFailure=sanitizeBrowserFailure(e.browserFailure);throw e;}},
   });regressionCompleted=true;return result;},
   report:()=>({executionMode:mode,commandAudit:structuredClone(audit),realDeploymentExecuted:audit.some(x=>x.realWrite),realRegressionExecuted:mode==='live'&&(httpAttempted||browserAttempted),regressionPassed:regressionCompleted,
    realDeploymentAttempted:Object.values(outcomes).some(x=>x!=='not-attempted'),workerOutcome:outcomes.worker,pagesOutcome:outcomes.pages,
-   httpAttempted,browserAttempted,commandFailure,publicationStopReason,
+   httpAttempted,browserAttempted,commandFailure,publicationStopReason,browserFailure,
    workerDryRunExecuted:mode==='keyless'&&audit.some(x=>x.workerDryRunExecuted),httpSimulated:mode==='keyless',browserSimulated:mode==='keyless',
    browserCommandValidated:audit.some(x=>x.phase==='browser'),browserTests:8}),
  };
