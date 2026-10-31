@@ -25,10 +25,18 @@ PCとスマホ相当のブラウザで結果JSON・画面を保存し、同じCI
 スマホ実機確認や検証公開後の受け入れ確認が済んだとは扱わず、未確認項目は分けて報告する。
 検証公開はdevelopマージ後、人のstaging承認1回、公開・HTTP／ブラウザ回帰1回を維持する。
 
-## 保護側への反映は未実施
+## 保護側の配置記録と復帰条件
 
-このPRをdevelopへ取り込む前に、ci-controlの信頼定義を更新する必要がある。
-現行の固定制御SHAは `7dd7b4cab720d6f268cd406932475f1cce5dcc3d`。
+2026-10-31、人の保守操作でci-controlを `7dd7b4cab720d6f268cd406932475f1cce5dcc3d` から
+`2fa516c94538d3ed434c3195de1c2063a1e7789f` へ更新した。
+全34ファイルのtreeを固定計画と照合し、既存3件だけの更新と残り31件の保持を確認した。
+一時例外削除後の保護はActive・bypass空・禁止4件を維持し、UTC設定版は `2026-10-31T00:30:20.881Z`。
+mainは `73cb5d9267c56f06f9f1150327ec6b8b3caa2bb9` のまま。配置ツールは一時トークン失効成功を報告した。
+このPRのdevelop取り込みと通常運用の復帰には、人による次の管理変数2件の更新も必要。
+
+- Repository variable `PULBASE_CONTROL_EVIDENCE_SHA` を新しい制御SHAへ更新
+- staging Environment variable `PULBASE_CONTROL_RULE_VERSIONS` を新しい設定版・strictへ更新
+
 更新対象は次の既存3ファイルだけで、公開workflow・鍵・mainは変更しない。
 
 - `ci/control/review-trust.mjs`

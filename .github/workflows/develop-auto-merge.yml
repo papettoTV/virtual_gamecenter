@@ -36,7 +36,7 @@ jobs:
           persist-credentials: false
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: '7dd7b4cab720d6f268cd406932475f1cce5dcc3d'
+          ref: '2fa516c94538d3ed434c3195de1c2063a1e7789f'
           path: fixed-control
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -65,7 +65,7 @@ jobs:
           persist-credentials: false
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: '7dd7b4cab720d6f268cd406932475f1cce5dcc3d'
+          ref: '2fa516c94538d3ed434c3195de1c2063a1e7789f'
           path: fixed-control
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
