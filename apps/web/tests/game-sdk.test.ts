@@ -1,3 +1,4 @@
+vi.mock("../src/features/platform/platform-client", () => ({ ensurePlatformSession: vi.fn().mockResolvedValue(undefined) }));
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { GameLifetime } from "../src/game-sdk/lifetime";
 import { GameHost } from "../src/game-sdk/game-host";
