@@ -26,6 +26,7 @@ import { createState } from "./state";
 import { createSimulation } from "./simulation";
 import { createRenderer } from "./renderer";
 import { clamp } from "./utils";
+import { updateCanvasPointer } from "./canvas-pointer";
 
 export function mountGame(context: GameContext): GameInstance {
   const scope = context.lifetime;
@@ -329,9 +330,12 @@ export function mountGame(context: GameContext): GameInstance {
   scope.listen(canvas, "pointerdown", (event) => {
     if (watching) return;
     if (state.collectionOpen && state.returnToResult) { toggleCollection(false); return; }
-    const rect = canvas.getBoundingClientRect(); pointer.active = true; pointer.x = (event.clientX - rect.left) * W / rect.width; pointer.y = (event.clientY - rect.top) * H / rect.height;
+    updateCanvasPointer(canvas, pointer, event, true);
   });
-  scope.listen(canvas, "pointermove", (event) => { if (pointer.active) { const rect = canvas.getBoundingClientRect(); pointer.x = (event.clientX - rect.left) * W / rect.width; pointer.y = (event.clientY - rect.top) * H / rect.height; } });
+  scope.listen(canvas, "pointermove", (event) => {
+    if (pointer.active) updateCanvasPointer(canvas, pointer, event);
+  });
+  scope.listen(canvas, "pointercancel", () => { pointer.active = false; });
   scope.listen(window, "pointerup", () => { pointer.active = false; });
   if (touchPause) scope.listen(touchPause, "click", togglePause);
   if (touchCollection) scope.listen(touchCollection, "click", () => toggleCollection());
