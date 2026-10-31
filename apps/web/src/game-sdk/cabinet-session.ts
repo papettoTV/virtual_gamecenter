@@ -35,7 +35,10 @@ export function createCabinetSession(options: SessionOptions, createClient: (han
       if (message.type === "soloStarted" && message.reservationId === soloPending?.reservationId) soloPending?.resolve(true);
       if (message.type === "error") soloPending?.resolve(false);
       if (message.type === "joinedCabinet" || message.type === "roleChanged") {
-        role = message.role; finishWaiting(role === "player");
+        role = message.role;
+        // A spectator acknowledgement from the initial watch join may still be
+        // in flight when the player-seat request is sent on the same socket.
+        if (role === "player") finishWaiting(true);
       }
       if (message.type === "cabinetState") state = message.state;
       options.onMessage?.(message);
