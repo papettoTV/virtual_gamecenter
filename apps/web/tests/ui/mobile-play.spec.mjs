@@ -5,14 +5,16 @@ import { test, expect } from '../../../../ci/ui-fixtures.mjs';
 async function mount(page, gameId, role = 'player') {
   await page.goto('http://127.0.0.1:5174/');
   await page.evaluate(async ({ gameId, role }) => {
-    const React = await import('/node_modules/.vite/deps/react.js');
-    const { createRoot } = await import('/node_modules/.vite/deps/react-dom_client.js');
+    // Direct browser imports receive Vite's CommonJS default export; they do
+    // not get the named-import interop that Vite applies to source modules.
+    const { default: React } = await import('/node_modules/.vite/deps/react.js');
+    const { default: ReactDOMClient } = await import('/node_modules/.vite/deps/react-dom_client.js');
     const { GameScreen } = await import('/src/features/game/GameScreen.tsx');
     const { getGameDefinition } = await import('/src/domain/game.ts');
     const { setLiveContext } = await import('/src/features/sharing/share-service.ts');
     const host = document.createElement('main');
     host.id = 'presentation-fixture'; document.body.append(host);
-    createRoot(host).render(React.createElement(GameScreen, { game: getGameDefinition(gameId) }));
+    ReactDOMClient.createRoot(host).render(React.createElement(GameScreen, { game: getGameDefinition(gameId) }));
     setLiveContext({ gameId, cabinetId: 'presentation-only', role, phase: 'ready' });
   }, { gameId, role });
   const screen = page.locator('#presentation-fixture #game-screen');
