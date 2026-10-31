@@ -1,7 +1,7 @@
 import { test, expect } from '../../../../ci/ui-fixtures.mjs';
 
 // Exercise the real UI and sharing store without replacing authentication,
-// credits, or game-start APIs. Actual game input still needs device acceptance.
+// credits, or game-start APIs. Real-device acceptance remains separate.
 async function mount(page, gameId, role = 'player') {
   await page.goto('http://127.0.0.1:5174/');
   await page.evaluate(async ({ gameId, role }) => {
@@ -76,6 +76,32 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 412, height: 915 }
   });
 }
 
+for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }]) {
+  test(`unselected analytics panel cannot block play exit ${viewport.width}`, async ({ page }) => {
+    // Enter in portrait, then rotate while playing, including on fine pointers.
+    await page.setViewportSize({ width: 390, height: 844 });
+    const screen = await mount(page, 'graze-duel');
+    const panel = page.locator('.analytics-consent');
+    await expect(panel).toBeVisible();
+    await expect(panel).toContainText('未選択（解析停止中）');
+    await phase(page, 'graze-duel', 'playing');
+    await page.setViewportSize(viewport);
+    await expect(screen).toHaveAttribute('data-mobile-play', 'true');
+    await expect(panel).toContainText('未選択（解析停止中）');
+    const exit = screen.getByRole('button', { name: '通常表示に戻る' });
+    const rect = await exit.boundingBox();
+    expect(await exit.evaluate((el, rect) => el === document.elementFromPoint(
+      rect.x + rect.width / 2, rect.y + rect.height / 2), rect)).toBe(true);
+    await exit.click();
+    await expect(screen).not.toHaveAttribute('data-mobile-play');
+    await expect(panel).toBeVisible();
+    await expect(panel).toContainText('未選択（解析停止中）');
+    expect(await panel.evaluate(el => el.closest('[inert]') === null)).toBe(true);
+    await panel.getByRole('button', { name: '閉じる', exact: true }).click();
+    await expect(panel).toBeHidden();
+  });
+}
+
 test('desktop and spectator keep the regular page', async ({ page, isMobile }) => {
   test.skip(isMobile, 'PCのポインター条件で確認する');
   await page.setViewportSize({ width: 1280, height: 900 });
@@ -118,7 +144,23 @@ for (const gameId of ['graze-duel', 'deep-sea-salvage']) {
             color: '#ff0000', age: 0, type: 'normal', shape: 'circle' }] };
         const boss = { active: false, phaseIndex: 0, x: 0, y: 0, radius: 0, hp: 0,
           flash: 0, encounterState: '', arrivalProgress: 0 };
+        const { createInputController } = await import('/src/games/graze-duel/input.js');
+        const { createSimulation } = await import('/src/games/graze-duel/simulation.js');
+        const { GameLifetime } = await import('/src/game-sdk/lifetime.ts');
+        const lifetime = new GameLifetime();
+        const { movePlayer } = createSimulation({
+          state: { players: [player], boss, particles: [] },
+          settings: { FIELD_TOP: 0, FIELD_BOTTOM: 640, FIELD_MARGIN: 20, FIELD_WIDTH: 480,
+            PLAYER_SPEED_SCALE: 1, PLAYER_TILT_MAX: .2, PLAYER_TILT_LERP: .1, MAX_PARTICLES: 100 },
+        });
+        const input = createInputController({ lifetime, canvas, keyboardTarget: window,
+          // Deliberately use the non-compact path: the real fullscreen DOM must enable dragging.
+          getState: () => ({ compact: false, spectator: false, screen: 'game', gameOver: false }),
+          togglePause() {}, requestRetry() {}, movePlayer });
+        window.disposeInputFixture = () => lifetime.dispose();
         window.renderFixture = () => {
+          const before = { x: player.x, y: player.y };
+          input.updateHuman(player, .05);
           const ctx = canvas.getContext('2d');
           ctx.clearRect(0, 0, 960, 640);
           // Crosshair in the base image and bullet in the real WebGL layer
@@ -132,7 +174,7 @@ for (const gameId of ['graze-duel', 'deep-sea-salvage']) {
           const copy = document.createElement('canvas'); copy.width = 960; copy.height = 640;
           const pixels = copy.getContext('2d'); pixels.drawImage(overlay, 0, 0);
           const pixel = [...pixels.getImageData(240, 250, 1, 1).data];
-          return { pixel, baseFit: getComputedStyle(canvas).objectFit,
+          return { pixel, before, x: player.x, y: player.y, touch: { ...input.touchMove }, baseFit: getComputedStyle(canvas).objectFit,
             overlayFit: getComputedStyle(overlay).objectFit,
             baseRect: canvas.getBoundingClientRect().toJSON(),
             overlayRect: overlay.getBoundingClientRect().toJSON() };
@@ -167,7 +209,16 @@ for (const gameId of ['graze-duel', 'deep-sea-salvage']) {
       await page.setViewportSize(viewport);
       await expect(screen).toHaveAttribute('data-mobile-play', 'true');
       if (gameId === 'graze-duel') {
+        const rect = await screen.locator('#game').boundingBox();
+        await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(rect.x + rect.width / 2 + 36, rect.y + rect.height / 2 + 36);
         const result = await page.evaluate(() => window.renderFixture());
+        expect(result.touch.active).toBe(true);
+        expect(result.touch.x).toBeGreaterThan(0);
+        expect(result.touch.y).toBeGreaterThan(0);
+        expect(result.x).toBeGreaterThan(result.before.x);
+        expect(result.y).toBeGreaterThan(result.before.y);
         expect(result.pixel[0]).toBeGreaterThan(100);
         expect(result.pixel[3]).toBeGreaterThan(0);
         expect(result.baseFit).toBe('contain');
@@ -175,6 +226,11 @@ for (const gameId of ['graze-duel', 'deep-sea-salvage']) {
         for (const key of ['x', 'y', 'width', 'height']) {
           expect(result.overlayRect[key]).toBeCloseTo(result.baseRect[key], 0);
         }
+        await page.mouse.up();
+        const released = await page.evaluate(() => window.renderFixture());
+        expect(released.touch.active).toBe(false);
+        expect(released.x).toBe(released.before.x);
+        expect(released.y).toBe(released.before.y);
       } else {
         const rect = await screen.locator('#game').boundingBox();
         const scale = Math.min(rect.width / 960, rect.height / 640);
@@ -205,5 +261,12 @@ for (const gameId of ['graze-duel', 'deep-sea-salvage']) {
     }
     await screen.getByRole('button', { name: '通常表示に戻る' }).click();
     await expect(screen).not.toHaveAttribute('data-mobile-play');
+    if (gameId === 'graze-duel') {
+      await page.evaluate(() => window.disposeInputFixture());
+      const released = await page.evaluate(() => window.renderFixture());
+      expect(released.touch.active).toBe(false);
+      expect(released.x).toBe(released.before.x);
+      expect(released.y).toBe(released.before.y);
+    }
   });
 }
