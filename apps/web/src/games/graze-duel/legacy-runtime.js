@@ -2186,8 +2186,8 @@ export function mountGame(context) {
     if (isVersusParticipant() && !pausedForLiveShare) return;
     pausedForLiveShare = false;
     if (waitingForStart) {
-      waitingForStart = false;
-      paused = false;
+      gameHost.requestPlay("start");
+      return;
     } else {
       paused = !paused;
     }
@@ -3552,15 +3552,17 @@ export function mountGame(context) {
   return {
     async prepareSolo() {
       if (scope.disposed) return;
-      if (currentCabinetId && cabinetClient.role === "player") return;
+      if (currentCabinetId && cabinetClient.role === "player") { showScreen("game"); return; }
       if (currentCabinetId && cabinetRole === "joining") {
         const joined = await cabinetClient.waitForPlayer();
-        if (scope.disposed || joined) return;
+        if (scope.disposed) return;
+        if (joined) { showScreen("game"); return; }
       }
       enterCabinet(createUuid());
       const ready = await cabinetClient.waitForPlayer();
       if (scope.disposed) return;
       if (!ready) throw new Error("Solo cabinet could not be prepared.");
+      showScreen("game");
     },
     async play(action, reservationId) {
       if (scope.disposed || !currentCabinetId) return false;
@@ -3570,6 +3572,7 @@ export function mountGame(context) {
       if (scope.disposed || !ready) return false;
       if (!reservationId || !await cabinetClient.startSolo(reservationId) || scope.disposed) return false;
       const started = startSoloPlay(reservationId, true);
+      if (started) { waitingForStart = false; paused = false; updatePauseButton(); }
       if (started && action === "retry") rankingSubmitPanel?.classList.remove("is-visible");
       return started;
     },

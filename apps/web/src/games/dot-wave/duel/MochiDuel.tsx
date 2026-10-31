@@ -39,6 +39,7 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
   const musicOverride = useRef<MusicStage | null>(null);
   const musicLevels = (history: Match["history"]): [MusicStage, MusicStage] => musicOverride.current === null ? musicStages(history) : [musicOverride.current, musicOverride.current];
   const busy = useRef(false);
+  const creditConfirmation = useRef(false);
   const alive = useRef(true);
   const [, render] = useReducer((value: number) => value + 1, 0);
   const e = engine.current;
@@ -70,10 +71,15 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
     }
     render();
   }
-  async function begin() {
+  async function begin(approved = false) {
     const current = engine.current;
     if (current.phase !== "intro" || busy.current || replica || (network && (!network.connected || (network.matchId && !network.startsAt)))) return;
+    if (network && !network.matchId && network.startCost > 0 && (current.cpuStage ?? 1) === 1 && !approved) {
+      creditConfirmation.current = true; render(); return;
+    }
+    creditConfirmation.current = false;
     busy.current = true;
+    render();
     try {
       sound.current ??= new DuelAudio();
       await sound.current.resume(); notifications.dismiss("game-audio");
@@ -294,6 +300,7 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
       if (network) network.publish(current, network.now() - (sound.current && ["countdown", "playing"].includes(current.phase) ? sound.current.seconds : current.seconds) * 1000);
     };
     const key = (event: KeyboardEvent) => {
+      if (creditConfirmation.current || document.querySelector(".platform-overlay, .share-overlay")) return;
       if (network && (network.side === null || !network.connected)) return;
       if (event.target instanceof Element && event.target.closest("input, select, textarea, a, [role=dialog], [data-debug-controls]")) return;
       if (engine.current.phase === "intro" && event.target instanceof Element && event.target.closest("button") && !event.target.closest(".duel-primary")) return;
@@ -350,6 +357,17 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
   const heading = e.phase === "intro" ? ""  : e.phase === "paused" ? "PAUSED / 一時停止" : e.phase === "finished" && cleared ? next ? `${stageInfo.label} CLEAR!` : "ALL STAGES CLEAR!" : e.phase === "finished" ? e.match.winner === "draw" ? "DRAW / 引き分け" : `${name(e.match.winner!)}の勝ち！` : e.phase === "impact" ? e.outcome!.damage ? "CORE HIT! パルス直撃！" : "攻撃を防いだ！" : beat < 4 ? `${name(attacker)}、次の攻撃！ ${4 - Math.floor(beat)}` : beat < 8 ? `${name(attacker)}の攻撃！` : `${name((1 - attacker) as Side)}、リズムで守れ！`;
 
   return <main className="dot-wave" data-phase={e.phase}>
+    {creditConfirmation.current && <div className="platform-overlay" role="dialog" aria-modal="true" aria-label="ゲームを開始しますか？"
+      onKeyDown={event => { event.stopPropagation(); if (event.code === "Escape") { event.preventDefault(); creditConfirmation.current = false; render(); } }}>
+      <div className="platform-dialog platform-dialog-small">
+        <h2>ゲームを開始しますか？</h2><p>開始時に1クレジットを使用します。</p>
+        <div className="platform-dialog-actions">
+          <button autoFocus type="button" onClick={() => { creditConfirmation.current = false; render(); }}>キャンセル</button>
+          <button type="button" onClick={() => void begin(true)}>1クレジットで開始</button>
+        </div>
+      </div>
+    </div>}
+
     <header><div><span className="duel-eyebrow">NEON RHYTHM BATTLE</span><h1><PixelWord /></h1></div><a href="/">ゲーム一覧へ</a></header>
     <div className="duel-mode-label">
       <span className="duel-mode-info">{e.mode === "cpu" ? `CPU対戦 · ${stageInfo.label} / 3` : e.mode === "online" ? "通信対戦" : "同じ端末で2人対戦"} · {e.phase === "intro" ? "攻守交代のリズムバトル" : `攻防 ${e.match.turn + (e.phase === "impact" || e.phase === "finished" ? 0 : 1)} / ${exchangeLimit(e.match)}`}</span>
@@ -364,10 +382,8 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
       {e.phase === "intro" && !busy.current && <div className="duel-state-overlay duel-start-panel">
       {!replica && !network?.matchId && <div className="duel-intro-panel">
         <div className="duel-start-actions">
-        {network && stage === 1 && network.startCost > 0 && <h2>ゲームを開始しますか？</h2>}
         <p className="duel-input-hint">{e.mode === "cpu" ? "スペース / F / タップでパルス" : "CYAN：F　PINK：J / それぞれのタップボタン"}</p>
-        <button className="duel-primary" onClick={() => void begin()} disabled={Boolean(network && !network.connected)}>START / {e.mode === "cpu" && stage > 1 ? `${stageInfo.label} 開始` : network ? network.startCost ? "1クレジットで開始" : "続ける" : "対戦開始"}</button>
-        {network && stage === 1 && network.startCost > 0 && <button type="button" onClick={() => navigate("/")}>キャンセル</button>}
+        <button className="duel-primary" onClick={() => void begin()} disabled={Boolean(network && !network.connected)}>START / {e.mode === "cpu" && stage > 1 ? `${stageInfo.label} 開始` : network ? network.startCost ? "ゲーム開始" : "続ける" : "対戦開始"}</button>
         </div>
         {e.mode === "cpu" && <div className="dot-stage-intro"><strong>{stageInfo.label} · {stageInfo.name}</strong><span>{stageInfo.title}</span></div>}
         <div className="dot-cue-guide"><span><BattleIcon kind="tap"/><span>チカチカ → もうすぐ</span></span><span><BattleIcon kind="note"/><span>音符でこうげき</span></span><span><BattleIcon kind="shield"/><span>シールドでまもる</span></span></div>
