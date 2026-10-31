@@ -8,8 +8,28 @@ const games = [
   { id: 'deep-sea-salvage', button: '潜航開始', key: 'p' },
   { id: 'dot-wave', button: 'START / ゲーム開始', key: 'Space' },
 ];
+// Wait for the rendered wallet without spending the bootstrap endpoint's budget.
 async function wallet(page) {
+  const badge = page.locator('.platform-credit-badge');
+  await expect(badge).toHaveText(/^\d+$/);
+  return Number(await badge.textContent());
+}
+async function persistedWallet(page) {
   return page.evaluate(async () => (await (await import('/src/features/platform/platform-client.ts')).fetchPlatformBootstrap()).wallet.availableTotal);
+}
+async function prepareGuest(page) {
+  // Reuse the application's initial real bootstrap instead of requesting it again.
+  const loaded = page.waitForResponse(response => response.url().endsWith('/api/platform/bootstrap'));
+  await page.goto(origin);
+  const response = await loaded;
+  expect(response.ok()).toBe(true);
+  const account = await response.json();
+  const decline = page.getByRole('button', { name: '拒否する', exact: true });
+  if (await decline.isVisible()) await decline.click();
+  if (!account.welcomeCreditGranted) {
+    return (await page.evaluate(async () => (await import('/src/features/platform/platform-client.ts')).claimWelcomeCredit())).wallet;
+  }
+  return account.wallet;
 }
 async function phase(page, game) {
   return page.evaluate(async game => game === 'dot-wave'
@@ -19,15 +39,8 @@ async function phase(page, game) {
 for (const game of games) {
   for (const input of ['primary', 'keyboard']) {
     test(`${game.id}: ${input}, ready, cancel, delayed duplicate and authorized start`, async ({ page, isMobile }) => {
-      await page.goto(origin);
-      const decline = page.getByRole('button', { name: '拒否する', exact: true });
-      if (await decline.isVisible()) await decline.click();
       // Only the disposable local guest and the real welcome-credit API are used.
-      await page.evaluate(async () => {
-        const api = await import('/src/features/platform/platform-client.ts');
-        const account = await api.fetchPlatformBootstrap();
-        if (!account.welcomeCreditGranted) await api.claimWelcomeCredit();
-      });
+      await prepareGuest(page);
       const writes = [];
       page.on('request', request => {
         if (request.method() === 'POST' && request.url().includes('/api/platform/credit-reservations')) writes.push(request.url());
@@ -89,11 +102,15 @@ for (const game of games) {
       await expect.poll(() => phase(page, game.id)).toBe(ready);
       expect(await wallet(page)).toBe(balance);
       await intent();
+      expect(await persistedWallet(page)).toBe(balance);
       // Delay the real request, without replacing credit or authorization responses.
       await page.route('**/api/platform/credit-reservations', async route => {
         await new Promise(resolve => setTimeout(resolve, 250));
         await route.continue();
       });
+      // Observe actual accounting responses; never replace reservation or capture.
+      const reserved = page.waitForResponse(response => response.request().method() === 'POST' && response.url().endsWith('/credit-reservations'));
+      const captured = page.waitForResponse(response => response.request().method() === 'POST' && response.url().endsWith('/capture'));
       const approve = dialog.getByRole('button', { name: '1クレジットで開始', exact: true });
       if (game.id === 'dot-wave') {
         await approve.focus();
@@ -116,21 +133,25 @@ for (const game of games) {
       await page.keyboard.press(game.key);
       await expect.poll(async () => ['playing', 'countdown', 'paused'].includes(await phase(page, game.id))).toBe(true);
       await expect(dialog).toBeHidden();
-      await expect.poll(() => wallet(page)).toBe(balance - 1);
+      const reservationResponse = await reserved;
+      const captureResponse = await captured;
+      expect(reservationResponse.ok()).toBe(true);
+      expect(captureResponse.ok()).toBe(true);
+      const reservation = await reservationResponse.json();
+      const capture = await captureResponse.json();
+      expect(reservation.wallet.availableTotal).toBe(balance - 1);
+      expect(capture.status).toBe('captured');
+      expect(capture.wallet.availableTotal).toBe(balance - 1);
+      expect(capture.wallet.reservedFree + capture.wallet.reservedPurchased).toBe(0);
+      await expect(page.locator('.platform-credit-badge')).toHaveText(String(balance - 1));
+      expect(await persistedWallet(page)).toBe(balance - 1);
       expect(writes.filter(url => url.endsWith('/credit-reservations'))).toHaveLength(1);
       expect(writes.filter(url => url.endsWith('/capture'))).toHaveLength(1);
       expect(writes.filter(url => url.endsWith('/release'))).toHaveLength(0);
     });
   }
   test(`${game.id}: failed capture keeps play stopped and releases the unused reservation`, async ({ page, isMobile }) => {
-    await page.goto(origin);
-    const decline = page.getByRole('button', { name: '拒否する', exact: true });
-    if (await decline.isVisible()) await decline.click();
-    await page.evaluate(async () => {
-      const api = await import('/src/features/platform/platform-client.ts');
-      const account = await api.fetchPlatformBootstrap();
-      if (!account.welcomeCreditGranted) await api.claimWelcomeCredit();
-    });
+    await prepareGuest(page);
     await page.goto(`${origin}/cabinets/${randomUUID()}?game=${game.id}`);
     const start = page.getByRole('button', { name: game.button, exact: true });
     if (isMobile || game.id === 'dot-wave') { await expect(start).toBeVisible(); await expect(start).toBeEnabled(); }
@@ -142,9 +163,11 @@ for (const game of games) {
     const released = page.waitForResponse(response => response.url().endsWith('/release') && response.ok());
     await page.getByRole('dialog', { name: 'ゲームを開始しますか？', exact: true })
       .getByRole('button', { name: '1クレジットで開始', exact: true }).click();
-    await released;
+    const releaseResponse = await released;
+    expect((await releaseResponse.json()).wallet.availableTotal).toBe(balance);
     await expect.poll(() => phase(page, game.id)).toBe(game.id === 'dot-wave' ? 'intro' : 'ready');
     expect(await wallet(page)).toBe(balance);
+    expect(await persistedWallet(page)).toBe(balance);
   });
   for (const occupied of [false, true]) {
     test(`${game.id}: spectator never requests a start (${occupied ? 'live player' : 'empty cabinet'})`, async ({ page, browser }) => {
@@ -156,33 +179,25 @@ for (const game of games) {
           await playerContext.route('**/*', route => localUiUrl(route.request().url()) ? route.continue() : route.abort());
           await playerContext.routeWebSocket('**/*', socket => localUiUrl(socket.url()) ? socket.connectToServer() : socket.close());
           const player = await playerContext.newPage();
-          await player.goto(origin);
-          const decline = player.getByRole('button', { name: '拒否する', exact: true });
-          if (await decline.isVisible()) await decline.click();
-          await player.evaluate(async () => {
-            const api = await import('/src/features/platform/platform-client.ts');
-            const account = await api.fetchPlatformBootstrap();
-            if (!account.welcomeCreditGranted) await api.claimWelcomeCredit();
-          });
+          await prepareGuest(player);
           await player.goto(cabinet);
           await expect.poll(() => phase(player, game.id)).toBe(game.id === 'dot-wave' ? 'intro' : 'ready');
           const playerBalance = await wallet(player);
           await player.locator('body').click({ position: { x: 2, y: 2 } });
           await player.keyboard.press(game.key);
+          const captured = player.waitForResponse(response => response.request().method() === 'POST' && response.url().endsWith('/capture'));
           await player.getByRole('dialog', { name: 'ゲームを開始しますか？', exact: true })
             .getByRole('button', { name: '1クレジットで開始', exact: true }).click();
           await expect.poll(async () => ['playing', 'countdown', 'paused'].includes(await phase(player, game.id))).toBe(true);
-          await expect.poll(() => wallet(player)).toBe(playerBalance - 1);
+          const captureResponse = await captured;
+          expect(captureResponse.ok()).toBe(true);
+          const capture = await captureResponse.json();
+          expect(capture.status).toBe('captured');
+          expect(capture.wallet.availableTotal).toBe(playerBalance - 1);
+          await expect(player.locator('.platform-credit-badge')).toHaveText(String(playerBalance - 1));
+          expect(await persistedWallet(player)).toBe(playerBalance - 1);
         }
-        await page.goto(origin);
-        const decline = page.getByRole('button', { name: '拒否する', exact: true });
-        if (await decline.isVisible()) await decline.click();
-        await page.evaluate(async () => {
-          const api = await import('/src/features/platform/platform-client.ts');
-          const account = await api.fetchPlatformBootstrap();
-          if (!account.welcomeCreditGranted) await api.claimWelcomeCredit();
-        });
-        const balance = await wallet(page);
+        const balance = (await prepareGuest(page)).availableTotal;
         const writes = [];
         page.on('request', request => { if (request.method() === 'POST' && request.url().includes('credit-reservations')) writes.push(request.url()); });
         await page.goto(`${cabinet}&watch=1&start=1`);
@@ -207,6 +222,7 @@ for (const game of games) {
         await expect(start).toBeHidden();
         await expect(dialog).toBeHidden();
         expect(await wallet(page)).toBe(balance);
+        expect(await persistedWallet(page)).toBe(balance);
         expect(writes).toHaveLength(0);
         if (!occupied) await expect(waiting).toBeVisible();
       } finally {
