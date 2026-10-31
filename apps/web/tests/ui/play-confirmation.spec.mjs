@@ -170,30 +170,84 @@ for (const game of games) {
     expect(await persistedWallet(page)).toBe(balance);
   });
   for (const occupied of [false, true]) {
-    test(`${game.id}: spectator never requests a start (${occupied ? 'live player' : 'empty cabinet'})`, async ({ page, browser }) => {
+    test(`${game.id}: spectator never requests a start (${occupied ? 'live player' : 'empty cabinet'})`, async ({ page, browser }, testInfo) => {
       const cabinet = `${origin}/cabinets/${randomUUID()}?game=${game.id}`;
       const playerContext = occupied ? await browser.newContext() : null;
+      const playerEvents = [];
+      const playerWrites = [];
+      let player;
       try {
         if (playerContext) {
           // Extra contexts need the same local-only network boundary as the fixture.
           await playerContext.route('**/*', route => localUiUrl(route.request().url()) ? route.continue() : route.abort());
           await playerContext.routeWebSocket('**/*', socket => localUiUrl(socket.url()) ? socket.connectToServer() : socket.close());
-          const player = await playerContext.newPage();
+          player = await playerContext.newPage();
+          // Record local accounting and connection transitions for failed CI diagnosis.
+          player.on('request', request => {
+            if (request.method() === 'POST' && request.url().includes('/api/platform/credit-reservations')) {
+              playerWrites.push(request.url());
+              playerEvents.push({ type: 'request', path: new URL(request.url()).pathname });
+            }
+          });
+          player.on('response', response => {
+            if (response.url().includes('/api/platform/credit-reservations')) {
+              playerEvents.push({ type: 'response', path: new URL(response.url()).pathname, status: response.status() });
+            }
+          });
+          player.on('websocket', socket => {
+            playerEvents.push({ type: 'socket-open' });
+            socket.on('close', () => playerEvents.push({ type: 'socket-close' }));
+            socket.on('framereceived', ({ payload }) => {
+              try {
+                const message = JSON.parse(String(payload));
+                // Keep only protocol event names, never guest/session payloads.
+                if (['joinedCabinet', 'roleChanged', 'dotWaveSoloStarted', 'error'].includes(message.type)) {
+                  playerEvents.push({ type: message.type });
+                }
+              } catch { /* Binary/non-JSON frames carry no diagnostic event. */ }
+            });
+          });
           await prepareGuest(player);
           await player.goto(cabinet);
           await expect.poll(() => phase(player, game.id)).toBe(game.id === 'dot-wave' ? 'intro' : 'ready');
+          if (game.id === 'dot-wave') {
+            // intro renders before the socket's joinedCabinet assigns the seat.
+            await expect(player.locator('.dot-cabinet-bar > span')).toContainText('あなたの筐体');
+            const start = player.getByRole('button', { name: game.button, exact: true });
+            await expect(start).toBeVisible();
+            await expect(start).toBeEnabled();
+          }
           const playerBalance = await wallet(player);
-          await player.locator('body').click({ position: { x: 2, y: 2 } });
-          await player.keyboard.press(game.key);
+          // Register both real accounting responses before any start operation.
+          const reserved = player.waitForResponse(response => response.request().method() === 'POST' && response.url().endsWith('/credit-reservations'));
           const captured = player.waitForResponse(response => response.request().method() === 'POST' && response.url().endsWith('/capture'));
-          await player.getByRole('dialog', { name: 'ゲームを開始しますか？', exact: true })
-            .getByRole('button', { name: '1クレジットで開始', exact: true }).click();
+          if (game.id === 'dot-wave') {
+            // Space on keydown opens a dialog that autofocuses Cancel; use the
+            // rendered primary control here. Dedicated cases above cover keys.
+            await player.getByRole('button', { name: game.button, exact: true }).click();
+          } else {
+            await player.locator('body').click({ position: { x: 2, y: 2 } });
+            await player.keyboard.press(game.key);
+          }
+          const confirmation = player.getByRole('dialog', { name: 'ゲームを開始しますか？', exact: true });
+          await expect(confirmation).toBeVisible();
+          await confirmation.getByRole('button', { name: '1クレジットで開始', exact: true }).click();
+          const reservationResponse = await reserved;
+          expect(reservationResponse.ok()).toBe(true);
+          expect((await reservationResponse.json()).wallet.availableTotal).toBe(playerBalance - 1);
           await expect.poll(async () => ['playing', 'countdown', 'paused'].includes(await phase(player, game.id))).toBe(true);
           const captureResponse = await captured;
           expect(captureResponse.ok()).toBe(true);
           const capture = await captureResponse.json();
           expect(capture.status).toBe('captured');
           expect(capture.wallet.availableTotal).toBe(playerBalance - 1);
+          expect(capture.wallet.reservedFree + capture.wallet.reservedPurchased).toBe(0);
+          await expect(confirmation).toBeHidden();
+          expect(playerWrites.filter(url => url.endsWith('/credit-reservations'))).toHaveLength(1);
+          expect(playerWrites.filter(url => url.endsWith('/capture'))).toHaveLength(1);
+          expect(playerWrites.filter(url => url.endsWith('/release'))).toHaveLength(0);
+          if (game.id === 'dot-wave') expect(playerEvents).toContainEqual({ type: 'dotWaveSoloStarted' });
+          playerEvents.push({ type: 'authorized-phase', phase: await phase(player, game.id) });
           await expect(player.locator('.platform-credit-badge')).toHaveText(String(playerBalance - 1));
           expect(await persistedWallet(player)).toBe(playerBalance - 1);
         }
@@ -226,6 +280,12 @@ for (const game of games) {
         expect(writes).toHaveLength(0);
         if (!occupied) await expect(waiting).toBeVisible();
       } finally {
+        if (playerContext) {
+          if (player && !player.isClosed()) {
+            playerEvents.push({ type: 'final-phase', phase: await phase(player, game.id).catch(() => 'unavailable') });
+          }
+          await testInfo.attach('local-player-start', { body: JSON.stringify(playerEvents), contentType: 'application/json' });
+        }
         await playerContext?.close();
       }
     });
