@@ -48,6 +48,12 @@ jobs:
         if: steps.ui.outputs.enabled == 'true'
         working-directory: .
         run: node ci/node_modules/@playwright/test/cli.js test --config ci/ui-local.config.mjs
+      - name: UIレポートが成果物対象のフォルダにあることを確認
+        if: steps.ui.outputs.enabled == 'true'
+        working-directory: .
+        run: |
+          test -s ci/ui-results/report.json
+          test -s ci/ui-results/html/index.html
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
