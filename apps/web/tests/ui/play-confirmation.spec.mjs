@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { test, expect } from '../../../../ci/ui-fixtures.mjs';
+import { localUiUrl } from '../../../../ci/ui-tests.mjs';
 
 const origin = 'http://127.0.0.1:5174';
 const games = [
@@ -112,15 +113,72 @@ for (const game of games) {
     await expect.poll(() => phase(page, game.id)).toBe(game.id === 'dot-wave' ? 'intro' : 'ready');
     expect(await wallet(page)).toBe(balance);
   });
-  test(`${game.id}: spectator never requests a start`, async ({ page }) => {
-    const writes = [];
-    page.on('request', request => { if (request.method() === 'POST' && request.url().includes('credit-reservations')) writes.push(request.url()); });
-    await page.goto(`${origin}/cabinets/${randomUUID()}?game=${game.id}&watch=1&start=1`);
-    if (game.id === 'dot-wave') await expect(page.locator('.dot-cabinet-bar > span')).toContainText('観戦中');
-    else await expect(page.locator('#spectator-banner')).toBeVisible();
-    await page.keyboard.press(game.key);
-    await expect(page.getByRole('button', { name: game.button, exact: true })).toBeHidden();
-    await expect(page.getByRole('dialog', { name: 'ゲームを開始しますか？' })).toBeHidden();
-    expect(writes).toHaveLength(0);
-  });
+  for (const occupied of [false, true]) {
+    test(`${game.id}: spectator never requests a start (${occupied ? 'live player' : 'empty cabinet'})`, async ({ page, browser }) => {
+      const cabinet = `${origin}/cabinets/${randomUUID()}?game=${game.id}`;
+      const playerContext = occupied ? await browser.newContext() : null;
+      try {
+        if (playerContext) {
+          // Extra contexts need the same local-only network boundary as the fixture.
+          await playerContext.route('**/*', route => localUiUrl(route.request().url()) ? route.continue() : route.abort());
+          await playerContext.routeWebSocket('**/*', socket => localUiUrl(socket.url()) ? socket.connectToServer() : socket.close());
+          const player = await playerContext.newPage();
+          await player.goto(origin);
+          const decline = player.getByRole('button', { name: '拒否する', exact: true });
+          if (await decline.isVisible()) await decline.click();
+          await player.evaluate(async () => {
+            const api = await import('/src/features/platform/platform-client.ts');
+            const account = await api.fetchPlatformBootstrap();
+            if (!account.welcomeCreditGranted) await api.claimWelcomeCredit();
+          });
+          await player.goto(cabinet);
+          await expect.poll(() => phase(player, game.id)).toBe(game.id === 'dot-wave' ? 'intro' : 'ready');
+          const playerBalance = await wallet(player);
+          await player.locator('body').click({ position: { x: 2, y: 2 } });
+          await player.keyboard.press(game.key);
+          await player.getByRole('dialog', { name: 'ゲームを開始しますか？', exact: true })
+            .getByRole('button', { name: '1クレジットで開始', exact: true }).click();
+          await expect.poll(async () => ['playing', 'countdown', 'paused'].includes(await phase(player, game.id))).toBe(true);
+          await expect.poll(() => wallet(player)).toBe(playerBalance - 1);
+        }
+        await page.goto(origin);
+        const decline = page.getByRole('button', { name: '拒否する', exact: true });
+        if (await decline.isVisible()) await decline.click();
+        await page.evaluate(async () => {
+          const api = await import('/src/features/platform/platform-client.ts');
+          const account = await api.fetchPlatformBootstrap();
+          if (!account.welcomeCreditGranted) await api.claimWelcomeCredit();
+        });
+        const balance = await wallet(page);
+        const writes = [];
+        page.on('request', request => { if (request.method() === 'POST' && request.url().includes('credit-reservations')) writes.push(request.url()); });
+        await page.goto(`${cabinet}&watch=1&start=1`);
+        const waiting = page.getByRole('region', { name: 'プレイの開始待ち・終了', exact: true });
+        if (!occupied) {
+          await expect(waiting).toBeVisible();
+          await expect(page.locator('.spectator-offline')).toBeAttached();
+        } else {
+          await expect(waiting).toBeHidden();
+          if (game.id === 'dot-wave') await expect(page.locator('.dot-cabinet-bar > span')).toContainText('観戦中');
+          else await expect(page.locator('#spectator-banner')).toBeVisible();
+        }
+        const start = page.getByRole('button', { name: game.button, exact: true });
+        const dialog = page.getByRole('dialog', { name: 'ゲームを開始しますか？' });
+        await expect(start).toBeHidden();
+        await expect(dialog).toBeHidden();
+        await page.locator('body').click({ position: { x: 2, y: 2 } });
+        await page.keyboard.press(game.key);
+        await page.keyboard.down(game.key);
+        await page.keyboard.down(game.key);
+        await page.keyboard.up(game.key);
+        await expect(start).toBeHidden();
+        await expect(dialog).toBeHidden();
+        expect(await wallet(page)).toBe(balance);
+        expect(writes).toHaveLength(0);
+        if (!occupied) await expect(waiting).toBeVisible();
+      } finally {
+        await playerContext?.close();
+      }
+    });
+  }
 }
