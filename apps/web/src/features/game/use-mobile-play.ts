@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react";
 import { liveSharing } from "../sharing/share-service";
 
+// Live play belongs to the browser; SSR and initial hydration use no session.
+const getServerSnapshot = () => null;
+
 // Use the same viewport presentation on iOS and browsers with Fullscreen API.
 // It does not depend on an asynchronous start retaining user activation.
 export function useMobilePlay(screen: RefObject<HTMLElement | null>) {
-  const context = useSyncExternalStore(liveSharing.subscribe, liveSharing.getSnapshot);
+  const context = useSyncExternalStore(liveSharing.subscribe, liveSharing.getSnapshot, getServerSnapshot);
   const [mobile, setMobile] = useState(false);
   const [active, setActive] = useState(false);
   const dismissed = useRef(false);
