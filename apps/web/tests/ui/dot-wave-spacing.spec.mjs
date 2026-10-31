@@ -7,6 +7,21 @@ const sizes = [
   { name: 'pc', width: 1440, height: 900 },
 ];
 
+test.beforeEach(async ({ page }, info) => {
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.stack ?? error.message));
+  // Check even when a layout assertion fails, so a React crash is reported
+  // directly instead of only as a missing game/result element.
+  info.layoutPageErrors = errors;
+});
+
+test.afterEach(async ({}, info) => {
+  await info.attach('page-errors', {
+    body: JSON.stringify(info.layoutPageErrors, null, 2), contentType: 'application/json',
+  });
+  expect(info.layoutPageErrors, 'No uncaught browser errors during the game flow').toEqual([]);
+});
+
 async function enter(page, game) {
   await page.goto('/');
   const decline = page.getByRole('button', { name: '拒否する', exact: true });
@@ -91,8 +106,15 @@ for (const size of sizes) {
         const current = engine.current;
         if (layoutFinishRequested && current.phase === 'playing' && current.mode === 'cpu') {
           layoutFinishRequested = false;
+          // Resolve a complete final exchange using the real game rules. In
+          // particular, impact rendering requires an outcome and history.
+          current.match = fresh('cpu', current.match.ending, 3).match;
+          current.match.hp = [100, 1];
+          current.exchange = createExchange(0, 0, beatAt(0));
+          for (const note of current.exchange.attack.notes) note.grade = 'perfect';
+          for (const note of current.exchange.defense.notes) note.grade = 'miss';
+          current.outcome = resolve(current.match, current.exchange);
           current.phase = 'impact'; current.impactElapsed = 0; current.cpuStage = 3;
-          current.match.winner = 0; current.match.hp = [100, 0];
           current.elapsedPlayMs = 180000;
           current.score = { total: 54820, maxCombo: 42, combo: 0, bossBonus: 1200 };
           sound.current?.stop();
