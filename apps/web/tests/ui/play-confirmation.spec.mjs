@@ -51,9 +51,19 @@ for (const game of games) {
       await page.evaluate(code => window.dispatchEvent(new KeyboardEvent('keydown', { code, repeat: true, bubbles: true })), game.key === 'p' ? 'KeyP' : 'Space');
       await expect.poll(() => phase(page, game.id)).toBe(ready);
       expect(writes).toHaveLength(0);
+      // A document listener sees real game keys only after the window capture guard.
+      await page.evaluate(() => {
+        window.dialogKeysAtDocument = [];
+        document.addEventListener('keydown', event => window.dialogKeysAtDocument.push(event.code));
+      });
+      await page.keyboard.press(game.key);
+      await expect(dialog).toBeVisible();
       await page.keyboard.press('Escape');
+      expect(await page.evaluate(() => window.dialogKeysAtDocument)).toEqual([]);
       await expect(dialog).toBeHidden();
       expect(await wallet(page)).toBe(balance);
+      await page.keyboard.press('Shift');
+      expect(await page.evaluate(() => window.dialogKeysAtDocument)).toContain('ShiftLeft');
       await intent();
       await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
       await expect(dialog).toBeHidden();

@@ -109,8 +109,14 @@ describe("typed platform play integration", () => {
     events = new EventTarget();
     vi.stubGlobal("window", {
       location: { href: "https://example.test/cabinets/test-cabinet?game=deep-sea-salvage", search: "?game=deep-sea-salvage", pathname: "/cabinets/test-cabinet" },
-      addEventListener: events.addEventListener.bind(events),
-      removeEventListener: events.removeEventListener.bind(events),
+      // The Workers EventTarget used by this suite has no DOM capture phase.
+      // Adapt that boundary here; browser specs verify actual propagation order.
+      addEventListener: vi.fn((type: string, listener: EventListener, options?: boolean | AddEventListenerOptions) => {
+        events.addEventListener(type, listener, typeof options === "boolean" ? false : { ...options, capture: false });
+      }),
+      removeEventListener: vi.fn((type: string, listener: EventListener) => {
+        events.removeEventListener(type, listener, false);
+      }),
       dispatchEvent: events.dispatchEvent.bind(events),
       history: {
         state: { preserved: true },
@@ -227,6 +233,48 @@ describe("typed platform play integration", () => {
     mount();
     expect(runtime.states[slots.pendingAction]).toBe("retry");
     expect(new URL(window.location.href).searchParams.has("start")).toBe(false);
+  });
+
+  it("registers a capture guard, cancels with Escape and removes the same guard", () => {
+    mount();
+    gameHost.requestPlay("start");
+    cleanup.forEach(dispose => dispose());
+    cleanup = [];
+    mount();
+    const registration = vi.mocked(window.addEventListener).mock.calls.find(([type]) => String(type) === "keydown");
+    expect(registration).toEqual(["keydown", expect.any(Function), true]);
+
+    const key = new Event("keydown", { cancelable: true });
+    Object.defineProperty(key, "code", { value: "Space" });
+    const stop = vi.spyOn(key, "stopPropagation");
+    window.dispatchEvent(key);
+    expect(stop).toHaveBeenCalledOnce();
+    expect(key.defaultPrevented).toBe(false); // Preserve native dialog button activation.
+    expect(runtime.states[slots.playDialog]).toBe("confirm");
+    expect(executePlay).not.toHaveBeenCalled();
+    expect(play).not.toHaveBeenCalled();
+
+    const escape = new Event("keydown", { cancelable: true });
+    Object.defineProperty(escape, "code", { value: "Escape" });
+    const stopEscape = vi.spyOn(escape, "stopPropagation");
+    window.dispatchEvent(escape);
+    expect(escape.defaultPrevented).toBe(true);
+    expect(stopEscape).toHaveBeenCalledOnce();
+    expect(runtime.states[slots.pendingAction]).toBe(null);
+    expect(runtime.states[slots.playDialog]).toBe(null);
+    expect(executePlay).not.toHaveBeenCalled();
+    expect(play).not.toHaveBeenCalled();
+
+    cleanup.forEach(dispose => dispose());
+    cleanup = [];
+    expect(window.removeEventListener).toHaveBeenCalledWith("keydown", registration![1], true);
+    stop.mockClear();
+    window.dispatchEvent(key);
+    expect(stop).not.toHaveBeenCalled();
+    mount();
+    gameHost.requestPlay("start");
+    expect(runtime.states[slots.pendingAction]).toBe("start");
+    expect(runtime.states[slots.playDialog]).toBe("confirm");
   });
 
   it("does not duplicate a stored retry restore", () => {
