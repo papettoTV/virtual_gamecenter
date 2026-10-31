@@ -2,6 +2,8 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { assertChanges, assertIssueNumber, assertSha } from './policy.mjs';
 import { PublicationStopped, publicationFailure, validatePublicationResult } from './publication-result.mjs';
+import {assertResumeSnapshot} from './automatic-resume.mjs';
+import {assertAutomaticIssue} from './issue-routing.mjs';
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8', maxBuffer: 1024 * 1024 }).trim();
 try {
   const text = await readFile(process.env.RESULT_FILE, 'utf8');
@@ -11,8 +13,26 @@ try {
   }
   const issue = assertIssueNumber(process.env.ISSUE_NUMBER);
   const base = assertSha(process.env.BASE_SHA);
-  if (git('rev-parse', 'HEAD') !== base) throw Error('Unexpected checkout');
+  const trustedBase=assertSha(process.env.TRUSTED_BASE_SHA||base),pull=process.env.PULL_NUMBER;
+  if (git('rev-parse', 'HEAD') !== trustedBase) throw Error('Unexpected trusted checkout');
+  const recheck=()=>{
+    if(!pull)return;
+    const number=assertIssueNumber(pull),repository='papettoTV/virtual_gamecenter';
+    assertAutomaticIssue(JSON.parse(execFileSync('gh',['api',`repos/${repository}/issues/${issue}`],{encoding:'utf8',stdio:['ignore','pipe','pipe']})));
+    const pr=JSON.parse(execFileSync('gh',['api',`repos/${repository}/pulls/${number}`],{encoding:'utf8',stdio:['ignore','pipe','pipe']}));
+    assertResumeSnapshot(pr,{issue,pull:number,head:assertSha(process.env.PR_HEAD_SHA),candidate:base,trustedBase,bot:process.env.AUTOMATION_BOT,repository});
+    if(git('ls-remote','origin',`refs/heads/codex/issue-${issue}`).split(/\s/)[0]!==pr.head.sha)throw Error('Remote branch moved');
+  };
   validatePublicationResult(result);
+  if(pull){
+    recheck();git('fetch','--no-tags','origin',base);
+    if(git('rev-parse',`${base}^1`)!==trustedBase||git('rev-parse',`${base}^2`)!==process.env.PR_HEAD_SHA)throw Error('Merge parents changed');
+    assertChanges(git('diff','--name-only','-z',trustedBase,base).split('\0').filter(Boolean).map(filename=>({filename})));
+    if(git('diff','--raw','--no-abbrev',trustedBase,base).split('\n').some(line=>line&&!/^:(?:000000|100644) (?:000000|100644) /.test(line)))throw Error('Existing PR has non-regular files');
+    // All executable publisher modules were imported from the trusted base before
+    // this checkout. Never execute candidate code with the App token present.
+    git('checkout','--detach',base);
+  }else if(base!==trustedBase)throw Error('Untrusted base without an existing PR');
   await writeFile(process.env.PATCH_FILE, result.patch);
   try {
     git('apply', '--index', '--check', process.env.PATCH_FILE);
@@ -35,6 +55,7 @@ try {
   git('config', 'user.name', 'Pulbase Automation');
   git('config', 'user.email', 'pulbase-automation@users.noreply.github.com');
   git('commit', '-m', `Issue #${issue} の対応`);
+  recheck();
   git('push', 'origin', branch);
   await writeFile(process.env.PR_BODY_FILE, `Issue #${issue} の自動実装候補です。\n\n${result.summary}\n\nCloses #${issue}\n\n検証結果はこのPRのチェック・実行証跡を参照してください。本番公開は含みません。\n`);
 } catch (error) {

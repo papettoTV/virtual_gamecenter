@@ -13,7 +13,7 @@ jobs:
   verify:
     env:
       PULBASE_TARGET_ENVIRONMENT: ${{ (github.base_ref == 'main' || github.ref_name == 'main') && 'production' || 'staging' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     defaults:
       run:
@@ -32,8 +32,29 @@ jobs:
         run: npm run pages:target:check -- "$PULBASE_TARGET_ENVIRONMENT"
       - name: Configure disposable local test credentials
         run: |
-          printf '%s\n' 'GOOGLE_CLIENT_ID=ci-example.apps.googleusercontent.com' 'GOOGLE_CLIENT_SECRET=ci-example' 'STRIPE_SECRET_KEY=sk_test_ci_example' 'STRIPE_WEBHOOK_SECRET=whsec_ci_example' > .dev.vars
+          printf '%s\n' 'BASIC_AUTH_USERNAME=ci-example' 'BASIC_AUTH_PASSWORD=ci-example' 'GOOGLE_CLIENT_ID=ci-example.apps.googleusercontent.com' 'GOOGLE_CLIENT_SECRET=ci-example' 'STRIPE_SECRET_KEY=sk_test_ci_example' 'STRIPE_WEBHOOK_SECRET=whsec_ci_example' > .dev.vars
       - run: npm test
+      - name: UI受け入れケースを探索（ローカル環境だけ）
+        id: ui
+        working-directory: .
+        run: |
+          npm ci --ignore-scripts --prefix ci
+          node ci/ui-tests.mjs
+      - name: 必要な場合だけ固定ブラウザを準備
+        if: steps.ui.outputs.enabled == 'true'
+        working-directory: .
+        run: node ci/node_modules/@playwright/test/cli.js install --with-deps chromium
+      - name: ローカルUI受け入れ検査（実サービス・本番データを使用しない）
+        if: steps.ui.outputs.enabled == 'true'
+        working-directory: .
+        run: node ci/node_modules/@playwright/test/cli.js test --config ci/ui-local.config.mjs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: ui-evidence-${{ github.sha }}-${{ github.run_attempt }}
+          path: ci/ui-results
+          if-no-files-found: error
+          retention-days: 7
       - name: Verify DOT WAVE integration stability without retries
         run: |
           for iteration in 1 2 3; do
@@ -61,7 +82,7 @@ jobs:
 
   automation-control:
     name: Automation control checks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     defaults:
       run:

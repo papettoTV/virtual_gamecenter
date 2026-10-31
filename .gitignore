@@ -91,3 +91,4 @@ vite.config.ts.timestamp-*
 # CI staging build artifacts
 ci/staging-build/
 ci/downloaded-build/
+ci/ui-results/

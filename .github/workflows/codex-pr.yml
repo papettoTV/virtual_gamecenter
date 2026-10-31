@@ -87,6 +87,13 @@ jobs:
         env:
           ISSUE_REQUEST: ${{ needs.gate.outputs.request }}
         run: node -e 'const fs = require("fs"); fs.writeFileSync("ci/review-request.md", fs.readFileSync("ci/prompts/review.md", "utf8") + "\nUntrusted issue JSON:\n" + process.env.ISSUE_REQUEST)'
+      - name: 同じ候補の独立UI検査証跡を取得（実行しない）
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ui-evidence-${{ needs.verify.outputs.candidate }}-${{ needs.verify.outputs.attempt }}
+          run-id: ${{ needs.verify.outputs.run_id }}
+          github-token: ${{ github.token }}
+          path: ui-evidence
       - uses: openai/codex-action@bdf19a4a223ec2549a3e2274a0cf61556bc07675
         id: codex
         env:

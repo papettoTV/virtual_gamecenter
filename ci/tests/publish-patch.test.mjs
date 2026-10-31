@@ -1,12 +1,36 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile, rm, chmod } from 'node:fs/promises';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 const publisher = fileURLToPath(new URL('../publish-patch.mjs', import.meta.url));
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
+test('既存PRの修正は同じブランチへのfast-forwardだけで履歴を保持する',async()=>{
+ const temporary=await mkdtemp(join(tmpdir(),'pulbase-repair-'));try{
+  const remote=join(temporary,'remote.git'),cwd=join(temporary,'work'),bin=join(temporary,'bin');
+  await mkdir(cwd);await mkdir(bin);git(temporary,'init','--bare',remote);git(cwd,'init','-b','develop');
+  git(cwd,'config','user.name','Test');git(cwd,'config','user.email','test@example.invalid');
+  await mkdir(join(cwd,'docs'));await writeFile(join(cwd,'docs/example.md'),'before\n');await writeFile(join(cwd,'README.md'),'base\n');
+  git(cwd,'add','.');git(cwd,'commit','-m','initial');git(cwd,'remote','add','origin',remote);
+  git(cwd,'checkout','-b','prior');await writeFile(join(cwd,'docs/example.md'),'prior change\n');git(cwd,'commit','-am','prior');
+  const head=git(cwd,'rev-parse','HEAD');git(cwd,'push','origin','HEAD:refs/heads/codex/issue-82');
+  git(cwd,'checkout','develop');await writeFile(join(cwd,'README.md'),'new trusted base\n');git(cwd,'commit','-am','new base');const trusted=git(cwd,'rev-parse','HEAD');
+  git(cwd,'merge','--no-ff','prior','-m','candidate');const candidate=git(cwd,'rev-parse','HEAD');git(cwd,'push','origin','HEAD:refs/pull/83/merge');
+  await writeFile(join(cwd,'docs/example.md'),'prior change\nrepair coverage\n');const patch=git(cwd,'diff')+'\n';git(cwd,'checkout','--','docs/example.md');git(cwd,'checkout','--detach',trusted);
+  const pr={number:83,state:'open',draft:false,mergeable:true,merge_commit_sha:candidate,user:{login:'pulbase-codex[bot]'},
+   head:{ref:'codex/issue-82',sha:head,repo:{full_name:'papettoTV/virtual_gamecenter'}},base:{ref:'develop',sha:trusted,repo:{full_name:'papettoTV/virtual_gamecenter'}}};
+  await writeFile(join(bin,'gh'),`#!/usr/bin/env node\nconst args=process.argv.slice(2);if(args[0]!=='api'||args.length!==2)process.exit(64);if(args[1]==='repos/papettoTV/virtual_gamecenter/issues/82')process.stdout.write(JSON.stringify({state:'open',labels:['実装:自動']}));else if(args[1]==='repos/papettoTV/virtual_gamecenter/pulls/83')process.stdout.write(${JSON.stringify(JSON.stringify(pr))});else process.exit(64);\n`);await chmod(join(bin,'gh'),0o755);
+  const env={...process.env,PATH:`${bin}:${process.env.PATH}`,RESULT_FILE:join(temporary,'result.json'),PATCH_FILE:join(temporary,'repair.patch'),PR_BODY_FILE:join(temporary,'body.md'),ISSUE_NUMBER:'82',PULL_NUMBER:'83',PR_HEAD_SHA:head,BASE_SHA:candidate,TRUSTED_BASE_SHA:trusted,AUTOMATION_BOT:'pulbase-codex[bot]'};
+  await writeFile(env.RESULT_FILE,JSON.stringify({summary:'既存PRの修正',patch}));
+  const result=spawnSync(process.execPath,[publisher],{cwd,env,encoding:'utf8'});assert.equal(result.status,0,result.stderr);
+  const updated=git(temporary,'--git-dir',remote,'rev-parse','refs/heads/codex/issue-82');
+  git(cwd,'merge-base','--is-ancestor',head,updated);assert.equal(git(cwd,'rev-parse',`${updated}^`),candidate);
+  assert.equal(git(cwd,'show',`${updated}:docs/example.md`),'prior change\nrepair coverage');
+  assert.equal(git(cwd,'show',`${updated}:README.md`),'new trusted base');
+ }finally{await rm(temporary,{recursive:true,force:true});}
+});
 for (const filename of ['docs/example.md', 'apps/web/src/games/graze-duel/rendering/example.js']) test(`publisher accepts only a regular-file patch: ${filename}`, async () => {
   const temporary = await mkdtemp(join(tmpdir(), 'pulbase-patch-'));
   try {
