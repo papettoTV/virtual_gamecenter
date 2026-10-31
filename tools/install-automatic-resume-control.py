@@ -17,17 +17,17 @@ import warnings
 import zipfile
 
 REPO = '/repos/papettoTV/virtual_gamecenter'
-BASE = 'ddc92cdf2193a68674a1c8ec2451c7ca71990ff4'
+BASE = 'b0d2ff949dfb5ea3470a8ec943bfad9e55e2f89c'
 MAIN = '73cb5d9267c56f06f9f1150327ec6b8b3caa2bb9'
 APP = 5405029
 BUNDLE_DIGEST = 'PACKAGED_BUNDLE_DIGEST'
 APPLY_RULE_VERSION = None  # Pin only after the sole human-managed App bypass is verified.
-STRICT_RULE_VERSION = '2026-10-31T04:40:37.870Z'
+STRICT_RULE_VERSION = '2026-10-31T10:35:45.400Z'
 MAIN_RULE_VERSION = '2026-10-21T20:32:35.191Z'
 MANIFEST = 'automatic-resume-installation.json'
-FILES = {'ci/control/review-trust.mjs', 'ci/control/review-trust.json', 'ci/production-candidate/policy.json', 'ci/control/toolchain/browser/regression.spec.mjs'}
+FILES = {'ci/control/review-trust.mjs', 'ci/control/review-trust.json', 'ci/production-candidate/policy.json', 'ci/control/toolchain/browser/regression.spec.mjs', 'ci/control/fixed-process.mjs', 'ci/control/fixed-staging-operations.mjs', 'ci/control/postmerge-runner.mjs'}
 SHA = re.compile(r'^[a-f0-9]{40}$')
-MESSAGE = 'ci: 自動Issue再開の信頼定義と固定回帰4件だけを更新（公開なし）'
+MESSAGE = 'ci: 固定ブラウザ回帰の失敗診断3件だけを更新（公開なし）'
 
 
 class Stop(RuntimeError):
