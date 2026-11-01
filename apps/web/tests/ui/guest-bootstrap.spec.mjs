@@ -1,8 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { test, expect } from '../../../../ci/ui-fixtures.mjs';
 
+// Keep real API coverage for the reproducible race; long initialization and
+// cancellation are covered with fake timers in cabinet-bootstrap.test.ts.
+test.use({ screenshot: 'only-on-failure' });
+
 for (const game of ['graze-duel', 'deep-sea-salvage', 'dot-wave']) {
-  for (const delay of [0, 1200, 6000]) {
+  for (const delay of [0, 1200]) {
     test(`${game}: new guest waits for real bootstrap (${delay}ms) and retains cabinet`, async ({ page }, testInfo) => {
       let initialized = false;
       let bootstrapAt;

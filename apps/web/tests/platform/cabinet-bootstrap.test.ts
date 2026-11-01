@@ -47,9 +47,11 @@ it.each(["graze-duel", "deep-sea-salvage", "dot-wave"])("shares guest creation a
   expect(fetch).toHaveBeenCalledTimes(1); expect(sockets).toHaveLength(2);
   session.leave();
 });
-it.each(["leave", "dispose", "move"])("invalidates pending guest connection on %s", async action => {
+it.each(["graze-duel", "deep-sea-salvage", "dot-wave"].flatMap(game =>
+  ["leave", "dispose", "move"].map(action => [game, action])
+))("invalidates pending %s guest connection on %s", async (game, action) => {
   const { session, lifetime, finish } = await setup();
-  session.join("old", "graze-duel"); const waiting = session.waitForPlayer();
+  session.join("old", game); const waiting = session.waitForPlayer();
   await vi.advanceTimersByTimeAsync(6500);
   expect(sockets).toHaveLength(0);
   if (action === "dispose") lifetime.dispose();
@@ -76,9 +78,9 @@ it("fails closed without retrying or charging when bootstrap fails, and permits 
   expect(fetch.mock.calls.every(call => String(call[0]).endsWith("/api/platform/bootstrap"))).toBe(true);
   session.leave();
 });
-it("starts the existing admission budget only after bootstrap, and still times out absent authorization", async () => {
+it.each(["graze-duel", "deep-sea-salvage", "dot-wave"])("starts the %s admission budget only after bootstrap, and still times out absent authorization", async game => {
   const { session, finish } = await setup();
-  session.join("first", "graze-duel");
+  session.join("first", game);
   const settled = vi.fn(); const waiting = session.waitForPlayer().then(settled);
   await vi.advanceTimersByTimeAsync(6500);
   expect(settled).not.toHaveBeenCalled();
