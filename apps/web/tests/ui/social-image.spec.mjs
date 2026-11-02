@@ -50,6 +50,13 @@ for (const [game, filename] of artwork) {
         window.open = url => { window.__previewShareLinks.push(String(url)); return null; };
       }, { game, kind });
       const fixture = page.locator('#social-image-fixture');
+      // Dismiss the real consent UI before interacting with the sharing fixture.
+      // Keep this choice local to these cases; other suites test unselected consent.
+      const consent = page.getByRole('region', { name: 'アクセス解析の設定', exact: true });
+      if (await consent.isVisible()) {
+        await consent.getByRole('button', { name: '拒否する', exact: true }).click();
+        await expect(consent).toBeHidden();
+      }
       await fixture.getByRole('button', { name: kind === 'result' ? '結果を共有' : '観戦に招待', exact: true }).click();
       const dialog = fixture.getByRole('dialog');
       await expect(dialog).toBeVisible();
