@@ -12,7 +12,7 @@ function fixture() {
   const approval = {version: 3, mode: 'postmerge-staging-live', execution,
     evidence: {repository, environment: 'staging', attempt: '1', runId: '55', artifactId: '77', sha: A, tree: D, policyDigest: 'a'.repeat(64)},
     files: 118, manifestDigest: 'b'.repeat(64), protection: {preflightReady: true, deploymentRequested: false, execution: clone(execution)}};
-  const stage = {name: 'staging', status: 'waiting', started_at: null, steps: []};
+  const stage = {name: 'staging', status: 'waiting', conclusion: null, started_at: null, runner_id: null, runner_name: null, steps: []};
   const jobs = [{name: 'prepare', status: 'completed', conclusion: 'success'}, stage];
   const artifact = {id: 22, name: 'postmerge-approval-101-1', expired: false, size_in_bytes: 799, workflow_run: {id: 101, head_sha: C}};
   const ci = {id: 55, path: '.github/workflows/web-checks.yml', event: 'push', head_branch: 'develop', head_sha: A,
@@ -77,7 +77,7 @@ const refusals = [
   ['再実行', s => s.run.run_attempt = 2],
   ['pull_request実行', s => s.run.event = 'pull_request'],
   ['公開開始済み', s => { s.stage.status = 'in_progress'; s.stage.started_at = '2026-11-03T00:00:00Z'; }],
-  ['runner開始済み', s => s.stage.started_at = '2026-11-03T00:00:00Z'],
+  ['runner割当済み', s => { s.stage.runner_id = 123; s.stage.runner_name = 'GitHub Actions 123'; }],
   ['公開stepが存在', s => s.stage.steps = [{name: 'publish', status: 'completed'}]],
   ['prepare失敗', s => s.jobs[0].conclusion = 'failure'],
   ['別の公開jobも存在', s => s.jobs.push({name: 'production', status: 'waiting'})],
@@ -105,6 +105,12 @@ test('分岐・祖先不明なら取り消さない', async () => {
   options.api = async p => p.startsWith('compare/') ? {status: 'diverged', ahead_by: 1, behind_by: 1} : original(p);
   assert.equal((await cleanupStaleStaging(options)).results[0].reason, 'not-strict-ancestor');
   assert.deepEqual(state.writes, []);
+});
+test('実API同様にstarted_atだけ存在するrunner未割当の承認待ちを判定する', async () => {
+  const {state, options} = fixture();
+  state.stage.started_at = '2026-11-02T21:56:34Z';
+  assert.equal((await cleanupStaleStaging(options)).results[0].outcome, 'cancelled');
+  assert.deepEqual(state.writes, [101]);
 });
 test('古い制御版は祖先で全guardコード一致のときだけ許可する', async () => {
   const {state, options} = fixture();

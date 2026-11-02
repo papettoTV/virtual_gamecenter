@@ -9,7 +9,7 @@
 `ci/stale-staging-runs.mjs` は、次の条件をすべて確認したrunだけを対象にする。
 
 - 同じリポジトリの `postmerge-staging.yml`、ci-controlブランチ、初回workflow_dispatch実行。
-- prepareが成功し、stagingジョブが人の承認待ちで、runner・stepがまだ始まっていない。承認者はpapettoTV、環境はstagingだけ。
+- prepareが成功し、stagingジョブが人の承認待ちで、runner未割当・stepなし・conclusion未設定。承認者はpapettoTV、環境はstagingだけ。GitHubはこの段階でもstarted_atを設定するため、その日時だけで開始済みとは判定しない。
 - そのrunから発行された小さな承認成果物に、run ID・制御SHA・対象アプリSHA・初回成功CI・manifestの識別子がそろっている。ZIPはメモリ内で1つのJSONだけ読み、展開先へファイルを作らない。
 - 対象アプリSHAが最新developの厳密な祖先。同じSHAの重複実行は対象外。
 - 固定制御SHAが現在のci-controlと一致する。旧制御版の場合は現在版の祖先であり、公開前に読み込む固定ガードとworkflowのGit blobがすべて同じである。
@@ -32,7 +32,7 @@ GitHubの状態読取とcancel要求は原子的ではない。確認後に人�
 |untouched|条件不一致または証跡未確認で変更なし|
 |would-cancel|読み取り診断での候補。書込なし|
 
-整理で障害が起きても、条件を満たす現在SHAの公開起動は別に扱う。整理失敗はworkflowの失敗と成果物で通知し、黙って成功扱いにしない。新しい公開もstaging承認まで進まない。
+一覧・refを読み取れず整理処理全体が停止しても、条件を満たす現在SHAの公開起動は別に扱う。この停止はworkflowの失敗と成果物で通知し、黙って成功扱いにしない。個々のrunで証跡を確認できない場合はuntouchedとして残す。新しい公開もstaging承認まで進まない。
 
 ## 公開しない検証
 
@@ -44,6 +44,12 @@ Node 22で `node --test ci/tests/stale-staging-runs.test.mjs ci/tests/postmerge-
 EXPECTED_CONTROL_SHA=<現在の固定制御SHA> node ci/stale-staging-runs.mjs
 ```
 
-実API診断で候補0件だったことは、実キャンセルの成功を意味しない。実証は設定だけの後続コミットで古くなった承認待ちを対象にし、Cancel成功と公開が始まらなかったことをIssueへ記録する。試験のためにstagingを承認・再公開する必要はない。
+実API診断で候補0件だったことは、実キャンセルの成功を意味しない。実証時は次を確認し、Issueへrun IDと結果を記録する。
+
+1. 設定変更だけのdevelop SHA Aで初回CIを成功させ、ci-controlのprepare成功・staging承認待ちにする。承認しない。
+2. この運用手順など、アプリ動作を変えない後続PRを必須CI成功後にdevelopへ取り込み、SHA Bを作る。
+3. BのWeb checks開始を契機にAだけがcancelledとなったことを、整理成果物とGitHubのrun状態の両方で確認する。Aのstagingにはrunner/公開stepの開始や公開結果がないことを確認する。
+4. Bは現在SHAなので取り消されない。BのCIが成功すれば、新しいstaging承認待ちが自動作成される。試験のためにBを承認する必要もない。
+5. ci-controlのbypass空・strictとmain未変更を確認する。取消試験のための公開・Secret更新・承認操作は行わない。
 
 参照：[GitHubの取消API](https://docs.github.com/en/rest/actions/workflow-runs#cancel-a-workflow-run)、[workflow_runイベント](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run)。
