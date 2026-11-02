@@ -128,7 +128,7 @@ describe("result page metadata", () => {
     const metadata = renderResultMetadata(result, "https://example.test/?tracking=1");
     expect(metadata).not.toContain("<script>");
     expect(metadata).toContain("&lt;script&gt;alert(&quot;owner&quot;)&lt;/script&gt;&amp;");
-    expect(metadata).toContain(`https://example.test/results/${result.id}/image.png`);
+    expect(metadata).toContain("https://example.test/social/buzz-barrier-ogp-v2.jpg");
     const shell = new Response('<html><head><title>Old</title><meta property="og:title" content="Old"><meta name="description" content="Old"></head><body><div id="root"></div><script type="module" src="/assets/app.js"></script></body></html>', {
       headers: { "Content-Type": "text/html", ETag: "old", "Content-Length": "999" },
     });
