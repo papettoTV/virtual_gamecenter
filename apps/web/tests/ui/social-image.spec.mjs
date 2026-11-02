@@ -30,18 +30,33 @@ for (const [game, filename, hash] of artwork) {
 // without replacing authentication, accounting or game-start APIs.
 for (const [game, filename] of artwork) {
   for (const kind of ['live', 'result']) {
-    test(`${game} ${kind} mobile panel artwork and links`, async ({ page }) => {
-      await page.setViewportSize({ width: 390, height: 844 });
+    test(`${game} ${kind} panel artwork and links`, async ({ page, baseURL }) => {
+      // Use the project's real desktop/mobile viewport, without booting App.
+      const origin = new URL(baseURL);
+      expect(['127.0.0.1', '[::1]']).toContain(origin.hostname);
+      expect(origin.protocol).toBe('http:');
+      expect(origin.port).toBe('5174');
+      const fixtureUrl = new URL('/__social-image-fixture', origin).href;
+      await page.route(fixtureUrl, route => route.fulfill({
+        contentType: 'text/html',
+        body: '<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Sharing component fixture</title></head><body><div id="social-image-fixture"></div></body></html>',
+      }));
       // Keep local LAN discovery inside the disposable test server.
       await page.route('**/api/local-address', route => route.fulfill({ json: { address: '127.0.0.1', port: 5174 } }));
-      await page.goto('/');
+      await page.goto(fixtureUrl);
       await page.evaluate(async ({ game, kind }) => {
+        // Supply Vite's normal React refresh preamble for this minimal HTML.
+        const { default: refresh } = await import('/@react-refresh');
+        refresh.injectIntoGlobalHook(window);
+        window.$RefreshReg$ = () => {};
+        window.$RefreshSig$ = () => type => type;
+        window.__vite_plugin_react_preamble_installed__ = true;
+        await import('/styles.css');
         const { default: React } = await import('/node_modules/.vite/deps/react.js');
         const { default: ReactDOMClient } = await import('/node_modules/.vite/deps/react-dom_client.js');
-        const { createResultImage, ResultShareButton, LiveShareButton } = await import('/src/features/sharing/ShareActions.tsx');
+        const { createResultImage, ResultShareButton, LiveShareButton, SharePanel } = await import('/src/features/sharing/ShareActions.tsx');
         const { setLiveContext } = await import('/src/features/sharing/share-service.ts');
-        const host = document.createElement('div');
-        host.id = 'social-image-fixture'; document.body.append(host);
+        const host = document.getElementById('social-image-fixture');
         const result = { id: '12345678-1234-4234-8234-123456789012', gameId: game, gameVersion: 'test', playerName: 'Preview-test', score: 1200, elapsedTimeMs: 1000, cleared: false, metrics: {}, createdAt: '2026-01-01T00:00:00Z' };
         if (kind === 'result') {
           // Run the real renderer outside SharePanel's swallowed catch so
@@ -55,25 +70,18 @@ for (const [game, filename] of artwork) {
           }
         }
         setLiveContext({ gameId: game, cabinetId: result.id, role: 'player', phase: 'ready' });
-        // App already owns SharePanel. A second panel duplicates dialogs,
-        // focus handlers and asynchronous image generation across React roots.
-        ReactDOMClient.createRoot(host).render(
-          React.createElement(kind === 'result' ? ResultShareButton : LiveShareButton, kind === 'result' ? { draft: result, placement: 'result-page' } : {}));
+        // One real panel and store; no App, guest session or game initialization.
+        ReactDOMClient.createRoot(host).render(React.createElement(React.Fragment, null,
+          React.createElement(kind === 'result' ? ResultShareButton : LiveShareButton, kind === 'result' ? { draft: result, placement: 'result-page' } : {}),
+          React.createElement(SharePanel)));
         window.__previewShareLinks = [];
         window.open = url => { window.__previewShareLinks.push(String(url)); return null; };
       }, { game, kind });
       const fixture = page.locator('#social-image-fixture');
-      // Dismiss the real consent UI before interacting with the sharing fixture.
-      // Keep this choice local to these cases; other suites test unselected consent.
-      const consent = page.getByRole('region', { name: 'アクセス解析の設定', exact: true });
-      if (await consent.isVisible()) {
-        await consent.getByRole('button', { name: '拒否する', exact: true }).click();
-        await expect(consent).toBeHidden();
-      }
       await fixture.getByRole('button', { name: kind === 'result' ? '結果を共有' : '観戦に招待', exact: true }).click();
       const dialog = page.getByRole('dialog');
       await expect(dialog).toHaveCount(1);
-      await expect(page.locator('#root').getByRole('dialog')).toBeVisible();
+      await expect(fixture.getByRole('dialog')).toBeVisible();
       const link = dialog.locator('.share-url');
       await expect(link).toContainText('shareId=');
       const shareUrl = new URL(await link.innerText());
@@ -104,6 +112,13 @@ for (const [game, filename] of artwork) {
         const download = await downloading;
         expect(download.suggestedFilename()).toBe(`${game}-result.png`);
         expect(await download.failure()).toBeNull();
+        const stream = await download.createReadStream();
+        const chunks = [];
+        for await (const chunk of stream) chunks.push(chunk);
+        const png = Buffer.concat(chunks);
+        expect(png.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
+        expect(png.subarray(12, 16).toString()).toBe('IHDR');
+        expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([1200, 630]);
       }
       await dialog.getByRole('button', { name: '× 閉じる' }).click();
       await expect(dialog).toHaveCount(0);
