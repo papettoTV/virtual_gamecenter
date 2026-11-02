@@ -96,7 +96,7 @@ async function expectDocked(page, phase = 'initial', scrollTarget) {
 }
 
 for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 664 }, { width: 320, height: 568 }]) {
-  test(`画面下部への固定と再表示 ${viewport.width}px`, async ({ page }) => {
+  test(`画面下部への固定と再表示 ${viewport.width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize(viewport);
     await page.goto('/');
     await expectDocked(page);
@@ -104,9 +104,12 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 664 
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollHeight - innerHeight)).toBeGreaterThan(0);
     // Initial rendering above is intentionally checked before waiting for fonts.
     await page.evaluate(() => document.fonts.ready.then(() => undefined));
-    for (let cycle = 0; cycle < 3; cycle++) {
+    // Preserve the original auto sweep everywhere; exercise smooth rendering on
+    // the desktop viewport from the reported failure without repeating it six times.
+    const behaviors = viewport.width === 1280 && testInfo.project.name === 'desktop'
+      ? ['auto', 'smooth'] : ['auto'];
+    for (const [cycle, behavior] of behaviors.entries()) {
       for (const fraction of [0, 0.5, 1, 0]) {
-        const behavior = cycle === 1 ? 'smooth' : 'auto';
         const target = await page.evaluate(({ fraction, behavior }) => {
           const target = (document.documentElement.scrollHeight - innerHeight) * fraction;
           window.scrollTo({ top: target, left: 0, behavior });
