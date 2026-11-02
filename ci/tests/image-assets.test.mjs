@@ -2,12 +2,12 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {deflateSync} from 'node:zlib';
-import {mkdtemp,mkdir,writeFile,readFile,symlink,rm} from 'node:fs/promises';
+import {mkdtemp,mkdir,writeFile,readFile,symlink,rm,chmod} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {fileURLToPath} from 'node:url';
 import {join,resolve} from 'node:path';
 import {execFileSync} from 'node:child_process';
-import {assetPlan,imagePath,validateImage,downloadImage,writeImage,MAX_IMAGE_BYTES} from '../image-assets.mjs';
+import {assetPlan,imagePath,validateImage,downloadImage,writeImage,prepareImageAssets,MAX_IMAGE_BYTES} from '../image-assets.mjs';
 import {allowedPath} from '../policy.mjs';
 import {validatePublicationResult} from '../publication-result.mjs';
 const hash=b=>createHash('sha256').update(b).digest('hex');
@@ -48,23 +48,25 @@ test('HTTP失敗・MIME偽装・ヘッダーと実受信の過大・破損を拒
 test('保存時も親ディレクトリ・最終ファイルのリンクや実行可能ファイルを拒否',async()=>{
  const root=await mkdtemp(join(tmpdir(),'png-safe-'));try{
  await writeImage(root,asset.path,bytes);assert.deepEqual(await readFile(join(root,asset.path)),bytes);
+ await chmod(join(root,asset.path),0o755);await assert.rejects(writeImage(root,asset.path,bytes));await chmod(join(root,asset.path),0o644);
  await rm(join(root,asset.path));await symlink(join(root,'outside'),join(root,asset.path));await assert.rejects(writeImage(root,asset.path,bytes));
  await rm(join(root,'apps/web/public/share'),{recursive:true});await symlink(root,join(root,'apps/web/public/share'));await assert.rejects(writeImage(root,asset.path,bytes));
  }finally{await rm(root,{recursive:true,force:true});}
 });
 test('隔離GitでテキストとPNGをコミット・pushし、PNG単独も許可し偽装パッチは止める',async()=>{
- for(const mode of ['mixed','asset-only','png-text']){
+ for(const mode of ['mixed','asset-only','jpeg-only','png-text']){
+  const sample=mode==='jpeg-only'?jpeg:bytes, selected=mode==='jpeg-only'?{...asset,path:'apps/web/public/share/test.jpg',sha256:hash(jpeg)}:asset;
   const root=await mkdtemp(join(tmpdir(),'png-publish-')),work=join(root,'work');const git=(...args)=>execFileSync('git',args,{cwd:work,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
   try{
    await mkdir(work);git('init','-b','develop');git('config','user.name','Test');git('config','user.email','test@example.invalid');await writeFile(join(work,'README'),'base');git('add','.');git('commit','-m','base');const base=git('rev-parse','HEAD');
    execFileSync('git',['init','--bare',join(root,'remote')],{stdio:'ignore'});git('remote','add','origin',join(root,'remote'));
    const file=mode==='png-text'?'apps/web/public/fake.png':'docs/png.md';
-   const patch=mode==='asset-only'?'':`diff --git a/${file} b/${file}\nnew file mode 100644\n--- /dev/null\n+++ b/${file}\n@@ -0,0 +1 @@\n+text\n`;
-   const result=join(root,'result.json');await writeFile(result,JSON.stringify({summary:'検証画像',patch,assets:[asset]}));
-   const preload=join(root,'fetch.mjs');await writeFile(preload,`globalThis.fetch=async()=>new Response(Buffer.from('${bytes.toString('base64')}','base64'),{headers:{'content-type':'image/png'}});`);
+   const patch=['asset-only','jpeg-only'].includes(mode)?'':`diff --git a/${file} b/${file}\nnew file mode 100644\n--- /dev/null\n+++ b/${file}\n@@ -0,0 +1 @@\n+text\n`;
+   const result=join(root,'result.json');await writeFile(result,JSON.stringify({summary:'検証画像',patch,assets:[selected]}));
+   const preload=join(root,'fetch.mjs');await writeFile(preload,`globalThis.fetch=async()=>new Response(Buffer.from('${sample.toString('base64')}','base64'),{headers:{'content-type':'image/png'}});`);
    const env={...process.env,ISSUE_NUMBER:'105',BASE_SHA:base,TRUSTED_BASE_SHA:base,PULL_NUMBER:'',RESULT_FILE:result,PATCH_FILE:join(root,'patch'),PR_BODY_FILE:join(root,'body'),GITHUB_OUTPUT:join(root,'out'),GITHUB_STEP_SUMMARY:join(root,'summary')};
    const run=()=>execFileSync(process.execPath,['--import',preload,fileURLToPath(new URL('../publish-patch.mjs',import.meta.url))],{cwd:work,env,stdio:['ignore','pipe','pipe']});
-   if(mode==='png-text'){assert.throws(run);assert.equal(git('rev-parse','HEAD'),base);}else{run();assert.equal(git('rev-parse','--abbrev-ref','HEAD'),'codex/issue-105');assert.equal(git('ls-files','-s',asset.path).split(' ')[0],'100644');assert.equal(git('show',`HEAD:${asset.path}`).length>0,true);assert.match(git('ls-remote','origin','refs/heads/codex/issue-105'),/refs\/heads\/codex\/issue-105/);}
+   if(mode==='png-text'){assert.throws(run);assert.equal(git('rev-parse','HEAD'),base);}else{run();assert.equal(git('rev-parse','--abbrev-ref','HEAD'),'codex/issue-105');assert.equal(git('ls-files','-s',selected.path).split(' ')[0],'100644');assert.equal(git('show',`HEAD:${selected.path}`).length>0,true);assert.match(git('ls-remote','origin','refs/heads/codex/issue-105'),/refs\/heads\/codex\/issue-105/);}
   }finally{await rm(root,{recursive:true,force:true});}
  }
 });
@@ -78,4 +80,10 @@ test('JPEGは実形式と拡張子・寸法・SHAを照合しPNG偽装を拒否'
  for(const bad of [jpeg.subarray(0,-2),Buffer.concat([jpeg,Buffer.from('tail')]),Buffer.from([255,216,...Buffer.alloc(50),255,217])])assert.throws(()=>validateImage(bad,hash(bad),a.path));
  assert.deepEqual(await downloadImage(a,async()=>response(jpeg,{'Content-Type':'image/jpeg'})),jpeg);
  assert.deepEqual(await downloadImage(a,async()=>response(jpeg)),jpeg); // GitHub attachment advertises PNG for these JPEG bytes.
+});
+
+test('1枚の上限以内でも全素材の合計8MiB超過は拒否',async()=>{
+ const large=png({extra:chunk('tEXt',Buffer.alloc(1100*1024,65))});
+ const assets=Array.from({length:8},(_,i)=>({...asset,path:`apps/web/public/share/test-${i}.png`,sha256:hash(large)}));
+ await assert.rejects(prepareImageAssets(assets,async()=>response(large)));
 });

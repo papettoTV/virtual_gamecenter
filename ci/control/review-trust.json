@@ -30,7 +30,7 @@
     "apps/web/config/pages-targets.json": "f833d605e9fa1c9a85bbd542184f2b94240cbb6f",
     "apps/web/vite.config.ts": "72c2f8fd96e386c4d22669b5461aee4e2faaead5",
     ".github/workflows/codex-issue.yml": "da82f3111caeca8caef08aa943474cdb580f38fc",
-    "ci/prompts/implement.md": "0ef110986f255408132ffeb4a15d5a726c2c936c",
+    "ci/prompts/implement.md": "8a8b8eb4d419520848b81db33255e3ce744c860c",
     "ci/automatic-resume.mjs": "5d1394653aa6518497e38cf20d78b69291f5a04e",
     "ci/publish-patch.mjs": "e9e060507ec5fbf84c30e70cd8d5e941a123e445",
     "ci/ui-tests.mjs": "e4566aebea0590421b1052a92da2c14ef3480114",
