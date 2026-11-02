@@ -1,5 +1,7 @@
 import type { ReactElement, ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { socialImage } from "../src/shared/social-image";
+import { socialImage as workerSocialImage } from "../src/worker/social-image";
 import { SocialPostPreview } from "../src/features/sharing/SocialPostPreview";
 import type { SharePanelState } from "../src/features/sharing/share-service";
 
@@ -28,7 +30,7 @@ function copy(node: ReactNode): string {
 it.each(["facebook", "x"] as const)("uses saved metadata, edits and actual OGP image for the %s reference preview", target => {
   const tree = SocialPostPreview({ panel, text: "編集した本文", target, onChange: vi.fn() });
   const image = elements(tree).find(element => element.type === "img");
-  expect(image?.props.src).toBe("http://localhost:5174/results/saved-result/image.png");
+  expect(image?.props.src).toBe("http://localhost:5174/social/buzz-barrier-ogp-v2.jpg");
   expect(copy(tree)).toContain("編集した本文");
   expect(copy(tree)).toContain("実際のSNSのレイアウトやカード表示とは異なる");
   expect(copy(tree).includes("本文を貼り付けた場合")).toBe(target === "facebook");
@@ -38,6 +40,25 @@ it.each(["facebook", "x"] as const)("uses saved metadata, edits and actual OGP i
 it("previews a live invitation with its own image rather than a result card", () => {
   const tree = SocialPostPreview({ panel: { ...panel, kind: "live", gameId: "dot-wave", result: undefined, url: "http://localhost:5174/cabinets/test?game=dot-wave&watch=1" }, text: "観戦に招待", target: "x", onChange: vi.fn() });
   const image = elements(tree).find(element => element.type === "img");
-  expect(image?.props.src).toBe("http://localhost:5174/share/live/dot-wave/image.png");
+  expect(image?.props.src).toBe("http://localhost:5174/social/dot-wave-ogp-v2.jpg");
   expect(copy(tree)).toContain("DOT WAVEの観戦");
+});
+
+it.each(["graze-duel", "dot-wave", "deep-sea-salvage", "unknown", "__proto__", "constructor"])("shares Worker artwork and metadata for live/result %s on the share origin", gameId => {
+  expect(workerSocialImage).toBe(socialImage);
+  for (const origin of ["https://develop.virtual-gamecenter.pages.dev", "https://example.test:8443"]) {
+    for (const kind of ["live", "result"] as const) {
+      for (const target of ["x", "facebook"] as const) {
+        const url = `${origin}/${kind === "live" ? "cabinets" : "results"}/saved?ref=share&shareId=test`;
+        const state = { ...panel, kind, gameId, url, result: kind === "result" ? { ...panel.result!, gameId } : undefined };
+        const tree = SocialPostPreview({ panel: state, text: "編集した本文", target, onChange: vi.fn() });
+        const image = elements(tree).find(element => element.type === "img");
+        const expected = socialImage(gameId, url);
+        expect(image?.props).toMatchObject({ src: expected.url, alt: expected.alt, width: expected.width, height: expected.height });
+        expect(new URL(String(image?.props.src)).origin).toBe(origin);
+        expect(copy(tree)).toContain("編集した本文");
+        if (target === "x") expect(copy(tree)).toContain(url);
+      }
+    }
+  }
 });

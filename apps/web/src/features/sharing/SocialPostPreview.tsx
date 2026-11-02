@@ -1,3 +1,4 @@
+import { socialImage } from "../../shared/social-image";
 import { getGameDefinition } from "../../domain/game";
 import { presentResult } from "./result-presenters";
 import type { SharePanelState } from "./share-service";
@@ -8,7 +9,7 @@ export function SocialPostPreview({ panel, text, target, onChange }: { panel: Sh
   const presentation = panel.result ? presentResult(panel.result) : null;
   const title = presentation ? `${game?.title ?? panel.gameId} | ${presentation.headline} | PULBASE` : `${game?.title ?? panel.gameId}の観戦 | PULBASE`;
   const description = panel.result && presentation ? `${panel.result.playerName} · ${presentation.details.join(" · ")}` : "この筐体のプレイを観戦できます。開始前・終了後は筐体の状況をご案内します。";
-  const imagePath = panel.kind === "result" ? `/results/${panel.targetId}/image.png` : `/share/live/${encodeURIComponent(panel.gameId)}/image.png`;
+  const image = socialImage(panel.gameId, panel.url);
   return <section className="social-preview" aria-label="SNS投稿イメージ">
     <h3>投稿イメージ</h3>
     <div className="social-preview-tabs" role="group" aria-label="プレビューするSNS">
@@ -22,7 +23,7 @@ export function SocialPostPreview({ panel, text, target, onChange }: { panel: Sh
       <p className="social-preview-copy">{text}</p>
       {target === "x" && <p className="social-preview-link">{panel.url}</p>}
       <div className="social-link-card">
-        <img src={new URL(imagePath, location.origin).href} alt={`${game?.title ?? panel.gameId}のリンクカード画像`} width="1200" height="630" />
+        <img src={image.url} alt={image.alt} width={image.width} height={image.height} />
         <div><small>{new URL(panel.url).host}</small><strong>{title}</strong>{target === "facebook" && <p>{description}</p>}</div>
       </div>
     </article>
