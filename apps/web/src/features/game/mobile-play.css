@@ -46,3 +46,61 @@
 #game-screen[data-mobile-play] .touch-actions { display: flex; gap: 8px; }
 #game-screen[data-mobile-play] .touch-actions > * { flex: 1; min-width: 0; }
 #game-screen[data-mobile-play] > .mobile-play-toggle { flex: 0 0 auto; min-height: 44px; }
+
+#game-screen[data-mobile-play][data-game-id="graze-duel"] {
+  padding-top: calc(max(8px, env(safe-area-inset-top)) + 52px);
+  align-items: center;
+  justify-content: center;
+}
+#game-screen[data-mobile-play][data-game-id="graze-duel"] > .game-frame {
+  flex: 0 1 auto;
+  width: min(100%, calc((100dvh - max(8px, env(safe-area-inset-top)) - max(8px, env(safe-area-inset-bottom)) - 52px) * 0.65));
+  height: auto;
+  aspect-ratio: 416 / 640;
+}
+#game-screen[data-mobile-play][data-game-id="graze-duel"] #game,
+#game-screen[data-mobile-play][data-game-id="graze-duel"] [data-three-game-renderer] {
+  position: absolute;
+  top: 0;
+  left: 50% !important;
+  width: calc(100% * 960 / 416) !important;
+  height: 100% !important;
+  max-width: none;
+  transform: translateX(-50%);
+}
+#game-screen[data-mobile-play][data-game-id="graze-duel"] > .touch-controls {
+  position: absolute;
+  top: max(8px, env(safe-area-inset-top));
+  right: max(8px, env(safe-area-inset-right));
+  z-index: 6;
+}
+#game-screen[data-mobile-play][data-game-id="graze-duel"] #touch-pause {
+  width: auto;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 12px;
+  font-size: 14px;
+}
+body:has(#game-screen[data-mobile-play][data-game-id="graze-duel"]) .notification-center {
+  left: max(8px, env(safe-area-inset-left));
+  right: calc(max(8px, env(safe-area-inset-right)) + 108px);
+  width: auto;
+  max-width: 560px;
+  transform: none;
+}
+#game-screen[data-mobile-play] .mobile-play-leave {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  min-height: 44px;
+  max-width: calc(100% - 24px);
+  padding: 10px 16px;
+  border: 1px solid rgba(105, 247, 255, 0.3);
+  border-radius: 10px;
+  background: #101827;
+  color: #f4f7ff;
+  font-size: 14px;
+  white-space: nowrap;
+}

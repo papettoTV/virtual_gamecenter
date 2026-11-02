@@ -3411,7 +3411,7 @@ export function mountGame(context) {
   }
 
   function isCompactView() {
-    return window.innerWidth <= 720;
+    return window.innerWidth <= 720 || Boolean(canvas.closest('[data-mobile-play="true"]'));
   }
 
 

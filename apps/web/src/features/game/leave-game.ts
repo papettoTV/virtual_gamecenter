@@ -8,7 +8,7 @@ export function needsLeaveConfirmation(context: LiveShareContext | null) {
 export function installLeaveGameConfirmation() {
   const confirmLeave = (event: MouseEvent) => {
     if (!(event.target instanceof Element)
-      || !event.target.closest("#game-back-to-arcade, #ranking-another-game")) return;
+      || !event.target.closest("#game-back-to-arcade, #ranking-another-game, .mobile-play-leave")) return;
     if (!needsLeaveConfirmation(liveSharing.getSnapshot())) return;
     if (window.confirm("ほかのゲームを探しに行きますか？\n今のプレイはここで終了します。使用済みのクレジットはそのまま消費されます。")) return;
     event.preventDefault();

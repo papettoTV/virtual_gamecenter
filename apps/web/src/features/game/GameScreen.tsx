@@ -18,7 +18,7 @@ export function GameScreen({ game }: GameScreenProps) {
   const ui = getGameUI(game.id);
   const { FrameIntro, SetIntro, ResultPresentation, ResultSummaryAction, AfterFrame, TouchActions, Settings, FooterAction, RetryAction } = ui;
   return (
-    <section ref={screen} data-mobile-play={play.active || undefined} className={`game-screen is-hidden${ui.screenClassName ? ` ${ui.screenClassName}` : ""}`} id="game-screen">
+    <section ref={screen} data-game-id={game.id} data-mobile-play={play.active || undefined} className={`game-screen is-hidden${ui.screenClassName ? ` ${ui.screenClassName}` : ""}`} id="game-screen">
       <div className="spectator-banner is-hidden" id="spectator-banner">
         <div>
           <strong id="spectator-view-label">観戦中</strong>
@@ -62,6 +62,11 @@ export function GameScreen({ game }: GameScreenProps) {
           </svg>
         </button>
         <canvas id="game" width="960" height="640" aria-label={`${game.title} game canvas`} />
+        {game.id === "graze-duel" && play.active && play.paused && <button
+          className="mobile-play-leave secondary-button"
+          type="button"
+          onClickCapture={event => { event.stopPropagation(); navigate("/"); }}
+        >別のゲームをする</button>}
         <FrameIntro game={game} />
         <SetIntro game={game} />
         <div className="versus-overlay is-hidden" id="versus-overlay" role="dialog" aria-modal="true">
@@ -119,7 +124,7 @@ export function GameScreen({ game }: GameScreenProps) {
       </div>
 
       <LiveShareButton />
-      {(play.active || play.available) && <button className="mobile-play-toggle touch-button" type="button" onKeyDown={event => event.stopPropagation()} onKeyUp={event => event.stopPropagation()} onPointerDown={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); play.toggle(); }}>
+      {(play.active || play.available) && !(game.id === "graze-duel" && play.active) && <button className="mobile-play-toggle touch-button" type="button" onKeyDown={event => event.stopPropagation()} onKeyUp={event => event.stopPropagation()} onPointerDown={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); play.toggle(); }}>
         {play.active ? "通常表示に戻る" : "全画面でプレイ"}
       </button>}
 

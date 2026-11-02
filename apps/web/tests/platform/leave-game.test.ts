@@ -19,7 +19,7 @@ describe("leaving a paid game", () => {
   for (const accepted of [false, true]) {
     it(`${accepted ? "allows" : "blocks"} navigation after confirmation`, () => {
       let handler: (event: unknown) => void = () => {};
-      class Target { closest() { return {}; } }
+      class Target { closest(selector: string) { expect(selector).toContain(".mobile-play-leave"); return {}; } }
       const removeEventListener = vi.fn();
       vi.stubGlobal("Element", Target);
       vi.stubGlobal("document", { addEventListener: (_name: string, listener: typeof handler) => { handler = listener; }, removeEventListener });

@@ -38,7 +38,7 @@ async function phase(page, game) {
 }
 for (const game of games) {
   for (const input of ['primary', 'keyboard']) {
-    test(`${game.id}: ${input}, ready, cancel, delayed duplicate and authorized start`, async ({ page, isMobile }) => {
+    test(`${game.id}: ${input}, ready, cancel, delayed duplicate and authorized start`, async ({ page, isMobile }, testInfo) => {
       // Only the disposable local guest and the real welcome-credit API are used.
       await prepareGuest(page);
       const writes = [];
@@ -148,6 +148,41 @@ for (const game of games) {
       expect(writes.filter(url => url.endsWith('/credit-reservations'))).toHaveLength(1);
       expect(writes.filter(url => url.endsWith('/capture'))).toHaveLength(1);
       expect(writes.filter(url => url.endsWith('/release'))).toHaveLength(0);
+      if (game.id === 'graze-duel' && isMobile) {
+        const screen = page.locator('#game-screen');
+        const pause = screen.locator('#touch-pause');
+        await expect(screen).toHaveAttribute('data-mobile-play', 'true');
+        await expect(screen.getByRole('button', { name: '通常表示に戻る' })).toHaveCount(0);
+        const pauseRect = await pause.boundingBox();
+        expect(await pause.evaluate((button, rect) => button === document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2), pauseRect)).toBe(true);
+        await pause.tap();
+        await expect.poll(() => phase(page, game.id)).toBe('paused');
+        await expect(pause).toHaveText('再開');
+        await expect(screen.getByRole('button', { name: '別のゲームをする', exact: true }).filter({ visible: true })).toBeVisible();
+        page.once('dialog', dialog => dialog.dismiss());
+        await screen.locator('.mobile-play-leave').tap();
+        await expect.poll(() => phase(page, game.id)).toBe('paused');
+        await expect(screen).toHaveAttribute('data-mobile-play', 'true');
+        await expect(page.locator('.notification-center')).not.toContainText('1クレジットを使用しました。', { timeout: 7000 });
+        for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 568 }, { width: 844, height: 390 }]) {
+          await page.setViewportSize(viewport);
+          const frame = await screen.locator('.game-frame').boundingBox();
+          const control = await pause.boundingBox();
+          expect(control.width).toBeGreaterThanOrEqual(44);
+          expect(control.height).toBeGreaterThanOrEqual(44);
+          expect(control.x + control.width).toBeLessThanOrEqual(viewport.width);
+          expect(frame.y).toBeGreaterThanOrEqual(control.y + control.height);
+          expect(frame.y + frame.height).toBeLessThanOrEqual(viewport.height);
+          expect(frame.width / frame.height).toBeCloseTo(416 / 640, 2);
+          if (viewport.width === 390) expect(frame.width).toBeGreaterThan(350);
+          await testInfo.attach(`buzz-paused-${viewport.width}`, { body: await page.screenshot(), contentType: 'image/png' });
+        }
+        await pause.tap();
+        await expect.poll(() => phase(page, game.id)).toBe('playing');
+        await expect(pause).toHaveText('一時停止');
+        await expect(screen.locator('.mobile-play-leave')).toHaveCount(0);
+        expect(await wallet(page)).toBe(balance - 1);
+      }
     });
   }
   test(`${game.id}: failed capture keeps play stopped and releases the unused reservation`, async ({ page, isMobile }) => {

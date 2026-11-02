@@ -53,11 +53,12 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 412, height: 915 }
     await page.setViewportSize({ width: viewport.height, height: viewport.width });
     await expect(screen).toHaveAttribute('data-mobile-play', 'true');
     const canvas = await screen.locator('#game').boundingBox();
-    const exit = screen.getByRole('button', { name: '通常表示に戻る' });
-    await expect(exit).toBeVisible();
+    const pause = screen.locator('#touch-pause');
+    await expect(pause).toBeVisible();
+    await expect(screen.getByRole('button', { name: '通常表示に戻る' })).toHaveCount(0);
     expect(canvas.height).toBeGreaterThan(0);
-    expect(canvas.y + canvas.height).toBeLessThanOrEqual((await exit.boundingBox()).y);
-    await exit.click();
+    expect(canvas.y).toBeGreaterThanOrEqual((await pause.boundingBox()).y + (await pause.boundingBox()).height);
+    await page.keyboard.press('Escape');
     await expect(screen).not.toHaveAttribute('data-mobile-play');
     expect(await page.evaluate(() => document.body.style.position)).not.toBe('fixed');
     // Return to portrait to offer mobile entry again on fine-pointer projects.
@@ -88,11 +89,15 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }
     await page.setViewportSize(viewport);
     await expect(screen).toHaveAttribute('data-mobile-play', 'true');
     await expect(panel).toContainText('未選択（解析停止中）');
-    const exit = screen.getByRole('button', { name: '通常表示に戻る' });
-    const rect = await exit.boundingBox();
-    expect(await exit.evaluate((el, rect) => el === document.elementFromPoint(
+    const pause = screen.locator('#touch-pause');
+    const rect = await pause.boundingBox();
+    expect(rect.x + rect.width).toBeGreaterThan(viewport.width - 24);
+    expect(rect.y).toBeLessThan(24);
+    expect(await pause.evaluate((el, rect) => el === document.elementFromPoint(
       rect.x + rect.width / 2, rect.y + rect.height / 2), rect)).toBe(true);
-    await exit.click();
+    await pause.click();
+    await expect(screen).toHaveAttribute('data-mobile-play', 'true');
+    await page.keyboard.press('Escape');
     await expect(screen).not.toHaveAttribute('data-mobile-play');
     await expect(panel).toBeVisible();
     await expect(panel).toContainText('未選択（解析停止中）');
@@ -259,7 +264,8 @@ for (const gameId of ['graze-duel', 'deep-sea-salvage']) {
         body: await page.screenshot(), contentType: 'image/png',
       });
     }
-    await screen.getByRole('button', { name: '通常表示に戻る' }).click();
+    if (gameId === 'graze-duel') await page.keyboard.press('Escape');
+    else await screen.getByRole('button', { name: '通常表示に戻る' }).click();
     await expect(screen).not.toHaveAttribute('data-mobile-play');
     if (gameId === 'graze-duel') {
       await page.evaluate(() => window.disposeInputFixture());

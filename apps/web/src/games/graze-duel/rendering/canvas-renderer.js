@@ -90,7 +90,7 @@ export function createCanvasRenderer(options) {
     });
 
     drawPlayerHud(selectedPlayer);
-    drawOpponentInfoHud(otherPlayer);
+    if (frame.versusParticipant || frame.versusSpectator) drawOpponentInfoHud(otherPlayer);
     if (playerIndex === 0) drawBossSpawnHint();
     drawCenterInfo();
   }
