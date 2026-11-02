@@ -55,7 +55,7 @@ export function useMobilePlay(screen: RefObject<HTMLElement | null>) {
     };
     root.addEventListener("contextmenu", preventMenu);
     document.addEventListener("keydown", escape, true);
-    root.querySelector<HTMLButtonElement>(".mobile-play-toggle")?.focus({ preventScroll: true });
+    root.querySelector<HTMLButtonElement>(root.dataset.gameId === "graze-duel" ? "#touch-pause" : ".mobile-play-toggle")?.focus({ preventScroll: true });
     return () => {
       root.removeEventListener("contextmenu", preventMenu);
       document.removeEventListener("keydown", escape, true);
@@ -67,7 +67,7 @@ export function useMobilePlay(screen: RefObject<HTMLElement | null>) {
     };
   }, [active, screen]);
 
-  return { active, available, toggle: () => {
+  return { active, available, paused: context?.phase === "paused", toggle: () => {
     dismissed.current = active;
     setActive(!active);
   } };
