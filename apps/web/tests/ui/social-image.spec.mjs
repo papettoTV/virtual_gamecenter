@@ -38,14 +38,27 @@ for (const [game, filename] of artwork) {
       await page.evaluate(async ({ game, kind }) => {
         const { default: React } = await import('/node_modules/.vite/deps/react.js');
         const { default: ReactDOMClient } = await import('/node_modules/.vite/deps/react-dom_client.js');
-        const { SharePanel, ResultShareButton, LiveShareButton } = await import('/src/features/sharing/ShareActions.tsx');
+        const { createResultImage, ResultShareButton, LiveShareButton } = await import('/src/features/sharing/ShareActions.tsx');
         const { setLiveContext } = await import('/src/features/sharing/share-service.ts');
         const host = document.createElement('div');
         host.id = 'social-image-fixture'; document.body.append(host);
         const result = { id: '12345678-1234-4234-8234-123456789012', gameId: game, gameVersion: 'test', playerName: 'Preview-test', score: 1200, elapsedTimeMs: 1000, cleared: false, metrics: {}, createdAt: '2026-01-01T00:00:00Z' };
+        if (kind === 'result') {
+          // Run the real renderer outside SharePanel's swallowed catch so
+          // Canvas/import/encoding failures report their actual browser error.
+          const file = await createResultImage(result);
+          const bitmap = await createImageBitmap(file);
+          const generated = { type: file.type, size: file.size, width: bitmap.width, height: bitmap.height };
+          bitmap.close();
+          if (generated.type !== 'image/png' || generated.size === 0 || generated.width !== 1200 || generated.height !== 630) {
+            throw new Error(`Unexpected result image: ${JSON.stringify(generated)}`);
+          }
+        }
         setLiveContext({ gameId: game, cabinetId: result.id, role: 'player', phase: 'ready' });
-        ReactDOMClient.createRoot(host).render(React.createElement(React.Fragment, null,
-          React.createElement(kind === 'result' ? ResultShareButton : LiveShareButton, kind === 'result' ? { draft: result, placement: 'result-page' } : {}), React.createElement(SharePanel)));
+        // App already owns SharePanel. A second panel duplicates dialogs,
+        // focus handlers and asynchronous image generation across React roots.
+        ReactDOMClient.createRoot(host).render(
+          React.createElement(kind === 'result' ? ResultShareButton : LiveShareButton, kind === 'result' ? { draft: result, placement: 'result-page' } : {}));
         window.__previewShareLinks = [];
         window.open = url => { window.__previewShareLinks.push(String(url)); return null; };
       }, { game, kind });
@@ -58,8 +71,9 @@ for (const [game, filename] of artwork) {
         await expect(consent).toBeHidden();
       }
       await fixture.getByRole('button', { name: kind === 'result' ? '結果を共有' : '観戦に招待', exact: true }).click();
-      const dialog = fixture.getByRole('dialog');
-      await expect(dialog).toBeVisible();
+      const dialog = page.getByRole('dialog');
+      await expect(dialog).toHaveCount(1);
+      await expect(page.locator('#root').getByRole('dialog')).toBeVisible();
       const link = dialog.locator('.share-url');
       await expect(link).toContainText('shareId=');
       const shareUrl = new URL(await link.innerText());
@@ -82,7 +96,15 @@ for (const [game, filename] of artwork) {
         const handoff = new URL(await page.evaluate(() => window.__previewShareLinks.at(-1)));
         expect(handoff.searchParams.get(target === 'X' ? 'url' : 'u')).toBe(shareUrl.href);
       }
-      if (kind === 'result') await expect(dialog.getByRole('button', { name: '結果画像を保存', exact: true })).toBeVisible();
+      if (kind === 'result') {
+        const save = dialog.getByRole('button', { name: '結果画像を保存', exact: true });
+        await expect(save).toBeVisible();
+        const downloading = page.waitForEvent('download');
+        await save.click();
+        const download = await downloading;
+        expect(download.suggestedFilename()).toBe(`${game}-result.png`);
+        expect(await download.failure()).toBeNull();
+      }
       await dialog.getByRole('button', { name: '× 閉じる' }).click();
       await expect(dialog).toHaveCount(0);
     });
