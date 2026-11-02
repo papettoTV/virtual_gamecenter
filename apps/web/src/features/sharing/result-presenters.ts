@@ -13,7 +13,7 @@ const resultPresenters: Readonly<Record<string, ResultPresenter>> = {
 };
 
 export function presentResult(result: SharedResultDraft): ResultPresentation {
-  const presenter = resultPresenters[result.gameId];
+  const presenter = Object.hasOwn(resultPresenters, result.gameId) ? resultPresenters[result.gameId] : undefined;
   if (presenter) return presenter(result);
   const title = getGameDefinition(result.gameId)?.localizedTitle ?? result.gameId;
   const score = Math.round(result.score).toLocaleString("ja-JP");
