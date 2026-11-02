@@ -71,12 +71,22 @@ test('既存の自動PRをレビュー受付でき、手元切替後は受付・
   await assert.rejects(mergePr({ github: f.github, context, head, base, verifiedTree: tree, expectedCheck: 'verify' }));
   assert.equal(f.merges(), 0);
   f.issue.labels = ['実装:自動'];
-  assert.equal(await mergePr({ github: f.github, context, head, base, verifiedTree: tree, expectedCheck: 'verify' }), head);
-  assert.equal(f.merges(), 1);
+  await assert.rejects(mergePr({ github: f.github, context, head, base, verifiedTree: tree, expectedCheck: 'verify' }), /旧マージ経路は停止済み/);
+  assert.equal(f.merges(), 0);
 });
 test('自動実装の受付は両ラベルの競合や手元PRを無視して開始しない', async () => {
   const context = { repo, actor: 'owner', eventName: 'workflow_dispatch', payload: { issue: { number: 1 } } };
   for (const f of [fixture(['実装:自動', '実装:手元']), fixture(['実装:自動'], [{ number: 3, body: 'Closes #1' }])]) {
     await assert.rejects(intake({ github: f.github, context, core: { setOutput() {} } }));
   }
+});
+
+
+test('自動実装の起動はラベル付与1つに限定し、作成時との二重受付を防ぐ', async () => {
+  const {readFile}=await import('node:fs/promises'); const {parse}=await import('yaml');
+  const workflow=parse(await readFile(new URL('../../.github/workflows/codex-issue.yml',import.meta.url),'utf8'));
+  assert.deepEqual(workflow.on.issues.types,['labeled']);
+  assert.ok(workflow.on.workflow_dispatch);assert.ok(workflow.jobs.intake.if.includes("github.event.label.name == '実装:自動'"));
+  assert.ok(!workflow.jobs.intake.if.includes("action == 'opened'"));
+  assert.equal(workflow.concurrency['cancel-in-progress'],false);
 });

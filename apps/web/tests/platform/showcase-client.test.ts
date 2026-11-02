@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createCabinetClient } from "../../src/realtime/cabinet-client";
 
+vi.mock("../../src/features/platform/platform-client", () => ({ ensurePlatformSession: vi.fn().mockResolvedValue(undefined) }));
+
 afterEach(() => vi.unstubAllGlobals());
 
 describe("showcase spectator connection", () => {
   for (const [explicitWatch, framed] of [[false, true], [true, true], [false, false]] as const) {
-    it(`never takes the player seat when watch=${explicitWatch}, framed=${framed}`, () => {
+    it(`never takes the player seat when watch=${explicitWatch}, framed=${framed}`, async () => {
       const handlers = new Map<string, () => void>();
       const sent: string[] = [];
       class Socket {
@@ -27,6 +29,7 @@ describe("showcase spectator connection", () => {
       });
       const client = createCabinetClient();
       client.join("room", "graze-duel", explicitWatch);
+      await Promise.resolve();
       socket!.readyState = 1;
       handlers.get("open")?.();
       expect(sent.map(message => JSON.parse(message))).toContainEqual({ type: "joinCabinet", gameId: "graze-duel", watch: true });

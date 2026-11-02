@@ -1,0 +1,48 @@
+#game-screen[data-mobile-play] {
+  --game-canvas-fit: contain;
+  position: fixed;
+  inset: 0;
+  /* Keep the inert page, including its analytics panel (2100), below play. */
+  z-index: 2200;
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  max-width: none;
+  margin: 0;
+  padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #050713;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+#game-screen[data-mobile-play] > :not(.game-frame):not(.touch-controls):not(.mobile-play-toggle) { display: none; }
+#game-screen[data-mobile-play] > .game-frame {
+  flex: 1 1 0;
+  min-height: 0;
+  width: 100%;
+  margin: 0;
+  aspect-ratio: auto;
+  overflow: hidden;
+}
+#game-screen[data-mobile-play] #game {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
+  object-fit: contain;
+  border: 0;
+  border-radius: 0;
+  touch-action: none;
+}
+#game-screen[data-mobile-play] .game-share-button { display: none; }
+#game-screen[data-mobile-play] > .touch-controls { display: block; flex: 0 0 auto; margin: 0; }
+#game-screen[data-mobile-play] .touch-actions { display: flex; gap: 8px; }
+#game-screen[data-mobile-play] .touch-actions > * { flex: 1; min-width: 0; }
+#game-screen[data-mobile-play] > .mobile-play-toggle { flex: 0 0 auto; min-height: 44px; }

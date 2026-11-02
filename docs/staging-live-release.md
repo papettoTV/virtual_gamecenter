@@ -1,0 +1,55 @@
+# staging実公開・回帰への接続
+
+## 公開の流れ
+
+developへマージ → 同じ実SHAの初回push CIと成果物が成功 → ci-controlから自動起動 → 公開対象SHA・CI・成果物ハッシュの固定 → 人がstaging承認1回 → 同じSHAのWorkerとPages developへ公開1回 → HTTPとdesktop/mobileのブラウザ8件を回帰1回 → 結果JSONを保存。
+
+公開先は既存のpulbase-stagingとhttps://develop.virtual-gamecenter.pages.devだけ。main・本番・Xは対象外。失敗時は停止して修正PRで対応し、自動再試行・再公開・巻き戻しはしない。WorkerとPagesの間の失敗は部分反映になり得るため、Worker/Pagesの結果をnot-attempted / unknown / uploadedとして残す。unknownは失敗確定ではなく、再実行せず確認する。
+
+## 固定された制御と鍵
+
+公開命令・Worker/D1/R2/DO設定・Pages develop指定・ブラウザ定義・依存lockはci-control側に固定する。prepareは読取のみで、承認後にも保護設定版・現在のdevelop・同じCI・成果物を各処理の前に再照合する。旧鍵なしpacketはversion 3の実公開packetへ流用できない。
+
+staging承認後、固定lockからinstall scriptsなしでツールを取得し、ChromiumとOS依存を取得する。その後の公開・回帰stepだけにstagingのCLOUDFLARE_API_TOKEN、PULBASE_CHECK_USERNAME、PULBASE_CHECK_PASSWORDを渡す。Cloudflareトークンは公開用子プロセスだけ、Basicは検証originのHTTP/ブラウザだけに渡す。子プロセスにGitHub/OpenAI鍵は継承しない。外部HTTP/WS・Service Worker・trace/videoを無効にし、生のCLI出力やブラウザJSONは成果物に含めない。回帰は検証用ゲストを作成するが、Googleログイン・本番・決済には進まない。
+
+Cloudflareトークンは対象アカウント1件、Individual Workersのpulbase-stagingにEditor、Pages Writeを必要範囲で付与する。既存Workerのbindingsだけのデプロイには、D1/R2への独立した直接操作権限は追加しない。Pagesと本番が同じプロジェクトのため、Pages鍵自体でブランチ単位の分離はできない。人のstaging承認と変更不能の制御コードでdevelopだけへの使用を制限する。鍵は管理用端末で作成し、staging Environmentだけへ保管する。AIの手元・repository共通Secret・codex Environmentには保管しない。
+
+## 運用と制御コードの更新
+
+通常運用の設定と成功記録は[CI/CD設定](codex-cicd-setup.md)を参照する。ci-controlは配置済みであり、通常のアプリ変更にbypassの付け外しや制御コードの再配置は不要。
+
+構築当時の旧親SHAと設定版に固定された配置/ZIP作成ツールは削除した。現在のci-controlにそのまま使える更新ツールではない。将来、固定コードや信頼定義を変更する場合は、その時点の制御SHA・保護設定版・レビュー済みの差分に対して管理手順を別途準備する。鍵なしで検証し、人が配置と保護状態を確認する。過去のツールやGit履歴を、そのまま実行する手順として流用しない。
+
+## 検証と現時点の範囲
+
+準備段階ではダミー認証・差し替えた通信/プロセスで成功経路と部分反映・認証不足・HTTP/ブラウザ失敗時の停止を検証する。実成果物のWorker dry-runとブラウザ定義読込も鍵なしで確認する。これを実公開・実回帰の成功とは扱わない。実環境の確認は制御配置とSecret登録後、人のstaging承認を受けた実行で行う。
+
+公式仕様: [Workersの役割とbindings](https://developers.cloudflare.com/workers/authorization/workers/)、[Pages API](https://developers.cloudflare.com/pages/configuration/api/)、[Playwright CI](https://playwright.dev/docs/ci-intro)。
+
+## 初回実公開の停止と診断改善
+
+実行40191335743はWorker公開段階で停止し、Pages/HTTP/ブラウザは未実行。管理画面では稼働版23dd6983のままで、新しい切替は確認されなかった。読取診断はWorkerのservice/settings/deployments/secretsとPagesすべて200で、必須Secret6つも存在した。これだけでは書込権限やアップロード処理の成功は証明できない。
+
+CLI出力を捨てていたため元のCFエラーは復元できない。修正版は生のstdout/stderrを出さず、既知のエラー分類・数値のCFコード・固定エンドポイント名だけを結果JSONへ残す。環境値は分類前に除去し、失敗結果への任意文字列や応答本文の混入を防ぐ。書込トークンの権限は拡大しない。
+
+修正は人が管理するci-controlへ配置し、構築モードの保護版・固定SHAを確認してから準備PRをdevelopへマージする。元の失敗実行を再実行せず、新しい実SHAで通常のstaging承認1回を受ける。再び失敗した場合は数値コードから原因を切り分ける。現時点では根本原因を特定した修正とは扱わない。
+
+## Pages公開後の共有設定チェックの修正
+
+実行40197341067ではWorker/Pagesの公開コマンドは成功し、公開後の検査で停止した。固定Wranglerはpages_build_output_dirを共有build_configの出力先へ送信する。生成した一時パスが共有設定を変える条件を、実CLIとローカル偽APIで再現した。
+
+修正は公開前に取得した共有出力先の現在値をメタデータとして保持し、実際のアップロード先は検証済みartifactの位置引数へ固定する。Macのパス別名もrealpathで正規化する。JSONのキー順序・同義パスだけを正規化し、source/build_config/production側設定の実変更は引き続き拒否する。自動PATCH修復や検査の削除は行わない。停止理由も固定の分類で保存する。
+
+初回修正のPRでは鍵なしのStaging toolchain checksで、実Wranglerとローカル偽APIの再現・修正確認と、固定Chromiumのsandbox起動だけを検証する。制御側も公開鍵を渡す前にsandbox起動を確認する。検証URLを開くアプリ回帰は、staging承認後の1回だけ。
+
+Ubuntu 24.04のAppArmor制限によるsandbox起動失敗も公開なしCIで検出した。固定Playwrightが示すChromium実行ファイルの実体だけにuserns許可profileを設定する。ワイルドカード、全体のsysctl変更、Chromium sandbox無効化は使用しない。使い捨てのGitHub Ubuntu runner上・公開鍵を渡す前だけに実施し、MacやCloudflareは変更しない。CIで共有メタデータ保持とsandbox起動が成功した。
+
+## 構築中と本運用の保護モード
+
+staging EnvironmentのPULBASE_CONTROL_RULE_VERSIONSに、人が確認したciControl/mainのUTC更新日時とprotectionModeを登録する。constructionではci-controlのbypassがpulbase-release（App ID 5405029 / Integration / always）1件だけであることを要求する。strictでは例外ゼロを要求する。protectionModeを省略した既存値はstrictとして扱い、未知の値は停止する。mainはどちらのモードも例外ゼロ・固定SHAを維持する。
+
+承認前の読取では例外ゼロまたはこのApp1件だけを受け付けるが、保護確認済みとは扱わない。承認後、staging内の人が登録したモードと設定版を照合し、各処理の前にも再確認する。APIが例外一覧を省略しても空とは推定せず、人が完全な一覧を確認した更新日時との一致を要求する。repository変数・workflow入力・develop成果物で構築モードを選べない。
+
+構築中も人のstaging承認は実行ごとに1回必要。release Appの秘密鍵は人の管理端末だけで扱い、stagingやAIへ渡さない。公開制御コードの配置ごとに人用ツールで内容を確認し、固定制御SHAを更新する。例外の維持はAIへの書込権限追加ではない。
+
+実公開・HTTP・ブラウザ回帰が一通り成功したら、人がci-controlの例外を削除して保存する。新しい保護設定版とprotectionMode=strictをstagingに登録し、例外ゼロを確認する。新しい成功CIのSHAを使う本運用条件の公開試験をstaging承認1回で行い、公開1回・回帰1回の成功を最終確認する。失敗時は自動再試行せず修正PRで対応する。main反映・本番公開は別途人の判断まで実施しない。

@@ -38,7 +38,7 @@ GitHub Actionsはmain/developへのpushと、それらを対象とするPRでテ
 | Google OAuth | 開発者ログイン/ローカル設定 | 専用のGoogle OAuth client | 本番用Google OAuth client |
 | 開発者ログイン | 有効 | 無効 | 無効 |
 | 新規購入 | 停止 | 停止 | 停止 |
-| サイト閲覧 | localhost/LAN | Basic認証を維持 | 当面Basic認証を維持 |
+| サイト閲覧 | localhost/LAN | Basic認証を維持（任意の自宅回線免除設定あり） | 当面Basic認証を維持 |
 | 削除Cron | テスト/手動検証 | 毎時 | 毎時 |
 
 検証・本番D1 IDは実際の専用DBへ対応付け済み。本番D1は空で、スキーマ移行とアプリの接続確認は未実施。ローカルの保存場所・既存DB IDは変更していない。
@@ -83,6 +83,20 @@ npm run deploy -- staging
 本番は `staging` を `production` に置き換える。DB移行はWorkerのデプロイと別操作であり、デプロイのたびに自動実行しない。スキーマ互換性とバックアップ、失敗時の復元・削除再適用手順を確認してから移行する。Workerだけの巻き戻しでDBも巻き戻るとは考えない。
 
 限定公開の確認後に、Basic認証の一般公開切替を別変更としてレビューする。現在の認証コードはSecret未設定で503を返すため、Secretを消すだけでは一般公開にならない。また、一部の共有画像/結果や計測入口は既存設計でBasic認証より先に処理されるため、Basic認証を全コンテンツの完全な非公開保証とは扱わず、EN-03で公開範囲を確認する。
+
+## 検証用の自宅回線免除（Issue #77）
+
+`pulbase-staging` の任意Secret `STAGING_TRUSTED_NETWORKS` にJSON配列で公開IP/CIDRを保存すると、自宅回線からのBasic認証だけを免除できる。例は `["192.0.2.20/32", "2001:db8:1234:5678::/64"]`（予約済み説明用アドレス）。実際の自宅IPはGit・Issue・テスト・ログへ記録せず、Cloudflare Secretだけで管理する。未設定でも従来のBasic認証とCI/CD・死活監視は継続するため、必須Secretには追加しない。
+
+- `APP_ENV=staging`、正規ホスト `develop.virtual-gamecenter.pages.dev`、Pagesの環境ヘッダーが一致する場合だけ適用する。本番・ローカルに免除を広げない。
+- [Cloudflareが設定するCF-Connecting-IP](https://developers.cloudflare.com/fundamentals/reference/http-headers/#cf-connecting-ip) を使う。Pagesは元のRequestを非公開Service Bindingへ渡し、環境ヘッダーは入口で上書きする。任意の `X-Forwarded-For` や `X-Real-IP` は免除判定に使わない。Workerの直接公開・別のプロキシ経由を追加する際は、この信頼境界も再確認する。
+- IPv4は現在の公開IPの `/32`、IPv6は自宅インターフェースと外向き接続を照合した `/64` を登録する。IPv6の一時アドレスは端末ごと・時間ごとに変わるため、1端末の `/128` だけでは同じ家のiPhoneを許可できない場合がある。IP判定はユーザー認証ではなく、同じ公開IP/サブネットの利用者を個別に区別しない。
+- 空・不正なJSON、無効なIP/CIDR、`/0`、32件超・4096文字超の設定では免除せずBasic認証へ戻る。個別プレイヤーのログイン、運営者権限、クレジット、API/WSの乱用対策はそのまま適用する。既存の認証対象外の共有画像・結果・計測入口の範囲も変更しない。
+- 自宅の公開IP/プレフィックスが変わった場合やVPN・iCloudプライベートリレー・携帯回線を利用した場合はBasic認証が出ることがある。家のWi-Fiにつないでいるというだけで免除を保証しない。自動で未知のIPを登録しない。
+
+登録・更新は対象名と `staging` を確認して `apps/web` から `npx wrangler secret put STAGING_TRUSTED_NETWORKS --config wrangler.jsonc --env staging` で行い、値は標準入力で渡す。CLIのSecret更新は既存コードのバージョンを公開する場合があるため、コードの承認付き検証公開と区別して記録する。コードは専用PR・必須CI・既存のstaging承認付き公開で反映する。
+
+免除だけを止める場合は `npx wrangler secret delete STAGING_TRUSTED_NETWORKS --config wrangler.jsonc --env staging` を運営者の判断で実行する。自宅を含め元のBasic認証に戻り、既存のBasic認証Secretは削除・変更しない。Secret更新後は、認証情報なしの自宅PC/実iPhone、外部の未認証401・正しいBasic認証での成功、API/WS、検証の実反映SHAを照合する。本番・main・DB・保留中の負荷試験は対象外。
 
 ## ローカル検証の証跡（2026-10-13）
 

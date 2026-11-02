@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createCabinetClient } from "../../src/realtime/cabinet-client";
 
+vi.mock("../../src/features/platform/platform-client", () => ({ ensurePlatformSession: vi.fn().mockResolvedValue(undefined) }));
+
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 describe("cabinet reconnect budgets", () => {
-  it.each(["graze-duel", "dot-wave", "deep-sea-salvage"])("acknowledges only decoded start permissions on the current connection: %s", game => {
+  it.each(["graze-duel", "dot-wave", "deep-sea-salvage"])("acknowledges only decoded start permissions on the current connection: %s", async game => {
     const sockets: FakeSocket[] = [];
     class FakeSocket extends EventTarget {
       static OPEN = 1;
@@ -18,6 +20,7 @@ describe("cabinet reconnect budgets", () => {
     vi.stubGlobal("window", { location: { protocol: "https:", host: "example.test", search: "" }, setTimeout, clearTimeout });
     const onMessage = vi.fn(), client = createCabinetClient({ onMessage });
     client.join("first", game);
+    await Promise.resolve();
     const first = sockets[0]!;
     const startReceipt = { attemptId: "request", token: "nonce", type: "startSolo", ignored: "private" };
     first.receive({ type: "soloStarted", reservationId: "request", startReceipt });
@@ -56,6 +59,7 @@ describe("cabinet reconnect budgets", () => {
     vi.stubGlobal("window", { location: { protocol: "https:", host: "example.test" }, setTimeout, clearTimeout });
     const client = createCabinetClient();
     client.join("test", "graze-duel");
+    await Promise.resolve();
     sockets[0]!.close();
     await vi.advanceTimersByTimeAsync(1000); expect(sockets).toHaveLength(2);
     sockets[1]!.close();

@@ -1,4 +1,5 @@
 import { notifications } from "../../features/notifications/notifications";
+import { renderResultSummary } from "../../features/game/result-summary";
 import { resultSharing } from "../../features/sharing/result-sharing";
 import { setLiveContext } from "../../features/sharing/share-service";
 import { createCabinetSession } from "../../game-sdk/cabinet-session";
@@ -25,6 +26,7 @@ import { createState } from "./state";
 import { createSimulation } from "./simulation";
 import { createRenderer } from "./renderer";
 import { clamp } from "./utils";
+import { updateCanvasPointer } from "./canvas-pointer";
 
 export function mountGame(context: GameContext): GameInstance {
   const scope = context.lifetime;
@@ -40,8 +42,6 @@ export function mountGame(context: GameContext): GameInstance {
   const cabinetScreen = document.querySelector<HTMLElement>("#cabinet-screen");
   const gameScreen = document.querySelector<HTMLElement>("#game-screen");
   const rankingPanel = document.querySelector<HTMLElement>("#ranking-submit-panel");
-  const rankingResult = document.querySelector<HTMLElement>("#ranking-result");
-  const rankingHeading = document.querySelector<HTMLElement>("#ranking-submit-heading");
   const rankingSubmit = document.querySelector<HTMLButtonElement>("#ranking-submit");
   const rankingName = document.querySelector<HTMLInputElement>("#ranking-name");
   const rankingList = document.querySelector<HTMLElement>("#ranking-list");
@@ -229,11 +229,15 @@ export function mountGame(context: GameContext): GameInstance {
       });
     }
     const rareCount = [...state.discovered].filter((id) => speciesById.get(id)?.rare).length;
-    if (rankingHeading) rankingHeading.textContent = "ランキング登録";
-    if (rankingResult) rankingResult.textContent = `${title} / SCORE ${state.finalScore.toLocaleString()}（適用前 ${state.finalSubtotal.toLocaleString()}・倍率 ${(multiplier * 100).toFixed(0)}%） / 図鑑 ${state.discovered.size}/21 / レア ${rareCount}/5 / 最大 ${Math.floor(state.maxDepth).toLocaleString()}m`;
+    renderResultSummary({ title, score: state.finalScore, details: [
+      ["図鑑", `${state.discovered.size}/21`], ["レア", `${rareCount}/5`],
+      ["最大深度", `${Math.floor(state.maxDepth).toLocaleString()}m`],
+      ["TIME", `${state.elapsed.toFixed(2)}s`],
+      ["適用前スコア", state.finalSubtotal.toLocaleString()], ["倍率", `${(multiplier * 100).toFixed(0)}%`],
+    ] });
     rankingPanel?.classList.add("is-visible"); rankingPanel?.classList.remove("is-submitted");
     if (rankingSubmit) rankingSubmit.disabled = !rankingName?.value.trim() || state.finalScore <= 0;
-    if (rankingRetry) rankingRetry.textContent = state.cleared ? "もう一度遊ぶ" : "1クレジットでリトライ";
+    if (rankingRetry) rankingRetry.textContent = state.cleared ? "1クレジットでもう一度" : "1クレジットでリトライ";
   }
 
   function retryFromResult() {
@@ -248,7 +252,7 @@ export function mountGame(context: GameContext): GameInstance {
   function togglePause() {
     if (watching) return;
     if (state.collectionOpen) { toggleCollection(); return; }
-    if (state.phase === "ready") startDive(); else if (state.phase === "dive") state.paused = !state.paused;
+    if (state.phase === "ready") gameHost.requestPlay("start"); else if (state.phase === "dive") state.paused = !state.paused;
     updateButtons();
   }
 
@@ -297,7 +301,7 @@ export function mountGame(context: GameContext): GameInstance {
     try {
       await submitRankingEntry({ gameId: DEEP_SEA_SALVAGE.id, elapsedTimeMs: Math.round(state.elapsed * 1000), cleared: state.cleared, score: state.finalScore, maxLevel: Math.floor(state.maxDepth), defeatedBossCount: state.cleared ? 1 : 0, clientVersion: DEEP_SEA_SALVAGE.currentVersion });
       if (scope.disposed) return;
-      rankingPanel?.classList.add("is-submitted"); if (rankingHeading) rankingHeading.textContent = "スコアランキング"; await loadRanking();
+      rankingPanel?.classList.add("is-submitted"); await loadRanking();
     } catch { if (!scope.disposed) rankingSubmit.disabled = false; }
   }
 
@@ -316,7 +320,8 @@ export function mountGame(context: GameContext): GameInstance {
   function escapeHtml(value: string) { const element = document.createElement("span"); element.textContent = value; return element.innerHTML; }
 
   scope.listen(window, "keydown", (event) => {
-    if (watching || document.querySelector(".share-overlay")) return;
+    if (watching || event.repeat || (document.querySelector(".share-overlay") || document.querySelector(".platform-overlay"))) return;
+    if (event.target instanceof Element && event.target.closest("input, textarea, select, button, [role=dialog]")) return;
     keys.add(event.code); if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(event.code)) event.preventDefault();
     if (event.code === "KeyP") togglePause();
     if (event.code === "KeyF") toggleCollection();
@@ -326,9 +331,12 @@ export function mountGame(context: GameContext): GameInstance {
   scope.listen(canvas, "pointerdown", (event) => {
     if (watching) return;
     if (state.collectionOpen && state.returnToResult) { toggleCollection(false); return; }
-    const rect = canvas.getBoundingClientRect(); pointer.active = true; pointer.x = (event.clientX - rect.left) * W / rect.width; pointer.y = (event.clientY - rect.top) * H / rect.height;
+    updateCanvasPointer(canvas, pointer, event, true);
   });
-  scope.listen(canvas, "pointermove", (event) => { if (pointer.active) { const rect = canvas.getBoundingClientRect(); pointer.x = (event.clientX - rect.left) * W / rect.width; pointer.y = (event.clientY - rect.top) * H / rect.height; } });
+  scope.listen(canvas, "pointermove", (event) => {
+    if (pointer.active) updateCanvasPointer(canvas, pointer, event);
+  });
+  scope.listen(canvas, "pointercancel", () => { pointer.active = false; });
   scope.listen(window, "pointerup", () => { pointer.active = false; });
   if (touchPause) scope.listen(touchPause, "click", togglePause);
   if (touchCollection) scope.listen(touchCollection, "click", () => toggleCollection());
@@ -365,7 +373,7 @@ export function mountGame(context: GameContext): GameInstance {
   }
 
   function syncInitialScreen() {
-    showScreen(cabinetId ? watching ? "game" : "cabinet" : "arcade");
+    showScreen(cabinetId ? "game" : "arcade");
     if (cabinetId) cabinetClient.join(cabinetId, DEEP_SEA_SALVAGE.id, true);
   }
   function loop(now: number) {
@@ -421,6 +429,7 @@ export function mountGame(context: GameContext): GameInstance {
       }
       if (cabinetClient.role !== "player") cabinetClient.join(cabinetId, DEEP_SEA_SALVAGE.id);
       const ready = await cabinetClient.waitForPlayer();
+      if (ready && !scope.disposed && generation === actionGeneration) { showScreen("game"); updateButtons(); }
       return ready && !scope.disposed && generation === actionGeneration;
     })();
     try { return await preparePending; } finally { preparePending = null; }
@@ -439,7 +448,7 @@ export function mountGame(context: GameContext): GameInstance {
       if (!await cabinetClient.waitForPlayer() || scope.disposed || generation !== actionGeneration) return false;
       if (!reservationId || !await cabinetClient.startSolo(reservationId) || scope.disposed || generation !== actionGeneration) return false;
       watching = false; playing = true;
-      if (action === "retry") retryFromResult(); else resetRun();
+      if (action === "retry") retryFromResult(); else { resetRun(); startDive(); }
       showScreen("game"); lastTime = performance.now();
       return true;
     } finally { playPending = false; }

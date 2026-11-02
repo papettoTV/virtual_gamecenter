@@ -1,5 +1,5 @@
-.showroom-shell { isolation: isolate; }
-.showroom-shell::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(180deg, rgb(2 6 15 / 20%), rgb(2 6 15 / 42%)), url("/assets/showroom/arcade-ambient-v1.jpg") center / cover no-repeat, #030713; }
+body:has(.showroom-shell) { isolation: isolate; }
+body:has(.showroom-shell)::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(180deg, rgb(2 6 15 / 20%), rgb(2 6 15 / 42%)), url("/assets/showroom/arcade-ambient-v1.jpg") center / cover no-repeat, #030713; }
 .showroom-shell .intro { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 24px; margin-bottom: 24px; }
 .showroom-shell .brand-category { grid-column: 1 / -1; margin: 0; font-size: 11px; }
 .showroom-shell .brand-heading { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin: 0; line-height: 1; }
@@ -53,7 +53,7 @@ body.is-showcase-preview { margin: 0; overflow: hidden; background: #02070f; }
 .is-showcase-preview main.dot-wave { margin: 0; padding: 0; width: 100%; max-width: none; }
 .is-showcase-preview .duel-board { margin: 0; border: 0; }
 @media (max-width: 700px) {
-  .showroom-shell::before { background-size: auto, 100% 100%, auto; }
+  body:has(.showroom-shell)::before { background-size: auto, 100% 100%, auto; }
   .showroom-shell { padding: 16px 12px; }
   .showroom-shell .intro { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-bottom: 20px; padding-right: 48px; }
   .showroom-shell .brand-category { order: 1; font-size: 10px; }

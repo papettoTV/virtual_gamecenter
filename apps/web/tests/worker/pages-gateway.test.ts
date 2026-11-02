@@ -15,11 +15,12 @@ afterAll(async () => {
 
 const origin = "https://develop.virtual-gamecenter.pages.dev";
 const authorization = "Basic " + btoa("test:test");
-const backend = {
+const backendFor = (networks?: string) => ({
   fetch(request: Request) {
-    return worker.fetch(request as Parameters<typeof worker.fetch>[0], { ...env, APP_ENV: "staging", BASIC_AUTH_USERNAME: "test", BASIC_AUTH_PASSWORD: "test", GOOGLE_CLIENT_ID: "test.apps.googleusercontent.com", GOOGLE_CLIENT_SECRET: "test", ASSETS: { fetch: async () => new Response("<html>game</html>", { headers: { "Content-Type": "text/html" } }) } } as unknown as Env);
+    return worker.fetch(request as Parameters<typeof worker.fetch>[0], { ...env, APP_ENV: "staging", STAGING_TRUSTED_NETWORKS: networks, BASIC_AUTH_USERNAME: "test", BASIC_AUTH_PASSWORD: "test", GOOGLE_CLIENT_ID: "test.apps.googleusercontent.com", GOOGLE_CLIENT_SECRET: "test", ASSETS: { fetch: async () => new Response("<html>game</html>", { headers: { "Content-Type": "text/html" } }) } } as unknown as Env);
   },
-};
+});
+const backend = backendFor();
 const forwarded = (path: string, init?: RequestInit) => gateway.fetch(new Request(origin + path, {
   ...init, headers: { Authorization: authorization, "CF-Connecting-IP": "192.0.2.90", ...Object.fromEntries(new Headers(init?.headers)) },
 }), { APP_ENV: "staging", BACKEND: backend });
@@ -39,6 +40,24 @@ function nextMessage(socket: WebSocket, predicate: (message: ServerMessage) => b
 }
 
 describe("Pages to Worker gateway", () => {
+  it("accepts trusted edge addresses for HTML, API and WebSocket while retaining Basic elsewhere", async () => {
+    const bindings = { APP_ENV: "staging", BACKEND: backendFor('["192.0.2.90/32", "2001:db8:77::/64"]') };
+    for (const address of ["192.0.2.90", "2001:db8:77::1234"]) {
+      const headers = { "CF-Connecting-IP": address };
+      expect((await gateway.fetch(new Request(origin, { headers }), bindings)).status).toBe(200);
+      expect((await gateway.fetch(new Request(origin + "/api/health", { headers }), bindings)).status).toBe(200);
+    }
+    const socketResponse = await gateway.fetch(new Request(origin + `/api/cabinets/${crypto.randomUUID()}/ws?gameId=dot-wave`, {
+      headers: { "CF-Connecting-IP": "192.0.2.90", Origin: origin, Upgrade: "websocket" },
+    }), bindings);
+    expect(socketResponse.status).toBe(101);
+    socketResponse.webSocket!.accept();
+    socketResponse.webSocket!.close();
+    const forged = { "CF-Connecting-IP": "198.51.100.9", "X-Forwarded-For": "192.0.2.90", "X-Real-IP": "192.0.2.90" };
+    expect((await gateway.fetch(new Request(origin, { headers: forged }), bindings)).status).toBe(401);
+    expect((await gateway.fetch(new Request(origin, { headers: { ...forged, Authorization: authorization } }), bindings)).status).toBe(200);
+  });
+
   it.each([undefined, "null", "https://untrusted.example", "https://virtual-gamecenter.pages.dev"])(
     "rejects unsafe API and WebSocket origins: %s", async unsafeOrigin => {
       const headers: Record<string, string> = unsafeOrigin ? { Origin: unsafeOrigin } : {};

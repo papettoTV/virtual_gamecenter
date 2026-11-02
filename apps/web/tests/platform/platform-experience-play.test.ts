@@ -7,6 +7,8 @@ import { claimWelcomeCredit, fetchPlatformBootstrap, PlatformApiError, type Plat
 import { notifications } from "../../src/features/notifications/notifications";
 import { recordPlayStartedFromWatch } from "../../src/features/engagement/engagement-client";
 
+const slots = { pendingAction: 1, playDialog: 2, busy: 3, welcome: 4 } as const;
+
 const runtime = vi.hoisted(() => ({
   states: [] as unknown[], cursor: 0,
   refs: [] as Array<{ current: unknown }>, refCursor: 0,
@@ -107,8 +109,14 @@ describe("typed platform play integration", () => {
     events = new EventTarget();
     vi.stubGlobal("window", {
       location: { href: "https://example.test/cabinets/test-cabinet?game=deep-sea-salvage", search: "?game=deep-sea-salvage", pathname: "/cabinets/test-cabinet" },
-      addEventListener: events.addEventListener.bind(events),
-      removeEventListener: events.removeEventListener.bind(events),
+      // The Workers EventTarget used by this suite has no DOM capture phase.
+      // Adapt that boundary here; browser specs verify actual propagation order.
+      addEventListener: vi.fn((type: string, listener: EventListener, options?: boolean | AddEventListenerOptions) => {
+        events.addEventListener(type, listener, typeof options === "boolean" ? false : { ...options, capture: false });
+      }),
+      removeEventListener: vi.fn((type: string, listener: EventListener) => {
+        events.removeEventListener(type, listener, false);
+      }),
       dispatchEvent: events.dispatchEvent.bind(events),
       history: {
         state: { preserved: true },
@@ -118,7 +126,7 @@ describe("typed platform play integration", () => {
           window.location.search = url.search;
         }),
       },
-      sessionStorage: { getItem: vi.fn(() => null) },
+      sessionStorage: { getItem: vi.fn(() => null), removeItem: vi.fn() },
     });
     bootstrapPlatform = { ...platform };
     vi.mocked(fetchPlatformBootstrap).mockResolvedValue(bootstrapPlatform);
@@ -140,7 +148,7 @@ describe("typed platform play integration", () => {
     }
   }
 
-  it("returns to the arcade without spending a credit when initial play is cancelled", () => {
+  it("returns to ready without spending a credit when initial play is cancelled", () => {
     const pushState = vi.fn();
     vi.stubGlobal("location", window.location);
     vi.stubGlobal("history", { pushState });
@@ -151,46 +159,48 @@ describe("typed platform play integration", () => {
     const button = elements(render()).find(element => element.props.className === "platform-cancel-button");
     expect(button).toBeDefined();
     (button!.props.onClick as () => void)();
-    expect(pushState).toHaveBeenCalledWith({}, "", "/");
+    expect(pushState).not.toHaveBeenCalled();
+    expect(runtime.states[slots.pendingAction]).toBe(null);
+    expect(runtime.states[slots.playDialog]).toBe(null);
     expect(executePlay).not.toHaveBeenCalled();
     expect(play).not.toHaveBeenCalled();
   });
 
-  it("opens the start confirmation once and removes only the start query", () => {
+  it("enters ready without confirmation and removes only the start query", () => {
     window.location.href = "https://example.test/cabinets/test-cabinet?game=deep-sea-salvage&start=1&watch=0#ranking";
     window.location.search = "?game=deep-sea-salvage&start=1&watch=0";
     mount();
-    expect(runtime.states[2]).toBe("start");
-    expect(runtime.states[3]).toBe("confirm");
+    expect(runtime.states[slots.pendingAction]).toBe(null);
+    expect(runtime.states[slots.playDialog]).toBe(null);
     expect(window.history.replaceState).toHaveBeenCalledWith(
       { preserved: true }, "", "/cabinets/test-cabinet?game=deep-sea-salvage&watch=0#ranking",
     );
     expect(play).not.toHaveBeenCalled();
-    runtime.states[2] = null;
-    runtime.states[3] = null;
+    runtime.states[slots.pendingAction] = null;
+    runtime.states[slots.playDialog] = null;
     mount();
-    expect(runtime.states[2]).toBe(null);
+    expect(runtime.states[slots.pendingAction]).toBe(null);
     expect(window.history.replaceState).toHaveBeenCalledOnce();
   });
 
-  it("waits for platform loading before consuming start=1", async () => {
+  it("prepares ready while platform loads without requesting a play", async () => {
     runtime.states[0] = null;
     window.location.href += "&start=1";
     window.location.search += "&start=1";
     mount();
-    expect(runtime.states[2]).toBe(null);
-    expect(window.history.replaceState).not.toHaveBeenCalled();
+    expect(runtime.states[slots.pendingAction]).toBe(null);
+    expect(window.history.replaceState).toHaveBeenCalledOnce();
     await vi.waitFor(() => expect(runtime.states[0]).toBe(bootstrapPlatform));
     mount();
-    expect(runtime.states[2]).toBe("start");
-    expect(runtime.states[3]).toBe("confirm");
+    expect(runtime.states[slots.pendingAction]).toBe(null);
+    expect(runtime.states[slots.playDialog]).toBe(null);
   });
 
   it("does not auto-start standalone credits", () => {
     window.location.href += "&start=1";
     window.location.search += "&start=1";
     mount(true);
-    expect(runtime.states[2]).toBe(null);
+    expect(runtime.states[slots.pendingAction]).toBe(null);
     expect(window.history.replaceState).not.toHaveBeenCalled();
   });
 
@@ -209,20 +219,62 @@ describe("typed platform play integration", () => {
       window.location.search = url.search;
       await vi.waitFor(() => expect(runtime.states[0]).toBe(bootstrapPlatform));
       mount();
-      expect(runtime.states[2]).toBe(null);
-      expect(runtime.states[3]).toBe(null);
+      expect(runtime.states[slots.pendingAction]).toBe(null);
+      expect(runtime.states[slots.playDialog]).toBe(null);
       expect(new URL(window.location.href).searchParams.has("start")).toBe(false);
     },
   );
 
   it("does not overwrite a pending retry with auto-start", () => {
-    runtime.states[2] = "retry";
-    runtime.states[3] = "confirm";
+    runtime.states[slots.pendingAction] = "retry";
+    runtime.states[slots.playDialog] = "confirm";
     window.location.href += "&start=1";
     window.location.search += "&start=1";
     mount();
-    expect(runtime.states[2]).toBe("retry");
+    expect(runtime.states[slots.pendingAction]).toBe("retry");
     expect(new URL(window.location.href).searchParams.has("start")).toBe(false);
+  });
+
+  it("registers a capture guard, cancels with Escape and removes the same guard", () => {
+    mount();
+    gameHost.requestPlay("start");
+    cleanup.forEach(dispose => dispose());
+    cleanup = [];
+    mount();
+    const registration = vi.mocked(window.addEventListener).mock.calls.find(([type]) => String(type) === "keydown");
+    expect(registration).toEqual(["keydown", expect.any(Function), true]);
+
+    const key = new Event("keydown", { cancelable: true });
+    Object.defineProperty(key, "code", { value: "Space" });
+    const stop = vi.spyOn(key, "stopPropagation");
+    window.dispatchEvent(key);
+    expect(stop).toHaveBeenCalledOnce();
+    expect(key.defaultPrevented).toBe(false); // Preserve native dialog button activation.
+    expect(runtime.states[slots.playDialog]).toBe("confirm");
+    expect(executePlay).not.toHaveBeenCalled();
+    expect(play).not.toHaveBeenCalled();
+
+    const escape = new Event("keydown", { cancelable: true });
+    Object.defineProperty(escape, "code", { value: "Escape" });
+    const stopEscape = vi.spyOn(escape, "stopPropagation");
+    window.dispatchEvent(escape);
+    expect(escape.defaultPrevented).toBe(true);
+    expect(stopEscape).toHaveBeenCalledOnce();
+    expect(runtime.states[slots.pendingAction]).toBe(null);
+    expect(runtime.states[slots.playDialog]).toBe(null);
+    expect(executePlay).not.toHaveBeenCalled();
+    expect(play).not.toHaveBeenCalled();
+
+    cleanup.forEach(dispose => dispose());
+    cleanup = [];
+    expect(window.removeEventListener).toHaveBeenCalledWith("keydown", registration![1], true);
+    stop.mockClear();
+    window.dispatchEvent(key);
+    expect(stop).not.toHaveBeenCalled();
+    mount();
+    gameHost.requestPlay("start");
+    expect(runtime.states[slots.pendingAction]).toBe("start");
+    expect(runtime.states[slots.playDialog]).toBe("confirm");
   });
 
   it("does not duplicate a stored retry restore", () => {
@@ -230,7 +282,7 @@ describe("typed platform play integration", () => {
     window.location.href += "&start=1";
     window.location.search += "&start=1";
     mount();
-    expect(runtime.states[2]).toBe(null);
+    expect(runtime.states[slots.pendingAction]).toBe(null);
     expect(new URL(window.location.href).searchParams.has("start")).toBe(false);
   });
 
@@ -242,21 +294,35 @@ describe("typed platform play integration", () => {
     mount();
     await vi.waitFor(() => expect(runtime.states[0]).toBe(bootstrapPlatform));
     gameHost.requestPlay(action);
-    expect(runtime.states[2]).toBe(action);
-    expect(runtime.states[3]).toBe("confirm");
+    expect(runtime.states[slots.pendingAction]).toBe(action);
+    expect(runtime.states[slots.playDialog]).toBe("confirm");
     expect(play).not.toHaveBeenCalled();
     confirm();
-    await vi.waitFor(() => expect(runtime.states[4]).toBe(false));
+    await vi.waitFor(() => expect(runtime.states[slots.busy]).toBe(false));
     expect(executePlay).toHaveBeenCalledWith({
       gameId: "deep-sea-salvage", cabinetId: "test-cabinet", action,
       start: expect.any(Function), walletChanged: expect.any(Function),
     });
     expect(play).toHaveBeenCalledWith(action, "reservation");
     expect((runtime.states[0] as PlatformBootstrap).wallet.availableTotal).toBe(4);
-    expect(runtime.states[2]).toBe(null);
-    expect(runtime.states[3]).toBe(null);
-    expect(runtime.states[4]).toBe(false);
+    expect(runtime.states[slots.pendingAction]).toBe(null);
+    expect(runtime.states[slots.playDialog]).toBe(null);
+    expect(runtime.states[slots.busy]).toBe(false);
     expect(recordPlayStartedFromWatch).toHaveBeenCalledWith("deep-sea-salvage", "test-cabinet");
+  });
+
+  it("ignores duplicate intent and confirmation while authorization is pending", async () => {
+    let finish!: (started: boolean) => void;
+    vi.mocked(executePlay).mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    mount();
+    gameHost.requestPlay("start"); gameHost.requestPlay("retry");
+    expect(runtime.states[slots.pendingAction]).toBe("start");
+    confirm(); confirm(); gameHost.requestPlay("start");
+    expect(executePlay).toHaveBeenCalledOnce();
+    expect(play).not.toHaveBeenCalled();
+    finish(false); await flush();
+    expect(runtime.states[slots.playDialog]).toBe("confirm");
+    expect(play).not.toHaveBeenCalled();
   });
 
   it("retains confirmation when the SDK reports that play did not start", async () => {
@@ -265,8 +331,8 @@ describe("typed platform play integration", () => {
     gameHost.requestPlay("retry");
     confirm();
     await flush();
-    expect(runtime.states[2]).toBe("retry");
-    expect(runtime.states[3]).toBe("confirm");
+    expect(runtime.states[slots.pendingAction]).toBe("retry");
+    expect(runtime.states[slots.playDialog]).toBe("confirm");
     expect(recordPlayStartedFromWatch).not.toHaveBeenCalled();
     expect(notifications.show).toHaveBeenCalledWith(expect.objectContaining({ type: "info" }));
   });
@@ -278,7 +344,7 @@ describe("typed platform play integration", () => {
     mount();
     gameHost.requestPlay("start");
     await flush();
-    expect(runtime.states[3]).toBe("insufficient");
+    expect(runtime.states[slots.playDialog]).toBe("insufficient");
     expect(executePlay).not.toHaveBeenCalled();
   });
 
@@ -288,7 +354,7 @@ describe("typed platform play integration", () => {
     mount();
     gameHost.requestPlay("start");
     await flush();
-    expect(runtime.states[3]).toBe("confirm");
+    expect(runtime.states[slots.playDialog]).toBe("confirm");
     expect((runtime.states[0] as PlatformBootstrap).wallet.availableTotal).toBe(3);
     expect(play).not.toHaveBeenCalled();
   });
@@ -300,9 +366,9 @@ describe("typed platform play integration", () => {
     gameHost.requestPlay("start");
     confirm();
     await flush();
-    expect(runtime.states[3]).toBe("insufficient");
+    expect(runtime.states[slots.playDialog]).toBe("insufficient");
     expect((runtime.states[0] as PlatformBootstrap).wallet).toEqual(wallet);
-    expect(runtime.states[4]).toBe(false);
+    expect(runtime.states[slots.busy]).toBe(false);
   });
 
   it("unsubscribes from game requests on unmount", () => {
@@ -310,7 +376,7 @@ describe("typed platform play integration", () => {
     cleanup.forEach(dispose => dispose());
     cleanup = [];
     gameHost.requestPlay("start");
-    expect(runtime.states[2]).toBe(null);
+    expect(runtime.states[slots.pendingAction]).toBe(null);
   });
 
   it("preserves standalone top-up decline callbacks", () => {
@@ -318,12 +384,12 @@ describe("typed platform play integration", () => {
     mount(true);
     const onDecline = vi.fn();
     events.dispatchEvent(new CustomEvent("request-credit-topup", { detail: { onDecline } }));
-    expect(runtime.states[5]).toBe(true);
+    expect(runtime.states[slots.welcome]).toBe(true);
     const welcome = elements(render(true)).find(element => "skipWelcomeCredit" in element.props);
     (welcome?.props.skipWelcomeCredit as () => void)();
     expect(onDecline).toHaveBeenCalledOnce();
-    expect(runtime.states[5]).toBe(false);
-    expect(runtime.states[3]).toBe(null);
+    expect(runtime.states[slots.welcome]).toBe(false);
+    expect(runtime.states[slots.playDialog]).toBe(null);
   });
 
   it("preserves standalone wallet refresh after claiming welcome credits", async () => {
@@ -336,7 +402,7 @@ describe("typed platform play integration", () => {
     const welcome = elements(render(true)).find(element => "handleWelcomeCredit" in element.props);
     await (welcome?.props.handleWelcomeCredit as () => Promise<void>)();
     expect(refreshed).toHaveBeenCalledOnce();
-    expect(runtime.states[3]).toBe(null);
-    expect(runtime.states[5]).toBe(false);
+    expect(runtime.states[slots.playDialog]).toBe(null);
+    expect(runtime.states[slots.welcome]).toBe(false);
   });
 });

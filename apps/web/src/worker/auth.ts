@@ -1,12 +1,16 @@
+import { isStagingNetworkAllowed } from "./staging-network-access";
+
 const REALM = "virtual-gamecenter";
 
 export interface BasicAuthEnv {
   BASIC_AUTH_USERNAME?: string;
   BASIC_AUTH_PASSWORD?: string;
+  STAGING_TRUSTED_NETWORKS?: string;
 }
 
 export async function authorizeRequest(request: Request, env: BasicAuthEnv & { APP_ENV?: string }): Promise<Response | null> {
   if (env.APP_ENV === "local" && isLocalRequest(request)) return null;
+  if (isStagingNetworkAllowed(request, env)) return null;
 
   const username = env.BASIC_AUTH_USERNAME;
   const password = env.BASIC_AUTH_PASSWORD;

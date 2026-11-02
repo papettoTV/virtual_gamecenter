@@ -30,7 +30,6 @@ export class GameHost {
     const instance = this.instance;
     if (!instance) return;
     await instance.prepareSolo?.();
-    if (this.instance === instance) this.requestPlay("start");
   }
 }
 

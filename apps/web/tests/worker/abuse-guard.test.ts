@@ -105,6 +105,8 @@ describe("distributed abuse guard", () => {
       expect(await admission.admissionCount(ip)).toBe(0);
     } finally { response.webSocket!.close(); }
   });
+  // 65 Worker requests plus 64 WebSocket cleanups exceed Vitest's default 5s
+  // on some CI runners. This checks admission correctness, not a latency SLO.
   it("enforces the all-cabinet address cap through Worker routing and ignores forged admission headers", async () => {
     const sockets: WebSocket[] = [];
     try {
@@ -122,5 +124,5 @@ describe("distributed abuse guard", () => {
       const ip = await hashIdentifier(`${env.APP_ENV}:ip:192.0.2.189`);
       await vi.waitFor(async () => { expect(await env.ABUSE_GUARDS.getByName("admission").admissionCount(ip)).toBe(0); });
     }
-  });
+  }, 15000);
 });

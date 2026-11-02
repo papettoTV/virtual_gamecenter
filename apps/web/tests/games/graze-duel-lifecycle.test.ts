@@ -140,7 +140,7 @@ describe("BUZZ BARRIER instance lifecycle", () => {
     const instance = mountGame({ game: BUZZ_BARRIER, lifetime });
     await instance.prepareSolo?.(); await instance.play("start", "reservation");
     expect(mocks.setResult).not.toHaveBeenCalled();
-    keyboard.dispatchEvent(keyEvent("Space"));
+    expect(mocks.setLiveContext).toHaveBeenCalledWith(expect.objectContaining({ phase: "playing" }));
     mocks.state!.players[0]!.lives = 0;
     mocks.state!.players[0]!.level = 7;
     let time = performance.now();
@@ -153,6 +153,7 @@ describe("BUZZ BARRIER instance lifecycle", () => {
       gameId: BUZZ_BARRIER.id, cleared: false, score: 0, metrics: { maxLevel: 7, defeatedBossCount: 0 },
     });
     expect(mocks.setResult.mock.calls[0]![0].elapsedTimeMs).toBeGreaterThan(0);
+    expect(mocks.setLiveContext).toHaveBeenCalledWith(expect.objectContaining({ gameId: BUZZ_BARRIER.id, role: "player", phase: "finished" }));
     mocks.clearResult.mockClear();
     await instance.play("retry", "reservation");
     expect(mocks.clearResult).toHaveBeenCalledWith(BUZZ_BARRIER.id);
@@ -194,6 +195,54 @@ describe("BUZZ BARRIER instance lifecycle", () => {
     expect(canvas.releasePointerCapture).toHaveBeenCalledWith(7);
     input.updateHuman(player, 0.016);
     expect(movePlayer).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps real drag input after fullscreen rotates beyond the legacy compact width", () => {
+    const lifetime = new GameLifetime();
+    const movePlayer = vi.fn();
+    let fullscreen = true;
+    Object.assign(canvas, { closest: (selector: string) => selector === '[data-mobile-play="true"]' && fullscreen ? canvas : null });
+    const input = createInputController({ lifetime, canvas, keyboardTarget: keyboard,
+      getState: () => ({ spectator: false, versusParticipant: false, compact: window.innerWidth <= 720, screen: "game", gameOver: false }),
+      togglePause: vi.fn(), requestRetry: vi.fn(), movePlayer });
+    const player = {};
+    for (const width of [390, 844]) {
+      Object.assign(keyboard, { innerWidth: width });
+      canvas.dispatchEvent(Object.assign(new Event("pointerdown", { cancelable: true }), { pointerId: 8, clientX: 100, clientY: 100 }));
+      canvas.dispatchEvent(Object.assign(new Event("pointermove", { cancelable: true }), { clientX: 172, clientY: 100 }));
+      input.updateHuman(player, 0.016);
+      expect(movePlayer).toHaveBeenLastCalledWith(player, 1, 0, false, 0.016);
+      canvas.dispatchEvent(new Event("pointerup"));
+      expect(input.touchMove.active).toBe(false);
+    }
+    fullscreen = false;
+    canvas.dispatchEvent(Object.assign(new Event("pointerdown", { cancelable: true }), { pointerId: 9, clientX: 100, clientY: 100 }));
+    canvas.dispatchEvent(Object.assign(new Event("pointermove", { cancelable: true }), { clientX: 172, clientY: 100 }));
+    input.updateHuman(player, 0.016);
+    expect(movePlayer).toHaveBeenLastCalledWith(player, 0, 0, false, 0.016);
+    keyboard.dispatchEvent(keyEvent("KeyD"));
+    input.updateHuman(player, 0.016);
+    expect(movePlayer).toHaveBeenLastCalledWith(player, 1, 0, false, 0.016);
+    const calls = movePlayer.mock.calls.length;
+    lifetime.dispose();
+    expect(input.touchMove.active).toBe(false);
+    input.updateHuman(player, 0.016);
+    expect(movePlayer).toHaveBeenCalledTimes(calls);
+  });
+
+  it.each([false, true])("preserves spectator versus-participation checks in fullscreen: %s", versusParticipant => {
+    const lifetime = new GameLifetime();
+    const movePlayer = vi.fn();
+    Object.assign(canvas, { closest: () => canvas });
+    const input = createInputController({ lifetime, canvas, keyboardTarget: keyboard,
+      getState: () => ({ spectator: true, versusParticipant, compact: false, screen: "game", gameOver: false }),
+      togglePause: vi.fn(), requestRetry: vi.fn(), movePlayer });
+    canvas.dispatchEvent(Object.assign(new Event("pointerdown", { cancelable: true }), { pointerId: 10, clientX: 100, clientY: 100 }));
+    canvas.dispatchEvent(Object.assign(new Event("pointermove", { cancelable: true }), { clientX: 172, clientY: 100 }));
+    const player = {};
+    input.updateHuman(player, 0.016);
+    expect(movePlayer).toHaveBeenCalledWith(player, versusParticipant ? 1 : 0, 0, false, 0.016);
+    lifetime.dispose();
   });
 
   it("closes audio once and never recreates it after disposal", () => {

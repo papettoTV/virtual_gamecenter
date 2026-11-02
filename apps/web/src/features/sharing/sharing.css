@@ -13,7 +13,7 @@
 .shared-result-card h2 { font-size: clamp(1.6rem, 5vw, 3rem); margin: 12px 0; overflow-wrap: anywhere; }
 .shared-result-card p { margin: 8px 0; }
 .result-share-button { color: #69f7ff; border-color: #69f7ff80; margin: 12px 0; }
-.safe-live-share { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 4; }
+.safe-live-share { display: flex; justify-content: center; margin: 12px 0; }
 .safe-live-share button { font-size: .9rem; padding: 8px 16px; background: #0e1e30; }
 .shared-result-page { max-width: 760px; padding-top: 36px; }
 .shared-result-page h1 { font-size: clamp(1.4rem, 5vw, 2.2rem); }

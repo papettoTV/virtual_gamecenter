@@ -10,6 +10,33 @@ const saved = (value: SharedResultDraft): SharedResult => ({ ...value, playerNam
 
 afterEach(() => vi.unstubAllGlobals());
 
+describe("game hashtags in share defaults", () => {
+  it.each([
+    ["graze-duel", "#バズバリア #BUZZBRRIER"],
+    ["dot-wave", "#ドットウェーブ #DOTWAVE"],
+    ["deep-sea-salvage", "#深海サルベージ #DEEPSEASALVAGE"],
+  ])("includes %s tags in invitations and player/viewer results", (gameId, tags) => {
+    const expected = `${tags} #PULBASE`;
+    for (const role of ["player", "spectator"] as const) {
+      for (const phase of ["ready", "playing", "paused", "finished"] as const) {
+        expect(liveShareText({ gameId, cabinetId: "cabinet", role, phase }).split("\n").at(-1)).toBe(expected);
+      }
+    }
+    const result = saved({ ...draft(), gameId });
+    expect(presentResult(result).text.split("\n").at(-1)).toBe(expected);
+    expect(resultShareText(result).split("\n").at(-1)).toBe(expected);
+    expect(resultShareText(result, true).split("\n").at(-1)).toBe(expected);
+  });
+
+  it("does not add another game's tags for an unknown game", () => {
+    const gameId = "new-game";
+    const result = saved({ ...draft(), gameId });
+    expect(liveShareText({ gameId, cabinetId: "cabinet", role: "player", phase: "ready" }).split("\n").at(-1)).toBe("#PULBASE");
+    expect(resultShareText(result).split("\n").at(-1)).toBe("#PULBASE");
+    expect(resultShareText(result, true).split("\n").at(-1)).toBe("#PULBASE");
+  });
+});
+
 describe("game-specific result presenters", () => {
   it("describes clears without claiming unsupported personal best or rank", () => {
     const card = presentResult(draft());

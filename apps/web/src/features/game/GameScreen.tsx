@@ -1,18 +1,24 @@
+import { useRef } from "react";
+import { useMobilePlay } from "./use-mobile-play";
+import "./mobile-play.css";
 import type { GameDefinition } from "../../domain/game";
 import { isGameModeAvailable } from "../../domain/play-mode-policy";
 import { DebugPanel, getGameUI } from "../../games/ui-registry";
 import { navigate } from "../../shared/navigation";
 import { LiveShareButton, ResultShareButton } from "../sharing/ShareActions";
+import { ResultFeedbackButton } from "../feedback/ResultFeedbackButton";
 
 export interface GameScreenProps {
   game: GameDefinition;
 }
 
 export function GameScreen({ game }: GameScreenProps) {
+  const screen = useRef<HTMLElement>(null);
+  const play = useMobilePlay(screen);
   const ui = getGameUI(game.id);
   const { FrameIntro, SetIntro, ResultPresentation, ResultSummaryAction, AfterFrame, TouchActions, Settings, FooterAction, RetryAction } = ui;
   return (
-    <section className={`game-screen is-hidden${ui.screenClassName ? ` ${ui.screenClassName}` : ""}`} id="game-screen">
+    <section ref={screen} data-mobile-play={play.active || undefined} className={`game-screen is-hidden${ui.screenClassName ? ` ${ui.screenClassName}` : ""}`} id="game-screen">
       <div className="spectator-banner is-hidden" id="spectator-banner">
         <div>
           <strong id="spectator-view-label">観戦中</strong>
@@ -58,7 +64,6 @@ export function GameScreen({ game }: GameScreenProps) {
         <canvas id="game" width="960" height="640" aria-label={`${game.title} game canvas`} />
         <FrameIntro game={game} />
         <SetIntro game={game} />
-        <LiveShareButton />
         <div className="versus-overlay is-hidden" id="versus-overlay" role="dialog" aria-modal="true">
           <p className="eyebrow" id="versus-eyebrow">Versus</p>
           <h2 id="versus-title">対戦</h2>
@@ -72,40 +77,51 @@ export function GameScreen({ game }: GameScreenProps) {
           <ResultShareButton placement="versus-result" />
         </div>
         <div className="ranking-submit ranking-overlay" id="ranking-submit-panel">
-          <h2 id="ranking-submit-heading">ランキング登録</h2>
+          <h2 id="ranking-submit-heading">プレイ結果</h2>
           <ResultPresentation game={game} />
-          <ResultShareButton />
           <div className="ranking-result-summary">
-            <p id="ranking-result">ゲーム終了時にスコアを登録できます。</p>
+            <div id="ranking-result">ゲーム終了時にスコアを登録できます。</div>
             <ResultSummaryAction game={game} />
           </div>
-          <div className="ranking-form">
-            <input id="ranking-name" type="hidden" />
-            <div className="ranking-name-summary">
-              <span>登録名</span>
-              <strong id="ranking-name-display">読み込み中</strong>
+          <p id="ranking-status" role="status" />
+          <div className="ranking-registration-section">
+            <h3>ランキング</h3>
+            <div className="ranking-form">
+              <input id="ranking-name" type="hidden" />
+              <div className="ranking-name-summary">
+                <span>登録名</span>
+                <strong id="ranking-name-display">読み込み中</strong>
+              </div>
+              <button id="ranking-submit" type="button" disabled>ランキングに登録</button>
             </div>
-            <button id="ranking-submit" type="button" disabled>登録</button>
-          </div>
-          <div className="ranking-user-registration" id="ranking-user-registration" hidden>
-            <p>ユーザー登録すると、ランキング名を自由に設定できます。</p>
-            <button
-              id="ranking-user-register"
-              type="button"
-              onClick={() => window.dispatchEvent(new Event("request-user-registration"))}
-            >
-              ユーザー登録
-            </button>
-          </div>
-          <div className="ranking-submit-list">
-            <RankingTable bodyId="ranking-submit-list" label="登録後のスコアランキング" />
+            <div className="ranking-user-registration" id="ranking-user-registration" hidden>
+              <button
+                id="ranking-user-register"
+                type="button"
+                onClick={() => window.dispatchEvent(new Event("request-user-registration"))}
+              >
+                ユーザー登録で名前を変更できます ›
+              </button>
+            </div>
+            <div className="ranking-submit-list">
+              <RankingTable bodyId="ranking-submit-list" label="登録後のスコアランキング" />
+            </div>
           </div>
           <div className="ranking-next-actions">
-            <button id="ranking-another-game" className="clear-restart-button" type="button" onClickCapture={event => { event.stopPropagation(); navigate("/"); }}>別のゲームをする</button>
             <RetryAction game={game} />
+            <button id="ranking-another-game" className="clear-restart-button" type="button" onClickCapture={event => { event.stopPropagation(); navigate("/"); }}>別のゲームを探す</button>
+          </div>
+          <div className="ranking-secondary-actions">
+            <ResultShareButton />
+            <ResultFeedbackButton />
           </div>
         </div>
       </div>
+
+      <LiveShareButton />
+      {(play.active || play.available) && <button className="mobile-play-toggle touch-button" type="button" onKeyDown={event => event.stopPropagation()} onKeyUp={event => event.stopPropagation()} onPointerDown={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); play.toggle(); }}>
+        {play.active ? "通常表示に戻る" : "全画面でプレイ"}
+      </button>}
 
       <AfterFrame game={game} />
 

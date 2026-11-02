@@ -70,6 +70,7 @@ it("records only the current player's terminal solo result and clears on retry/d
   expect(sharing.setResult).not.toHaveBeenCalled();
   controller.network.soloEnded();
   controller.network.publish(current, 0);
+  expect(sharing.setLiveContext).toHaveBeenCalledWith(expect.objectContaining({ gameId: "dot-wave", role: "player", phase: "finished" }));
   expect(sharing.setResult).toHaveBeenCalledTimes(1);
   expect(controller.getResultShareDraft()).toMatchObject({
     gameId: "dot-wave", elapsedTimeMs: 12000, cleared: true,
@@ -95,6 +96,7 @@ it("does not register spectator finishes and shares spectator state honestly", a
   expect(sharing.shareLive).toHaveBeenCalledWith({
     gameId: "dot-wave", cabinetId: "test", role: "spectator", phase: "finished",
   });
+  expect(sharing.setLiveContext).toHaveBeenCalledWith(expect.objectContaining({ gameId: "dot-wave", role: "spectator", phase: "finished" }));
 });
 
 it("pauses active solo play before opening sharing and never auto-resumes", async () => {

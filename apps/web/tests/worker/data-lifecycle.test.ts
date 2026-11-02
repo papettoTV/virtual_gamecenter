@@ -174,6 +174,15 @@ describe("data deletion", () => {
 });
 
 describe("retention", () => {
+  it("expires feedback after ninety days and its daily abuse buckets after expiry", async () => {
+    await env.DB.prepare("INSERT INTO feedback (id, category, message, activity, created_at) VALUES ('old-feedback', 'bug', 'old', 'site', datetime('now', '-91 days')), ('recent-feedback', 'good', 'recent', 'site', CURRENT_TIMESTAMP)").run();
+    await env.DB.prepare("INSERT INTO feedback_rate_buckets (bucket, count, last_id, expires_at) VALUES ('old-bucket', 1, 'old-feedback', datetime('now', '-1 second')), ('recent-bucket', 1, 'recent-feedback', datetime('now', '+1 day'))").run();
+    await runRetention(env.DB, rooms, env.DELETION_AUDIT);
+    expect(await env.DB.prepare("SELECT id FROM feedback WHERE id = 'old-feedback'").first()).toBeNull();
+    expect(await env.DB.prepare("SELECT id FROM feedback WHERE id = 'recent-feedback'").first()).not.toBeNull();
+    expect(await env.DB.prepare("SELECT bucket FROM feedback_rate_buckets WHERE bucket = 'old-bucket'").first()).toBeNull();
+    expect(await env.DB.prepare("SELECT bucket FROM feedback_rate_buckets WHERE bucket = 'recent-bucket'").first()).not.toBeNull();
+  });
   it("reapplies accepted deletions after the D1 deletion receipt is rolled back", async () => {
     const target = await guest();
     const response = await api("request", target.cookies, "POST", await preview(target.cookies));

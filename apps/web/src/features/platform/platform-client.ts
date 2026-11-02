@@ -83,6 +83,7 @@ export class PlatformApiError extends Error {
   }
 }
 
+let sessionEstablished = false;
 let bootstrapRequest: Promise<PlatformBootstrap> | null = null;
 export interface DeletionPreview {
   playerName: string;
@@ -115,8 +116,13 @@ export function fetchDataDeletionStatus(receipt: DeletionReceipt): Promise<{ sta
 
 export function fetchPlatformBootstrap(): Promise<PlatformBootstrap> {
   // Concurrent consumers must share the first request that establishes the guest cookie.
-  bootstrapRequest ??= requestJson<PlatformBootstrap>("/api/platform/bootstrap").finally(() => { bootstrapRequest = null; });
+  bootstrapRequest ??= requestJson<PlatformBootstrap>("/api/platform/bootstrap").then(value => { sessionEstablished = true; return value; }).finally(() => { bootstrapRequest = null; });
   return bootstrapRequest;
+}
+
+// Reuse the initial guest bootstrap; reconnects do not need another wallet fetch.
+export async function ensurePlatformSession(): Promise<void> {
+  if (!sessionEstablished) await fetchPlatformBootstrap();
 }
 
 export async function acceptPolicies(

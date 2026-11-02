@@ -9,6 +9,8 @@ export function createInputController({ lifetime, canvas, keyboardTarget, getSta
   let pointerId = null;
 
   scope.listen(keyboardTarget, "keydown", (event) => {
+    if (event.repeat || (document.querySelector(".platform-overlay") || document.querySelector(".share-overlay"))) return;
+    if (event.target?.closest?.("input, textarea, select, button, [role=dialog]")) return;
     const state = getState();
     if (state.spectator && !state.versusParticipant) return;
     if (event.code === "Space") {
@@ -22,7 +24,9 @@ export function createInputController({ lifetime, canvas, keyboardTarget, getSta
   scope.listen(keyboardTarget, "keyup", (event) => keys.delete(event.code));
   scope.listen(canvas, "pointerdown", (event) => {
     const state = getState();
-    if (state.compact && (!state.spectator || state.versusParticipant)) {
+    // Fullscreen stays active after rotation beyond the legacy compact width.
+    const fullscreen = canvas.closest?.('[data-mobile-play="true"]');
+    if ((state.compact || fullscreen) && (!state.spectator || state.versusParticipant)) {
       event.preventDefault();
       canvas.setPointerCapture(event.pointerId);
       pointerId = event.pointerId;

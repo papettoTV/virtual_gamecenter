@@ -1,0 +1,50 @@
+import { test, expect } from '@playwright/test';
+
+test('result hierarchy, mobile controls and submitted results remain usable', async ({ page }, testInfo) => {
+  await page.route('**/api/ranking**', route => {
+    if (new URL(route.request().url()).origin !== 'http://127.0.0.1:5174') throw Error('Local-only result test');
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ rankings: [{ player_name: '確認用プレイヤー', play_time_ms: 3000, cleared: 1, score: 597000, max_level: 1, defeated_boss_count: 3, created_at: '2026-10-28 00:00:00' }] }) });
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: '拒否する', exact: true }).click();
+  await page.getByRole('button', { name: '遊ぶ', exact: true }).first().click();
+  await page.getByRole('button', { name: '受け取る', exact: true }).click();
+  await page.getByRole('button', { name: '1クレジットで開始', exact: true }).click();
+  await page.getByText('デバッグ設定', { exact: true }).click();
+  await page.locator('#debug-ranking-preview-toggle').check();
+  await page.getByText('デバッグ設定', { exact: true }).click();
+  if (testInfo.project.name === 'mobile') await page.locator('#touch-pause').click();
+  else { await page.locator('#game').click(); await page.keyboard.press('Space'); }
+  const panel = page.locator('#ranking-submit-panel');
+  await expect(panel).toBeVisible({ timeout: 12000 });
+  await expect(panel.locator('h2')).toHaveText('ALL CLEAR');
+  await expect(panel.locator('.result-score')).toHaveText(/[\d,]+/);
+  await expect(panel.locator('.result-metrics')).toContainText('タイムボーナス');
+  await expect(page.locator('.game-share-button')).not.toBeVisible();
+  await expect(page.locator('#touch-pause')).not.toBeVisible();
+  const panelBox = await panel.boundingBox();
+  expect(panelBox.x).toBeGreaterThanOrEqual(0);
+  expect(panelBox.x + panelBox.width).toBeLessThanOrEqual(page.viewportSize().width);
+  const retry = await panel.locator('#ranking-retry').boundingBox();
+  const back = await panel.locator('#ranking-another-game').boundingBox();
+  const feedback = await panel.getByRole('button', { name: '感想・不具合を送る' }).boundingBox();
+  expect(retry.y + retry.height).toBeLessThanOrEqual(back.y);
+  expect(back.y + back.height).toBeLessThanOrEqual(feedback.y);
+  const score = await panel.locator('.result-score').textContent();
+  await panel.getByRole('button', { name: '感想・不具合を送る' }).click();
+  const dialog = page.getByRole('dialog', { name: '感想・不具合を送る', exact: true });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'フィードバックを閉じる' }).click();
+  await expect(panel.locator('.result-score')).toHaveText(score);
+  await panel.screenshot({ path: `/tmp/pulbase-result-${testInfo.project.name}.png` });
+  await panel.locator('#ranking-submit').click();
+  await expect(panel.locator('.ranking-submit-list')).toBeVisible();
+  await expect(panel.locator('.result-score')).toHaveText(score);
+  await expect(panel.locator('.ranking-form')).not.toBeVisible();
+  await expect(panel.locator('#ranking-user-registration')).not.toBeVisible();
+  await expect(panel.locator('#ranking-retry')).toBeVisible();
+  await page.getByText('デバッグ設定', { exact: true }).click();
+  await page.locator('#debug-ranking-preview-toggle').uncheck();
+  await panel.locator('#ranking-another-game').click();
+  await expect(page.getByRole('region', { name: 'ゲームを見て回る' })).toBeVisible();
+});

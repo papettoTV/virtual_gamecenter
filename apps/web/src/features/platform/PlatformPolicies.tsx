@@ -1,11 +1,17 @@
-import type { Dispatch, SetStateAction } from "react";
+import { useState, type Dispatch, type SetStateAction } from "react";
 import type { PolicyKind } from "./platform-types";
 import { BRAND } from "../../domain/brand";
 import { openAnalyticsSettings } from "../analytics/AnalyticsConsent";
+import { openFeedback } from "../feedback/Feedback";
 
 export interface PlatformPoliciesProps {
   policy: PolicyKind | null;
   setPolicy: Dispatch<SetStateAction<PolicyKind | null>>;
+}
+
+export function SiteFooter() {
+  const [policy, setPolicy] = useState<PolicyKind | null>(null);
+  return <PlatformPolicies policy={policy} setPolicy={setPolicy} />;
 }
 
 export function PlatformPolicies({ policy, setPolicy }: PlatformPoliciesProps) {
@@ -20,6 +26,7 @@ export function PlatformPolicies({ policy, setPolicy }: PlatformPoliciesProps) {
         <button type="button" onClick={() => setPolicy("terms")}>利用規約</button>
         <button type="button" onClick={() => setPolicy("privacy")}>プライバシーポリシー</button>
         <button type="button" onClick={openAnalyticsSettings}>アクセス解析設定</button>
+        <button type="button" onClick={openFeedback}>感想・不具合を送る</button>
         <a href="/third-party-notices.html" target="_blank" rel="noopener noreferrer">ライセンス</a>
         <a href="https://x.com/pulbase" target="_blank" rel="noopener noreferrer">お問い合わせ：X @pulbase</a>
         <span>特定商取引法に基づく表記は有料化前に公開予定</span>
