@@ -8,7 +8,7 @@
 
 `実装:自動` のラベル付与 → Codex実装 → AppによるPR作成 → 必須CIと独立Codexレビュー → 同じ候補と固定定義を再照合 → developへ自動マージ → 実マージSHAの初回push CI → ci-controlから公開処理を自動起動 → 人のstaging承認1回 → Worker/Pages公開1回・HTTP/ブラウザ回帰1回。
 
-ラベルなしのIssueはチャットから手元実装する。担当ラベルを併用せず、同じIssueでPRを重複作成しない。失敗時は停止し、修正PRで対応する。古いhead/base・証跡の再実行・候補差替えを強制的に通さない。進行中の古い公開待ちがあれば、公開せず終了させて最新の対象を確認する。
+ラベルなしのIssueはチャットから手元実装する。担当ラベルを併用せず、同じIssueでPRを重複作成しない。失敗時は停止し、修正PRで対応する。古いhead/base・証跡の再実行・候補差替えを強制的に通さない。新しいdevelopが出ると、公開前の古いstaging承認待ちは[自動整理](staging-workflow-cancellation.md)する。公開中や確認できない実行は変更しない。
 
 [自動マージの信頼条件と運用](develop-auto-merge.md)、[固定された検証公開処理](staging-live-release.md)、[運用確認手順](staging-operation-check.md)を参照する。
 
@@ -21,7 +21,7 @@
 | PULBASE_CODEX_ENABLED | true | 自動実装・レビューの受付 |
 | PULBASE_DEVELOP_AUTO_MERGE_ENABLED | true | 現行のdevelop自動マージ |
 | PULBASE_CONTROL_EVIDENCE_ENABLED | true | 実マージCIからの検証公開起動 |
-| PULBASE_CONTROL_EVIDENCE_SHA | 2c883a1cdd961510a0557742f74294739752f445 | 人が確認した固定制御SHA |
+| PULBASE_CONTROL_EVIDENCE_SHA | 人が配置・確認した40桁のci-control SHA | 人が確認した固定制御SHA。通常のアプリ変更では更新しない |
 | PULBASE_PRODUCTION_ENABLED | false | 未接続の本番経路の無効化。保持する |
 | PULBASE_RELEASE_APP_ID | 5405029 | 未接続の本番用App。保持する |
 
