@@ -72,8 +72,11 @@ function assertRun(run, workflowId) {
 async function waiting(api, runId) {
   const jobs = complete(await api('actions/runs/' + runId + '/jobs?filter=latest&per_page=100'), 'jobs');
   const prepare = jobs.find(j => j.name === 'prepare'), stage = jobs.find(j => j.name === 'staging');
+  // GitHub fills started_at when creating a waiting job, before approval.
+  // Actual execution is excluded by its state, runner assignment and steps.
   need(jobs.length === 2 && prepare?.status === 'completed' && prepare.conclusion === 'success'
-    && stage?.status === 'waiting' && stage.started_at === null && Array.isArray(stage.steps) && stage.steps.length === 0, 'not-unstarted-approval');
+    && stage?.status === 'waiting' && stage.conclusion === null && stage.runner_id === null && stage.runner_name === null
+    && Array.isArray(stage.steps) && stage.steps.length === 0, 'not-unstarted-approval');
   const pending = await api('actions/runs/' + runId + '/pending_deployments');
   need(Array.isArray(pending) && pending.length === 1 && pending[0].environment?.name === 'staging'
     && pending[0].reviewers?.length === 1 && pending[0].reviewers[0].type === 'User'

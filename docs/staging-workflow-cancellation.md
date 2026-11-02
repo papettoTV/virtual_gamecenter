@@ -9,7 +9,7 @@
 `ci/stale-staging-runs.mjs` は、次の条件をすべて確認したrunだけを対象にする。
 
 - 同じリポジトリの `postmerge-staging.yml`、ci-controlブランチ、初回workflow_dispatch実行。
-- prepareが成功し、stagingジョブが人の承認待ちで、runner・stepがまだ始まっていない。承認者はpapettoTV、環境はstagingだけ。
+- prepareが成功し、stagingジョブが人の承認待ちで、runner未割当・stepなし・conclusion未設定。承認者はpapettoTV、環境はstagingだけ。GitHubはこの段階でもstarted_atを設定するため、その日時だけで開始済みとは判定しない。
 - そのrunから発行された小さな承認成果物に、run ID・制御SHA・対象アプリSHA・初回成功CI・manifestの識別子がそろっている。ZIPはメモリ内で1つのJSONだけ読み、展開先へファイルを作らない。
 - 対象アプリSHAが最新developの厳密な祖先。同じSHAの重複実行は対象外。
 - 固定制御SHAが現在のci-controlと一致する。旧制御版の場合は現在版の祖先であり、公開前に読み込む固定ガードとworkflowのGit blobがすべて同じである。
