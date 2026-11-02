@@ -27,7 +27,9 @@ async function navigateGuest(page, url, reload = false) {
     && response.frame() === page.mainFrame());
   if (reload) await page.reload({ waitUntil: 'domcontentloaded' });
   else await page.goto(url, { waitUntil: 'domcontentloaded' });
-  await expect(page).toHaveURL(url);
+  const canonicalUrl = new URL(url);
+  canonicalUrl.searchParams.delete('start');
+  await expect(page).toHaveURL(canonicalUrl.href);
   expect(await page.evaluate(() => performance.timeOrigin)).not.toBe(previousDocument);
   expect(await page.evaluate(() => document.readyState)).not.toBe('loading');
   const response = await loaded;
