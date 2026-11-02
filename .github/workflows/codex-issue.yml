@@ -112,7 +112,7 @@ jobs:
           script: |
             const { assertAutomaticAssignment } = await import(`${process.env.GITHUB_WORKSPACE}/ci/issue-routing.mjs`);
             await assertAutomaticAssignment({ github, repo: context.repo, issueNumber: process.env.ISSUE_NUMBER, exceptPullNumber: process.env.PULL_NUMBER ? Number(process.env.PULL_NUMBER) : undefined });
-      - name: Validate and publish text patch without executing candidate code
+      - name: Validate and publish text patch and PNG/JPEG assets without executing candidate code
         id: publish
         env:
           CODEX_RESULT: ${{ needs.implement.outputs.result }}

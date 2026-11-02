@@ -21,6 +21,7 @@ export function allowedPath(path) {
   return /^apps\/web\/src\/.+\.(?:ts|tsx|js|jsx|mjs|css|json|svg)$/.test(path)
     || /^apps\/web\/tests\/.+\.(?:ts|tsx|js|jsx|mjs|css|json|html|svg)$/.test(path)
     || /^apps\/web\/public\/.+\.(?:js|mjs|css|json|html|svg|txt)$/.test(path)
+    || /^apps\/web\/public\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_-]+\.(?:png|jpg|jpeg)$/.test(path)
     || path === 'apps/web/index.html'
     || /^docs\/.+\.md$/.test(path);
 }

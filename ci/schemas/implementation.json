@@ -1,1 +1,1 @@
-{"type":"object","properties":{"summary":{"type":"string"},"patch":{"type":"string"}},"required":["summary","patch"],"additionalProperties":false}
+{"type":"object","properties":{"summary":{"type":"string"},"patch":{"type":"string"},"assets":{"type":"array","items":{"type":"object","properties":{"path":{"type":"string"},"url":{"type":"string"},"sha256":{"type":"string"}},"required":["path","url","sha256"],"additionalProperties":false}}},"required":["summary","patch","assets"],"additionalProperties":false}
