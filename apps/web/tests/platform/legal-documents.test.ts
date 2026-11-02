@@ -25,6 +25,13 @@ describe("free beta legal documents", () => {
     expect(terms).toContain("責任を全部免除するものではありません");
   });
 
+  it("does not restrict free beta participation by age or residence and keeps guardian guidance", () => {
+    expect(terms).not.toMatch(/18歳以上|日本国内|国内限定|居住地域による制限/);
+    expect(terms).toContain("未成年の方は保護者と利用条件を確認し、法令上必要な場合は同意を得て利用してください");
+    expect(terms).toContain("実名や連絡先等を公開名に設定しないことをおすすめします");
+    expect(terms).toContain("他の利用者がリアルタイムでプレイを観戦できます");
+  });
+
   it("discloses stored email, analytics and deletion limitations without inventing retention", () => {
     for (const text of ["メールアドレスも取得・保存", "Google Analytics 4", "閲覧URL", "Cloudflare", "Stripe", "vgc_device", "最大5年", "削除から1年", "ログアウトだけでは"]) {
       expect(privacy).toContain(text);
