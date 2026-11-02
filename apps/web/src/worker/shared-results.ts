@@ -1,3 +1,4 @@
+import { socialImageMetadata } from "./social-image";
 import { getGameDefinition } from "../domain/game";
 import type { SharedResult, SharedResultDraft } from "../domain/shared-result";
 import { getPlayerIdentity } from "./platform";
@@ -158,7 +159,6 @@ export function renderResultMetadata(result: SharedResult, origin: string): stri
   const title = `${game?.title ?? result.gameId} | ${presentation.headline} | PULBASE`;
   const description = `${result.playerName} · ${presentation.details.join(" · ")}`;
   const canonical = new URL(`/results/${result.id}`, base.origin).href;
-  const image = new URL(`/results/${result.id}/image.png`, base.origin).href;
   return `<title>${escapeHtml(title)}</title>
 <meta name="description" content="${escapeHtml(description)}">
 <link rel="canonical" href="${escapeHtml(canonical)}">
@@ -167,11 +167,10 @@ export function renderResultMetadata(result: SharedResult, origin: string): stri
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="PULBASE">
 <meta property="og:url" content="${escapeHtml(canonical)}">
-<meta property="og:image" content="${escapeHtml(image)}">
+${socialImageMetadata(result.gameId, base.origin)}
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${escapeHtml(title)}">
-<meta name="twitter:description" content="${escapeHtml(description)}">
-<meta name="twitter:image" content="${escapeHtml(image)}">`;
+<meta name="twitter:description" content="${escapeHtml(description)}">`;
 }
 
 export function rewriteResultPage(shell: Response, result: SharedResult, origin: string): Response {
