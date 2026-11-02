@@ -11,7 +11,7 @@ describe("live URL metadata", () => {
     expect(html).toContain("開始前・終了後");
     expect(html).not.toContain("private-attribution");
     expect(html.match(/property="og:title"/g)).toHaveLength(1);
-    expect(html).toContain("/share/live/deep-sea-salvage/image.png");
+    expect(html).toContain("/social/deep-sea-salvage-ogp-v2.jpg");
     expect(response.headers.has("etag")).toBe(false);
   });
   it("generates an actual PNG for live invitations", async () => {
