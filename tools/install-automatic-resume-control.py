@@ -17,17 +17,17 @@ import warnings
 import zipfile
 
 REPO = '/repos/papettoTV/virtual_gamecenter'
-BASE = 'b0d2ff949dfb5ea3470a8ec943bfad9e55e2f89c'
+BASE = '8e2fc0128bc53c20626c81f44e1187c8de38d641'
 MAIN = '73cb5d9267c56f06f9f1150327ec6b8b3caa2bb9'
 APP = 5405029
 BUNDLE_DIGEST = 'PACKAGED_BUNDLE_DIGEST'
 APPLY_RULE_VERSION = None  # Pin only after the sole human-managed App bypass is verified.
-STRICT_RULE_VERSION = '2026-10-31T10:35:45.400Z'
+STRICT_RULE_VERSION = '2026-10-31T21:38:03.915Z'
 MAIN_RULE_VERSION = '2026-10-21T20:32:35.191Z'
 MANIFEST = 'automatic-resume-installation.json'
-FILES = {'ci/control/review-trust.mjs', 'ci/control/review-trust.json', 'ci/production-candidate/policy.json', 'ci/control/toolchain/browser/regression.spec.mjs', 'ci/control/fixed-process.mjs', 'ci/control/fixed-staging-operations.mjs', 'ci/control/postmerge-runner.mjs'}
+FILES = {'ci/control/review-trust.mjs', 'ci/control/review-trust.json', 'ci/production-candidate/policy.json'}
 SHA = re.compile(r'^[a-f0-9]{40}$')
-MESSAGE = 'ci: 固定ブラウザ回帰の失敗診断3件だけを更新（公開なし）'
+MESSAGE = 'ci: PNG/JPEG素材対応の信頼定義3件を更新（公開なし）'
 
 
 class Stop(RuntimeError):
