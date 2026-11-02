@@ -7,7 +7,7 @@
     "AGENTS.md": "462572401ca3b44d2998f26e4855bde6b5130fb7",
     ".github/workflows/codex-pr.yml": "6f3d33fc65ee2d455c024b64c1d920a269180c78",
     ".github/workflows/web-checks.yml": "763279dcfa7478db4f31b7849f509d4eb6259522",
-    "ci/prompts/review.md": "be546cb6db4235148ac31fa80827796fe1a6d52f",
+    "ci/prompts/review.md": "7100ebb0587dde89452c8dd16a0fb2fa4da1d177",
     "ci/schemas/review.json": "7fdca2655ec7103d6886bc64d11a0c5db1690657",
     "ci/review-receipt.mjs": "8100fe44e4c7b7c8e85183d70951b93d05c2cc9b",
     "ci/github.mjs": "236fbeef56c074603eec0d2c95b278baab78aa1b",
