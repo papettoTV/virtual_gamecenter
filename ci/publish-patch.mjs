@@ -4,6 +4,7 @@ import { assertChanges, assertIssueNumber, assertSha } from './policy.mjs';
 import { PublicationStopped, publicationFailure, validatePublicationResult } from './publication-result.mjs';
 import {assertResumeSnapshot} from './automatic-resume.mjs';
 import {assertAutomaticIssue} from './issue-routing.mjs';
+import {prepareImageAssets,writeImage,imagePath} from './image-assets.mjs';
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8', maxBuffer: 1024 * 1024 }).trim();
 try {
   const text = await readFile(process.env.RESULT_FILE, 'utf8');
@@ -24,6 +25,12 @@ try {
     if(git('ls-remote','origin',`refs/heads/codex/issue-${issue}`).split(/\s/)[0]!==pr.head.sha)throw Error('Remote branch moved');
   };
   validatePublicationResult(result);
+  // Download in the trusted runner with no GitHub credentials forwarded. Validate
+  // all bytes before writing any asset; signed redirect URLs are never logged.
+  let assets;
+  try { assets=await prepareImageAssets(result.assets??[]); } catch {
+    throw new PublicationStopped('invalid_result', '画像素材の取得・容量・形式・SHA-256照合に失敗しました。PRは作成していません。');
+  }
   if(pull){
     recheck();git('fetch','--no-tags','origin',base);
     if(git('rev-parse',`${base}^1`)!==trustedBase||git('rev-parse',`${base}^2`)!==process.env.PR_HEAD_SHA)throw Error('Merge parents changed');
@@ -35,8 +42,12 @@ try {
   }else if(base!==trustedBase)throw Error('Untrusted base without an existing PR');
   await writeFile(process.env.PATCH_FILE, result.patch);
   try {
-    git('apply', '--index', '--check', process.env.PATCH_FILE);
-    git('apply', '--index', process.env.PATCH_FILE);
+    if(result.patch.trim()){
+      git('apply', '--index', '--check', process.env.PATCH_FILE);
+      git('apply', '--index', process.env.PATCH_FILE);
+    }
+    if(git('diff','--cached','--name-only','-z').split('\0').some(imagePath))throw Error('Images must use the asset manifest');
+    for(const asset of assets){await writeImage(process.cwd(),asset.path,asset.bytes);git('add','--',asset.path);}
   } catch {
     throw new PublicationStopped('invalid_patch', '差分を指定のベースに安全に適用できませんでした。PRは作成していません。');
   }
@@ -48,7 +59,7 @@ try {
   }
   const raw = git('diff', '--cached', '--raw', '--no-abbrev');
   if (raw.split('\n').some(line => !/^:(?:000000|100644) (?:000000|100644) /.test(line))) {
-    throw new PublicationStopped('invalid_patch', '実行可能ファイル・シンボリックリンクは許可していません。通常の非実行テキストファイルだけが対象です。PRは作成していません。');
+    throw new PublicationStopped('invalid_patch', '実行可能ファイル・シンボリックリンクは許可していません。通常の非実行テキスト・検証済みPNG/JPEGだけが対象です。PRは作成していません。');
   }
   const branch = `codex/issue-${issue}`;
   git('checkout', '-b', branch);

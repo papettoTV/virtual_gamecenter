@@ -1,3 +1,4 @@
+import {assetPlan} from './image-assets.mjs';
 export class PublicationStopped extends Error {
   constructor(code, reason) {
     super(reason);
@@ -11,7 +12,10 @@ export function validatePublicationResult(result) {
     || result.patch.includes('GIT binary patch')) {
     throw new PublicationStopped('invalid_result', '自動実装の出力形式・サイズが不正です。PRは作成していません。');
   }
-  if (!result.patch.trim()) {
+  try { assetPlan(result.assets); } catch {
+    throw new PublicationStopped('invalid_result', '画像素材一覧の保存先・取得URL・ハッシュ・件数が不正です。PRは作成していません。');
+  }
+  if (!result.patch.trim() && !(result.assets?.length)) {
     throw new PublicationStopped('no_patch', `実装候補の差分が返されなかったため停止しました。PRは作成していません。\n\n実装側の説明：\n${result.summary || '説明は返されませんでした。'}`);
   }
   return result;
