@@ -4,6 +4,42 @@ import { resolve } from 'node:path';
 import { parseDocument } from 'yaml';
 import assert from 'node:assert/strict';
 const root = fileURLToPath(new URL('../', import.meta.url));
+// The existing required check remains the final gate, including skipped/cancelled matrix jobs.
+export function checkWebWorkflow(web) {
+  assert.ok(!JSON.stringify(web).includes('secrets.'));
+  assert.deepEqual(web.permissions, {contents: 'read'});
+  assert.deepEqual(web.jobs.verify.needs, ['unit', 'ui']);
+  assert.equal(web.jobs.verify.if, 'always()');
+  assert.deepEqual(web.jobs.ui.strategy.matrix, {project: ['desktop', 'mobile']});
+  assert.equal(web.jobs.ui.strategy['fail-fast'], false);
+  assert.equal(web.jobs.ui.needs, undefined);
+  assert.equal(web.jobs.unit.needs, undefined);
+  for (const job of Object.values(web.jobs)) {
+    assert.equal(job.environment, undefined);
+    assert.equal(job['continue-on-error'], undefined);
+    for (const step of job.steps ?? []) {
+      assert.equal(step['continue-on-error'], undefined);
+      if (step.uses) assert.match(step.uses, /@[a-f0-9]{40}$/);
+    }
+  }
+  const unit = web.jobs.unit.steps;
+  assert.ok(unit.some(s => s.run === 'npm test'));
+  assert.ok(unit.some(s => s.run?.includes('for iteration in 1 2 3')));
+  const ui = web.jobs.ui.steps.find(s => s.run?.includes('test --config ci/ui-local.config.mjs'));
+  assert.equal(ui.run, 'node ci/node_modules/@playwright/test/cli.js test --config ci/ui-local.config.mjs --project=${{ matrix.project }} --reporter=list,blob');
+  const steps = web.jobs.verify.steps;
+  const gate = steps.findIndex(s => s.env?.UNIT_RESULT);
+  assert.ok(gate > 0);
+  assert.equal(steps[gate].if, 'always()');
+  assert.deepEqual(steps[gate].env, {UNIT_RESULT: '${{ needs.unit.result }}', UI_RESULT: '${{ needs.ui.result }}'});
+  assert.equal(steps[gate].run, 'test "$UNIT_RESULT" = success && test "$UI_RESULT" = success');
+  const build = steps.findIndex(s => s.run === 'npm run build:${PULBASE_TARGET_ENVIRONMENT}');
+  const pack = steps.findIndex(s => s.run === 'node ci/staging-artifact.mjs');
+  assert.ok(build > gate && pack > build);
+  assert.equal(steps[build].if, undefined);
+  assert.equal(steps[pack].if, "env.PULBASE_TARGET_ENVIRONMENT == 'staging'");
+  assert.ok(steps.some(s => s.with?.name === 'ui-evidence-${{ github.sha }}-${{ github.run_attempt }}' && s.if === 'always()'));
+}
 export async function checkWorkflows() {
   const entries = [];
   for (const directory of ['.github/workflows', '.github/workflow-templates']) {
@@ -49,8 +85,7 @@ export async function checkWorkflows() {
   assert.ok(!JSON.stringify(develop).includes('secrets.'));
   assert.ok(develop.jobs.retired.steps.some(step => step.run?.includes('exit 1')));
   const web = entries.find(item => item.file === 'web-checks.yml').data;
-  assert.ok(!JSON.stringify(web).includes('secrets.'));
-  assert.ok(JSON.stringify(web.jobs.verify).includes('staging-artifact.mjs'));
+  checkWebWorkflow(web);
 
   const release = entries.find(item => item.file === 'production-release.yml.disabled').data;
   assert.match(release.jobs.prepare.if, /PULBASE_PRODUCTION_ENABLED/);

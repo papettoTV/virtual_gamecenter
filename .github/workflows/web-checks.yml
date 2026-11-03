@@ -10,11 +10,11 @@ concurrency:
   group: web-checks-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  verify:
+  unit:
     env:
       PULBASE_TARGET_ENVIRONMENT: ${{ (github.base_ref == 'main' || github.ref_name == 'main') && 'production' || 'staging' }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 5
     defaults:
       run:
         working-directory: apps/web
@@ -34,6 +34,37 @@ jobs:
         run: |
           printf '%s\n' 'BASIC_AUTH_USERNAME=ci-example' 'BASIC_AUTH_PASSWORD=ci-example' 'GOOGLE_CLIENT_ID=ci-example.apps.googleusercontent.com' 'GOOGLE_CLIENT_SECRET=ci-example' 'STRIPE_SECRET_KEY=sk_test_ci_example' 'STRIPE_WEBHOOK_SECRET=whsec_ci_example' > .dev.vars
       - run: npm test
+      - name: Verify DOT WAVE integration stability without retries
+        run: |
+          for iteration in 1 2 3; do
+            echo "DOT WAVE stability run $iteration/3"
+            npm run test:dot-wave
+          done
+
+  ui:
+    name: UI (${{ matrix.project }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [desktop, mobile]
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+      - name: Configure disposable local test credentials
+        run: |
+          printf '%s\n' 'BASIC_AUTH_USERNAME=ci-example' 'BASIC_AUTH_PASSWORD=ci-example' 'GOOGLE_CLIENT_ID=ci-example.apps.googleusercontent.com' 'GOOGLE_CLIENT_SECRET=ci-example' 'STRIPE_SECRET_KEY=sk_test_ci_example' 'STRIPE_WEBHOOK_SECRET=whsec_ci_example' > .dev.vars
       - name: UI受け入れケースを探索（ローカル環境だけ）
         id: ui
         working-directory: .
@@ -47,13 +78,74 @@ jobs:
       - name: ローカルUI受け入れ検査（実サービス・本番データを使用しない）
         if: steps.ui.outputs.enabled == 'true'
         working-directory: .
-        run: node ci/node_modules/@playwright/test/cli.js test --config ci/ui-local.config.mjs
-      - name: UIレポートが成果物対象のフォルダにあることを確認
-        if: steps.ui.outputs.enabled == 'true'
+        env:
+          PLAYWRIGHT_BLOB_OUTPUT_FILE: ${{ github.workspace }}/ci/ui-results/blob/${{ matrix.project }}.zip
+        run: node ci/node_modules/@playwright/test/cli.js test --config ci/ui-local.config.mjs --project=${{ matrix.project }} --reporter=list,blob
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: ui-part-${{ github.sha }}-${{ github.run_attempt }}-${{ matrix.project }}
+          path: |
+            ci/ui-results/discovery.json
+            ci/ui-results/blob/*.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  verify:
+    needs: [unit, ui]
+    if: always()
+    env:
+      PULBASE_TARGET_ENVIRONMENT: ${{ (github.base_ref == 'main' || github.ref_name == 'main') && 'production' || 'staging' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+      - name: Check Pages branch and environment mapping
+        run: npm run pages:target:check -- "$PULBASE_TARGET_ENVIRONMENT"
+      - name: UIの固定依存を準備
         working-directory: .
+        run: npm ci --ignore-scripts --prefix ci
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        if: always()
+        with:
+          pattern: ui-part-${{ github.sha }}-${{ github.run_attempt }}-*
+          path: ci/ui-parts
+      - name: 同じ検査定義のPC・スマホ証跡だけを統合
+        if: always()
+        working-directory: .
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_FILE: ${{ github.workspace }}/ci/ui-results/report.json
+          PLAYWRIGHT_HTML_OUTPUT_DIR: ${{ github.workspace }}/ci/ui-results/html
         run: |
-          test -s ci/ui-results/report.json
-          test -s ci/ui-results/html/index.html
+          node --input-type=module <<'JS'
+          import {readFile,mkdir,copyFile,readdir} from 'node:fs/promises';
+          import assert from 'node:assert/strict';
+          const root='ci/ui-parts', prefix=`ui-part-${process.env.GITHUB_SHA}-${process.env.GITHUB_RUN_ATTEMPT}-`;
+          assert.deepEqual((await readdir(root)).sort(),['desktop','mobile'].map(p=>prefix+p));
+          const parts=await Promise.all(['desktop','mobile'].map(p=>readFile(`${root}/${prefix}${p}/discovery.json`,'utf8')));
+          assert.equal(parts[0],parts[1],'PCとスマホの検査定義が不一致です');
+          const discovery=JSON.parse(parts[0]);
+          assert.equal(discovery.required,discovery.files.length>0);
+          await mkdir('ci/ui-results/blob',{recursive:true});
+          await copyFile(`${root}/${prefix}desktop/discovery.json`,'ci/ui-results/discovery.json');
+          if(discovery.required)for(const p of ['desktop','mobile'])await copyFile(`${root}/${prefix}${p}/blob/${p}.zip`,`ci/ui-results/blob/${p}.zip`);
+          JS
+          if test -f ci/ui-results/blob/desktop.zip; then
+            node ci/node_modules/@playwright/test/cli.js merge-reports --reporter=json,html ci/ui-results/blob
+            test -s ci/ui-results/report.json
+            test -s ci/ui-results/html/index.html
+          fi
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
@@ -61,12 +153,12 @@ jobs:
           path: ci/ui-results
           if-no-files-found: error
           retention-days: 7
-      - name: Verify DOT WAVE integration stability without retries
-        run: |
-          for iteration in 1 2 3; do
-            echo "DOT WAVE stability run $iteration/3"
-            npm run test:dot-wave
-          done
+      - name: 単体検査とPC・スマホ検査の全成功を必須にする
+        if: always()
+        env:
+          UNIT_RESULT: ${{ needs.unit.result }}
+          UI_RESULT: ${{ needs.ui.result }}
+        run: test "$UNIT_RESULT" = success && test "$UI_RESULT" = success
       - name: Build for the target environment without deploying
         env:
           PULBASE_RELEASE_SHA: ${{ github.sha }}
