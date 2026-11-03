@@ -297,7 +297,12 @@ export function mountGame(context: GameContext): GameInstance {
     }
   }
 
-  function isCompactCanvas() { const rect = canvas.getBoundingClientRect(); return rect.height > rect.width * 1.2; }
+  function isCompactCanvas() {
+    // A contained image shows the entire world even inside a portrait element.
+    if (getComputedStyle(canvas).objectFit === "contain") return false;
+    const rect = canvas.getBoundingClientRect();
+    return rect.height > rect.width * 1.2;
+  }
   function horizontalBounds(): [number, number] { return isCompactCanvas() ? [325, 635] : [42, W - 42]; }
 
   scope.listen(window, "keydown", (event) => {

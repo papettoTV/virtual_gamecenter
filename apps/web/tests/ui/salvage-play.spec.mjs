@@ -81,6 +81,12 @@ test('salvage: book isolation, canvas cancellation, authorized duplicate start a
     const status = await screen.locator('#salvage-status').boundingBox();
     expect(status.y).toBeGreaterThanOrEqual(0);
     expect(status.y + status.height).toBeLessThanOrEqual(viewport.height);
+    expect(status.width).toBeGreaterThan(viewport.width - 50);
+    const pause = await screen.locator('#touch-pause').boundingBox();
+    const collection = await screen.locator('#touch-collection').boundingBox();
+    expect(pause.y).toBeGreaterThanOrEqual(status.y + status.height);
+    expect(collection.width).toBeGreaterThanOrEqual(44);
+    expect(collection.height).toBeGreaterThanOrEqual(44);
     const canvas = await screen.locator('#game').boundingBox();
     expect(canvas.width).toBeGreaterThan(0); expect(canvas.height).toBeGreaterThan(0);
     await info.attach(`salvage-${viewport.width}`, { body: await page.screenshot(), contentType: 'image/png' });
