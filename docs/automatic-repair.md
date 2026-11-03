@@ -30,16 +30,21 @@ developへのマージ後は、固定CI成果物・SHA/ハッシュ照合 → st
 既存PR #125/#129/#131/#133へ、最終CIと信頼定義の人用配置・strict再固定が済んでから改善PRのdevelop反映で自動照合する。必要な既存対象は `実装:再開` でも同じ経路を起動できる。Issue #134は4件の実行証跡を確認するまで完了扱いにしない。
 
 
-## 人用配置と設定更新
+## 人用配置と保守操作の一括実行
 
-`tools/package-automatic-resume-control.py` でレビュー済みの信頼定義3件と固定した親SHA・全34ファイル一覧・ZIPハッシュをまとめる。人用の配置ツールは次の順に処理する。
+`python3 tools/package-automatic-resume-control.py 出力先 --human-maintenance` でレビュー済みの信頼定義3件と固定した親SHA・全34ファイル一覧・ZIPハッシュをまとめる。管理端末で `--maintain ZIP` を実行すると、次の処理をまとめて行う。
 
-1. 管理端末で、人が保管するpulbase-releaseのPEMを使って3件だけを配置する。取得する一時トークンはContents writeだけで、終了時に失効する。
-2. ツールが待機したら、人がGitHub画面で一時bypassを削除・保存する。ツールは保護ルールを変更しない。
-3. `strict` と入力し、管理端末専用のFine-grained PATを非表示で入力する。対象はvirtual_gamecenterだけ、Variables write・Environments write・Administration readだけ（Metadata readは自動付与）。Contents/Workflows/Actions/Deployments/Secretsへの権限は追加しない。GitHubのEnvironments write自体は環境設定変更も可能なので、この認証をAI・GitHub Secret・Keychain・共有端末へ渡さず、人の管理端末でだけ使用する。
-4. ツールはbypassが空であることを省略されていない管理者API応答で確認する。配置commitの親・全ファイル、mainの固定SHA/保護、stagingの必須承認・ci-control限定を再確認する。
-5. 配置SHAとbypass削除後の設定版から `PULBASE_CONTROL_EVIDENCE_SHA` とstagingの `PULBASE_CONTROL_RULE_VERSIONS` を生成し、既存値を照合してから更新する。保存後は両方と保護条件を再読取する。値の手入力は不要。
+1. 人が確認欄へ `ci-control` と入力し、管理端末専用のFine-grained PATとpulbase-releaseのPEMパスを非表示で入力する。認証値は保存・引数渡し・環境変数・ログ出力をしない。
+2. 現在のbypass空・固定した保護設定版・2変数・mainの固定SHA/保護・stagingの承認/ブランチ制限・元の全34ファイルを確認する。
+3. 非秘密の復旧記録を保存してから、ci-controlのルール25676153にpulbase-release（App ID 5405029）だけのAlways allowを追加する。対象・Active・禁止ルールは変更しない。
+4. 人の鍵からContents writeだけの一時Appトークンを取得し、信頼定義3件だけを配置、他31件を保持する。一時トークンは処理終了時に失効する。
+5. 成功・失敗・Ctrl-Cのいずれでもbypass削除を試み、空を読み返す。別のAppや保護ルール変更を検出した場合は上書きせず停止する。
+6. 配置commitの親と全ファイルを検査し、削除後の設定版から `PULBASE_CONTROL_EVIDENCE_SHA` とstagingの `PULBASE_CONTROL_RULE_VERSIONS` を生成、更新、読み返す。main保護・staging承認条件も再検査する。配置失敗で元のSHAのままなら、SHAを維持して削除後のstrict設定版だけを復帰する。
 
-通常は `--apply-and-configure ZIP` を使う。配置成功時には鍵やトークンを含まない `.receipt.json` をZIPの隣へ保存する。設定更新中の失敗・中断からは **再配置せず** `--finish ZIP` で再確認する。片方だけ保存された場合も、元の値または今回の値に一致するときだけ残りを更新する。別の値・別の配置・bypass残存・APIによる未確認は停止し、ロールバックや書込の自動再試行を行わない。
+管理端末専用PATはvirtual_gamecenterだけを対象に、**Administration write・Variables write・Environments write**を付ける（Metadata readは自動付与）。Contents/Workflows/Actions/Deployments/SecretsやAccountの権限は追加しない。GitHubのAdministration writeは保護ルール全般、Environments writeは環境設定も変更可能なので、AI用PATやAppへ追加せず、人の保管庫と管理端末だけで扱う。ツールのAPI書込フィルタは、ci-controlのルール1件のbypass（空またはpulbase-releaseだけ）と2変数、Appによる配置3ファイルに限定する。mainルール・承認API・Secret・main/develop refは書込対象外。
 
-設定用PATはプロセス内だけで使用し、保存・引数渡し・環境変数・ログ出力をしない。初回に管理用認証の準備は必要だが、以後の配置では2変数のコピー＆ペーストを行わない。配置ツールはworkflow起動・承認・main/develop更新・本番公開を行わない。
+正常時はbypassの画面操作も2変数のコピー＆ペーストも不要。staging公開時の人の承認は1回のまま維持する。配置ツールはworkflowを起動しない。
+
+通信断で削除を確認できない、強制終了や電源断でfinallyが動かない場合は、完了扱いにせず **再配置せず** `--cleanup ZIP` を管理端末で実行する。ツールはZIPの隣の `.maintenance.json` を読み、同じ対象のbypass削除とstrict・変数の再確認だけを行い、再配置や追加のbypass付与をしない。通信自体が復旧しなければ、最後の手段としてGitHub画面でpulbase-releaseだけを削除する。`.maintenance.json` / `.receipt.json` は鍵・トークンを含まない。復旧時に一時Appトークンの失効を証明できなければ、その点を結果へ明示する。
+
+旧 `--apply` / `--apply-and-configure` は手動bypass方式、`--finish` は配置済み記録から2変数だけを更新する互換モードとして残す。いずれも設定の削除や認可検査の省略を行わない。

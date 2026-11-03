@@ -222,6 +222,204 @@ class ConfigurationTests(unittest.TestCase):
             self.assertFalse(M.configuration_permitted(method, path, body))
 
 
+class MaintenanceFixture(ConfigurationFixture):
+    def __init__(self):
+        super().__init__()
+        self.ref = M.BASE
+        self.rule.update(name='ci-control-human-managed', updated_at=M.STRICT_RULE_VERSION)
+        self.put_number = 0
+        self.drop_add_response = False
+        self.fail_cleanup = False
+        self.states = []
+
+    def api(self, method, path, auth=None, body=None):
+        assert M.maintenance_permitted(method, path, body), (method, path)
+        if method == 'PUT':
+            self.calls.append((method, path, body))
+            if self.fail_cleanup and not body['bypass_actors']:
+                return 503, None
+            self.put_number += 1
+            self.rule.update(bypass_actors=json.loads(json.dumps(body['bypass_actors'])),
+                             updated_at=f'2026-11-04T00:00:0{self.put_number}.000Z')
+            if self.drop_add_response and body['bypass_actors']:
+                raise RuntimeError('NEVER_PRINT_RAW_CREDENTIAL')
+            return 200, json.loads(json.dumps(self.rule))
+        if method == 'GET' and path == M.CONTROL_RULE:
+            self.calls.append((method, path, body))
+            self.mutate(method, path, body)
+            return 200, json.loads(json.dumps(self.rule))
+        if method == 'GET' and '/git/commits/' in path and M.BASE in path:
+            self.calls.append((method, path, body))
+            return 200, {'tree': {'sha': 'b' * 40}, 'parents': []}
+        if method == 'GET' and '/git/trees/' + 'b' * 40 in path:
+            self.calls.append((method, path, body))
+            return 200, self.tree(self.baseline)
+        return super().api(method, path, auth, body)
+
+    def app_api(self, method, path, auth=None, body=None):
+        if method == 'GET' and path == M.CONTROL_RULE:
+            return self.api(method, path, auth, body)
+        # The contents-only App credential cannot update rules or variables.
+        if method == 'PATCH' and path.endswith('/git/refs/heads/ci-control'):
+            assert M.permitted(method, path, body)
+            self.calls.append((method, path, body))
+            self.ref = body['sha']
+            return 200, {'ref': 'refs/heads/ci-control', 'object': {'sha': self.ref}}
+        return Fixture.api(self, method, path, auth, body)
+
+
+class MaintenanceTests(unittest.TestCase):
+    def run_maintenance(self, f):
+        return M.maintain(f.data, f.baseline, 'fake-jwt', 'fake-human-token', api=f.api,
+                          app_api=f.app_api, checkpoint=lambda state: f.states.append(json.loads(json.dumps(state))))
+
+    def test_one_human_command_adds_app_installs_removes_and_updates_variables(self):
+        f = MaintenanceFixture()
+        result = self.run_maintenance(f)
+        self.assertTrue(result['success'], result)
+        self.assertTrue(result['bypassAdded'])
+        self.assertTrue(result['bypassRemoved'])
+        self.assertTrue(result['variablesVerified'])
+        self.assertEqual(f.rule['bypass_actors'], [])
+        self.assertEqual([(m, p) for m, p, b in f.calls if m not in ('GET', 'POST', 'DELETE')], [
+            ('PUT', M.CONTROL_RULE), ('PATCH', M.REPO + '/git/refs/heads/ci-control'),
+            ('PUT', M.CONTROL_RULE), ('PATCH', M.REPOSITORY_VARIABLE), ('PATCH', M.STAGING_VARIABLE)])
+        self.assertTrue(result['installation']['tokenRevoked'])
+        self.assertNotIn('fake-human-token', json.dumps(f.states) + json.dumps(result))
+        self.assertNotIn('fake-jwt', json.dumps(f.states) + json.dumps(result))
+        self.assertFalse(result['deploymentRequested'])
+
+    def test_failed_installation_closes_bypass_and_restores_baseline_strict_variables(self):
+        f = MaintenanceFixture()
+        f.fail = ('POST', M.REPO + '/git/commits')
+        result = self.run_maintenance(f)
+        self.assertFalse(result['success'])
+        self.assertTrue(result['bypassRemoved'])
+        self.assertTrue(result['variablesVerified'], result)
+        self.assertEqual(f.ref, M.BASE)
+        self.assertEqual(f.variables[M.REPOSITORY_VARIABLE]['value'], M.BASE)
+        self.assertEqual(json.loads(f.variables[M.STAGING_VARIABLE]['value'])['ciControl'], f.rule['updated_at'])
+        self.assertFalse(any(m == 'PATCH' and '/git/refs/' in p for m, p, b in f.calls))
+
+    def test_lost_add_response_still_cleans_up_without_repeating_add_or_installing(self):
+        f = MaintenanceFixture()
+        f.drop_add_response = True
+        result = self.run_maintenance(f)
+        self.assertFalse(result['success'])
+        self.assertTrue(result['bypassRemoved'])
+        self.assertTrue(result['variablesVerified'])
+        self.assertEqual(f.put_number, 2)
+        self.assertNotIn('NEVER_PRINT_RAW_CREDENTIAL', json.dumps(result))
+        self.assertFalse(any(m == 'POST' for m, p, b in f.calls))
+
+    def test_ctrl_c_after_add_still_cleans_up(self):
+        f = MaintenanceFixture()
+        def cancelled(*args, **kwargs):
+            raise KeyboardInterrupt()
+        with patch.object(M, 'apply', side_effect=cancelled):
+            result = self.run_maintenance(f)
+        self.assertFalse(result['success'])
+        self.assertTrue(result['bypassRemoved'])
+        self.assertTrue(result['variablesVerified'])
+
+    def test_cleanup_failure_stops_variables_and_can_be_recovered_without_reinstall(self):
+        f = MaintenanceFixture()
+        f.fail_cleanup = True
+        result = self.run_maintenance(f)
+        self.assertFalse(result['success'])
+        self.assertTrue(result['cleanupRequired'])
+        self.assertFalse(result['variablesVerified'])
+        self.assertEqual(f.variables[M.REPOSITORY_VARIABLE]['value'], M.BASE)
+        f.fail_cleanup = False
+        f.calls.clear()
+        recovered = M.cleanup_maintenance(f.data, f.baseline, 'fake-human-token', f.states[-1], api=f.api)
+        self.assertTrue(recovered['success'], recovered)
+        self.assertEqual(f.rule['bypass_actors'], [])
+        self.assertFalse(any(m in ('POST', 'DELETE') or '/git/refs/' in p for m, p, b in f.calls))
+
+    def test_state_must_be_persisted_before_opening_bypass(self):
+        f = MaintenanceFixture()
+        def disk_full(state):
+            raise OSError('DO_NOT_PRINT_RAW_PATH')
+        result = M.maintain(f.data, f.baseline, 'fake-jwt', 'fake-human-token', api=f.api,
+                            app_api=f.app_api, checkpoint=disk_full)
+        self.assertFalse(result['success'])
+        self.assertEqual(f.rule['bypass_actors'], [])
+        self.assertFalse(any(m != 'GET' for m, p, b in f.calls))
+        self.assertNotIn('DO_NOT_PRINT_RAW_PATH', json.dumps(result))
+
+    def test_start_with_unexpected_bypass_or_variables_refuses_all_writes(self):
+        for target in ('bypass', 'variables'):
+            f = MaintenanceFixture()
+            if target == 'bypass':
+                f.rule['bypass_actors'] = M.APP_BYPASS
+            else:
+                f.variables[M.REPOSITORY_VARIABLE]['value'] = 'f' * 40
+            result = self.run_maintenance(f)
+            self.assertFalse(result['success'])
+            self.assertFalse(any(m != 'GET' for m, p, b in f.calls))
+
+    def test_other_actor_or_protection_change_is_never_overwritten_during_cleanup(self):
+        for change in ('actor', 'rule'):
+            f = MaintenanceFixture()
+            def failed(*args, **kwargs):
+                if change == 'actor':
+                    f.rule['bypass_actors'].append({'actor_id': 123, 'actor_type': 'Integration', 'bypass_mode': 'always'})
+                else:
+                    f.rule['rules'].append({'type': 'extra'})
+                raise RuntimeError('unsafe to continue')
+            with patch.object(M, 'apply', side_effect=failed):
+                result = self.run_maintenance(f)
+            self.assertFalse(result['success'])
+            self.assertTrue(result['cleanupRequired'])
+            self.assertEqual(len([c for c in f.calls if c[0] == 'PUT']), 1)
+            self.assertFalse(any(m == 'PATCH' for m, p, b in f.calls))
+
+    def test_cleanup_is_idempotent_after_success_and_never_readds_bypass(self):
+        f = MaintenanceFixture()
+        self.assertTrue(self.run_maintenance(f)['success'])
+        f.calls.clear()
+        result = M.cleanup_maintenance(f.data, f.baseline, 'fake-human-token', f.states[-1], api=f.api)
+        self.assertTrue(result['success'], result)
+        self.assertTrue(result['installationTokenRevocationConfirmed'])
+        self.assertFalse(any(method != 'GET' for method, path, body in f.calls))
+
+    def test_missing_administration_write_does_not_begin_installation(self):
+        f = MaintenanceFixture()
+        def forbidden(method, path, auth=None, body=None):
+            if method == 'PUT':
+                f.calls.append((method, path, body))
+                return 403, None
+            return f.api(method, path, auth, body)
+        result = M.maintain(f.data, f.baseline, 'fake-jwt', 'fake-human-token', api=forbidden,
+                            app_api=f.app_api, checkpoint=lambda state: f.states.append(state))
+        self.assertFalse(result['success'])
+        self.assertTrue(result['bypassRemoved'])
+        self.assertEqual(f.rule['bypass_actors'], [])
+        self.assertFalse(any(method == 'POST' for method, path, body in f.calls))
+
+    def test_permission_filter_only_allows_one_rule_and_one_app(self):
+        self.assertTrue(M.maintenance_permitted('PUT', M.CONTROL_RULE, {'bypass_actors': M.APP_BYPASS}))
+        self.assertTrue(M.maintenance_permitted('PUT', M.CONTROL_RULE, {'bypass_actors': []}))
+        for path, body in [
+            (M.REPO + '/rulesets/25520943', {'bypass_actors': M.APP_BYPASS}),
+            (M.REPO + '/rulesets/25676153', {'bypass_actors': M.APP_BYPASS, 'enforcement': 'disabled'}),
+            (M.REPO + '/rulesets/25676153', {'bypass_actors': [{'actor_id': 5403155, 'actor_type': 'Integration', 'bypass_mode': 'always'}]}),
+            (M.REPO + '/environments/staging', {}),
+        ]:
+            self.assertFalse(M.maintenance_permitted('PUT', path, body))
+        self.assertFalse(M.permitted('PUT', M.CONTROL_RULE, {'bypass_actors': M.APP_BYPASS}))
+        self.assertFalse(M.configuration_permitted('PUT', M.CONTROL_RULE, {'bypass_actors': M.APP_BYPASS}))
+
+    def test_nonsecret_maintenance_record_is_atomic_and_private(self):
+        with tempfile.TemporaryDirectory() as root:
+            archive = Path(root) / 'bundle.zip'
+            M.save_maintenance_state(archive, {'version': 1, 'stage': 'opening-bypass'})
+            record = M.maintenance_state_path(archive)
+            self.assertEqual(record.stat().st_mode & 0o777, 0o600)
+            self.assertEqual(json.loads(record.read_text())['stage'], 'opening-bypass')
+
+
 class InstallTests(unittest.TestCase):
     def archive(self, mutate=lambda manifest: None):
         f = Fixture()
