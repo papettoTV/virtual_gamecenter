@@ -17,17 +17,17 @@ import warnings
 import zipfile
 
 REPO = '/repos/papettoTV/virtual_gamecenter'
-BASE = '3972989c7144c3cd56bd0149e89f0c7f19e1eefb'
+BASE = '9c58d73893d264407f08268461b16d0464bbe7d5'
 MAIN = '73cb5d9267c56f06f9f1150327ec6b8b3caa2bb9'
 APP = 5405029
 BUNDLE_DIGEST = 'PACKAGED_BUNDLE_DIGEST'
 APPLY_RULE_VERSION = None  # Pin only after the sole human-managed App bypass is verified.
-STRICT_RULE_VERSION = '2026-11-02T05:37:52.031Z'
+STRICT_RULE_VERSION = '2026-11-03T04:24:38.832Z'
 MAIN_RULE_VERSION = '2026-10-21T20:32:35.191Z'
 MANIFEST = 'automatic-resume-installation.json'
 FILES = {'ci/control/review-trust.mjs', 'ci/control/review-trust.json', 'ci/production-candidate/policy.json'}
 SHA = re.compile(r'^[a-f0-9]{40}$')
-MESSAGE = 'ci: CI並列検査の信頼定義3件を更新（公開なし）'
+MESSAGE = 'ci: 自動修正継続の信頼定義3件を更新（公開なし）'
 
 
 class Stop(RuntimeError):
@@ -234,7 +234,7 @@ def main():
         print(json.dumps({'mode': 'plan-only', 'parent': BASE, 'replacedFiles': len(data), 'existingFilesPreserved': len(baseline) - len(data), 'privateKeyUsed': False, 'writeRequested': False}, indent=2))
         return
     need(sys.stdin.isatty(), '配置は人の管理用ターミナルで実行してください。')
-    need(input('CI並列検査の信頼定義3件だけを更新する場合 ci-control と入力: ') == 'ci-control', '中止しました。')
+    need(input('自動修正継続の信頼定義3件だけを更新する場合 ci-control と入力: ') == 'ci-control', '中止しました。')
     with warnings.catch_warnings():
         warnings.simplefilter('error', getpass.GetPassWarning)
         pem = Path(getpass.getpass('人が保管するpulbase-releaseのPEMファイルのパス（非表示）: ')).expanduser().absolute()

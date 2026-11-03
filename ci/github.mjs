@@ -2,8 +2,10 @@ import { assertAutomatedPr, assertChanges, assertIssueNumber, assertSha } from '
 import { publicationFailureText } from './publication-result.mjs';
 import { automaticIssueLabel, issueImplementationMode, assertAutomaticIssue, assertNoIssuePr, assertAutomaticAssignment } from './issue-routing.mjs';
 import {resumeLabel,resumeTarget} from './automatic-resume.mjs';
+import {authorisedTicket} from './repair-ticket.mjs';
+import {readPorts} from './automatic-repair.mjs';
 
-export async function intake({ github, context, core, issueInput, resumeInput, bot }) {
+export async function intake({ github, context, core, issueInput, resumeInput, repairTicket, bot }) {
   const issue_number = assertIssueNumber(issueInput || context.payload.issue?.number);
   const repo = context.repo;
   const { data: issue } = await github.rest.issues.get({ ...repo, issue_number });
@@ -14,8 +16,11 @@ export async function intake({ github, context, core, issueInput, resumeInput, b
     return;
   }
   assertAutomaticIssue(issue);
-  const { data: actor } = await github.rest.repos.getCollaboratorPermissionLevel({ ...repo, username: context.actor });
-  if (!['admin', 'maintain', 'write'].includes(actor.permission)) throw Error('Write access required');
+  const currentBranch = repairTicket?(await github.rest.repos.getBranch({ ...repo, branch: 'develop' })).data:null;
+  const ticket=repairTicket?await authorisedTicket(readPorts(process.env.GH_TOKEN).api,repairTicket,{issue:issue_number,base:assertSha(currentBranch.commit.sha)}):null;
+  if(ticket&&context.eventName!=='workflow_dispatch')throw Error('修正ticketは明示dispatch専用です');
+  if(!ticket){const { data: actor } = await github.rest.repos.getCollaboratorPermissionLevel({ ...repo, username: context.actor });
+  if (!['admin', 'maintain', 'write'].includes(actor.permission)) throw Error('Write access required');}
   if (context.eventName !== 'workflow_dispatch') {
     const { data: author } = await github.rest.repos.getCollaboratorPermissionLevel({ ...repo, username: issue.user.login });
     const labelled = context.payload.action === 'labeled' && [automaticIssueLabel,resumeLabel].includes(context.payload.label?.name);
@@ -24,7 +29,9 @@ export async function intake({ github, context, core, issueInput, resumeInput, b
   const { data: branch } = await github.rest.repos.getBranch({ ...repo, branch: 'develop' });
   const sha = assertSha(branch.commit.sha);
   const resuming=resumeInput==='true'||context.payload.label?.name===resumeLabel;
-  const target=resuming?await resumeTarget({github,repo,issueNumber:issue_number,bot,base:sha}):null;
+  if(ticket&&ticket.base!==sha)throw Error('修正ticketのbaseが変わりました');
+  const target=resuming?await resumeTarget({github,repo,issueNumber:issue_number,bot,base:sha,repair:Boolean(ticket)}):null;
+  if(ticket&&(!target||target.head!==ticket.head||target.pull!==String(ticket.pull)))throw Error('修正ticketのhead/PRが変わりました');
   if(!target)await assertNoIssuePr({ github, repo, issueNumber: issue_number });
   const text = JSON.stringify({ number: issue_number, title: issue.title, body: issue.body ?? '',
     resume:target?{pullNumber:target.pull,existingHead:target.head}:null });
@@ -35,7 +42,9 @@ export async function intake({ github, context, core, issueInput, resumeInput, b
   core.setOutput('trusted_base',sha);
   core.setOutput('pull',target?.pull??'');
   core.setOutput('head',target?.head??'');
-  core.setOutput('request', text);
+  core.setOutput('repair',ticket?'true':'false');
+  core.setOutput('observed_base',target?.observedBase??'');
+  core.setOutput('request',ticket?JSON.stringify({...JSON.parse(text),repair:{round:ticket.round,diagnostics:ticket.diagnostics}}):text);
 }
 
 export async function preparePr({ github, context, core, bot }) {

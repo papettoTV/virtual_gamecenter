@@ -1,0 +1,55 @@
+name: 自動PRの失敗診断と修正継続
+on:
+  workflow_run:
+    workflows: [Web checks, Codex PR verification, Codex issue to PR]
+    types: [completed]
+  push:
+    branches: [develop]
+  issues:
+    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: 既存の自動Issue番号（新PRは作成しない）
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: write
+  issues: write
+concurrency:
+  group: automatic-repair-repository
+  cancel-in-progress: false
+jobs:
+  coordinate:
+    if: >-
+      vars.PULBASE_CODEX_ENABLED == 'true' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'issues' && github.event.label.name == '実装:再開') ||
+       github.event_name == 'push' ||
+       (github.event_name == 'workflow_run' && contains(fromJSON('["failure","success"]'), github.event.workflow_run.conclusion)))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AUTOMATION_BOT: ${{ vars.PULBASE_AUTOMATION_BOT }}
+        with:
+          script: |
+            const { runCoordinator } = await import(`${process.env.GITHUB_WORKSPACE}/ci/automatic-repair.mjs`);
+            await runCoordinator({github,context,core});
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: automatic-repair-${{ github.run_id }}-1
+          path: automatic-repair-result.json
+          if-no-files-found: error
+          retention-days: 7
