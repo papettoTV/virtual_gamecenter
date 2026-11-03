@@ -57,7 +57,7 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 412, height: 915 }
     await expect(pause).toBeVisible();
     await expect(screen.getByRole('button', { name: '通常表示に戻る' })).toHaveCount(0);
     expect(canvas.height).toBeGreaterThan(0);
-    expect(canvas.y).toBeGreaterThanOrEqual((await pause.boundingBox()).y + (await pause.boundingBox()).height);
+    expect(canvas.y).toBeCloseTo((await pause.boundingBox()).y, 0);
     await page.keyboard.press('Escape');
     await expect(screen).not.toHaveAttribute('data-mobile-play');
     expect(await page.evaluate(() => document.body.style.position)).not.toBe('fixed');
@@ -91,7 +91,8 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }
     await expect(panel).toContainText('未選択（解析停止中）');
     const pause = screen.locator('#touch-pause');
     const rect = await pause.boundingBox();
-    expect(rect.x + rect.width).toBeGreaterThan(viewport.width - 24);
+    const frame = await screen.locator(".game-frame").boundingBox();
+    expect(rect.x + rect.width).toBeCloseTo(frame.x + frame.width, 0);
     expect(rect.y).toBeLessThan(24);
     expect(await pause.evaluate((el, rect) => el === document.elementFromPoint(
       rect.x + rect.width / 2, rect.y + rect.height / 2), rect)).toBe(true);

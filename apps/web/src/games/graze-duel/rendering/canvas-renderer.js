@@ -89,7 +89,7 @@ export function createCanvasRenderer(options) {
       }
     });
 
-    drawPlayerHud(selectedPlayer);
+    if (!frame.mobileHud) drawPlayerHud(selectedPlayer);
     if (frame.versusParticipant || frame.versusSpectator) drawOpponentInfoHud(otherPlayer);
     if (playerIndex === 0) drawBossSpawnHint();
     drawCenterInfo();
@@ -465,6 +465,7 @@ export function createCanvasRenderer(options) {
   }
 
   function drawCenterInfo() {
+    if (frame.mobileHud) return;
     context.fillStyle = "rgba(0,0,0,0.34)";
     roundRect(WIDTH / 2 - 48, 24, 96, 50, 16);
     context.fill();

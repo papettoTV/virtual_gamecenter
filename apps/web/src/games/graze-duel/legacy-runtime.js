@@ -2236,6 +2236,8 @@ export function mountGame(context) {
     updateLiveShareContext();
     if (!touchPause) return;
     touchPause.textContent = waitingForStart ? "ゲーム開始" : paused ? "再開" : "一時停止";
+    touchPause.setAttribute("aria-label", touchPause.textContent);
+    touchPause.dataset.icon = waitingForStart || paused ? "▶" : "Ⅱ";
   }
 
   function getGameDelta(delta) {
@@ -3385,7 +3387,24 @@ export function mountGame(context) {
     if (currentScreen !== "game") return;
     updateRenderStressBullets();
     renderThreeBulletLayer();
+    const mobileHud = Boolean(canvas.closest('[data-mobile-play="true"][data-game-id="graze-duel"]'));
+    if (mobileHud) {
+      const player = players[0];
+      const values = { score: `S ${Math.round(player.score)}`, time: `${Math.floor(elapsedRound)}s`,
+        level: `LV${player.level} ×${player.multiplier.toFixed(1)} / ${player.combo}`, lives: `♥${player.lives}` };
+      for (const [name, value] of Object.entries(values)) {
+        const node = document.querySelector(`[data-buzz-status="${name}"]`);
+        if (node && node.textContent !== value) node.textContent = value;
+        if (node) node.setAttribute("aria-label", name === "score" ? `${player.label} スコア ${Math.round(player.score)}` : name === "lives" ? `残機 ${player.lives}` : value);
+      }
+      const gauge = document.querySelector('[data-buzz-status="gauge"]');
+      if (gauge) {
+        gauge.value = Math.min(1, player.gauge / getAttackCost(player));
+        gauge.setAttribute("aria-valuetext", player.gauge >= getAttackCost(player) ? "AUTO ATTACK" : `GAUGE ${Math.floor(player.gauge)} / ${getAttackCost(player)}`);
+      }
+    }
     canvasRenderer.render({
+      mobileHud,
       players,
       boss,
       opponentBoss,
