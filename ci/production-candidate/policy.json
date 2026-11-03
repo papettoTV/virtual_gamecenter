@@ -5,7 +5,7 @@
   "controlSha": "2c883a1cdd961510a0557742f74294739752f445",
   "mainSha": "73cb5d9267c56f06f9f1150327ec6b8b3caa2bb9",
   "maxAgeMs": 86400000,
-  "reviewPolicyDigest": "b86f749f05ca6ffc54fada5c6719905d6c05ae9e2a0609a1c02fd8f9915f3d52",
+  "reviewPolicyDigest": "9bc9b5c794db50d67cc8c146ea0c85d1468dff46ccbd4bfb1cc9c5f0728ef256",
   "preparationFiles": {
     ".github/workflows/production-preparation.yml": "f2b765c9733f8a894b2752e1008f332da07f27c0",
     "ci/production-preparation.mjs": "ee6b726ab90a1aa6865c7220af1c720283385851",
