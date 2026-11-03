@@ -62,7 +62,7 @@ export function GameScreen({ game }: GameScreenProps) {
           </svg>
         </button>
         <canvas id="game" width="960" height="640" aria-label={`${game.title} game canvas`} />
-        {game.id === "graze-duel" && play.active && play.paused && <button
+        {["graze-duel", "deep-sea-salvage"].includes(game.id) && play.active && play.paused && <button
           className="mobile-play-leave secondary-button"
           type="button"
           onClickCapture={event => { event.stopPropagation(); navigate("/"); }}
@@ -89,7 +89,7 @@ export function GameScreen({ game }: GameScreenProps) {
             <ResultSummaryAction game={game} />
           </div>
           <p id="ranking-status" role="status" />
-          <div className="ranking-registration-section">
+          {game.id !== "deep-sea-salvage" && <div className="ranking-registration-section">
             <h3>ランキング</h3>
             <div className="ranking-form">
               <input id="ranking-name" type="hidden" />
@@ -111,7 +111,7 @@ export function GameScreen({ game }: GameScreenProps) {
             <div className="ranking-submit-list">
               <RankingTable bodyId="ranking-submit-list" label="登録後のスコアランキング" />
             </div>
-          </div>
+          </div>}
           <div className="ranking-next-actions">
             <RetryAction game={game} />
             <button id="ranking-another-game" className="clear-restart-button" type="button" onClickCapture={event => { event.stopPropagation(); navigate("/"); }}>別のゲームを探す</button>
@@ -147,12 +147,12 @@ export function GameScreen({ game }: GameScreenProps) {
       </div>
       <Settings game={game} />
 
-      <section className="ranking-panel">
+      {game.id !== "deep-sea-salvage" && <section className="ranking-panel">
         <div className="ranking-list">
           <h2>スコアランキング</h2>
           <RankingTable bodyId="ranking-list" label="スコアランキング" />
         </div>
-      </section>
+      </section>}
 
       <div className="game-footer-actions">
         <FooterAction game={game} />

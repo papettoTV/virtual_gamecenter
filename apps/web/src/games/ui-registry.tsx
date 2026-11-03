@@ -3,7 +3,7 @@ import type { GameDefinition, GameId } from "../domain/game";
 import { gameHost } from "../game-sdk/game-host";
 import { DebugPanel } from "./graze-duel/ui/DebugPanel";
 import { MochiIntro, MochiSetIntro, MochiResult, MochiTouchAction, MochiSettings, MochiRetryAction } from "./mochi-beat/ui/MochiGameUI";
-import { SalvageResultCollection, SalvageTerrainEditor, SalvageTouchCollection, SalvageEditorAction } from "./deep-sea-salvage/ui/SalvageGameUI";
+import { SalvageIntro, SalvageResultCollection, SalvageTerrainEditor, SalvageTouchCollection, SalvageEditorAction } from "./deep-sea-salvage/ui/SalvageGameUI";
 import "./dot-wave/style.css";
 
 export { DebugPanel };
@@ -52,6 +52,7 @@ const gameUIRegistry: Readonly<Record<GameId, Partial<GameUIConfig>>> = {
   "dot-wave": {},
   "deep-sea-salvage": {
     screenClassName: "salvage-screen",
+    FrameIntro: SalvageIntro,
     debugPanelHidden: true,
     ResultSummaryAction: SalvageResultCollection,
     AfterFrame: SalvageTerrainEditor,

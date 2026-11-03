@@ -617,16 +617,7 @@ export function createRenderer(canvas: HTMLCanvasElement, state: State, queries:
       drawOverlay("LIVE", ["プレイヤーの開始を待っています"]);
       return;
     }
-    const panelX = W / 2 - 300;
-    // Center the instructions between the HUD and the sea surface.
-    const panelY = Math.max(76, (76 + screenY(0) - 154) / 2);
-    ctx.fillStyle = "rgba(0,18,30,.76)"; ctx.strokeStyle = "rgba(123,255,238,.42)"; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.roundRect(panelX, panelY, 600, 154, 18); ctx.fill(); ctx.stroke();
-    ctx.textAlign = "center"; ctx.fillStyle = "#71ffe8"; ctx.font = "900 34px system-ui"; ctx.fillText("深海サルベージ", W / 2, panelY + 43);
-    ctx.fillStyle = "#e9fffc"; ctx.font = "700 16px system-ui";
-    ctx.fillText("魚に近づくと自動で調査", W / 2, panelY + 78);
-    ctx.fillText("WASD / 矢印: 移動　F: 図鑑", W / 2, panelY + 105);
-    ctx.fillStyle = "#ffe48b"; ctx.fillText("P または画面下のボタンで潜航開始", W / 2, panelY + 133); ctx.textAlign = "left";
+    // The accessible HTML intro remains readable at phone sizes.
   }
 
   function oceanPalette(depth: number) {
