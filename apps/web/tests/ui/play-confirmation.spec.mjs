@@ -53,7 +53,62 @@ async function phase(page, game) {
     ? document.querySelector('main.dot-wave[data-phase]')?.dataset.phase
     : (await import('/src/features/sharing/share-service.ts')).liveSharing.getSnapshot()?.phase, game);
 }
+// Observe real cabinet connections, including connections opened before exit.
+const cabinetSockets = new WeakMap();
+test.beforeEach(async ({ page }) => {
+  const sockets = new Set();
+  cabinetSockets.set(page, sockets);
+  page.on('websocket', socket => {
+    sockets.add(socket);
+    socket.on('close', () => sockets.delete(socket));
+  });
+});
+// Keep real accounting APIs and sockets: this helper only operates existing UI.
+async function leaveToDirectory(page, gameId, selector = null) {
+  const sockets = [...cabinetSockets.get(page)];
+  const dialogs = [];
+  const onDialog = async dialog => { dialogs.push(dialog.message()); await dialog.dismiss(); };
+  page.on('dialog', onDialog);
+  try {
+    if (!selector && gameId !== 'dot-wave') await page.keyboard.press('Escape');
+    const leave = selector ? page.locator(selector)
+      : gameId === 'dot-wave' ? page.getByRole('link', { name: 'ゲーム一覧へ', exact: true })
+      : page.locator('#game-back-to-arcade');
+    await expect(leave).toBeVisible();
+    // Native clicks in one task exercise duplicate input on the same control.
+    await leave.evaluate(button => { button.click(); button.click(); });
+    await expect(page).toHaveURL(`${origin}/`);
+    await expect(page.locator('#game-screen, main.dot-wave')).toHaveCount(0);
+    await expect.poll(() => page.evaluate(async () => (await import('/src/features/sharing/share-service.ts')).liveSharing.getSnapshot())).toBeNull();
+    await expect.poll(() => page.evaluate(() => ({
+      fixed: document.body.style.position === 'fixed',
+      hidden: document.body.style.overflow === 'hidden',
+      inert: document.querySelectorAll('[inert]').length,
+      fullscreen: Boolean(document.fullscreenElement),
+    }))).toEqual({ fixed: false, hidden: false, inert: 0, fullscreen: false });
+    await expect.poll(() => sockets.filter(socket => cabinetSockets.get(page).has(socket)).length).toBe(0);
+    await wallet(page);
+    expect(dialogs).toEqual([]);
+  } finally {
+    page.off('dialog', onDialog);
+  }
+}
 for (const game of games) {
+  test(`${game.id}: unpaid ready exits immediately and another game remains unpaid`, async ({ page }) => {
+    await prepareGuest(page);
+    const balance = await wallet(page);
+    const writes = [];
+    page.on('request', request => {
+      if (request.method() === 'POST' && request.url().includes('/credit-reservations')) writes.push(request.url());
+    });
+    for (const id of [game.id, games[(games.indexOf(game) + 1) % games.length].id]) {
+      await page.goto(`${origin}/cabinets/${randomUUID()}?game=${id}`);
+      await expect.poll(() => phase(page, id)).toBe(id === 'dot-wave' ? 'intro' : 'ready');
+      await leaveToDirectory(page, id);
+      expect(await persistedWallet(page)).toBe(balance);
+      expect(writes).toHaveLength(0);
+    }
+  });
   for (const input of ['primary', 'keyboard']) {
     test(`${game.id}: ${input}, ready, cancel, delayed duplicate and authorized start`, async ({ page, isMobile }, testInfo) => {
       // Only the disposable local guest and the real welcome-credit API are used.
@@ -187,10 +242,6 @@ for (const game of games) {
         await expect.poll(() => phase(page, game.id)).toBe('paused');
         await expect(pause).toHaveText('再開');
         await expect(screen.getByRole('button', { name: '別のゲームをする', exact: true }).filter({ visible: true })).toBeVisible();
-        page.once('dialog', dialog => dialog.dismiss());
-        await screen.locator('.mobile-play-leave').tap();
-        await expect.poll(() => phase(page, game.id)).toBe('paused');
-        await expect(screen).toHaveAttribute('data-mobile-play', 'true');
         await expect(page.locator('.notification-center')).not.toContainText('1クレジットを使用しました。', { timeout: 7000 });
         for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 568 }, { width: 844, height: 390 }]) {
           await page.setViewportSize(viewport);
@@ -210,7 +261,22 @@ for (const game of games) {
         await expect(pause).toHaveText('一時停止');
         await expect(screen.locator('.mobile-play-leave')).toHaveCount(0);
         expect(await wallet(page)).toBe(balance - 1);
+        await pause.tap();
+        await expect.poll(() => phase(page, game.id)).toBe('paused');
       }
+      await test.step('直接退出・連打: 消費済み残高と表示復帰', async () => {
+        await leaveToDirectory(page, game.id, isMobile && game.id === 'graze-duel' ? '.mobile-play-leave' : null);
+        expect(await persistedWallet(page)).toBe(balance - 1);
+        expect(writes.filter(url => url.endsWith('/credit-reservations'))).toHaveLength(1);
+        expect(writes.filter(url => url.endsWith('/capture'))).toHaveLength(1);
+        expect(writes.filter(url => url.endsWith('/release'))).toHaveLength(0);
+        // A new visit must be unpaid and ready; leaving it cannot refund the old run.
+        await page.goto(cabinet);
+        await expect.poll(() => phase(page, game.id)).toBe(ready);
+        await leaveToDirectory(page, game.id);
+        expect(await persistedWallet(page)).toBe(balance - 1);
+        expect(writes.filter(url => url.endsWith('/credit-reservations'))).toHaveLength(1);
+      });
     });
   }
   test(`${game.id}: failed capture keeps play stopped and releases the unused reservation`, async ({ page, isMobile }) => {
@@ -342,6 +408,9 @@ for (const game of games) {
         expect(await persistedWallet(page)).toBe(balance);
         expect(writes).toHaveLength(0);
         if (!occupied) await expect(waiting).toBeVisible();
+        await leaveToDirectory(page, game.id, game.id === 'dot-wave' ? null : '#spectator-game-back');
+        expect(await persistedWallet(page)).toBe(balance);
+        expect(writes).toHaveLength(0);
       } finally {
         if (playerContext) {
           if (player && !player.isClosed()) {
