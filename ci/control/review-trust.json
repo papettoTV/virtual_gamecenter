@@ -1,12 +1,12 @@
 {
   "version": 1,
-  "policyId": "review-trust-2026-11-02-v4",
+  "policyId": "review-trust-2026-11-03-v5",
   "repository": "papettoTV/virtual_gamecenter",
   "maxEvidenceAgeMs": 86400000,
   "files": {
     "AGENTS.md": "462572401ca3b44d2998f26e4855bde6b5130fb7",
     ".github/workflows/codex-pr.yml": "6f3d33fc65ee2d455c024b64c1d920a269180c78",
-    ".github/workflows/web-checks.yml": "763279dcfa7478db4f31b7849f509d4eb6259522",
+    ".github/workflows/web-checks.yml": "ef358ea69424b8fbd37c4a8360dfefece4a9d1eb",
     "ci/prompts/review.md": "7100ebb0587dde89452c8dd16a0fb2fa4da1d177",
     "ci/schemas/review.json": "7fdca2655ec7103d6886bc64d11a0c5db1690657",
     "ci/review-receipt.mjs": "8100fe44e4c7b7c8e85183d70951b93d05c2cc9b",
@@ -15,7 +15,7 @@
     "ci/issue-routing.mjs": "2249309f414984a7a47057e6b869a4c5bec2df95",
     "ci/ci-evidence.mjs": "c9940d6615e1a2a9242a16c835964dedf0064a66",
     "ci/staging-artifact.mjs": "8e7c5c6530f54c82e345b90ad7afd4d83cfda825",
-    "ci/check-workflows.mjs": "087ace871bd5df1a8f2130a59e4dcd9b1c1eb77c",
+    "ci/check-workflows.mjs": "015df64356c1feaf5bce4ac9486ffb7ae13d4b4b",
     "ci/package.json": "7a3095aeb8ef4c236ca8e813313338026775becb",
     "ci/package-lock.json": "f24bd7c4b6bb4de691e9b2ddcc0abffd7a857dff",
     "apps/web/package.json": "f6b9371154eee01a1605c87016faeffe0f0a4237",
