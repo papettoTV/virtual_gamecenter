@@ -414,6 +414,12 @@ p {
   backdrop-filter: blur(8px);
 }
 
+@media (max-width: 1184px) {
+  .salvage-screen .game-share-button {
+    top: max(72px, calc(env(safe-area-inset-top) + 56px));
+  }
+}
+
 .cabinet-copy-status {
   grid-column: 1 / -1;
   min-height: 1.4em;
