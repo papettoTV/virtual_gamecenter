@@ -36,6 +36,7 @@ for (const width of [320, 390, 844, 1184, 1185, 1440]) {
     const dialog = page.getByRole('dialog', { name: '観戦に招待', exact: true });
     await expect(dialog).toBeVisible();
     await expect(profile).toHaveAttribute('aria-expanded', 'false');
+    await expect(dialog.locator('.social-link-card img')).toHaveAttribute('src', /deep-sea-salvage-ogp-v2\.jpg$/);
     await dialog.getByRole('button', { name: '× 閉じる', exact: true }).click();
     await activate(profile);
     await expect(page.getByRole('region', { name: 'プレイヤー情報', exact: true })).toBeVisible();
