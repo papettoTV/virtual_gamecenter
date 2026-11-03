@@ -4,7 +4,7 @@ import { getPausePresentation } from "./pause-presentation";
 import { createCyberCanyonBackground } from "./cyber-canyon-background";
 import { drawPlayerShip } from "./player-ship";
 import { createCanvasBossRenderer } from "./boss-geometry";
-import { sparkFade, sparkTail } from "../graze-sparks";
+import { GRAZE_SPARK_WIDTH, sparkFade, sparkTail } from "../graze-sparks";
 
 export function createCanvasRenderer(options) {
   let { context, getAttackCost, randomRange, createLightningBolt } = options;
@@ -484,7 +484,7 @@ export function createCanvasRenderer(options) {
         const tail = sparkTail(particle);
         context.globalAlpha = sparkFade(particle);
         context.strokeStyle = particle.color;
-        context.lineWidth = 1.2;
+        context.lineWidth = GRAZE_SPARK_WIDTH;
         context.beginPath();
         context.moveTo(tail.x, tail.y);
         context.lineTo(particle.x, particle.y);

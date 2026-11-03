@@ -35,20 +35,34 @@ export function createGrazeAudio() {
     const noise = audio.createBufferSource();
     const filter = audio.createBiquadFilter();
     const gainNode = audio.createGain();
+    const accent = audio.createOscillator();
+    const accentGain = audio.createGain();
+    const intensity = Math.min(24, Math.max(0, combo));
     noise.buffer = grazeNoise;
     filter.type = "bandpass";
-    filter.Q.setValueAtTime(0.7, now);
-    filter.frequency.setValueAtTime(5600, now);
-    filter.frequency.exponentialRampToValueAtTime(2200, now + 0.045);
+    filter.Q.setValueAtTime(0.85, now);
+    filter.frequency.setValueAtTime(4200, now);
+    filter.frequency.exponentialRampToValueAtTime(2000, now + 0.045);
     gainNode.gain.setValueAtTime(0.0001, now);
-    gainNode.gain.exponentialRampToValueAtTime(0.028 + Math.min(combo, 24) * 0.0003, now + 0.002);
+    gainNode.gain.exponentialRampToValueAtTime(0.024 + intensity * 0.0002, now + 0.002);
     gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.055);
     noise.connect(filter);
     filter.connect(gainNode);
     gainNode.connect(audio.destination);
+    accent.type = "sine";
+    accent.frequency.setValueAtTime(1800 + intensity * 12, now);
+    accent.frequency.exponentialRampToValueAtTime(1150 + intensity * 8, now + 0.028);
+    accentGain.gain.setValueAtTime(0.0001, now);
+    accentGain.gain.exponentialRampToValueAtTime(0.022, now + 0.0015);
+    accentGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.075);
+    accent.connect(accentGain);
+    accentGain.connect(audio.destination);
     noise.onended = () => { noise.disconnect(); filter.disconnect(); gainNode.disconnect(); };
+    accent.onended = () => { accent.disconnect(); accentGain.disconnect(); };
     noise.start(now);
     noise.stop(now + 0.06);
+    accent.start(now);
+    accent.stop(now + 0.08);
   }
 
   function playAttackSound(): void {

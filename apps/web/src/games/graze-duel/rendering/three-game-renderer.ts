@@ -1,7 +1,7 @@
 import { createPlayerEffects } from "./three-player-effects";
 import * as THREE from "three";
 import { drawPlayerShip } from "./player-ship";
-import { sparkFade, sparkTail } from "../graze-sparks";
+import { GRAZE_SPARK_WIDTH, sparkFade, sparkTail } from "../graze-sparks";
 import { createBossModels, getBossAppearance, getBossRotation, writeBossPositions, type BossModel } from "./boss-geometry";
 import type {
   BossRenderState,
@@ -441,8 +441,8 @@ function updateParticleVisual(
       const deltaX = point.x - transformedTail.x;
       const deltaY = point.y - transformedTail.y;
       const length = Math.hypot(deltaX, deltaY) || 1;
-      const normalX = -deltaY / length * 0.6 * transform.scale;
-      const normalY = deltaX / length * 0.6 * transform.scale;
+      const normalX = -deltaY / length * GRAZE_SPARK_WIDTH / 2 * transform.scale;
+      const normalY = deltaX / length * GRAZE_SPARK_WIDTH / 2 * transform.scale;
       for (let corner = 0; corner < SPARK_CORNERS.length; corner += 1) {
         const endpoint = SPARK_CORNERS[corner]!;
         const head = endpoint >= 2;
