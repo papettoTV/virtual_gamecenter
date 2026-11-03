@@ -119,6 +119,32 @@ for (const [game, filename] of artwork) {
         });
         await dialog.getByRole('button', { name: 'リンクをコピー', exact: true }).click();
         expect(await page.evaluate(() => window.__copied)).toBe(shareUrl.href);
+        await expect(dialog.getByRole('status')).toHaveText('コピーしました。');
+        await page.evaluate(() => {
+          Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => { throw new Error('Permission denied'); } } });
+        });
+        const copyLink = dialog.getByRole('button', { name: 'リンクをコピー', exact: true });
+        await copyLink.click();
+        await expect(dialog.getByRole('status')).toHaveText('コピーできませんでした。もう一度お試しください。');
+        await expect(copyLink).toBeFocused();
+        await page.evaluate(() => {
+          Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
+          document.addEventListener('copy', event => {
+            const field = document.activeElement;
+            window.__legacyCopy = {
+              text: field.value.substring(field.selectionStart, field.selectionEnd),
+              inDialog: Boolean(field.closest('[role="dialog"]')),
+              inert: Boolean(field.closest('[inert]')),
+            };
+            // Intercept the real copy event so no system clipboard is needed.
+            event.preventDefault();
+          }, { once: true });
+        });
+        await copyLink.click();
+        expect(await page.evaluate(() => window.__legacyCopy)).toEqual({ text: shareUrl.href, inDialog: true, inert: false });
+        await expect(dialog.getByRole('status')).toHaveText('コピーしました。');
+        await expect(copyLink).toBeFocused();
+        await expect(dialog.locator('textarea')).toHaveCount(1);
         await dialog.locator('#share-text').fill('編集した投稿文');
         await dialog.getByRole('button', { name: '共有する', exact: true }).click();
         await expect(dialog.getByRole('status')).toContainText('共有先を選んでください');

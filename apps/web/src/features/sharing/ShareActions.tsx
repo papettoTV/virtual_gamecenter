@@ -103,6 +103,7 @@ export function SharePanel() {
       overlay?.style.setProperty("--share-height", `${viewport?.height ?? window.innerHeight}px`);
       overlay?.style.setProperty("--share-top", `${viewport?.offsetTop ?? 0}px`);
     };
+    window.addEventListener("resize", resize);
     resize(); viewport?.addEventListener("resize", resize); viewport?.addEventListener("scroll", resize);
     const key = (event: KeyboardEvent) => {
       if (event.key === "Escape") { event.preventDefault(); sharePanel.close(); }
@@ -116,6 +117,7 @@ export function SharePanel() {
     document.addEventListener("keydown", key, true);
     return () => {
       document.removeEventListener("keydown", key, true);
+      window.removeEventListener("resize", resize);
       viewport?.removeEventListener("resize", resize); viewport?.removeEventListener("scroll", resize);
       hidden.forEach(({ element, inert }) => { element.inert = inert; });
       document.body.style.overflow = overflow;
@@ -126,6 +128,16 @@ export function SharePanel() {
   const track = (event: "share_target_opened" | "share_link_copied" | "share_native_handoff" | "share_image_saved", channel: string) => recordSharingEvent(event, panel, channel);
   const openTarget = (target: SocialTarget) => {
     window.open(createSocialShareUrl(target, text, panel.url), "_blank", "noopener,noreferrer"); track("share_target_opened", target);
+  };
+  const copy = async (value: string) => {
+    try {
+      await copySharedText(value, "share");
+      if (sharePanel.getSnapshot() !== panel) return;
+      setMessage("コピーしました。");
+      track("share_link_copied", "clipboard");
+    } catch {
+      if (sharePanel.getSnapshot() === panel) setMessage("コピーできませんでした。もう一度お試しください。");
+    }
   };
   const share = async () => {
     if (sharing.current) return;
@@ -158,7 +170,7 @@ export function SharePanel() {
         {(panel.kind === "live" || choosing) && <div className="share-alternatives">
         <div className="share-actions">
           <button type="button" onClick={() => openTarget("facebook")}>Facebookで共有</button><button type="button" onClick={() => openTarget("x")}>Xで共有</button>
-          <button type="button" onClick={() => void copySharedText(`${text}\n${panel.url}`, "share").then(() => track("share_link_copied", "clipboard")).catch(() => {})}>文章とURLをコピー</button>
+          <button type="button" onClick={() => void copy(`${text}\n${panel.url}`)}>文章とURLをコピー</button>
           {image && <button type="button" onClick={() => {
             const url = URL.createObjectURL(image); const link = document.createElement("a"); link.href = url; link.download = image.name; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); track("share_image_saved", "download");
           }}>結果画像を保存</button>}
@@ -171,7 +183,7 @@ export function SharePanel() {
       </div>
       {panel.kind === "result" && <footer className="share-footer">
         <button className="share-primary" type="button" disabled={panel.status !== "ready"} onClick={() => void share()}>共有する</button>
-        <button type="button" disabled={panel.status !== "ready"} onClick={() => void copySharedText(panel.url, "share").then(() => track("share_link_copied", "clipboard")).catch(() => {})}>リンクをコピー</button>
+        <button type="button" disabled={panel.status !== "ready"} onClick={() => void copy(panel.url)}>リンクをコピー</button>
       </footer>}
     </section>
   </div>;
