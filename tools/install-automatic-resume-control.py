@@ -17,12 +17,12 @@ import warnings
 import zipfile
 
 REPO = '/repos/papettoTV/virtual_gamecenter'
-BASE = '9c58d73893d264407f08268461b16d0464bbe7d5'
+BASE = 'd2b6dafd43935e30eae661482ecee166aa76e680'
 MAIN = '73cb5d9267c56f06f9f1150327ec6b8b3caa2bb9'
 APP = 5405029
 BUNDLE_DIGEST = 'PACKAGED_BUNDLE_DIGEST'
 APPLY_RULE_VERSION = None  # Pin only after the sole human-managed App bypass is verified.
-STRICT_RULE_VERSION = '2026-11-03T04:24:38.832Z'
+STRICT_RULE_VERSION = '2026-11-03T11:10:27.241Z'
 MAIN_RULE_VERSION = '2026-10-21T20:32:35.191Z'
 MANIFEST = 'automatic-resume-installation.json'
 FILES = {'ci/control/review-trust.mjs', 'ci/control/review-trust.json', 'ci/production-candidate/policy.json'}
@@ -96,8 +96,8 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-def request(method, path, auth=None, body=None):
-    need(permitted(method, path, body), '対象外のAPI操作を拒否しました。')
+def request(method, path, auth=None, body=None, policy=permitted):
+    need(policy(method, path, body), '対象外のAPI操作を拒否しました。')
     headers = {'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'Content-Type': 'application/json'}
     if auth:
         headers['Authorization'] = 'Bearer ' + auth
@@ -132,26 +132,28 @@ def tree_matches(tree, expected):
          and {x['path']: x['sha'] for x in leaves} == expected, '既存ファイルの変更・削除・想定外ファイルを検出しました。')
 
 
-def guards(api, baseline, applying, token=None):
-    version = APPLY_RULE_VERSION if applying else STRICT_RULE_VERSION
+def guards(api, baseline, applying, token=None, *, revision=BASE, strict_version=STRICT_RULE_VERSION, require_bypass_list=False):
+    version = APPLY_RULE_VERSION if applying else strict_version
     need(isinstance(version, str), '人が確認した一時例外の設定版が未固定です。配置は無効です。')
     rule = ok(api, 'GET', REPO + '/rulesets/25676153', token)
     expected = [{'actor_id': APP, 'actor_type': 'Integration', 'bypass_mode': 'always'}] if applying else []
     # Public/App reads may omit the bypass list. The reviewed exact version is pinned
     # only after the limited owner read has independently checked the complete list.
     need(rule.get('target') == 'branch' and rule.get('enforcement') == 'active' and rule.get('updated_at') == version
+         and (not require_bypass_list or 'bypass_actors' in rule)
          and ('bypass_actors' not in rule or rule['bypass_actors'] == expected)
          and rule.get('conditions', {}).get('ref_name', {}).get('include') == ['refs/heads/ci-control']
          and all(x in ('refs/heads/main', 'refs/heads/develop') for x in rule['conditions']['ref_name'].get('exclude', []))
          and {'creation', 'update', 'deletion', 'non_fast_forward'} <= {x['type'] for x in rule.get('rules', [])}, 'ci-controlの保護・設定版が不一致です。')
     main = ok(api, 'GET', REPO + '/rulesets/25520943', token)
     need(main.get('target') == 'branch' and main.get('enforcement') == 'active' and main.get('updated_at') == MAIN_RULE_VERSION
+         and (not require_bypass_list or 'bypass_actors' in main)
          and ('bypass_actors' not in main or main['bypass_actors'] == [])
          and main.get('conditions', {}).get('ref_name') == {'include': ['refs/heads/main'], 'exclude': []}
          and any(x['type'] == 'update' for x in main.get('rules', [])), 'mainの更新禁止が不一致です。')
     need(ok(api, 'GET', REPO + '/git/ref/heads/main', token)['object']['sha'] == MAIN, 'mainが準備時のSHAから変わりました。')
-    need(ok(api, 'GET', REPO + '/git/ref/heads/ci-control', token)['object']['sha'] == BASE, 'ci-controlが想定の親SHAと不一致です。')
-    tree_matches(ok(api, 'GET', REPO + '/git/trees/' + BASE + '?recursive=1', token), baseline)
+    need(ok(api, 'GET', REPO + '/git/ref/heads/ci-control', token)['object']['sha'] == revision, 'ci-controlが想定のSHAと不一致です。')
+    tree_matches(ok(api, 'GET', REPO + '/git/trees/' + revision + '?recursive=1', token), baseline)
     env = ok(api, 'GET', REPO + '/environments/staging', token)
     reviewers = [x for x in env.get('protection_rules', []) if x.get('type') == 'required_reviewers']
     need(env.get('can_admins_bypass') is False and env.get('deployment_branch_policy') == {'protected_branches': False, 'custom_branch_policies': True}
@@ -225,25 +227,156 @@ def sign(pem):
     return (payload + b'.' + b64(result.stdout)).decode()
 
 
-def main():
-    need(len(sys.argv) == 3 and sys.argv[1] in ('--plan', '--apply'), '使い方: python3 install-automatic-resume-control.py --plan または --apply 配置ZIP')
-    data, baseline = bundle(Path(sys.argv[2]).expanduser().absolute())
-    applying = sys.argv[1] == '--apply'
-    guards(request, baseline, applying)
-    if not applying:
-        print(json.dumps({'mode': 'plan-only', 'parent': BASE, 'replacedFiles': len(data), 'existingFilesPreserved': len(baseline) - len(data), 'privateKeyUsed': False, 'writeRequested': False}, indent=2))
-        return
-    need(sys.stdin.isatty(), '配置は人の管理用ターミナルで実行してください。')
-    need(input('自動修正継続の信頼定義3件だけを更新する場合 ci-control と入力: ') == 'ci-control', '中止しました。')
+
+REPOSITORY_VARIABLE = REPO + '/actions/variables/PULBASE_CONTROL_EVIDENCE_SHA'
+STAGING_VARIABLE = REPO + '/environments/staging/variables/PULBASE_CONTROL_RULE_VERSIONS'
+ISO_VERSION = re.compile(r'^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$')
+
+
+def configuration_permitted(method, path, body):
+    # A separate human credential can only reach these two variable endpoints.
+    # Environment protection, secrets, deployment approvals and refs are never writable.
+    if method == 'GET':
+        return path in (REPOSITORY_VARIABLE, STAGING_VARIABLE) or permitted(method, path, body)
+    if method != 'PATCH' or not isinstance(body, dict) or set(body) != {'name', 'value'}:
+        return False
+    if path == REPOSITORY_VARIABLE:
+        return body['name'] == 'PULBASE_CONTROL_EVIDENCE_SHA' and isinstance(body['value'], str) and bool(SHA.fullmatch(body['value']))
+    if path == STAGING_VARIABLE and body['name'] == 'PULBASE_CONTROL_RULE_VERSIONS':
+        try:
+            value = json.loads(body['value'])
+            return (set(value) == {'ciControl', 'main', 'protectionMode'}
+                    and isinstance(value['ciControl'], str) and bool(ISO_VERSION.fullmatch(value['ciControl']))
+                    and value['main'] == MAIN_RULE_VERSION and value['protectionMode'] == 'strict')
+        except (TypeError, ValueError):
+            return False
+    return False
+
+
+def configuration_request(method, path, auth=None, body=None):
+    return request(method, path, auth, body, policy=configuration_permitted)
+
+
+def strict_configuration_guards(api, token, commit, data, baseline):
+    need(bool(SHA.fullmatch(commit)) and commit != BASE, '配置先のcommitが不正です。')
+    rule = ok(api, 'GET', REPO + '/rulesets/25676153', token)
+    version = rule.get('updated_at', '')
+    need(isinstance(version, str) and bool(ISO_VERSION.fullmatch(version)) and version != APPLY_RULE_VERSION
+         and rule.get('bypass_actors') == [], 'bypassが空であることを管理者読取権限で確認できません。変数は更新しません。')
+    expected_tree = baseline | {p: blob(b) for p, b in data.items()}
+    guards(api, expected_tree, False, token, revision=commit, strict_version=version, require_bypass_list=True)
+    need(ok(api, 'GET', REPO + '/rulesets/25676153', token) == rule, '確認中に保護設定が変わりました。')
+    installed = ok(api, 'GET', REPO + '/git/commits/' + commit, token)
+    need([x.get('sha') for x in installed.get('parents', [])] == [BASE], '配置commitの親が不一致です。')
+    need(bool(SHA.fullmatch(installed.get('tree', {}).get('sha', ''))), '配置treeが不正です。')
+    tree_matches(ok(api, 'GET', REPO + '/git/trees/' + installed['tree']['sha'] + '?recursive=1', token), expected_tree)
+    return {'ciControl': version, 'main': MAIN_RULE_VERSION, 'protectionMode': 'strict'}
+
+
+def variable_value(api, token, path, name):
+    value = ok(api, 'GET', path, token)
+    need(isinstance(value, dict) and value.get('name') == name and isinstance(value.get('value'), str), '既存変数を確認できません。新規作成や代用はしません。')
+    return value['value']
+
+
+def configure(commit, data, baseline, token, api=configuration_request):
+    report = {'mode': 'human-configuration-only', 'commit': commit, 'stage': 'strict-preflight',
+              'variablesVerified': False, 'updatedVariables': [], 'credentialSaved': False,
+              'bypassChanged': False, 'mainRefWriteRequested': False, 'developRefWriteRequested': False,
+              'workflowStarted': False, 'deploymentRequested': False, 'success': False}
+    try:
+        versions = strict_configuration_guards(api, token, commit, data, baseline)
+        paths = [(REPOSITORY_VARIABLE, 'PULBASE_CONTROL_EVIDENCE_SHA', commit),
+                 (STAGING_VARIABLE, 'PULBASE_CONTROL_RULE_VERSIONS', json.dumps(versions, separators=(',', ':')))]
+        # Read BOTH before either write. Never replace an unexpected third-party value.
+        current = [variable_value(api, token, path, name) for path, name, target in paths]
+        need(current[0] in (BASE, commit), '制御SHA変数が想定外です。上書きしません。')
+        old_versions = {'ciControl': STRICT_RULE_VERSION, 'main': MAIN_RULE_VERSION, 'protectionMode': 'strict'}
+        need(json.loads(current[1]) in (old_versions, versions), '保護設定版変数が想定外です。上書きしません。')
+        for index, (path, name, target) in enumerate(paths):
+            report['stage'] = 'update-' + name
+            need(strict_configuration_guards(api, token, commit, data, baseline) == versions, '保護設定版が変わりました。')
+            need(variable_value(api, token, path, name) == current[index], '確認後に変数が変更されました。上書きしません。')
+            matches = current[index] == target if index == 0 else json.loads(current[index]) == versions
+            if not matches:
+                ok(api, 'PATCH', path, token, {'name': name, 'value': target})
+                report['updatedVariables'].append(name)
+            saved = variable_value(api, token, path, name)
+            need(saved == target if index == 0 else json.loads(saved) == versions, '変数の保存値が不一致です。再配置せず--finishで状態を確認してください。')
+        need(strict_configuration_guards(api, token, commit, data, baseline) == versions, '更新後の保護設定が変わりました。')
+        need(variable_value(api, token, REPOSITORY_VARIABLE, paths[0][1]) == commit
+             and json.loads(variable_value(api, token, STAGING_VARIABLE, paths[1][1])) == versions, '最終保存値が不一致です。')
+        report.update(stage='complete', variablesVerified=True, ruleVersions=versions, success=True)
+    except Exception as error:
+        report['stopped'] = True
+        report['reason'] = str(error) if isinstance(error, Stop) else '設定確認で停止しました。認証値・元応答は表示しません。'
+    return report
+
+
+def hidden(prompt):
     with warnings.catch_warnings():
         warnings.simplefilter('error', getpass.GetPassWarning)
-        pem = Path(getpass.getpass('人が保管するpulbase-releaseのPEMファイルのパス（非表示）: ')).expanduser().absolute()
+        return getpass.getpass(prompt)
+
+
+def receipt_path(archive):
+    return archive.with_name(archive.name + '.receipt.json')
+
+
+def save_receipt(archive, result):
+    receipt = {'version': 1, 'bundleDigest': BUNDLE_DIGEST, 'commit': result['commit'],
+               'refUpdated': result['refUpdated'], 'tokenRevoked': result['tokenRevoked']}
+    target = receipt_path(archive)
+    need(not target.is_symlink(), '配置記録のリンクは拒否します。')
+    target.write_text(json.dumps(receipt, indent=2) + '\n')
+    target.chmod(0o600)
+
+
+def finish(archive, data, baseline):
+    receipt = receipt_path(archive)
+    need(receipt.is_file() and not receipt.is_symlink() and receipt.stat().st_size < 2048, '非秘密の配置記録がありません。再配置せずお知らせください。')
+    value = json.loads(receipt.read_text())
+    need(value.get('version') == 1 and value.get('bundleDigest') == BUNDLE_DIGEST
+         and value.get('refUpdated') is True and value.get('tokenRevoked') is True
+         and bool(SHA.fullmatch(value.get('commit', ''))), '配置記録が不正です。')
+    print('GitHub画面でpulbase-releaseの一時bypassを削除・保存し、再読み込み後も空であることを確認してください。')
+    need(input('bypass削除後、2変数を自動更新する場合 strict と入力: ') == 'strict', '設定更新を中止しました。再配置せず--finishで再開できます。')
+    token = hidden('管理端末専用のFine-grained token（非表示・保存なし）: ')
+    need(token.startswith('github_pat_'), '管理端末専用のFine-grained tokenを使用してください。保存はしません。')
+    try:
+        result = configure(value['commit'], data, baseline, token)
+    finally:
+        token = None
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    need(result['success'], '2変数の確認が完了していません。再配置せず、この結果だけお知らせください。')
+
+
+def main():
+    need(len(sys.argv) == 3 and sys.argv[1] in ('--plan', '--apply', '--apply-and-configure', '--finish'),
+         '使い方: python3 install-automatic-resume-control.py --plan / --apply / --apply-and-configure / --finish 配置ZIP')
+    archive = Path(sys.argv[2]).expanduser().absolute()
+    data, baseline = bundle(archive)
+    if sys.argv[1] == '--plan':
+        guards(request, baseline, False)
+        print(json.dumps({'mode': 'plan-only', 'parent': BASE, 'replacedFiles': len(data), 'existingFilesPreserved': len(baseline) - len(data), 'privateKeyUsed': False, 'writeRequested': False}, indent=2))
+        return
+    need(sys.stdin.isatty(), '配置・設定更新は人の管理用ターミナルで実行してください。')
+    if sys.argv[1] == '--finish':
+        finish(archive, data, baseline)
+        return
+    guards(request, baseline, True)
+    need(input('信頼定義3件だけを更新する場合 ci-control と入力: ') == 'ci-control', '中止しました。')
+    pem = Path(hidden('人が保管するpulbase-releaseのPEMファイルのパス（非表示）: ')).expanduser().absolute()
     need(pem.is_file() and not pem.is_symlink() and pem.stat().st_size < 16384, '通常の鍵ファイルではありません。')
     result = apply(data, baseline, sign(pem))
     print(json.dumps(result, ensure_ascii=False, indent=2))
-    print('成功・失敗にかかわらず一時例外を削除してください。workflow起動・変数変更・再実行はまだ行わないでください。')
-    if not result['success']:
-        sys.exit(1)
+    if result['success']:
+        save_receipt(archive, result)
+    need(result['success'], '配置が完了していません。一時例外を削除して結果をお知らせください。')
+    if sys.argv[1] == '--apply-and-configure':
+        finish(archive, data, baseline)
+    else:
+        print('一時例外を削除・保存後、同じZIPを--finishで指定すると2変数を自動更新できます。')
 
 
 if __name__ == '__main__':

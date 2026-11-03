@@ -18,7 +18,7 @@ export async function intake({ github, context, core, issueInput, resumeInput, r
   assertAutomaticIssue(issue);
   const currentBranch = repairTicket?(await github.rest.repos.getBranch({ ...repo, branch: 'develop' })).data:null;
   const ticket=repairTicket?await authorisedTicket(readPorts(process.env.GH_TOKEN).api,repairTicket,{issue:issue_number,base:assertSha(currentBranch.commit.sha)}):null;
-  if(ticket&&context.eventName!=='workflow_dispatch')throw Error('修正ticketは明示dispatch専用です');
+  if(ticket&&(context.eventName!=='workflow_dispatch'||context.actor!=='github-actions[bot]'))throw Error('修正ticketは検証済みActions botのdispatch専用です');
   if(!ticket){const { data: actor } = await github.rest.repos.getCollaboratorPermissionLevel({ ...repo, username: context.actor });
   if (!['admin', 'maintain', 'write'].includes(actor.permission)) throw Error('Write access required');}
   if (context.eventName !== 'workflow_dispatch') {

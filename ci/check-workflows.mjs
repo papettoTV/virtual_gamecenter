@@ -69,6 +69,10 @@ export async function checkWorkflows() {
   assert.equal(issue.jobs.implement.if, "needs.intake.outputs.eligible == 'true'");
   assert.ok(issue.jobs.publish.steps.some(step => step.run === undefined && step.with?.script?.includes('assertAutomaticAssignment')));
   assert.ok(!JSON.stringify(issue).includes('refs/heads/main'));
+  const implementation = issue.jobs.implement.steps.find(step => step.uses?.startsWith('openai/codex-action@'));
+  assert.equal(implementation.with['allow-bots'], "${{ needs.intake.outputs.repair == 'true' && github.actor == 'github-actions[bot]' }}");
+  assert.equal(implementation.with['allow-users'], undefined);
+  assert.equal(implementation.with['allow-bot-users'], undefined);
   const pr = entries.find(item => item.file === 'codex-pr.yml').data;
   assert.deepEqual(pr.on.pull_request.branches, ['develop']);
   for (const name of ['staging', 'regression', 'merge', 'report']) assert.equal(pr.jobs[name], undefined);

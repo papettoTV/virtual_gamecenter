@@ -74,6 +74,154 @@ class Fixture:
         raise AssertionError(path)
 
 
+class ConfigurationFixture(Fixture):
+    def __init__(self):
+        super().__init__()
+        self.ref = 'd' * 40
+        self.rule.update(updated_at='2026-11-04T00:00:00.000Z', bypass_actors=[])
+        self.variables = {
+            M.REPOSITORY_VARIABLE: {'name': 'PULBASE_CONTROL_EVIDENCE_SHA', 'value': M.BASE},
+            M.STAGING_VARIABLE: {'name': 'PULBASE_CONTROL_RULE_VERSIONS', 'value': json.dumps({
+                'ciControl': M.STRICT_RULE_VERSION, 'main': M.MAIN_RULE_VERSION, 'protectionMode': 'strict'})}}
+        self.lose_response = False
+
+    def api(self, method, path, auth=None, body=None):
+        assert M.configuration_permitted(method, path, body), (method, path)
+        if path in self.variables:
+            self.calls.append((method, path, body))
+            self.mutate(method, path, body)
+            if self.fail == (method, path):
+                return 403, None
+            if method == 'GET':
+                return 200, dict(self.variables[path])
+            self.variables[path] = dict(body)
+            if self.lose_response:
+                raise RuntimeError('NEVER_PRINT_TOKEN')
+            return 204, None
+        if method == 'GET' and '/git/commits/' in path:
+            self.calls.append((method, path, body))
+            return 200, {'tree': {'sha': 'c' * 40}, 'parents': [{'sha': M.BASE}]}
+        return super().api(method, path, auth, body)
+
+
+class ConfigurationTests(unittest.TestCase):
+    def configure(self, f):
+        return M.configure(f.ref, f.data, f.baseline, 'fake-never-print', f.api)
+
+    def test_exact_two_variables_updated_and_reread_only_after_strict(self):
+        f = ConfigurationFixture()
+        result = self.configure(f)
+        self.assertTrue(result['success'], result)
+        self.assertEqual(set(result['updatedVariables']), {'PULBASE_CONTROL_EVIDENCE_SHA', 'PULBASE_CONTROL_RULE_VERSIONS'})
+        self.assertEqual([(m, p) for m, p, b in f.calls if m != 'GET'], [
+            ('PATCH', M.REPOSITORY_VARIABLE), ('PATCH', M.STAGING_VARIABLE)])
+        self.assertNotIn('fake-never-print', json.dumps(result))
+        self.assertEqual(f.variables[M.REPOSITORY_VARIABLE]['value'], f.ref)
+        self.assertEqual(json.loads(f.variables[M.STAGING_VARIABLE]['value'])['ciControl'], f.rule['updated_at'])
+        self.assertFalse(result['credentialSaved'])
+        self.assertFalse(result['deploymentRequested'])
+        f.calls.clear()
+        self.assertTrue(self.configure(f)['success'])
+        self.assertFalse(any(m != 'GET' for m, p, b in f.calls))
+
+    def test_bypass_present_or_hidden_stops_before_writes(self):
+        for value in ('present', 'hidden'):
+            f = ConfigurationFixture()
+            if value == 'present':
+                f.rule['bypass_actors'] = [{'actor_id': M.APP}]
+            else:
+                f.rule.pop('bypass_actors')
+            self.assertFalse(self.configure(f)['success'])
+            self.assertFalse(any(m != 'GET' for m, p, b in f.calls))
+
+    def test_unexpected_variable_and_missing_permissions_stop_before_writes(self):
+        for target in (M.REPOSITORY_VARIABLE, M.STAGING_VARIABLE):
+            f = ConfigurationFixture()
+            f.variables[target]['value'] = 'unexpected'
+            self.assertFalse(self.configure(f)['success'])
+            self.assertFalse(any(m != 'GET' for m, p, b in f.calls))
+            f = ConfigurationFixture()
+            f.fail = ('GET', target)
+            self.assertFalse(self.configure(f)['success'])
+            self.assertFalse(any(m != 'GET' for m, p, b in f.calls))
+
+    def test_partial_failure_resumes_without_redeployment(self):
+        f = ConfigurationFixture()
+        f.fail = ('PATCH', M.STAGING_VARIABLE)
+        result = self.configure(f)
+        self.assertFalse(result['success'])
+        self.assertEqual(f.variables[M.REPOSITORY_VARIABLE]['value'], f.ref)
+        f.fail = None
+        f.calls.clear()
+        self.assertTrue(self.configure(f)['success'])
+        self.assertEqual([(m, p) for m, p, b in f.calls if m != 'GET'], [('PATCH', M.STAGING_VARIABLE)])
+
+    def test_ambiguous_write_never_retries_or_leaks_raw_error(self):
+        f = ConfigurationFixture()
+        f.lose_response = True
+        result = self.configure(f)
+        self.assertFalse(result['success'])
+        self.assertNotIn('NEVER_PRINT_TOKEN', json.dumps(result))
+        self.assertEqual(len([c for c in f.calls if c[0] == 'PATCH']), 1)
+        f.lose_response = False
+        self.assertTrue(self.configure(f)['success'])
+
+    def test_concurrent_change_is_not_overwritten(self):
+        f = ConfigurationFixture()
+        reads = 0
+        def mutate(method, path, body):
+            nonlocal reads
+            if method == 'GET' and path == M.REPOSITORY_VARIABLE:
+                reads += 1
+                if reads == 2:
+                    f.variables[path]['value'] = 'f' * 40
+        f.mutate = mutate
+        self.assertFalse(self.configure(f)['success'])
+        self.assertFalse(any(m != 'GET' for m, p, b in f.calls))
+
+    def test_installed_tree_or_staging_change_stops(self):
+        for mutation in ('tree', 'staging', 'main'):
+            f = ConfigurationFixture()
+            original = f.api
+            def api(method, path, auth=None, body=None):
+                code, value = original(method, path, auth, body)
+                if mutation == 'tree' and '/git/trees/' in path and M.BASE not in path:
+                    value['tree'][0]['sha'] = 'f' * 40
+                if mutation == 'staging' and path.endswith('/environments/staging'):
+                    value['can_admins_bypass'] = True
+                if mutation == 'main' and path.endswith('/git/ref/heads/main'):
+                    value['object']['sha'] = 'f' * 40
+                return code, value
+            result = M.configure(f.ref, f.data, f.baseline, 'fake-never-print', api)
+            self.assertFalse(result['success'])
+            self.assertFalse(any(m != 'GET' for m, p, b in f.calls))
+
+    def test_receipt_never_contains_keys_and_rejects_unrevoked_installation(self):
+        f = ConfigurationFixture()
+        with tempfile.TemporaryDirectory() as root:
+            archive = Path(root) / 'fixed.zip'
+            M.save_receipt(archive, {'commit': f.ref, 'refUpdated': True, 'tokenRevoked': False,
+                                     'privateKey': 'NEVER_SAVE', 'token': 'NEVER_SAVE'})
+            self.assertNotIn('NEVER_SAVE', M.receipt_path(archive).read_text())
+            with patch.object(M, 'hidden', side_effect=AssertionError('must not request credentials')):
+                with self.assertRaises(M.Stop):
+                    M.finish(archive, f.data, f.baseline)
+
+    def test_configuration_cannot_write_secrets_approvals_rules_or_other_variables(self):
+        for method, path, body in [
+            ('PATCH', M.REPO + '/rulesets/25676153', {}),
+            ('PUT', M.REPO + '/environments/staging', {}),
+            ('PATCH', M.REPO + '/git/refs/heads/ci-control', {'sha': 'd' * 40, 'force': False}),
+            ('PATCH', M.REPO + '/actions/variables/PULBASE_PRODUCTION_ENABLED', {'name': 'PULBASE_PRODUCTION_ENABLED', 'value': 'true'}),
+            ('PUT', M.REPO + '/environments/staging/secrets/OPENAI_API_KEY', {}),
+            ('POST', M.REPO + '/actions/runs/123/pending_deployments', {}),
+            ('POST', '/app/installations/123/access_tokens', {'permissions': {'variables': 'write'}}),
+            ('DELETE', M.REPOSITORY_VARIABLE, None),
+            ('PATCH', M.STAGING_VARIABLE, {'name': 'PULBASE_CONTROL_RULE_VERSIONS', 'value': json.dumps({'ciControl': '2026-11-04T00:00:00.000Z', 'main': M.MAIN_RULE_VERSION, 'protectionMode': 'maintenance'})}),
+        ]:
+            self.assertFalse(M.configuration_permitted(method, path, body))
+
+
 class InstallTests(unittest.TestCase):
     def archive(self, mutate=lambda manifest: None):
         f = Fixture()
