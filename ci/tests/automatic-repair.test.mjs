@@ -1,5 +1,5 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';
-import {coordinateRepair} from '../automatic-repair.mjs';import {marker} from '../repair-ticket.mjs';
+import {coordinateRepair,repairBatch} from '../automatic-repair.mjs';import {marker} from '../repair-ticket.mjs';
 const repo={owner:'papettoTV',repo:'virtual_gamecenter'},repository='papettoTV/virtual_gamecenter',base='a'.repeat(40),head='b'.repeat(40),bot='pulbase-codex[bot]';
 function fixture(){
  const issue={state:'open',labels:['実装:自動']},pr={number:125,user:{login:bot},state:'open',draft:false,mergeable:false,base:{ref:'develop',sha:'c'.repeat(40),repo:{full_name:repository}},head:{ref:'codex/issue-124',sha:head,repo:{full_name:repository}}};
@@ -43,4 +43,10 @@ test('CI合格イベントでもbaseを取り込んでいなければ同期、�
   const f=fixture();f.options.event.workflow_run.conclusion='success';f.options.diagnostics=async()=>({ready:true,failed:false,entries:[]});f.options.github.rest.repos.compareCommitsWithBasehead=async()=>({data:{merge_base_commit:{sha:included?base:head}}});
   assert.equal((await coordinateRepair(f.options)).status,included?'ignored':'dispatched');assert.equal(f.sent.length,included?0:1);
  }
+});
+
+test('終了済みの旧検証Issueを除外し、1件の受付失敗で他のticketを無効にしない',async()=>{
+ const prs=[43,124,128].map((n,i)=>({number:n+1,head:{ref:`codex/issue-${n}`}})),sent=[],notices=[];
+ const result=await repairBatch(prs,{issue:async n=>({state:n===43?'closed':'open',labels:['実装:自動']}),execute:async n=>{if(n===124)throw Error('protected path');sent.push(n);return {status:'dispatched',issue:n};},notify:async(n,b)=>notices.push(n)});
+ assert.deepEqual(result.map(x=>x.status),['ignored','stopped','dispatched']);assert.deepEqual(sent,[128]);assert.deepEqual(notices,[124]);
 });

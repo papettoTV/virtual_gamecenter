@@ -159,6 +159,9 @@ jobs:
           node ci/publish-patch.mjs
           if [ -z "$PULL_NUMBER" ]; then
             gh pr create --base develop --head "codex/issue-$ISSUE_NUMBER" --title "Issue #$ISSUE_NUMBER の対応" --body-file "$PR_BODY_FILE"
+          else
+            node -e 'const fs=require("fs");fs.writeFileSync(process.env.PR_BODY_FILE+".json",JSON.stringify({body:fs.readFileSync(process.env.PR_BODY_FILE,"utf8")}))'
+            gh api --method PATCH "repos/$GH_REPO/pulls/$PULL_NUMBER" --input "$PR_BODY_FILE.json" > /dev/null
           fi
   failure:
     needs: [intake, implement, publish]

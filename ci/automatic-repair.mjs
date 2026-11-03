@@ -2,7 +2,7 @@
 import {writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import {assertAutomatedPr,assertChanges,assertIssueNumber,assertSha} from './policy.mjs';
-import {assertAutomaticAssignment} from './issue-routing.mjs';
+import {assertAutomaticAssignment,issueImplementationMode} from './issue-routing.mjs';
 import {collectDiagnostics,boundedDiagnostics,safeText} from './repair-diagnostics.mjs';
 import {repairBudget,marker,numericId} from './repair-ticket.mjs';
 const repository='papettoTV/virtual_gamecenter';
@@ -61,6 +61,21 @@ export async function coordinateRepair({github,repo,event,eventName,runId,bot,ac
  await dispatch({issue:String(issue),resume:true,repair_ticket:String(comment.id)});
  return {status:'dispatched',issue,pull:pull.number,head,base,round:budget.round,commentId:comment.id};
 }
+export async function repairBatch(prs,{issue,execute,notify}){
+ const results=[];
+ for(const pr of prs){
+  const number=assertIssueNumber(pr.head.ref.replace('codex/issue-',''));let active=false;
+  try{
+   const current=await issue(number);
+   if(current.state!=='open'||issueImplementationMode(current)!=='automatic'){results.push({status:'ignored',issue:number,reason:'closed-or-manual'});continue;}
+   active=true;results.push(await execute(number));
+  }catch{
+   if(active)try{await notify(number,`PR #${pr.number}の自動修正受付が停止しました。担当・head/base・許可範囲・実行結果を確認してください。他のIssueの修正は継続します。`);}catch{}
+   results.push({status:'stopped',issue:number,pull:pr.number,reason:'target-check-failed'});
+  }
+ }
+ return results;
+}
 export function readPorts(token){
  if(!token)throw Error('読取認証がありません');
  const api=async path=>{
@@ -84,7 +99,8 @@ export async function runCoordinator({github,context,core}){
    const prs=await github.paginate(github.rest.pulls.list,{...context.repo,state:'open',base:'develop',per_page:100});
    const targets=prs.filter(p=>p.user?.login===process.env.AUTOMATION_BOT&&/^codex\/issue-[1-9][0-9]*$/.test(p.head?.ref??''));
    if(targets.length>20)throw Error('同期対象が過大です');
-   result=[];for(const p of targets)result.push(await execute({...context.payload,inputs:{issue:p.head.ref.replace('codex/issue-','')}}));
+   result=await repairBatch(targets,{issue:async n=>(await github.rest.issues.get({...context.repo,issue_number:n})).data,execute:n=>execute({...context.payload,inputs:{issue:String(n)}}),notify:async(n,body)=>github.rest.issues.createComment({...context.repo,issue_number:n,body})});
+   if(result.some(x=>x.status==='stopped'))core.warning('一部の自動修正受付が停止しました。Issueと結果JSONを確認してください。成功した他の受付は維持します。');
   }else result=await execute(context.payload);
   await writeFile('automatic-repair-result.json',JSON.stringify(result,null,2));core.info(JSON.stringify(result));
  }catch(error){
