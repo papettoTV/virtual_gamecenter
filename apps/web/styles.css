@@ -414,6 +414,14 @@ p {
   backdrop-filter: blur(8px);
 }
 
+@media (max-width: 1184px) {
+  .salvage-screen .game-share-button {
+    /* Below the fixed profile and the canvas HUD. Above this width, the
+       centered 1040px frame already leaves room for the profile beside it. */
+    top: max(72px, calc(env(safe-area-inset-top) + 56px));
+  }
+}
+
 .cabinet-copy-status {
   grid-column: 1 / -1;
   min-height: 1.4em;
