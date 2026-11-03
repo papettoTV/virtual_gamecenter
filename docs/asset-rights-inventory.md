@@ -4,13 +4,14 @@
 
 ## 今回の結論と確認範囲
 
-- [全ファイル・ハッシュ・GLB・ビルド照合の記録](public-asset-audit-2026-11-03.json)と[運営者の確認票](asset-rights-owner-review.md)を作成した。確認票のR-01〜06は未回答で、LP-07全体は対応中。
+- [除外前の全ファイル記録](public-asset-audit-2026-11-03.json)と[運営者の確認票](asset-rights-owner-review.md)を作成した。2026-11-03にR-01〜04の確認済み、R-05の8点の保管継続・配布除外、R-06の追加表記不要の回答を受領した。LP-07はPR #120の反映・再確認待ち。
+- 以下の92ファイル・ビルド照合等は除外前の履歴。現在の配布対象は[除外後の記録](public-asset-audit-2026-11-03-after-exclusion.json)を参照。8点は`assets/archive/site-public/`へ内容変更なしで移動し、[保管manifest](../assets/archive/site-public/manifest.json)にサイズ・SHA-256を記録した。GLB26点・図鑑24点・現行デモ2本・固定SNS画像3点は維持する。保管素材と配布素材を合わせた確認範囲は従来通り。
 - public入力は92ファイル、48,467,560 bytes（約46.22 MiB）。画像50点（PNG36/JPEG7/SVG6/ICO1）、GLB26点、MP4 3本、Blender原本3点、JSON4点、README1点、HTML3点、JS1点、配布制御1点。ゲームの見える画面だけでなく未参照ファイルも数えた。
 - ローカルの`npm run build:staging`で91ファイルのバイト一致を確認。残る`.assetsignore`はCloudflare Viteプラグインが`wrangler.json`/`.dev.vars`の除外を追記して再生成する配布制御ファイルであり、素材の差し替えと区別する。追加25パスは生成JS/CSS・index.html・Pagesゲートウェイ等。CDN上の実配信や本番への反映を確認した結果ではない。
 - GLB26点は全て`THREE.GLTFExporter r185`を記録し、JSON内のbuffers/imagesの外部URI・画像参照は0件。これは外部画像ファイル参照の検査であり、メッシュの原作者や参照資料の権利を証明するものではない。モデルmanifestの26パスと対応する。
 - MP4 3本をffprobeで再実査し、H.264映像のみ・音声トラック0本を再確認。既存音声実査台帳のSHA-256とも一致した。Web Audioの合成音は動画内の音声とは別の確認対象。
 - 新しいSNS用JPEG3点を対象へ追加した。#90/#113の技術的な承認・検証を、元素材の権利確認と混同しない。
-- 制作原本3点・制作プレビュー2点・旧BUZZデモ2点・非採用MOCHIアイコン1点の計8点（26,979,762 bytes、約25.73 MiB）がビルドにも含まれる。除外を推奨するが、今回削除・移動・配布設定変更はしない。モデルmanifest・図鑑・provenanceは同じ理由で一括削除しない。
+- 除外前は制作原本3点・制作プレビュー2点・旧BUZZデモ2点・非採用MOCHIアイコン1点の計8点（26,979,762 bytes、約25.73 MiB）がビルドにも含まれていた。R-05承認後、8点だけを非配布アーカイブへ移動した。モデルmanifest・図鑑・provenanceは維持する。
 
 ### 棚卸しの再実行
 
@@ -28,6 +29,8 @@ node --test apps/web/tests/asset-policy.test.mjs
 
 ### 検証記録（2026-11-03）
 
+- R-05反映後：標準`npm test`全1,053件（素材6件を含む）・型検査・`build:staging`・CI制御198件・workflow/template11定義が成功。Blenderスクリプトは構文と保管ルートを確認し、素材の再生成は行わない。
+- 除外後publicは84ファイル・21,488,110 bytes。ビルド83件バイト一致、欠落/変更0件、`.assetsignore`の再生成1件。指定8点がdist/clientに存在しないこと、保管先8点のサイズ/SHA-256が移動前と一致すること、実行時GLB26点・図鑑24点・SNS画像3点が不変であることを確認した。[除外後の照合記録](public-asset-audit-2026-11-03-after-exclusion.json)を参照。以降の箇条書きは除外前の棚卸し時の検証履歴。
 - `npm test`成功：通常Vitest856件とDOT WAVE/モード制限/セキュリティ/復元/解析/公開設定/監視等の標準スイート。公開設定・素材検査は23件、うち素材検査5件（新規3件）。
 - `npm run build:staging`成功（型検査を含む）。既存の500 kB超チャンク警告は残る。生成物をCloudflareへ送信していない。
 - CI制御198件、workflow/template構文検査11件成功。負荷試験ツールの検査やモックは遠隔負荷試験の合格へ読み替えない。
@@ -63,7 +66,9 @@ node --test apps/web/tests/asset-policy.test.mjs
 
 この3本については「含まれる音源が未確認」という残課題は解消。2026-11-03にも同じハッシュと音声0本を再確認した。ただし映像自体・元素材の権利確認とは別であり、`deliverables/`等の宣伝動画に使う音源は未確認のまま。音声付きの宣伝素材を外部公開してよいという判定ではない。動画の稼働中環境でのバイト照合は今回実施していない。
 
-| 素材・パス | 現在分かる制作経路 | 利用・表示 | 残る確認 |
+運営者は下表のR-01〜04相当の確認観点を2026-11-03に確認済みと回答し、R-06は追加表記なしと回答した。下表は対象と観点の記録であり、回答待ちの一覧ではない。追加の出典情報が提供されていないことと、未回答を混同しない。
+
+| 素材・パス | 現在分かる制作経路 | 利用・表示 | 確認観点・継続管理 |
 | --- | --- | --- | --- |
 | ゲームコードとCanvas/WebGL描画：`apps/web/src/games/` | リポジトリ内の実装。ソースコードはルートMIT | プレイ・観戦・キャプチャ | 外部から転用した表現・コードがないか、運営者確認。ゲーム名が既存作品の権利を保証するものではない |
 | BUZZ BARRIERボス：`public/assets/buzz-barrier/bosses/*.png` | 同ディレクトリの`provenance.json`にOpenAI生成・ユーザー承認・切り抜き履歴あり | ゲーム・観戦表示 | 最初の参照画像の権利、利用した生成サービスの条件、第三者との類似性を確認 |
@@ -72,7 +77,7 @@ node --test apps/web/tests/asset-policy.test.mjs
 | 図鑑画像：`public/assets/deep-sea-salvage/encyclopedia/*.png` | Blender撮影用`scripts/render-deep-sea-model-catalog.py`とREADMEあり | ゲーム内図鑑 | 使用モデルの確認に追随 |
 | 背景：`public/assets/showroom/arcade-ambient-v1.jpg` | 隣接JSONにOpenAI生成・プロンプト・用途記録あり | トップ背景 | 運営者による入力素材・利用条件確認 |
 | 現行BUZZデモ：`public/demos/buzz-barrier/boss-demo-v1.{mp4,jpg}` | 隣接JSONに宣伝素材のキャプチャ元・リビジョン・ハッシュを記録。音声トラック0本を実査 | 無音ループ映像。ライブではない | 元ゲーム・元映像の権利に追随 |
-| 旧BUZZデモ：`public/graze-duel-promo.mp4`、`graze-duel-promo-poster.jpg` | 旧デモファイルもpublicに残る。音声トラック0本を実査 | 現行ゲーム定義では未採用でも配布候補 | 出典確認、または公開用ビルドから除外するかを決める |
+| 旧BUZZデモ：`assets/archive/site-public/graze-duel-promo.mp4`、`graze-duel-promo-poster.jpg`（リポジトリルートから） | 旧デモを内容維持で保管。音声トラック0本を実査 | 現行配布から除外 | R-05承認により保管先へ移動。過去の音声監査とのハッシュ照合を維持 |
 | DOT WAVEデモ：`public/dot-wave-promo.mp4`、`dot-wave-promo-poster.jpg` | ファイルとゲーム定義の参照あり。音声トラック0本を実査 | トップ・筐体のデモ | 撮影元・映像の許諾を確認 |
 | ブランド：`public/brand/*` | `deliverables/pulbase-brand-final/`に正本・生成スクリプト・manifestあり。文字とシンボルはパス構成 | ロゴ・favicon・OGP | 作者・素材契約・画像化した文字の利用条件、商標・ドメインの最終確認 |
 | SNS固定画像：`public/social/*-ogp-v2.jpg`（3点） | #90の承認添付3枚と一致。#107で追加、#114でプレビュー定義を共通化 | 観戦/結果URLのOGP・X/FB共有パネル | 見た目の承認は元素材の許諾ではない。ゲーム画像・画像化された文字等の確認に追随。外部SNSでのキャッシュ・再配布を含む用途確認 |
@@ -98,10 +103,10 @@ node --test apps/web/tests/asset-policy.test.mjs
 
 - `deliverables/`、`videos/`にはSNS・宣伝用素材がある。アプリpublicの棚卸しだけで外部公開可能とは判定しない。特にBGM、歓声、生成映像、Xのロゴ等は各provenance・許諾を別途確認する。
 - 比較ロゴ用フォントは`deliverables/pulbase-logo-b/fonts/`にChakra Petch / Space Grotesk / Sora / Rajdhaniと各OFLファイルがある。現行アプリへのWebフォント配布は確認されない。過去のロゴや宣伝素材へ画像化して使った場合も制作元を追跡する。
-- public配下にはBlenderの制作原本・プレビューもある。未参照でもビルドへ複製され得るため、第三者素材を入れてよい領域ではない。公開対象から制作原本・バックアップを分離する運用は残課題。
+- Blender制作原本・プレビューは非配布アーカイブへ分離した。生成スクリプトの保存先も変更し、publicへ戻さない。publicは未参照でもビルドへ複製され得るため、第三者素材を無確認で入れてよい領域ではない。
 
 ## 公開前に埋める記録
 
 各未確認行について、運営者が「作者／制作方法」「入力・参照元」「許諾URL・取得日」「配信・宣伝・改変の可否」「必須表記」「確認者・日付」を記録する。生成履歴だけで権利確認済みとはしない。判断できない素材は差し替え・除外または個別許諾する。
 
-現時点ではLP-07は**対応中**。商標の再調査・権利者の確認や契約条件の判断をこのコード点検で代替しない。
+現時点ではLP-07は**確認待ち**（PR #120の反映・公開候補版の再確認）。運営者回答は受領済みだが、商標の再調査・権利者の確認や契約条件の判断をこのコード点検で代替しない。本番デプロイ・既存CDNキャッシュの削除は実施していない。

@@ -6,6 +6,7 @@ import bpy
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 MODEL_DIR = PROJECT_ROOT / "public" / "assets" / "deep-sea-salvage" / "models"
+ARCHIVE_DIR = PROJECT_ROOT.parents[1] / "assets" / "archive" / "site-public" / "assets" / "deep-sea-salvage" / "models"
 
 
 def clear_scene():
@@ -62,14 +63,15 @@ def add_studio_setup(name: str):
     scene.render.resolution_y = 640
     scene.render.resolution_percentage = 100
     scene.render.image_settings.file_format = "PNG"
-    scene.render.filepath = str(MODEL_DIR / f"{name}-blender-preview.png")
+    scene.render.filepath = str(ARCHIVE_DIR / f"{name}-blender-preview.png")
 
 
 def save_editable_model(name: str):
+    ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
     clear_scene()
     import_model(name)
     add_studio_setup(name)
-    bpy.ops.wm.save_as_mainfile(filepath=str(MODEL_DIR / f"{name}.blend"))
+    bpy.ops.wm.save_as_mainfile(filepath=str(ARCHIVE_DIR / f"{name}.blend"))
     bpy.ops.render.render(write_still=True)
 
 
