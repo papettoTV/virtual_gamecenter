@@ -6,7 +6,7 @@
   "files": {
     "AGENTS.md": "462572401ca3b44d2998f26e4855bde6b5130fb7",
     ".github/workflows/codex-pr.yml": "6f3d33fc65ee2d455c024b64c1d920a269180c78",
-    ".github/workflows/web-checks.yml": "50fc521b36fb79667909033118ed1267b96d733e",
+    ".github/workflows/web-checks.yml": "ef358ea69424b8fbd37c4a8360dfefece4a9d1eb",
     "ci/prompts/review.md": "7100ebb0587dde89452c8dd16a0fb2fa4da1d177",
     "ci/schemas/review.json": "7fdca2655ec7103d6886bc64d11a0c5db1690657",
     "ci/review-receipt.mjs": "8100fe44e4c7b7c8e85183d70951b93d05c2cc9b",
