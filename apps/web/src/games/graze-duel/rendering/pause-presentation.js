@@ -7,7 +7,7 @@ export function getPausePresentation(frame) {
   }
   return {
     action: frame.compact
-      ? frame.waitingForStart ? "画面下の「ゲーム開始」でスタート" : "「再開」ボタンでゲーム再開"
+      ? frame.waitingForStart ? "ゲーム領域をタップしてゲーム開始" : "「再開」ボタンでゲーム再開"
       : frame.waitingForStart ? "Spaceでゲーム開始" : "Spaceで再開",
     instructions: frame.compact
       ? ["移動: ゲーム画面をスライド", "ボス攻撃: 無敵シールドを当てる"]
