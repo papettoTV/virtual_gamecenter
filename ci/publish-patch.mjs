@@ -4,6 +4,7 @@ import { assertChanges, assertIssueNumber, assertSha } from './policy.mjs';
 import { PublicationStopped, publicationFailure, validatePublicationResult } from './publication-result.mjs';
 import {assertResumeSnapshot} from './automatic-resume.mjs';
 import {assertAutomaticIssue} from './issue-routing.mjs';
+import {prepareRepairWorkspace} from './repair-workspace.mjs';
 import {prepareImageAssets,writeImage,imagePath} from './image-assets.mjs';
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8', maxBuffer: 1024 * 1024 }).trim();
 try {
@@ -14,17 +15,18 @@ try {
   }
   const issue = assertIssueNumber(process.env.ISSUE_NUMBER);
   const base = assertSha(process.env.BASE_SHA);
-  const trustedBase=assertSha(process.env.TRUSTED_BASE_SHA||base),pull=process.env.PULL_NUMBER;
+  const trustedBase=assertSha(process.env.TRUSTED_BASE_SHA||base),pull=process.env.PULL_NUMBER,repair=process.env.REPAIR_MODE==='true';
   if (git('rev-parse', 'HEAD') !== trustedBase) throw Error('Unexpected trusted checkout');
   const recheck=()=>{
     if(!pull)return;
     const number=assertIssueNumber(pull),repository='papettoTV/virtual_gamecenter';
     assertAutomaticIssue(JSON.parse(execFileSync('gh',['api',`repos/${repository}/issues/${issue}`],{encoding:'utf8',stdio:['ignore','pipe','pipe']})));
     const pr=JSON.parse(execFileSync('gh',['api',`repos/${repository}/pulls/${number}`],{encoding:'utf8',stdio:['ignore','pipe','pipe']}));
-    assertResumeSnapshot(pr,{issue,pull:number,head:assertSha(process.env.PR_HEAD_SHA),candidate:base,trustedBase,bot:process.env.AUTOMATION_BOT,repository});
+    assertResumeSnapshot(pr,{issue,pull:number,head:assertSha(process.env.PR_HEAD_SHA),candidate:base,trustedBase,bot:process.env.AUTOMATION_BOT,repository,repair,observedBase:process.env.OBSERVED_BASE_SHA});
+    if(repair&&JSON.parse(execFileSync('gh',['api',`repos/${repository}/git/ref/heads/develop`],{encoding:'utf8',stdio:['ignore','pipe','pipe']})).object.sha!==trustedBase)throw Error('develop moved');
     if(git('ls-remote','origin',`refs/heads/codex/issue-${issue}`).split(/\s/)[0]!==pr.head.sha)throw Error('Remote branch moved');
   };
-  validatePublicationResult(result);
+  validatePublicationResult(result,{allowSyncOnly:repair});
   // Download in the trusted runner with no GitHub credentials forwarded. Validate
   // all bytes before writing any asset; signed redirect URLs are never logged.
   let assets;
@@ -33,12 +35,18 @@ try {
   }
   if(pull){
     recheck();git('fetch','--no-tags','origin',base);
-    if(git('rev-parse',`${base}^1`)!==trustedBase||git('rev-parse',`${base}^2`)!==process.env.PR_HEAD_SHA)throw Error('Merge parents changed');
-    assertChanges(git('diff','--name-only','-z',trustedBase,base).split('\0').filter(Boolean).map(filename=>({filename})));
+    if(repair&&!result.patch.trim()&&!assets.length){
+      const contains=git('merge-base',base,trustedBase)===trustedBase;
+      if(contains)throw new PublicationStopped('no_patch','最新developを含む候補に修正差分がありません。追加の同一実行は停止します。');
+    }
+    if(!repair&&(git('rev-parse',`${base}^1`)!==trustedBase||git('rev-parse',`${base}^2`)!==process.env.PR_HEAD_SHA))throw Error('Merge parents changed');
+    const comparison=repair?git('merge-base',trustedBase,base):trustedBase;
+    assertChanges(git('diff','--name-only','-z',comparison,base).split('\0').filter(Boolean).map(filename=>({filename})));
     if(git('diff','--raw','--no-abbrev',trustedBase,base).split('\n').some(line=>line&&!/^:(?:000000|100644) (?:000000|100644) /.test(line)))throw Error('Existing PR has non-regular files');
     // All executable publisher modules were imported from the trusted base before
     // this checkout. Never execute candidate code with the App token present.
     git('checkout','--detach',base);
+    if(repair)prepareRepairWorkspace({head:base,base:trustedBase});
   }else if(base!==trustedBase)throw Error('Untrusted base without an existing PR');
   await writeFile(process.env.PATCH_FILE, result.patch);
   try {
@@ -53,19 +61,23 @@ try {
   }
   const paths = git('diff', '--cached', '--name-only', '-z').split('\0').filter(Boolean);
   try {
-    assertChanges(paths.map(filename => ({ filename })));
+    if(paths.length||!repair)assertChanges(paths.map(filename => ({ filename })));
   } catch {
     throw new PublicationStopped('protected_path', '変更対象に自動実装の許可範囲外のファイルがあります。人による確認が必要です。PRは作成していません。');
   }
   const raw = git('diff', '--cached', '--raw', '--no-abbrev');
-  if (raw.split('\n').some(line => !/^:(?:000000|100644) (?:000000|100644) /.test(line))) {
+  if (raw.split('\n').some(line => line&&!/^:(?:000000|100644) (?:000000|100644) /.test(line))) {
     throw new PublicationStopped('invalid_patch', '実行可能ファイル・シンボリックリンクは許可していません。通常の非実行テキスト・検証済みPNG/JPEGだけが対象です。PRは作成していません。');
   }
   const branch = `codex/issue-${issue}`;
   git('checkout', '-b', branch);
   git('config', 'user.name', 'Pulbase Automation');
   git('config', 'user.email', 'pulbase-automation@users.noreply.github.com');
-  git('commit', '-m', `Issue #${issue} の対応`);
+  if(repair){
+    const final=git('diff','--cached','--name-only','-z',trustedBase).split('\0').filter(Boolean);assertChanges(final.map(filename=>({filename})));
+    for(const filename of git('diff','--cached','--name-only','--diff-filter=ACMR','-z',trustedBase).split('\0').filter(f=>f&&!imagePath(f))){const content=execFileSync('git',['show',`:${filename}`],{encoding:'utf8',maxBuffer:1024*1024});if(/^(?:<{7} |={7}$|>{7} )/m.test(content))throw Error('未解消の競合を公開しません');}
+    const commit=git('-c','core.hooksPath=/dev/null','commit-tree',git('write-tree'),'-p',assertSha(process.env.PR_HEAD_SHA),'-p',trustedBase,'-m',`Issue #${issue} の自動修正・develop同期`);git('reset','--hard',commit);
+  }else git('commit', '-m', `Issue #${issue} の対応`);
   recheck();
   git('push', 'origin', branch);
   await writeFile(process.env.PR_BODY_FILE, `Issue #${issue} の自動実装候補です。\n\n${result.summary}\n\nCloses #${issue}\n\n検証結果はこのPRのチェック・実行証跡を参照してください。本番公開は含みません。\n`);

@@ -53,3 +53,26 @@ test('UIケース探索はspecだけ、シンボリックリンクや過大フ�
   await rm(join(root,'linked.spec.mjs'));await writeFile(join(root,'large.spec.mjs'),'x'.repeat(90001));await assert.rejects(discoverUiTests(root));
  }finally{await rm(root,{recursive:true,force:true});}
 });
+
+test('信頼された修正受付に限り、競合・古いPR baseを隔離修正へ渡す',async()=>{
+ const f=fixture();f.pr.mergeable=false;f.pr.merge_commit_sha=null;f.pr.base.sha='d'.repeat(40);
+ const target=await resumeTarget({github:f.github,repo,issueNumber:82,bot,base,repair:true});
+ assert.equal(target.candidate,head);assert.equal(target.observedBase,'d'.repeat(40));
+ const expected={issue:82,pull:83,head,candidate:head,trustedBase:base,bot,repository,repair:true,observedBase:target.observedBase};
+ assert.equal(assertResumeSnapshot(f.pr,expected),true);
+ assert.throws(()=>assertResumeSnapshot(f.pr,{...expected,observedBase:base}));assert.throws(()=>assertResumeSnapshot(f.pr,{...expected,candidate:base}));
+ f.pr.base.sha=base;assert.equal(assertResumeSnapshot(f.pr,expected),true);
+ await assert.rejects(resumeTarget({github:f.github,repo,issueNumber:82,bot,base}));
+});
+test('発行済みticketの診断と競合snapshotを、権限のない実装エージェントへ渡す',async()=>{
+ const f=fixture();f.pr.mergeable=false;f.pr.merge_commit_sha=null;f.pr.base.sha='d'.repeat(40);f.issue.user={login:'papettoTV'};f.issue.title='修正';f.issue.body='要件';
+ f.github.rest.repos={getCollaboratorPermissionLevel:async()=>{throw Error('botへのユーザー権限付与は不要');},getBranch:async()=>({data:{commit:{sha:base}}})};
+ const beforeFetch=globalThis.fetch,beforeToken=process.env.GH_TOKEN;process.env.GH_TOKEN='test-only';
+ const ticket={version:1,issue:82,pull:83,head,base,round:1,dispatcherRun:41500000000,diagnostics:[{kind:'ui',message:'isMobile is not defined'}]};
+ const comment={user:{login:'github-actions[bot]',type:'Bot'},body:`<!-- pulbase-auto-repair:v1 ${JSON.stringify(ticket)} -->\n開始`,issue_url:'https://api.github.com/repos/papettoTV/virtual_gamecenter/issues/82'};
+ globalThis.fetch=async url=>new Response(JSON.stringify(url.endsWith('/issues/comments/6590000000')?comment:{path:'.github/workflows/automatic-repair.yml',head_sha:base,head_repository:{full_name:repository},event:'workflow_run',run_attempt:1,created_at:new Date().toISOString(),conclusion:null}));
+ try{
+  const outputs={};await intake({github:f.github,context:{repo,actor:'github-actions[bot]',eventName:'workflow_dispatch',payload:{}},core:{setOutput:(k,v)=>outputs[k]=v},issueInput:'82',resumeInput:'true',repairTicket:'6590000000',bot});
+  assert.equal(outputs.repair,'true');assert.equal(outputs.base,head);assert.equal(outputs.trusted_base,base);assert.equal(outputs.observed_base,'d'.repeat(40));assert.equal(JSON.parse(outputs.request).repair.diagnostics[0].message,'isMobile is not defined');
+ }finally{globalThis.fetch=beforeFetch;if(beforeToken===undefined)delete process.env.GH_TOKEN;else process.env.GH_TOKEN=beforeToken;}
+});

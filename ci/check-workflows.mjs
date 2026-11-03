@@ -87,6 +87,17 @@ export async function checkWorkflows() {
   const web = entries.find(item => item.file === 'web-checks.yml').data;
   checkWebWorkflow(web);
 
+  const repair=entries.find(item=>item.file==='automatic-repair.yml').data;
+  assert.deepEqual(repair.permissions,{contents:'read',actions:'write',issues:'write'});
+  assert.equal(repair.concurrency.group,'automatic-repair-repository');
+  assert.equal(repair.concurrency['cancel-in-progress'],false);
+  assert.equal(repair.jobs.coordinate.environment,undefined);
+  assert.ok(!JSON.stringify(repair).includes('secrets.'));
+  assert.equal(repair.jobs.coordinate.steps.find(s=>s.uses?.startsWith('actions/checkout@')).with.ref,'${{ github.sha }}');
+  assert.ok(JSON.stringify(issue.jobs.implement).includes('trusted-repair/repair-workspace.mjs'));
+  assert.ok(JSON.stringify(issue.jobs.publish).includes('REPAIR_MODE'));
+  assert.ok(!issue.jobs.intake.if.includes("github.event.label.name == '実装:再開'"));
+
   const release = entries.find(item => item.file === 'production-release.yml.disabled').data;
   assert.match(release.jobs.prepare.if, /PULBASE_PRODUCTION_ENABLED/);
   assert.equal(release.jobs.prepare.environment, 'release-preflight');
