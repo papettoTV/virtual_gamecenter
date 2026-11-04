@@ -46,7 +46,7 @@ export function createGrazeAudio() {
       const source = audio.createBufferSource();
       const gain = audio.createGain();
       source.buffer = buffer;
-      gain.gain.setValueAtTime(1, audio.currentTime);
+      gain.gain.setValueAtTime(0.4, audio.currentTime);
       source.connect(gain);
       gain.connect(audio.destination);
       grazeVoices.set(source, gain);

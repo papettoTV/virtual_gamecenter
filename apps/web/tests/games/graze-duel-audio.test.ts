@@ -37,7 +37,7 @@ describe("selected U3 graze sound", () => {
     expect(context.createBiquadFilter).not.toHaveBeenCalled();
     expect(sources[0]!.buffer).toBe(buffer);
     expect(sources[0]!.start).toHaveBeenCalledWith(0);
-    expect(gains[0]!.gain.setValueAtTime).toHaveBeenCalledWith(1, 0);
+    expect(gains[0]!.gain.setValueAtTime).toHaveBeenCalledWith(0.4, 0);
     sources[0]!.onended?.();
     expect(sources[0]!.disconnect).toHaveBeenCalledOnce();
     expect(gains[0]!.disconnect).toHaveBeenCalledOnce();

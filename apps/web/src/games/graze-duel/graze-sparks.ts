@@ -7,19 +7,19 @@ export function emitGrazeSparks(particles: MovingParticle[], horizontal: number,
   const direction = Math.atan2(bulletY - vertical, bulletX - horizontal);
   const originX = horizontal + Math.cos(direction) * 14;
   const originY = vertical + Math.sin(direction) * 14;
-  const count = Math.min(5, Math.max(0, limit - particles.length));
+  const count = Math.min(12, Math.max(0, limit - particles.length));
   for (let index = 0; index < count; index += 1) {
-    const angle = direction + index * Math.PI * 2 / 5 + (random() - 0.5) * 0.7;
-    const speed = 160 + random() * 160;
-    const life = 0.22 + random() * 0.16;
+    const angle = direction + index * Math.PI * 2 / 12 + (random() - 0.5) * 0.3;
+    const speed = 320 + random() * 200;
+    const life = 0.32 + random() * 0.18;
     particles.push({
       x: originX,
       y: originY,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
-      color: index % 2 === 0 ? "#fff5da" : "#ffbd73",
+      color: index % 3 === 0 ? "#f4fcff" : index % 3 === 1 ? "#72eaff" : "#ef91ff",
       kind: "spark",
-      length: 8 + random() * 8,
+      length: 24 + random() * 24,
       life,
       maxLife: life,
     });
