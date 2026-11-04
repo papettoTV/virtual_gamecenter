@@ -7,7 +7,7 @@ describe("level-up label", () => {
     const label = createLevelUpLabel(player);
     player.x += 100;
     player.y += 100;
-    expect(label).toEqual({ x: 156, y: 352, level: 12, remaining: 1 });
+    expect(label).toEqual({ x: 156, y: 372, level: 12, remaining: 1 });
     const updated = tickLevelUpLabel(label, 0.4)!;
     expect(updated).toEqual({ ...label, remaining: 0.6 });
     expect(label.remaining).toBe(1);
@@ -20,19 +20,22 @@ describe("level-up label", () => {
     const first = createLevelUpLabel(player);
     const second = createLevelUpLabel({ ...player, x: 240, level: 13 });
     expect(first.level).toBe(12);
-    expect(second).toEqual({ x: 196, y: 352, level: 13, remaining: 1 });
+    expect(second).toEqual({ x: 196, y: 372, level: 13, remaining: 1 });
   });
 
   it("draws thin text within the field and supports the opponent field offset", () => {
     const context = {
-      save: vi.fn(), restore: vi.fn(), measureText: vi.fn(() => ({ width: 80 })), fillText: vi.fn(),
+      save: vi.fn(), restore: vi.fn(), measureText: vi.fn(text => ({ width: text === "LEVEL" ? 50 : 32 })), fillText: vi.fn(),
     } as unknown as CanvasRenderingContext2D;
     drawLevelUpLabel(context, { x: 156, y: 352, level: 12, remaining: 0.5 }, 524, 392, 74, 690);
-    expect(context.fillText).toHaveBeenLastCalledWith("LEVEL 12", 680, 352);
-    expect(context.font).toBe("300 16px system-ui");
+    expect(context.fillText).toHaveBeenNthCalledWith(1, "LEVEL", 635, 352);
+    expect(context.fillText).toHaveBeenNthCalledWith(2, "12", 693, 352);
+    expect(context.font).toBe("300 28px system-ui");
+    expect(context.fillStyle).toBe("rgba(153, 133, 255, 0.9)");
     drawLevelUpLabel(context, { x: 0, y: 20, level: 13, remaining: 1 }, 44, 392, 74, 690);
-    expect(context.fillText).toHaveBeenLastCalledWith("LEVEL 13", 92, 86);
+    expect(context.fillText).toHaveBeenNthCalledWith(3, "LEVEL", 52, 92);
+    expect(context.fillText).toHaveBeenLastCalledWith("13", 110, 92);
     drawLevelUpLabel(context, null, 44, 392, 74, 690);
-    expect(context.fillText).toHaveBeenCalledTimes(2);
+    expect(context.fillText).toHaveBeenCalledTimes(4);
   });
 });

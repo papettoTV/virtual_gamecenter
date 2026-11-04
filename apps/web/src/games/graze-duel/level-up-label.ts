@@ -1,7 +1,7 @@
 export type LevelUpLabel = { x: number; y: number; level: number; remaining: number };
 
 export function createLevelUpLabel(player: { x: number; y: number; fieldX: number; level: number }): LevelUpLabel {
-  return { x: player.x - player.fieldX, y: player.y - 48, level: player.level, remaining: 1 };
+  return { x: player.x - player.fieldX, y: player.y - 28, level: player.level, remaining: 1 };
 }
 
 export function tickLevelUpLabel(label: LevelUpLabel | null | undefined, delta: number): LevelUpLabel | null {
@@ -13,13 +13,20 @@ export function drawLevelUpLabel(context: CanvasRenderingContext2D, label: Level
   if (!label || label.remaining <= 0) return;
   context.save();
   context.font = "300 16px system-ui";
-  context.textAlign = "center";
+  context.textAlign = "left";
   context.textBaseline = "middle";
-  context.fillStyle = "rgba(222, 235, 255, 0.85)";
-  const text = `LEVEL ${label.level}`;
-  const margin = context.measureText(text).width / 2 + 8;
+  context.fillStyle = "rgba(153, 133, 255, 0.9)";
+  const titleWidth = context.measureText("LEVEL").width;
+  const number = String(label.level);
+  context.font = "300 28px system-ui";
+  const totalWidth = titleWidth + 8 + context.measureText(number).width;
+  const margin = totalWidth / 2 + 8;
   const horizontal = Math.max(fieldX + margin, Math.min(fieldX + fieldWidth - margin, fieldX + label.x));
-  const vertical = Math.max(top + 12, Math.min(bottom - 12, label.y));
-  context.fillText(text, horizontal, vertical);
+  const vertical = Math.max(top + 18, Math.min(bottom - 18, label.y));
+  const left = horizontal - totalWidth / 2;
+  context.font = "300 16px system-ui";
+  context.fillText("LEVEL", left, vertical);
+  context.font = "300 28px system-ui";
+  context.fillText(number, left + titleWidth + 8, vertical);
   context.restore();
 }
