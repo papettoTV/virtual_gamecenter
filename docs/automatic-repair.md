@@ -35,7 +35,7 @@ developへのマージ後は、固定CI成果物・SHA/ハッシュ照合 → st
 `python3 tools/package-automatic-resume-control.py 出力先 --human-maintenance` でレビュー済みの信頼定義3件と固定した親SHA・全34ファイル一覧・ZIPハッシュをまとめる。管理端末で `--maintain ZIP` を実行すると、次の処理をまとめて行う。
 
 1. 人が確認欄へ `ci-control` と入力し、管理端末専用のFine-grained PATとpulbase-releaseのPEMパスを非表示で入力する。認証値は保存・引数渡し・環境変数・ログ出力をしない。
-2. 現在のbypass空・固定した保護設定版・2変数・mainの固定SHA/保護・stagingの承認/ブランチ制限・元の全34ファイルを確認する。
+2. 保護APIの設定日時はタイムゾーン付きの同一時刻をUTCミリ秒へ正規化して照合する（タイムゾーンなし・不正形式・ミリ秒未満の精度は受け付けない）。現在のbypass空・固定した保護設定版・2変数・mainの固定SHA/保護・stagingの承認/ブランチ制限・元の全34ファイルを確認する。
 3. 非秘密の復旧記録を保存してから、ci-controlのルール25676153にpulbase-release（App ID 5405029）だけのAlways allowを追加する。対象・Active・禁止ルールは変更しない。
 4. 人の鍵からContents writeだけの一時Appトークンを取得し、信頼定義3件だけを配置、他31件を保持する。一時トークンは処理終了時に失効する。
 5. 成功・失敗・Ctrl-Cのいずれでもbypass削除を試み、空を読み返す。別のAppや保護ルール変更を検出した場合は上書きせず停止する。

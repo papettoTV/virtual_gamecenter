@@ -420,6 +420,51 @@ class MaintenanceTests(unittest.TestCase):
             self.assertEqual(json.loads(record.read_text())['stage'], 'opening-bypass')
 
 
+class RuleTimestampTests(unittest.TestCase):
+    def test_authenticated_japan_offset_passes_complete_maintenance_with_same_instant(self):
+        f = MaintenanceFixture()
+        def offset_api(api):
+            def read(method, path, auth=None, body=None):
+                code, value = api(method, path, auth, body)
+                if path in (M.CONTROL_RULE, M.REPO + '/rulesets/25520943') and isinstance(value, dict):
+                    value = json.loads(json.dumps(value))
+                    instant = M.datetime.fromisoformat(value['updated_at'].replace('Z', '+00:00'))
+                    from datetime import timedelta
+                    value['updated_at'] = instant.astimezone(M.timezone(timedelta(hours=9))).isoformat(timespec='milliseconds')
+                return code, value
+            return read
+        result = M.maintain(f.data, f.baseline, 'fake-jwt', 'fake-human-token',
+                            api=offset_api(f.api), app_api=offset_api(f.app_api),
+                            checkpoint=lambda state: f.states.append(json.loads(json.dumps(state))))
+        self.assertTrue(result['success'], result)
+        self.assertTrue(result['bypassRemoved'])
+        self.assertEqual(json.loads(f.variables[M.STAGING_VARIABLE]['value'])['ciControl'], '2026-11-04T00:00:02.000Z')
+        self.assertEqual(f.rule['bypass_actors'], [])
+
+    def test_changed_timestamp_still_stops_and_names_failed_condition(self):
+        f = MaintenanceFixture()
+        f.rule['updated_at'] = '2026-11-03T20:10:27.242+09:00'
+        result = M.maintain(f.data, f.baseline, 'fake-jwt', 'fake-human-token', api=f.api, app_api=f.app_api)
+        self.assertFalse(result['success'])
+        self.assertIn('設定版', result['reason'])
+        self.assertFalse(any(method != 'GET' for method, path, body in f.calls))
+
+    def test_missing_bypass_is_named_and_not_treated_as_empty(self):
+        f = MaintenanceFixture()
+        f.rule.pop('bypass_actors')
+        result = M.maintain(f.data, f.baseline, 'fake-jwt', 'fake-human-token', api=f.api, app_api=f.app_api)
+        self.assertFalse(result['success'])
+        self.assertIn('bypass一覧の可視性', result['reason'])
+        self.assertFalse(any(method != 'GET' for method, path, body in f.calls))
+
+    def test_no_naive_invalid_or_truncated_timestamp_is_accepted(self):
+        values = ['2026-11-03T11:10:27.241', '2026-11-03T11:10:27.241999Z', '2026-99-03T11:10:27.241Z']
+        for value in values:
+            self.assertEqual(M.canonical_rule_time(value), value)
+        self.assertEqual(M.canonical_rule_time('2026-11-03T20:10:27.241+09:00'), M.STRICT_RULE_VERSION)
+        self.assertNotEqual(M.canonical_rule_time('2026-11-03T20:10:27.242+09:00'), M.STRICT_RULE_VERSION)
+
+
 class InstallTests(unittest.TestCase):
     def archive(self, mutate=lambda manifest: None):
         f = Fixture()

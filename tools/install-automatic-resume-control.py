@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Human-terminal-only replacement of pinned trust and browser regression files. No workflow changes."""
 import base64
+from datetime import datetime, timezone
 import getpass
 import hashlib
 import io
@@ -120,9 +121,23 @@ def request(method, path, auth=None, body=None, policy=permitted):
         raise Stop('GitHubに接続できません。認証・API応答は表示しません。') from None
 
 
+
+def canonical_rule_time(value):
+    # Match equivalent RFC3339 instants, preserving millisecond precision.
+    # Naive/invalid timestamps and finer precision are deliberately not accepted.
+    if not isinstance(value, str) or not re.fullmatch(r'\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?(?:Z|[+-]\d\d:\d\d)', value):
+        return value
+    try:
+        instant = datetime.fromisoformat(value.replace('Z', '+00:00'))
+        return instant.astimezone(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+    except ValueError:
+        return value
+
 def ok(api, method, path, auth=None, body=None):
     code, value = api(method, path, auth, body)
     need(code in (200, 201, 204), 'GitHub API確認に失敗しました（HTTP ' + str(code) + '）。再試行せず状態を確認してください。')
+    if path in (REPO + '/rulesets/25676153', REPO + '/rulesets/25520943') and isinstance(value, dict):
+        value = dict(value, updated_at=canonical_rule_time(value.get('updated_at')))
     return value
 
 
@@ -141,12 +156,16 @@ def guards(api, baseline, applying, token=None, *, revision=BASE, strict_version
     expected = [{'actor_id': APP, 'actor_type': 'Integration', 'bypass_mode': 'always'}] if applying else []
     # Public/App reads may omit the bypass list. The reviewed exact version is pinned
     # only after the limited owner read has independently checked the complete list.
-    need(rule.get('target') == 'branch' and rule.get('enforcement') == 'active' and rule.get('updated_at') == version
-         and (not require_bypass_list or 'bypass_actors' in rule)
-         and ('bypass_actors' not in rule or rule['bypass_actors'] == expected)
-         and rule.get('conditions', {}).get('ref_name', {}).get('include') == ['refs/heads/ci-control']
-         and all(x in ('refs/heads/main', 'refs/heads/develop') for x in rule['conditions']['ref_name'].get('exclude', []))
-         and {'creation', 'update', 'deletion', 'non_fast_forward'} <= {x['type'] for x in rule.get('rules', [])}, 'ci-controlの保護・設定版が不一致です。')
+    checks = {
+        'ブランチルール': rule.get('target') == 'branch',
+        'Active': rule.get('enforcement') == 'active',
+        '設定版': rule.get('updated_at') == version,
+        'bypass一覧の可視性': not require_bypass_list or 'bypass_actors' in rule,
+        'bypass一致': 'bypass_actors' not in rule or rule['bypass_actors'] == expected,
+        '対象ブランチ': rule.get('conditions', {}).get('ref_name', {}).get('include') == ['refs/heads/ci-control'],
+        '除外ブランチ': all(x in ('refs/heads/main', 'refs/heads/develop') for x in rule.get('conditions', {}).get('ref_name', {}).get('exclude', [])),
+        '禁止ルール4件': {'creation', 'update', 'deletion', 'non_fast_forward'} <= {x['type'] for x in rule.get('rules', [])}}
+    need(all(checks.values()), 'ci-controlの保護・設定版が不一致です（不一致: ' + '、'.join(k for k, v in checks.items() if not v) + '）。')
     main = ok(api, 'GET', REPO + '/rulesets/25520943', token)
     need(main.get('target') == 'branch' and main.get('enforcement') == 'active' and main.get('updated_at') == MAIN_RULE_VERSION
          and (not require_bypass_list or 'bypass_actors' in main)
