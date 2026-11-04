@@ -25,16 +25,16 @@ describe("level-up label", () => {
 
   it("draws thin text within the field and supports the opponent field offset", () => {
     const context = {
-      save: vi.fn(), restore: vi.fn(), measureText: vi.fn(text => ({ width: text === "LEVEL" ? 50 : 32 })), fillText: vi.fn(),
+      save: vi.fn(), restore: vi.fn(), measureText: vi.fn(() => ({ width: 50 })), fillText: vi.fn(),
     } as unknown as CanvasRenderingContext2D;
     drawLevelUpLabel(context, { x: 156, y: 352, level: 12, remaining: 0.5 }, 524, 392, 74, 690);
-    expect(context.fillText).toHaveBeenNthCalledWith(1, "LEVEL", 635, 352);
-    expect(context.fillText).toHaveBeenNthCalledWith(2, "12", 693, 352);
-    expect(context.font).toBe("300 28px system-ui");
+    expect(context.fillText).toHaveBeenNthCalledWith(1, "LEVEL", 626, 352);
+    expect(context.fillText).toHaveBeenNthCalledWith(2, "12", 684, 352);
+    expect(context.font).toBe("300 44px system-ui");
     expect(context.fillStyle).toBe("rgba(153, 133, 255, 0.9)");
     drawLevelUpLabel(context, { x: 0, y: 20, level: 13, remaining: 1 }, 44, 392, 74, 690);
-    expect(context.fillText).toHaveBeenNthCalledWith(3, "LEVEL", 52, 92);
-    expect(context.fillText).toHaveBeenLastCalledWith("13", 110, 92);
+    expect(context.fillText).toHaveBeenNthCalledWith(3, "LEVEL", 52, 100);
+    expect(context.fillText).toHaveBeenLastCalledWith("13", 110, 100);
     drawLevelUpLabel(context, null, 44, 392, 74, 690);
     expect(context.fillText).toHaveBeenCalledTimes(4);
   });
