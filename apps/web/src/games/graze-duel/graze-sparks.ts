@@ -9,7 +9,7 @@ export function emitGrazeSparks(particles: MovingParticle[], horizontal: number,
   const originY = vertical + Math.sin(direction) * 14;
   const count = Math.min(12, Math.max(0, limit - particles.length));
   for (let index = 0; index < count; index += 1) {
-    const angle = direction + index * Math.PI * 2 / 12 + (random() - 0.5) * 0.3;
+    const angle = direction + (random() + random() - 1) * Math.PI / 6;
     const speed = 320 + random() * 200;
     const life = 0.32 + random() * 0.18;
     particles.push({

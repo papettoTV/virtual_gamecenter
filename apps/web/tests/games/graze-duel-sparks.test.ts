@@ -31,13 +31,25 @@ describe("graze sparks", () => {
     expect(particles.every(particle => [particle.x, particle.y, particle.vx, particle.vy].every(Number.isFinite))).toBe(true);
   });
 
-  it("spreads streaks in all directions and stays within the game budget", () => {
+  it.each([[30, -30], [-30, 30], [30, 0], [-30, 0], [0, -30], [0, 30]])("aims sparks toward the graze at (%s, %s) with a bounded random fan", (bulletX, bulletY) => {
+    const direction = Math.atan2(bulletY, bulletX);
+    const angles = new Set<number>();
+    for (const randomness of [0, 0.25, 0.5, 0.75, 1]) {
+      const particles: Particle[] = [];
+      emitGrazeSparks(particles, 0, 0, bulletX, bulletY, 180, () => randomness);
+      for (const particle of particles) {
+        const angle = Math.atan2(particle.vy, particle.vx);
+        const difference = Math.atan2(Math.sin(angle - direction), Math.cos(angle - direction));
+        expect(Math.abs(difference)).toBeLessThanOrEqual(Math.PI / 6 + 1e-10);
+        expect(particle.vx * bulletX + particle.vy * bulletY).toBeGreaterThan(0);
+        angles.add(angle);
+      }
+    }
+    expect(angles.size).toBeGreaterThan(1);
+  });
+
+  it("stays within the game budget during repeated directional grazes", () => {
     const particles: Particle[] = [];
-    emitGrazeSparks(particles, 0, 0, 30, 0, 180, () => 0.5);
-    expect(particles.some(particle => particle.vx > 300)).toBe(true);
-    expect(particles.some(particle => particle.vx < -300)).toBe(true);
-    expect(particles.some(particle => particle.vy > 300)).toBe(true);
-    expect(particles.some(particle => particle.vy < -300)).toBe(true);
     for (let index = 0; index < 30; index += 1) emitGrazeSparks(particles, 0, 0, 30, 0, 180);
     expect(particles).toHaveLength(180);
   });
