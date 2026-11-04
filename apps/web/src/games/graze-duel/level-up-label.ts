@@ -1,7 +1,7 @@
 export type LevelUpLabel = { x: number; y: number; level: number; remaining: number };
 
 export function createLevelUpLabel(player: { x: number; y: number; fieldX: number; level: number }): LevelUpLabel {
-  return { x: player.x - player.fieldX, y: player.y - 28, level: player.level, remaining: 1 };
+  return { x: player.x - player.fieldX, y: player.y - 42, level: player.level, remaining: 1 };
 }
 
 export function tickLevelUpLabel(label: LevelUpLabel | null | undefined, delta: number): LevelUpLabel | null {

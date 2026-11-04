@@ -7,7 +7,7 @@ describe("level-up label", () => {
     const label = createLevelUpLabel(player);
     player.x += 100;
     player.y += 100;
-    expect(label).toEqual({ x: 156, y: 372, level: 12, remaining: 1 });
+    expect(label).toEqual({ x: 156, y: 358, level: 12, remaining: 1 });
     const updated = tickLevelUpLabel(label, 0.4)!;
     expect(updated).toEqual({ ...label, remaining: 0.6 });
     expect(label.remaining).toBe(1);
@@ -20,7 +20,7 @@ describe("level-up label", () => {
     const first = createLevelUpLabel(player);
     const second = createLevelUpLabel({ ...player, x: 240, level: 13 });
     expect(first.level).toBe(12);
-    expect(second).toEqual({ x: 196, y: 372, level: 13, remaining: 1 });
+    expect(second).toEqual({ x: 196, y: 358, level: 13, remaining: 1 });
   });
 
   it("draws thin text within the field and supports the opponent field offset", () => {
