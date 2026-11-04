@@ -10,7 +10,7 @@ function setup() {
   function gainNode() {
     return { gain: { setValueAtTime: vi.fn() }, connect: vi.fn(), disconnect: vi.fn() };
   }
-  const buffer = { duration: 0.32 };
+  const buffer = { duration: 0.4 };
   const context = {
     currentTime: 0, state: "running", destination: {}, close: vi.fn(async () => {}),
     decodeAudioData: vi.fn(async () => buffer),
@@ -26,12 +26,12 @@ function setup() {
 
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
-describe("selected J graze sound", () => {
+describe("selected U graze sound", () => {
   it("plays the selected one-shot without adding a pitched accent or changing its speed", async () => {
     const { audio, context, sources, gains, buffer, fetchSound } = setup();
     await audio.playGrazeSound(1);
     expect(fetchSound).toHaveBeenCalledOnce();
-    expect(fetchSound.mock.calls[0]?.[0]).toContain("graze-j.wav");
+    expect(fetchSound.mock.calls[0]?.[0]).toContain("graze-u.wav");
     expect(context.decodeAudioData).toHaveBeenCalledOnce();
     expect(context.createOscillator).not.toHaveBeenCalled();
     expect(context.createBiquadFilter).not.toHaveBeenCalled();
