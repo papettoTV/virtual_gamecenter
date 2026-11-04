@@ -23,6 +23,7 @@ import {
 } from "./core";
 import { createGrazeAudio } from "./audio";
 import { emitGrazeSparks } from "./graze-sparks";
+import { createLevelUpLabel, tickLevelUpLabel } from "./level-up-label";
 import { BUZZ_BARRIER } from "../../domain/game";
 import { recordWatchStarted } from "../../features/engagement/engagement-client";
 import { createCanvasRenderer } from "./rendering/canvas-renderer";
@@ -46,7 +47,7 @@ export function mountGame(context) {
     notifications.clearScope(BUZZ_BARRIER.id);
   });
   const audio = createGrazeAudio();
-  const { playAttackSound, playBossAttackSound, playBossHitSound, playExplosionSound, playGrazeSound } = audio;
+  const { playBossAttackSound, playBossHitSound, playExplosionSound, playGrazeSound } = audio;
   scope.own(() => audio.dispose());
   const canvas = document.querySelector("#game");
   const arcadeScreen = document.querySelector("#arcade-screen");
@@ -370,6 +371,7 @@ export function mountGame(context) {
       player.attackFlash = 0;
       player.attackCooldown = 0;
       player.levelUpFlash = 0;
+      player.levelUpLabel = null;
       player.tilt = 0;
       player.targetTilt = 0;
       player.grazeIds.clear();
@@ -423,6 +425,7 @@ export function mountGame(context) {
       player.attackFlash = 0;
       player.attackCooldown = 0;
       player.levelUpFlash = 0;
+      player.levelUpLabel = null;
       player.tilt = 0;
       player.targetTilt = 0;
       player.grazeIds.clear();
@@ -1646,6 +1649,7 @@ export function mountGame(context) {
         hitInvincible: player.hitInvincible,
         attackFlash: player.attackFlash,
         levelUpFlash: player.levelUpFlash,
+        levelUpLabel: player.levelUpLabel,
         tilt: player.tilt,
         bullets: player.bullets.map((bullet) => ({
           id: bullet.id,
@@ -1723,6 +1727,7 @@ export function mountGame(context) {
         hitInvincible: player.hitInvincible,
         attackFlash: player.attackFlash,
         levelUpFlash: player.levelUpFlash,
+        levelUpLabel: player.levelUpLabel,
         tilt: player.tilt,
       })),
       boss: createBossSyncState(),
@@ -1943,6 +1948,7 @@ export function mountGame(context) {
       player.y += (player.spectatorTargetY - player.y) * correctionRatio;
       player.invincible = Math.max(0, player.invincible - delta);
       player.levelUpInvincible = Math.max(0, player.levelUpInvincible - delta);
+      player.levelUpLabel = tickLevelUpLabel(player.levelUpLabel, delta);
 
       if (!sceneRenderer) {
         for (const bullet of player.bullets) {
@@ -2098,6 +2104,7 @@ export function mountGame(context) {
         hitInvincible: player.hitInvincible,
         attackFlash: player.attackFlash,
         levelUpFlash: player.levelUpFlash,
+        levelUpLabel: player.levelUpLabel,
         tilt: player.tilt,
         bullets: player.bullets.map((bullet) => ({
           id: bullet.id,
@@ -3228,10 +3235,10 @@ export function mountGame(context) {
     attacker.level += 1;
     attacker.levelUpInvincible = getNextInvincibleTime(attacker.levelUpInvincible);
     attacker.levelUpFlash = 0.42;
+    attacker.levelUpLabel = createLevelUpLabel(attacker);
     attacker.attackFlash = 0.35;
     attacker.attackCooldown = AUTO_ATTACK_COOLDOWN;
     if (!attackingBoss) defender.attackFlash = 0.55;
-    playAttackSound();
 
     if (boss.encounterState === "active" && attacker === players[0]) {
       boss.shieldAttackCharges += 1;

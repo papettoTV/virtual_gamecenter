@@ -5,6 +5,7 @@ import { createCyberCanyonBackground } from "./cyber-canyon-background";
 import { drawPlayerShip } from "./player-ship";
 import { createCanvasBossRenderer } from "./boss-geometry";
 import { GRAZE_SPARK_WIDTH, sparkFade, clipSpark } from "../graze-sparks";
+import { drawLevelUpLabel } from "../level-up-label";
 
 export function createCanvasRenderer(options) {
   let { context, getAttackCost, randomRange, createLightningBolt } = options;
@@ -70,6 +71,11 @@ export function createCanvasRenderer(options) {
     }
 
     if (!frame.compact && !frame.sceneRendered) drawParticles();
+    if (!frame.compact) {
+      for (const player of frame.players) {
+        drawLevelUpLabel(context, player.levelUpLabel, player.fieldX, FIELD_WIDTH, FIELD_TOP, FIELD_BOTTOM);
+      }
+    }
     drawHitDebug();
     if (frame.paused) drawPaused();
     if (frame.gameOver) drawGameOver();
@@ -88,6 +94,7 @@ export function createCanvasRenderer(options) {
         drawPlayer(selectedPlayer);
         drawParticles();
       }
+      drawLevelUpLabel(context, selectedPlayer.levelUpLabel, selectedPlayer.fieldX, FIELD_WIDTH, FIELD_TOP, FIELD_BOTTOM);
     });
 
     if (!frame.mobileHud) drawPlayerHud(selectedPlayer);
