@@ -4,7 +4,7 @@ import { getPausePresentation } from "./pause-presentation";
 import { createCyberCanyonBackground } from "./cyber-canyon-background";
 import { drawPlayerShip } from "./player-ship";
 import { createCanvasBossRenderer } from "./boss-geometry";
-import { GRAZE_SPARK_WIDTH, sparkFade, sparkTail } from "../graze-sparks";
+import { GRAZE_SPARK_WIDTH, sparkFade, clipSpark } from "../graze-sparks";
 
 export function createCanvasRenderer(options) {
   let { context, getAttackCost, randomRange, createLightningBolt } = options;
@@ -481,13 +481,15 @@ export function createCanvasRenderer(options) {
     for (const particle of frame.particles) {
       context.save();
       if (particle.kind === "spark") {
-        const tail = sparkTail(particle);
+        const fieldX = particle.fieldX ?? frame.players.find(player => particle.x >= player.fieldX && particle.x <= player.fieldX + FIELD_WIDTH)?.fieldX;
+        const segment = fieldX === undefined ? null : clipSpark(particle, { left: fieldX, right: fieldX + FIELD_WIDTH, top: FIELD_TOP, bottom: FIELD_BOTTOM });
+        if (!segment) { context.restore(); continue; }
         context.globalAlpha = sparkFade(particle);
         context.strokeStyle = particle.color;
         context.lineWidth = GRAZE_SPARK_WIDTH;
         context.beginPath();
-        context.moveTo(tail.x, tail.y);
-        context.lineTo(particle.x, particle.y);
+        context.moveTo(segment.tail.x, segment.tail.y);
+        context.lineTo(segment.head.x, segment.head.y);
         context.stroke();
         context.restore();
         continue;

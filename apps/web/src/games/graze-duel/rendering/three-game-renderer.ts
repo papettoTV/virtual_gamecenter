@@ -1,7 +1,7 @@
 import { createPlayerEffects } from "./three-player-effects";
 import * as THREE from "three";
 import { drawPlayerShip } from "./player-ship";
-import { GRAZE_SPARK_WIDTH, sparkFade, sparkTail } from "../graze-sparks";
+import { GRAZE_SPARK_WIDTH, sparkFade, clipSpark } from "../graze-sparks";
 import { createBossModels, getBossAppearance, getBossRotation, writeBossPositions, type BossModel } from "./boss-geometry";
 import type {
   BossRenderState,
@@ -142,7 +142,7 @@ export function createThreeGameRenderer(width: number, height: number): GameScen
       updatePlayerVisuals(playerVisuals, players, elapsed, transform, options);
       updateBossVisual(bossVisuals[0]!, frame.boss, 0, players[0]?.fieldX ?? 0, elapsed, transform, options, width, height);
       updateBossVisual(bossVisuals[1]!, frame.opponentBoss, 1, players[1]?.fieldX ?? 0, elapsed, transform, options, width, height);
-      updateParticleVisual(particleVisual, frame.particles, transform, width, height, colorCache);
+      updateParticleVisual(particleVisual, frame.particles, transform, width, height, colorCache, options, players);
       renderer.clear();
       renderer.render(scene, camera);
       frameCount += 1;
@@ -426,6 +426,8 @@ function updateParticleVisual(
   width: number,
   height: number,
   colorCache: Map<string, THREE.Color>,
+  options: RenderOptions,
+  players: PlayerRenderState[],
 ) {
   const count = Math.min(MAX_PARTICLES, particles.length);
   let pointCount = 0;
@@ -435,23 +437,27 @@ function updateParticleVisual(
     const point = transformPoint(particle.x, particle.y, transform);
     const color = cachedColor(colorCache, particle.color);
     if (particle.kind === "spark") {
-      const tail = sparkTail(particle);
-      const transformedTail = transformPoint(tail.x, tail.y, transform);
+      const fieldX = particle.fieldX ?? players.find(player => particle.x >= player.fieldX && particle.x <= player.fieldX + options.fieldWidth)?.fieldX;
+      if (fieldX === undefined) continue;
+      const segment = clipSpark(particle, { left: fieldX, right: fieldX + options.fieldWidth, top: options.fieldTop, bottom: options.fieldBottom });
+      if (!segment) continue;
+      const head = transformPoint(segment.head.x, segment.head.y, transform);
+      const transformedTail = transformPoint(segment.tail.x, segment.tail.y, transform);
       const fade = sparkFade(particle);
-      const deltaX = point.x - transformedTail.x;
-      const deltaY = point.y - transformedTail.y;
+      const deltaX = head.x - transformedTail.x;
+      const deltaY = head.y - transformedTail.y;
       const length = Math.hypot(deltaX, deltaY) || 1;
       const normalX = -deltaY / length * GRAZE_SPARK_WIDTH / 2 * transform.scale;
       const normalY = deltaX / length * GRAZE_SPARK_WIDTH / 2 * transform.scale;
       for (let corner = 0; corner < SPARK_CORNERS.length; corner += 1) {
         const endpoint = SPARK_CORNERS[corner]!;
-        const head = endpoint >= 2;
+        const isHead = endpoint >= 2;
         const side = endpoint % 2 === 0 ? 1 : -1;
         const vertex = sparkCount * 6 + corner;
         visual.sparkPositions.setXYZ(vertex,
-          (head ? point.x : transformedTail.x) + normalX * side - width / 2,
-          height / 2 - (head ? point.y : transformedTail.y) - normalY * side, 0);
-        const brightness = fade * (head ? 1 : 0.2);
+          (isHead ? head.x : transformedTail.x) + normalX * side - width / 2,
+          height / 2 - (isHead ? head.y : transformedTail.y) - normalY * side, 0);
+        const brightness = fade * (isHead ? 1 : 0.2);
         visual.sparkColors.setXYZ(vertex, color.r * brightness, color.g * brightness, color.b * brightness);
       }
       sparkCount += 1;

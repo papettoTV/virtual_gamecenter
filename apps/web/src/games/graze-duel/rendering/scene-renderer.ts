@@ -51,6 +51,7 @@ export type ParticleRenderState = {
   vy?: number;
   length?: number;
   maxLife?: number;
+  fieldX?: number;
 };
 
 export type SceneRenderFrame = {

@@ -3188,7 +3188,7 @@ export function mountGame(context) {
         const gaugeGain = Math.round(42 * player.multiplier);
         player.score += 42;
         player.gauge = Math.min(getAttackCost(player) * 3, player.gauge + gaugeGain);
-        emitGrazeSparks(particles, player.x, player.y, bullet.x, bullet.y, MAX_PARTICLES);
+        emitGrazeSparks(particles, player.x, player.y, bullet.x, bullet.y, MAX_PARTICLES, Math.random, player.fieldX);
         playGrazeSound(player.combo);
         if (player.gauge >= getAttackCost(player) && player.attackCooldown <= 0) {
           tryAutoAttack(player, getOpponent(player));
