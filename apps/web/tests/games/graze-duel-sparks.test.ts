@@ -5,20 +5,20 @@ import type { ParticleRenderState } from "../../src/games/graze-duel/rendering/s
 type Particle = ParticleRenderState & { vx: number; vy: number };
 
 describe("graze sparks", () => {
-  it("emits twelve long cyan and violet streaks at the grazed side", () => {
+  it("emits twelve thick blue-violet streaks at the grazed side", () => {
     const particles: Particle[] = [];
     emitGrazeSparks(particles, 100, 200, 130, 200, 512, () => 0.5);
     expect(particles).toHaveLength(12);
-    expect(new Set(particles.map(particle => particle.color))).toEqual(new Set(["#f4fcff", "#72eaff", "#ef91ff"]));
-    expect(GRAZE_SPARK_WIDTH).toBe(2);
+    expect(new Set(particles.map(particle => particle.color))).toEqual(new Set(["#9985ff"]));
+    expect(GRAZE_SPARK_WIDTH).toBe(3);
     for (const particle of particles) {
       expect(particle.kind).toBe("spark");
       expect(particle.x).toBe(114);
       expect(particle.y).toBe(200);
-      expect(particle.life).toBeCloseTo(0.41);
-      expect(Math.hypot(particle.vx, particle.vy)).toBeCloseTo(420);
+      expect(particle.life).toBeCloseTo(0.55);
+      expect(Math.hypot(particle.vx, particle.vy)).toBeCloseTo(1100);
       const tail = sparkTail(particle);
-      expect(Math.hypot(particle.x - tail.x, particle.y - tail.y)).toBeCloseTo(36);
+      expect(Math.hypot(particle.x - tail.x, particle.y - tail.y)).toBeCloseTo(50);
       expect(sparkFade(particle)).toBe(1);
     }
   });
@@ -40,7 +40,7 @@ describe("graze sparks", () => {
       for (const particle of particles) {
         const angle = Math.atan2(particle.vy, particle.vx);
         const difference = Math.atan2(Math.sin(angle - direction), Math.cos(angle - direction));
-        expect(Math.abs(difference)).toBeLessThanOrEqual(Math.PI / 6 + 1e-10);
+        expect(Math.abs(difference)).toBeLessThanOrEqual(Math.PI / 12 + 1e-10);
         expect(particle.vx * bulletX + particle.vy * bulletY).toBeGreaterThan(0);
         angles.add(angle);
       }
@@ -52,6 +52,15 @@ describe("graze sparks", () => {
     const particles: Particle[] = [];
     for (let index = 0; index < 30; index += 1) emitGrazeSparks(particles, 0, 0, 30, 0, 180);
     expect(particles).toHaveLength(180);
+  });
+
+  it("can travel beyond a nearby field edge before fading out", () => {
+    const particles: Particle[] = [];
+    emitGrazeSparks(particles, 100, 200, 130, 200, 180, () => 0.5);
+    const particle = particles[0]!;
+    const elapsed = 0.3;
+    expect(particle.x + particle.vx * elapsed).toBeGreaterThan(400);
+    expect(sparkFade({ ...particle, life: particle.life - elapsed })).toBeGreaterThan(0.4);
   });
 
   it("shortens and fades the streak before it expires", () => {

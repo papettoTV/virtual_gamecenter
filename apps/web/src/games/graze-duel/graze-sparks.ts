@@ -1,7 +1,7 @@
 import type { ParticleRenderState } from "./rendering/scene-renderer";
 
 type MovingParticle = ParticleRenderState & { vx: number; vy: number };
-export const GRAZE_SPARK_WIDTH = 2;
+export const GRAZE_SPARK_WIDTH = 3;
 
 export function emitGrazeSparks(particles: MovingParticle[], horizontal: number, vertical: number, bulletX: number, bulletY: number, limit: number, random: () => number = Math.random) {
   const direction = Math.atan2(bulletY - vertical, bulletX - horizontal);
@@ -9,17 +9,17 @@ export function emitGrazeSparks(particles: MovingParticle[], horizontal: number,
   const originY = vertical + Math.sin(direction) * 14;
   const count = Math.min(12, Math.max(0, limit - particles.length));
   for (let index = 0; index < count; index += 1) {
-    const angle = direction + (random() + random() - 1) * Math.PI / 6;
-    const speed = 320 + random() * 200;
-    const life = 0.32 + random() * 0.18;
+    const angle = direction + (random() + random() - 1) * Math.PI / 12;
+    const speed = 900 + random() * 400;
+    const life = 0.45 + random() * 0.2;
     particles.push({
       x: originX,
       y: originY,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
-      color: index % 3 === 0 ? "#f4fcff" : index % 3 === 1 ? "#72eaff" : "#ef91ff",
+      color: "#9985ff",
       kind: "spark",
-      length: 24 + random() * 24,
+      length: 36 + random() * 28,
       life,
       maxLife: life,
     });
