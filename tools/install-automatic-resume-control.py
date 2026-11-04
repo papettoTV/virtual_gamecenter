@@ -425,19 +425,23 @@ def maintain(data, baseline, jwt, token, *, api=maintenance_request, app_api=req
                 report['cleanupRequired'] = True
                 report['cleanupMessage'] = 'bypass削除を確認できません。再配置せず--cleanupで復旧してください。通信不能時はGitHub画面でpulbase-releaseだけを削除してください。'
     if report['bypassRemoved']:
+        report['stage'] = 'verify-configuration'
+        report['configurationStage'] = 'read-installed-ref'
         try:
             current = ok(api, 'GET', REPO + '/git/ref/heads/ci-control', token)['object']['sha']
             installed = current != BASE
             need(not installed or (installation is not None and installation.get('success') is True
                  and current == installation.get('commit')), '配置先を確定できません。再配置せず--cleanupで確認してください。')
+            report['configurationStage'] = 'verify-and-update-variables'
             config = configure(current, data, baseline, token, api, installed=installed)
             report['configuration'] = config
             report['variablesVerified'] = config['success']
             report['success'] = bool(installation and installation.get('success') and config['success'] and not report.get('stopped'))
             if report['success']:
                 report['stage'] = 'complete'
-        except (Exception, KeyboardInterrupt):
+        except (Exception, KeyboardInterrupt) as error:
             report['configurationRequired'] = True
+            report['configurationReason'] = str(error) if isinstance(error, Stop) else '配置後の確認で停止しました。認証値・元応答は表示しません。'
             report['configurationMessage'] = 'strict復帰後の配置・変数を確定できません。再配置せず--cleanupで確認してください。'
     return report
 

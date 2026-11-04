@@ -375,6 +375,25 @@ class MaintenanceTests(unittest.TestCase):
             self.assertEqual(len([c for c in f.calls if c[0] == 'PUT']), 1)
             self.assertFalse(any(m == 'PATCH' for m, p, b in f.calls))
 
+    def test_post_install_read_failure_keeps_safe_http_reason_and_phase(self):
+        f = MaintenanceFixture()
+        def forbidden(method, path, auth=None, body=None):
+            if f.put_number == 2 and path.endswith('/git/ref/heads/ci-control'):
+                f.calls.append((method, path, body))
+                return 403, None
+            return f.api(method, path, auth, body)
+        result = M.maintain(f.data, f.baseline, 'fake-jwt', 'NEVER_PRINT_CREDENTIAL', api=forbidden,
+                            app_api=f.app_api, checkpoint=lambda state: f.states.append(state))
+        self.assertFalse(result['success'])
+        self.assertTrue(result['bypassRemoved'])
+        self.assertTrue(result['installation']['success'])
+        self.assertTrue(result['configurationRequired'])
+        self.assertEqual(result['configurationStage'], 'read-installed-ref')
+        self.assertIn('HTTP 403', result['configurationReason'])
+        self.assertNotIn('NEVER_PRINT_CREDENTIAL', json.dumps(result))
+        self.assertFalse(any(method == 'PATCH' and path in (M.REPOSITORY_VARIABLE, M.STAGING_VARIABLE)
+                             for method, path, body in f.calls))
+
     def test_cleanup_is_idempotent_after_success_and_never_readds_bypass(self):
         f = MaintenanceFixture()
         self.assertTrue(self.run_maintenance(f)['success'])
