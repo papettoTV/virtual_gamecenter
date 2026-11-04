@@ -354,7 +354,7 @@ export function mountGame(context) {
       player.lives = MAX_LIVES;
       player.score = 0;
       player.gauge = 0;
-      player.level = 1;
+      player.level = 0;
       player.nextBossLevel = BOSS_ATTACK_INTERVAL;
       player.combo = 0;
       player.multiplier = 1;

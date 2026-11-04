@@ -63,7 +63,7 @@ export function createGameState(settings) {
       lives: MAX_LIVES,
       score: 0,
       gauge: 0,
-      level: 1,
+      level: 0,
       nextBossLevel: BOSS_ATTACK_INTERVAL,
       combo: 0,
       multiplier: 1,

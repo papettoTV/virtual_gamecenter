@@ -2,6 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import { createLevelUpLabel, drawLevelUpLabel, tickLevelUpLabel } from "../../src/games/graze-duel/level-up-label";
 
 describe("level-up label", () => {
+  it("shows LEVEL 1 on the first level-up from zero", () => {
+    const player = { x: 200, y: 400, fieldX: 44, level: 0 };
+    player.level += 1;
+    expect(createLevelUpLabel(player).level).toBe(1);
+  });
   it("fixes the new level in front of the original player position for one second", () => {
     const player = { x: 200, y: 400, fieldX: 44, level: 12 };
     const label = createLevelUpLabel(player);
