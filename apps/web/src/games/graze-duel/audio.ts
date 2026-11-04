@@ -1,4 +1,4 @@
-import grazeSoundUrl from "./assets/graze-u.wav?url";
+import grazeSoundUrl from "./assets/graze-u3.wav?url";
 
 type AudioWindow = Window & typeof globalThis & {
   webkitAudioContext?: typeof AudioContext;

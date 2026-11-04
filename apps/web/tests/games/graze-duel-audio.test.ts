@@ -26,12 +26,12 @@ function setup() {
 
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
-describe("selected U graze sound", () => {
+describe("selected U3 graze sound", () => {
   it("plays the selected one-shot without adding a pitched accent or changing its speed", async () => {
     const { audio, context, sources, gains, buffer, fetchSound } = setup();
     await audio.playGrazeSound(1);
     expect(fetchSound).toHaveBeenCalledOnce();
-    expect(fetchSound.mock.calls[0]?.[0]).toContain("graze-u.wav");
+    expect(fetchSound.mock.calls[0]?.[0]).toContain("graze-u3.wav");
     expect(context.decodeAudioData).toHaveBeenCalledOnce();
     expect(context.createOscillator).not.toHaveBeenCalled();
     expect(context.createBiquadFilter).not.toHaveBeenCalled();
