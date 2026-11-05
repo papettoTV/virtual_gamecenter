@@ -42,3 +42,12 @@
 - 報告された開始前退出テストの接続待ち失敗は、期待パスに `/api` が欠けていたことが原因。実クライアント `src/realtime/cabinet-client.ts` と Worker のルートに合わせて `/api/cabinets/<id>/ws` を待つよう修正した。筐体接続が存在することと退出後に切断されることの検証は維持し、アプリの退出・会計・認可処理は変更していない。
 - `node --check apps/web/tests/ui/play-confirmation.spec.mjs` と `git diff --check` は成功。focused Vitest（play-service、graze-duel-lifecycle、cabinetRouteLifecycle）および `apps/web` の `npm test` はローカル Worker の `listen EPERM 127.0.0.1` で停止し、合否は未確認。
 - `apps/web` の `npm run build:staging` は終了コード0。型検査・Vite・Pages成果物生成が成功（ログ書き込み・チャンク容量の警告あり）。Playwright が利用できず、desktop / mobile のブラウザケースはローカル未実行。独立 CI の成功、実デプロイ SHA 照合、実端末・実残高の受け入れ確認、Issue への記録は未実施。
+
+## PR #129 修復ラウンド3（2026-11-05）
+
+- 受付済み候補に競合はない。既存の直接退出・開始認可・会計処理を維持し、今回の追加差分はブラウザテストと本記録のみ。
+- 報告された bootstrap の非成功、残高確認の `distributed_rate_limited`、登録状態の undefined は、同一ローカル IP を共有するテストで読み取り予算を消費している状況と整合する。Worker の bootstrap 予算は IP ごとに60回/分、認証済み player ごとに10回/分。残高の照合まで bootstrap を使っていたため、残高専用の実 `GET /api/platform/credits` に変更した。保存済み残高との照合は維持する。
+- `guest-bootstrap` と `play-confirmation` の読み取りに限り、実 Worker が429かつ1〜60秒の `Retry-After` を返した場合は指定時間待ち、1回だけ再送するテスト補助を追加。実レスポンス・Cookieをそのまま使い、再送後の失敗は隠さない。待機をテスト上限に加算し、CI注釈へ記録する。書き込み・WebSocket・認可を再送または代替せず、Worker の保護や予算も変更しない。
+- 同意/登録取消ケースの初期 bootstrap は成功を明示検証してから内容を読む。筐体遷移も共通の bootstrap 完了待ちへ揃え、バックプレッシャー待機を ready の描画時間超過と混同しない。guest の実参加5秒・参加後描画5秒の検証、取消・遅延二重入力・開始認可・実会計・退出・接続終了のアサーションは維持する。ready が undefined になる失敗を含め、修復の実効性は独立 CI での確認が必要。
+- 変更した3つの JavaScript ファイルの `node --check` と `git diff --check` は成功。focused Vitest（play-service、graze-duel-lifecycle、cabinetRouteLifecycle）と `npm test` は Worker 起動時の `listen EPERM 127.0.0.1` で停止し、テスト本体の合否は未確認。Wrangler のログ作成制限も発生した。
+- `apps/web` の `npm run build:staging` は終了コード0。型検査・Vite・Pages成果物生成まで成功（ログ作成とチャンク容量の警告あり）。Playwright の import は `ERR_MODULE_NOT_FOUND` で、desktop / mobile のブラウザケースはローカル未実行。デプロイ、SHA照合、実端末・検証環境での受け入れ確認、Issueへの記録は未実施。

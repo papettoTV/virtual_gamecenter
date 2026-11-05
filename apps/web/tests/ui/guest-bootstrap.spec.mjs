@@ -1,9 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { test, expect } from '../../../../ci/ui-fixtures.mjs';
+import { respectReadBudget } from './api-read-budget.mjs';
 
 // Keep real API coverage for the reproducible race; long initialization and
 // cancellation are covered with fake timers in cabinet-bootstrap.test.ts.
 test.use({ screenshot: 'only-on-failure' });
+test.beforeEach(async ({ context }, testInfo) => respectReadBudget(context, testInfo));
 
 for (const game of ['graze-duel', 'deep-sea-salvage', 'dot-wave']) {
   for (const delay of [0, 1200]) {
@@ -23,7 +25,7 @@ for (const game of ['graze-duel', 'deep-sea-salvage', 'dot-wave']) {
       await page.route('**/api/platform/bootstrap', async route => {
         bootstraps++;
         if (delay) await new Promise(resolve => setTimeout(resolve, delay));
-        await route.continue();
+        await route.fallback();
       });
       page.on('response', response => {
         if (response.url().endsWith('/api/platform/bootstrap') && response.ok()) {
@@ -49,7 +51,7 @@ for (const game of ['graze-duel', 'deep-sea-salvage', 'dot-wave']) {
       });
       const url = `http://127.0.0.1:5174/cabinets/${randomUUID()}?game=${game}`;
       const bootstrap = page.waitForResponse(response =>
-        response.url().endsWith('/api/platform/bootstrap'), { timeout: delay + 5000 });
+        response.url().endsWith('/api/platform/bootstrap'), { timeout: delay + 70000 });
       await page.goto(url);
       expect((await bootstrap).ok()).toBe(true);
       // The deliberate request delay is outside the existing admission budget.
