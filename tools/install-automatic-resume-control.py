@@ -486,6 +486,7 @@ def human_maintenance(archive, data, baseline, cleaning=False):
     token = hidden('管理端末専用のFine-grained token（非表示・保存なし）: ')
     need(token.startswith('github_pat_'), '管理端末専用のFine-grained tokenを使用してください。')
     try:
+        print('処理中: GitHubの保護設定・配置・2変数を確認しています。通信確認には数分かかる場合があります。', file=sys.stderr, flush=True)
         if cleaning:
             path = maintenance_state_path(archive)
             need(path.is_file() and not path.is_symlink() and path.stat().st_size < 65536, '保守記録がありません。GitHub画面でbypassを確認してください。')
@@ -499,8 +500,9 @@ def human_maintenance(archive, data, baseline, cleaning=False):
                 save_receipt(archive, result['installation'])
     finally:
         token = None
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+    print(json.dumps(result, ensure_ascii=False, indent=2), flush=True)
     need(result['success'], '保守が完了していません。再配置せず結果をお知らせください。')
+    print('完了しました。ツールは終了します。Ctrl+Cは不要です。', file=sys.stderr, flush=True)
 
 def hidden(prompt):
     with warnings.catch_warnings():

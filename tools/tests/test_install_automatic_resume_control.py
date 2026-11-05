@@ -7,6 +7,31 @@ import hashlib
 import io
 import tempfile
 import zipfile
+import subprocess
+import sys
+
+
+class TerminalCompletionTests(unittest.TestCase):
+    def test_cleanup_prints_and_exits_without_interrupt_or_credentials_in_output(self):
+        script = '''
+import importlib.util, json, tempfile
+from pathlib import Path
+from unittest.mock import patch
+spec = importlib.util.spec_from_file_location('installer', %r)
+m = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(m)
+with tempfile.TemporaryDirectory() as directory:
+    archive = Path(directory) / 'bundle.zip'
+    m.maintenance_state_path(archive).write_text('{}')
+    with patch('builtins.input', return_value='ci-control'), patch.object(m, 'hidden', return_value='github_pat_fake_do_not_print'), patch.object(m, 'cleanup_maintenance', return_value={'mode':'human-maintenance-cleanup','success':True}):
+        m.human_maintenance(archive, {}, {}, cleaning=True)
+''' % str(path)
+        result = subprocess.run([sys.executable, '-c', script], capture_output=True, text=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(json.loads(result.stdout)['success'])
+        self.assertIn('処理中:', result.stderr)
+        self.assertIn('ツールは終了します。Ctrl+Cは不要', result.stderr)
+        self.assertNotIn('github_pat_fake', result.stdout + result.stderr)
 
 path = Path(__file__).resolve().parents[1] / 'install-automatic-resume-control.py'
 spec = importlib.util.spec_from_file_location('installer', path)
