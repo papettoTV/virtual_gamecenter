@@ -30,7 +30,7 @@ for (const [game, filename, hash] of artwork) {
 // without replacing authentication, accounting or game-start APIs.
 for (const [game, filename] of artwork) {
   for (const kind of ['live', 'result']) {
-    test(`${game} ${kind} panel artwork and links`, async ({ page, baseURL }) => {
+    test(`${game} ${kind} panel preview, handoff and accessibility`, async ({ page, baseURL }) => {
       // Use the project's real desktop/mobile viewport, without booting App.
       const origin = new URL(baseURL);
       expect(['127.0.0.1', '[::1]']).toContain(origin.hostname);
@@ -43,6 +43,13 @@ for (const [game, filename] of artwork) {
       }));
       // Keep local LAN discovery inside the disposable test server.
       await page.route('**/api/local-address', route => route.fulfill({ json: { address: '127.0.0.1', port: 5174 } }));
+      const nativeHandoffs = [];
+      page.on('request', request => {
+        if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/platform/sharing/events') {
+          const event = request.postDataJSON();
+          if (event.eventType === 'share_native_handoff') nativeHandoffs.push(event);
+        }
+      });
       await page.goto(fixtureUrl);
       await page.evaluate(async ({ game, kind }) => {
         // Supply Vite's normal React refresh preamble for this minimal HTML.
@@ -57,7 +64,7 @@ for (const [game, filename] of artwork) {
         const { createResultImage, ResultShareButton, LiveShareButton, SharePanel } = await import('/src/features/sharing/ShareActions.tsx');
         const { setLiveContext } = await import('/src/features/sharing/share-service.ts');
         const host = document.getElementById('social-image-fixture');
-        const result = { id: '12345678-1234-4234-8234-123456789012', gameId: game, gameVersion: 'test', playerName: 'Preview-test', score: 1200, elapsedTimeMs: 1000, cleared: false, metrics: {}, createdAt: '2026-01-01T00:00:00Z' };
+        const result = { id: '12345678-1234-4234-8234-123456789012', gameId: game, gameVersion: 'test', playerName: 'Preview-test', score: 1200, elapsedTimeMs: 1000, cleared: false, metrics: game === 'dot-wave' ? { mode: 'cpu', turns: 10, remainingHp: 45 } : {}, createdAt: '2026-01-01T00:00:00Z' };
         if (kind === 'result') {
           // Run the real renderer outside SharePanel's swallowed catch so
           // Canvas/import/encoding failures report their actual browser error.
@@ -82,27 +89,88 @@ for (const [game, filename] of artwork) {
       const dialog = page.getByRole('dialog');
       await expect(dialog).toHaveCount(1);
       await expect(fixture.getByRole('dialog')).toBeVisible();
-      const link = dialog.locator('.share-url');
-      await expect(link).toContainText('shareId=');
-      const shareUrl = new URL(await link.innerText());
+      await expect(dialog.locator('#share-text')).toBeVisible();
+      const shareUrl = new URL(await page.evaluate(async () => {
+        const { sharePanel } = await import('/src/features/sharing/share-service.ts');
+        return sharePanel.getSnapshot().url;
+      }));
+      if (kind === 'result') {
+        await expect(dialog.locator('.shared-result-card')).toHaveCount(1);
+        expect(await fixture.getByRole('button', { name: '結果を共有', exact: true }).evaluate(el => el.closest('[inert]') !== null)).toBe(true);
+        await expect(dialog.locator('.share-result-preview')).toContainText('Preview-test');
+        await expect(dialog.locator('.social-preview, .share-url')).toHaveCount(0);
+        if (game === 'dot-wave') {
+          await expect(dialog.locator('.shared-result-card')).toContainText('10');
+          await expect(dialog.locator('.shared-result-card')).toContainText('45');
+          await expect(dialog.locator('.shared-result-card')).not.toContainText('SCORE');
+        }
+        for (const size of [{ width: 320, height: 568 }, { width: 844, height: 390 }, { width: 390, height: 300 }]) {
+          await page.setViewportSize(size);
+          await expect(dialog.getByRole('button', { name: '共有する', exact: true })).toBeInViewport();
+          await expect(dialog.getByRole('button', { name: 'リンクをコピー', exact: true })).toBeInViewport();
+        }
+        await page.setViewportSize({ width: 390, height: 844 });
+        await dialog.evaluate(el => { el.style.fontSize = '200%'; });
+        await expect(dialog.getByRole('button', { name: '共有する', exact: true })).toBeInViewport();
+        await dialog.evaluate(el => { el.style.fontSize = ''; });
+        await page.evaluate(() => {
+          Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
+          Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async text => { window.__copied = text; } } });
+        });
+        await dialog.getByRole('button', { name: 'リンクをコピー', exact: true }).click();
+        expect(await page.evaluate(() => window.__copied)).toBe(shareUrl.href);
+        await expect(dialog.getByRole('status')).toHaveText('コピーしました。');
+        await page.evaluate(() => {
+          Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => { throw new Error('Permission denied'); } } });
+        });
+        const copyLink = dialog.getByRole('button', { name: 'リンクをコピー', exact: true });
+        await copyLink.click();
+        await expect(dialog.getByRole('status')).toHaveText('コピーできませんでした。もう一度お試しください。');
+        await expect(copyLink).toBeFocused();
+        await page.evaluate(() => {
+          Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
+          document.addEventListener('copy', event => {
+            const field = document.activeElement;
+            window.__legacyCopy = {
+              text: field.value.substring(field.selectionStart, field.selectionEnd),
+              inDialog: Boolean(field.closest('[role="dialog"]')),
+              inert: Boolean(field.closest('[inert]')),
+            };
+            // Intercept the real copy event so no system clipboard is needed.
+            event.preventDefault();
+          }, { once: true });
+        });
+        await copyLink.click();
+        expect(await page.evaluate(() => window.__legacyCopy)).toEqual({ text: shareUrl.href, inDialog: true, inert: false });
+        await expect(dialog.getByRole('status')).toHaveText('コピーしました。');
+        await expect(copyLink).toBeFocused();
+        await expect(dialog.locator('textarea')).toHaveCount(1);
+        await dialog.locator('#share-text').fill('編集した投稿文');
+        await dialog.getByRole('button', { name: '共有する', exact: true }).click();
+        await expect(dialog.getByRole('status')).toContainText('共有先を選んでください');
+      }
       expect(shareUrl.origin).toBe(new URL(page.url()).origin);
       expect(shareUrl.pathname).toBe(`/${kind === 'result' ? 'results' : 'cabinets'}/12345678-1234-4234-8234-123456789012`);
       expect(shareUrl.searchParams.get('ref')).toBe('share');
+      expect(shareUrl.searchParams.get('shareId')).toMatch(/^[0-9a-f-]{36}$/);
       if (kind === 'live') {
         expect(shareUrl.searchParams.get('game')).toBe(game);
         expect(shareUrl.searchParams.get('watch')).toBe('1');
       }
       const image = dialog.locator('.social-link-card img');
       for (const target of ['X', 'Facebook']) {
-        await dialog.getByRole('button', { name: target, exact: true }).click();
-        await expect(image).toHaveAttribute('src', new URL(`/social/${filename}-ogp-v2.jpg`, shareUrl).href);
-        await image.scrollIntoViewIfNeeded();
-        await expect(image).toBeInViewport();
-        await expect.poll(() => image.evaluate(img => [img.complete, img.naturalWidth, img.naturalHeight])).toEqual([true, 1200, 630]);
+        if (kind === 'live') {
+          await dialog.getByRole('button', { name: target, exact: true }).click();
+          await expect(image).toHaveAttribute('src', new URL(`/social/${filename}-ogp-v2.jpg`, shareUrl).href);
+          await image.scrollIntoViewIfNeeded();
+          await expect(image).toBeInViewport();
+          await expect.poll(() => image.evaluate(img => [img.complete, img.naturalWidth, img.naturalHeight])).toEqual([true, 1200, 630]);
+        }
         // Capture handoff without sending a real social post.
         await dialog.getByRole('button', { name: `${target}で共有`, exact: true }).click();
         const handoff = new URL(await page.evaluate(() => window.__previewShareLinks.at(-1)));
         expect(handoff.searchParams.get(target === 'X' ? 'url' : 'u')).toBe(shareUrl.href);
+        if (kind === 'result' && target === 'X') expect(handoff.searchParams.get('text')).toBe('編集した投稿文');
       }
       if (kind === 'result') {
         const save = dialog.getByRole('button', { name: '結果画像を保存', exact: true });
@@ -120,7 +188,63 @@ for (const [game, filename] of artwork) {
         expect(png.subarray(12, 16).toString()).toBe('IHDR');
         expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([1200, 630]);
       }
-      await dialog.getByRole('button', { name: '× 閉じる' }).click();
+      if (kind === 'result') {
+        await page.evaluate(() => {
+          window.__nativeCalls = [];
+          Object.defineProperty(navigator, 'share', { configurable: true, value: data => {
+            window.__nativeCalls.push(data);
+            return new Promise((resolve, reject) => { window.__finishShare = { resolve, reject }; });
+          } });
+        });
+        const primary = dialog.getByRole('button', { name: '共有する', exact: true });
+        await primary.click(); await primary.click();
+        expect(await page.evaluate(() => window.__nativeCalls)).toEqual([{ text: '編集した投稿文', url: shareUrl.href }]);
+        await page.evaluate(() => window.__finishShare.reject(new DOMException('Cancelled', 'AbortError')));
+        await expect(dialog.getByRole('status')).toHaveText('共有をキャンセルしました。');
+        expect(nativeHandoffs).toEqual([]);
+        await primary.click();
+        await page.evaluate(() => window.__finishShare.reject(new Error('Unavailable')));
+        await expect(dialog.getByRole('status')).toContainText('共有できませんでした');
+        await primary.click();
+        await page.evaluate(() => window.__finishShare.resolve());
+        await expect(dialog.getByRole('status')).toHaveText('共有先に渡しました。');
+        await expect.poll(() => nativeHandoffs.length).toBe(1);
+        // A pending handoff belongs to this panel, not a later reopening.
+        await primary.click();
+        await page.evaluate(() => { window.__oldShare = window.__finishShare; });
+        await dialog.getByRole('button', { name: '× 閉じる' }).click();
+        await expect(dialog).toHaveCount(0);
+        await fixture.getByRole('button', { name: '結果を共有', exact: true }).click();
+        await expect(dialog.locator('#share-text')).toBeVisible();
+        await dialog.locator('#share-text').fill('開き直した投稿文');
+        await primary.click();
+        expect(await page.evaluate(() => window.__nativeCalls.length)).toBe(5);
+        expect(await page.evaluate(() => window.__nativeCalls.at(-1))).toEqual({
+          text: '開き直した投稿文',
+          url: await page.evaluate(async () => {
+            const { sharePanel } = await import('/src/features/sharing/share-service.ts');
+            return sharePanel.getSnapshot().url;
+          }),
+        });
+        await page.evaluate(() => window.__oldShare.reject(new DOMException('Cancelled', 'AbortError')));
+        await expect(dialog.getByRole('status')).toHaveCount(0);
+        await primary.click();
+        expect(await page.evaluate(() => window.__nativeCalls.length)).toBe(5);
+        expect(nativeHandoffs).toHaveLength(1);
+        await page.evaluate(() => window.__finishShare.resolve());
+        await expect(dialog.getByRole('status')).toHaveText('共有先に渡しました。');
+        await expect.poll(() => nativeHandoffs.length).toBe(2);
+        const close = dialog.getByRole('button', { name: '× 閉じる' });
+        await close.focus();
+        await page.keyboard.press('Shift+Tab');
+        await expect(dialog.getByRole('button', { name: 'リンクをコピー', exact: true })).toBeFocused();
+        await page.keyboard.press('Tab');
+        await expect(close).toBeFocused();
+        await page.keyboard.press('Escape');
+        await expect(fixture.getByRole('button', { name: '結果を共有', exact: true })).toBeFocused();
+      } else {
+        await dialog.getByRole('button', { name: '× 閉じる' }).click();
+      }
       await expect(dialog).toHaveCount(0);
     });
   }
