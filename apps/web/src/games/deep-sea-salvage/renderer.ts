@@ -24,8 +24,26 @@ export function createRenderer(canvas: HTMLCanvasElement, state: State, queries:
     return [species.id, image];
   }));
 
+  let collectionFrameKey: string | null = null;
   function draw() {
     if (disposed) return;
+    if (state.collectionOpen || (state.paused && state.phase === "dive")) {
+      const mode = state.collectionOpen ? "collection" : "pause";
+      // This opaque screen covers the world. Avoid rendering WebGL and filtered
+      // portraits on every RAF while paused, including in software renderers.
+      // Image readiness remains part of the key so late portraits still appear.
+      const key = JSON.stringify([mode, isWatching(), state.returnToResult,
+        SPECIES.map(species => {
+          const image = speciesIcons.get(species.id);
+          return [state.discovered.has(species.id), Boolean(image?.complete && image.naturalWidth > 0)];
+        })]);
+      if (key !== collectionFrameKey) {
+        drawCollection(mode);
+        collectionFrameKey = key;
+      }
+      return;
+    }
+    collectionFrameKey = null;
     drawBackground();
     const renderedInThree = drawThreeGameObjects();
     if (!renderedInThree) {
@@ -38,11 +56,9 @@ export function createRenderer(canvas: HTMLCanvasElement, state: State, queries:
     drawHud();
     if ((state.boss.active && state.bossGaugeVisible) || state.phase === "boss-clear") drawBossResearchGauge();
     if (state.phase === "ready" && debugParams.get("terrainPreview") !== "1") drawStartOverlay();
-    if (state.paused && state.phase === "dive" && !state.collectionOpen) drawCollection("pause");
     if (state.phase === "result" && !state.collectionOpen) drawOverlay(state.message, [`SCORE ${state.finalScore.toLocaleString()}`, isWatching() ? "プレイヤーの選択を待っています" : `図鑑 ${state.discovered.size} / 21　最大深度 ${Math.floor(state.maxDepth).toLocaleString()}m`]);
     if (state.phase === "boss-clear") drawBossClearSequence();
     if (state.phase === "hull-break") drawHullBreakSequence();
-    if (state.collectionOpen) drawCollection();
   }
 
   function drawThreeGameObjects() {
@@ -575,7 +591,7 @@ export function createRenderer(canvas: HTMLCanvasElement, state: State, queries:
   }
 
   function drawCollection(mode: "collection" | "pause" = "collection") {
-    ctx.fillStyle = "rgba(0,5,13,.96)"; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "#00050d"; ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = "#6effe9"; ctx.font = "900 34px system-ui"; ctx.textAlign = "center"; ctx.fillText(`${mode === "pause" ? "PAUSED　" : ""}今回の調査図鑑　${state.discovered.size} / 21`, W / 2, 48);
     const cols = 7; const cellW = 122; const cellH = 156; const startX = (W - cols * cellW) / 2;
     SPECIES.forEach((species, index) => {
@@ -607,6 +623,7 @@ export function createRenderer(canvas: HTMLCanvasElement, state: State, queries:
   }
 
   function drawOverlay(title: string, lines: string[]) {
+    collectionFrameKey = null;
     ctx.fillStyle = "rgba(0,5,13,.78)"; ctx.fillRect(0, 0, W, H); ctx.textAlign = "center";
     ctx.fillStyle = "#71ffe8"; ctx.font = "900 46px system-ui"; ctx.fillText(title, W / 2, H / 2 - 74);
     ctx.fillStyle = "#e9fffc"; ctx.font = "700 18px system-ui"; lines.forEach((line, index) => ctx.fillText(line, W / 2, H / 2 - 14 + index * 34)); ctx.textAlign = "left";
