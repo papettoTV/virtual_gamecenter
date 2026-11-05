@@ -33,7 +33,14 @@ async function navigateGuest(page, url, reload = false) {
   if (reload) await page.reload({ waitUntil: 'domcontentloaded' });
   else await page.goto(url, { waitUntil: 'domcontentloaded' });
   const canonicalUrl = new URL(url);
-  canonicalUrl.searchParams.delete('start');
+  // PlatformExperience skips solo preparation (including URL cleanup) for
+  // spectators. DOT WAVE's standalone controller removes start in both roles.
+  // Neither URL behavior authorizes a play; spectator cases below verify real
+  // accounting stays untouched even when start=1 remains in the address bar.
+  if (canonicalUrl.searchParams.get('watch') !== '1'
+    || canonicalUrl.searchParams.get('game') === 'dot-wave') {
+    canonicalUrl.searchParams.delete('start');
+  }
   await expect(page).toHaveURL(canonicalUrl.href);
   expect(await page.evaluate(() => performance.timeOrigin)).not.toBe(previousDocument);
   expect(await page.evaluate(() => document.readyState)).not.toBe('loading');

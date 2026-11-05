@@ -1,5 +1,12 @@
 # Issue #128: 一覧への直接退出
 
+## PR #129 観戦URLの追加修復（2026-11-05）
+
+- `navigateGuest` が観戦時も一律に `start` の削除を待っていたため、会計・退出の検証に到達していなかった。共通 `PlatformExperience` は `watch=1` で開始準備より先に return し、URLを維持する。一方、DOT WAVE の `cabinetController.start` は観戦でも `start` を削除する。通常プレイとこの2種類の観戦URLの期待値を分け、アプリの開始・会計処理は変更していない。
+- 3ゲームの空筐体・プレイヤーありの観戦ケースは維持した。`watch=1&start=1` で開始UIが出ず、キー連打後も実財布が不変、予約・captureを含む会計書き込みゼロ、確認なしの連打退出、筐体接続切断・表示復帰まで引き続き検証する。
+- `node --check apps/web/tests/ui/play-confirmation.spec.mjs` と `git diff --check` は成功。focused Vitest（play-service、platform-experience-play、graze-duel-lifecycle）と `npm test` は Worker 起動時の `listen EPERM 127.0.0.1` で停止し、テスト本体の合否は未確認。
+- `apps/web` の `npm run build:staging` は終了コード0（Wranglerログ作成・チャンク容量の警告あり）。Playwright は `ERR_MODULE_NOT_FOUND` のためPC・スマホのブラウザケースは未実行。独立CI・レビュー、デプロイSHA照合、実端末・検証環境の残高と退出確認は未実施。
+
 ## 現行コードの調査
 
 - BUZZ BARRIER (`graze-duel`) と DEEP SEA SALVAGE (`deep-sea-salvage`) は共通 `GameScreen` を使う。旧 `leave-game.ts` は document の capture 段階で `#game-back-to-arcade`、`#ranking-another-game`、`.mobile-play-leave` を捕捉していた。
