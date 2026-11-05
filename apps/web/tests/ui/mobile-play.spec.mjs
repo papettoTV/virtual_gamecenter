@@ -32,9 +32,15 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 412, height: 915 }
   test(`mobile viewport, invitation, rotation and restoration ${viewport.width}`, async ({ page }) => {
     await page.setViewportSize(viewport);
     const screen = await mount(page, 'graze-duel');
+    // Resolve the real consent panel before exercising the invitation below it.
+    await page.getByRole('button', { name: '拒否する', exact: true }).click();
     const invite = screen.getByRole('button', { name: '観戦に招待', exact: true });
-    const frame = await screen.locator('.game-frame').boundingBox();
     await expect(invite).toBeVisible();
+    await expect(screen.getByRole('button', { name: 'タップして開始（1枚）', exact: true })).toBeVisible();
+    await expect(screen.locator('#touch-pause')).toBeHidden();
+    await expect(screen.locator('.game-share-button')).toHaveCount(0);
+    const frame = await screen.locator('.game-frame').boundingBox();
+    expect(frame.height).toBeGreaterThan(Math.min(viewport.height * .72, 760));
     expect((await invite.boundingBox()).y).toBeGreaterThanOrEqual(frame.y + frame.height);
     await invite.click();
     await expect(page.getByRole('dialog', { name: '観戦に招待', exact: true })).toBeVisible();
