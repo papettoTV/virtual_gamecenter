@@ -505,7 +505,7 @@ class RuleTimestampTests(unittest.TestCase):
         values = ['2026-11-03T11:10:27.241', '2026-11-03T11:10:27.241999Z', '2026-99-03T11:10:27.241Z']
         for value in values:
             self.assertEqual(M.canonical_rule_time(value), value)
-        self.assertEqual(M.canonical_rule_time('2026-11-03T20:10:27.241+09:00'), M.STRICT_RULE_VERSION)
+        self.assertEqual(M.canonical_rule_time('2026-11-03T20:10:27.241+09:00'), '2026-11-03T11:10:27.241Z')
         self.assertNotEqual(M.canonical_rule_time('2026-11-03T20:10:27.242+09:00'), M.STRICT_RULE_VERSION)
 
 

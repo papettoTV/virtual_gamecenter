@@ -22,3 +22,13 @@ test('初回の信頼されたdevelop受付runと現在snapshotだけを許可',
  assert.equal((await authorisedTicket(api,'6590000000',{issue:124,base,now})).pull,125);
  for(const patch of [{run_attempt:2},{path:'.github/workflows/web-checks.yml'},{head_sha:head},{created_at:new Date(now-3600000).toISOString()},{conclusion:'failure'}])await assert.rejects(authorisedTicket(async p=>p.startsWith('issues/')?comment(ticket):{...run,...patch},'6590000000',{issue:124,base,now}));
 });
+test('人が許可した既存ticketだけを除外し、追加3回とsnapshot重複拒否を維持する',()=>{
+ const scope={issue:124,pull:125,head,base};
+ const prior=[6602548641,6646553769,6649212086].map((id,i)=>({...comment({...ticket,head:String(i).repeat(40)}),id}));
+ assert.equal(repairBudget(prior,scope).round,1);
+ const fresh=[4,5,6].map((i)=>({...comment({...ticket,head:String(i).repeat(40)}),id:7000000000+i}));
+ assert.equal(repairBudget([...prior,...fresh],scope).reason,'repair-limit');
+ assert.equal(repairBudget([...prior,comment(ticket)],scope).reason,'duplicate-snapshot');
+ assert.equal(repairBudget(prior,{...scope,head:'0'.repeat(40)}).reason,'duplicate-snapshot');
+ assert.equal(repairBudget(prior.map(c=>({...c,id:c.id+100})),scope).reason,'repair-limit');
+});
