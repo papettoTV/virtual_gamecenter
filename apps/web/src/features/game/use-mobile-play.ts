@@ -67,7 +67,7 @@ export function useMobilePlay(screen: RefObject<HTMLElement | null>) {
     };
   }, [active, screen]);
 
-  return { active, available, paused: context?.phase === "paused", toggle: () => {
+  return { active, available, mobile, ready: context?.role === "player" && context.phase === "ready", inviteOnly: context?.role === "player" && ["ready", "paused"].includes(context.phase), paused: context?.phase === "paused", toggle: () => {
     dismissed.current = active;
     setActive(!active);
   } };

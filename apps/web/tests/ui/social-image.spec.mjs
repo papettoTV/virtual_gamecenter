@@ -209,6 +209,31 @@ for (const [game, filename] of artwork) {
         await page.evaluate(() => window.__finishShare.resolve());
         await expect(dialog.getByRole('status')).toHaveText('共有先に渡しました。');
         await expect.poll(() => nativeHandoffs.length).toBe(1);
+        // A pending handoff belongs to this panel, not a later reopening.
+        await primary.click();
+        await page.evaluate(() => { window.__oldShare = window.__finishShare; });
+        await dialog.getByRole('button', { name: '× 閉じる' }).click();
+        await expect(dialog).toHaveCount(0);
+        await fixture.getByRole('button', { name: '結果を共有', exact: true }).click();
+        await expect(dialog.locator('#share-text')).toBeVisible();
+        await dialog.locator('#share-text').fill('開き直した投稿文');
+        await primary.click();
+        expect(await page.evaluate(() => window.__nativeCalls.length)).toBe(5);
+        expect(await page.evaluate(() => window.__nativeCalls.at(-1))).toEqual({
+          text: '開き直した投稿文',
+          url: await page.evaluate(async () => {
+            const { sharePanel } = await import('/src/features/sharing/share-service.ts');
+            return sharePanel.getSnapshot().url;
+          }),
+        });
+        await page.evaluate(() => window.__oldShare.reject(new DOMException('Cancelled', 'AbortError')));
+        await expect(dialog.getByRole('status')).toHaveCount(0);
+        await primary.click();
+        expect(await page.evaluate(() => window.__nativeCalls.length)).toBe(5);
+        expect(nativeHandoffs).toHaveLength(1);
+        await page.evaluate(() => window.__finishShare.resolve());
+        await expect(dialog.getByRole('status')).toHaveText('共有先に渡しました。');
+        await expect.poll(() => nativeHandoffs.length).toBe(2);
         const close = dialog.getByRole('button', { name: '× 閉じる' });
         await close.focus();
         await page.keyboard.press('Shift+Tab');

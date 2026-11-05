@@ -74,7 +74,7 @@ export function SharePanel() {
   const [previewTarget, setPreviewTarget] = useState<SocialTarget>("x");
   const [choosing, setChoosing] = useState(false);
   const [message, setMessage] = useState("");
-  const sharing = useRef(false);
+  const sharing = useRef<typeof panel>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     setText(panel?.text ?? ""); setImage(null); setChoosing(false); setMessage("");
@@ -140,9 +140,9 @@ export function SharePanel() {
     }
   };
   const share = async () => {
-    if (sharing.current) return;
+    if (sharing.current === panel) return;
     if (!navigator.share) { setChoosing(true); setMessage("共有先を選んでください。"); return; }
-    sharing.current = true; setMessage(""); setChoosing(true);
+    sharing.current = panel; setMessage(""); setChoosing(true);
     try {
       await navigator.share({ text, url: panel.url });
       if (sharePanel.getSnapshot() !== panel) return;
@@ -152,7 +152,7 @@ export function SharePanel() {
       if (sharePanel.getSnapshot() !== panel) return;
       if (error instanceof Error && error.name === "AbortError") setMessage("共有をキャンセルしました。");
       else { setMessage("共有できませんでした。共有先を選ぶか、リンクをコピーしてください。"); setChoosing(true); }
-    } finally { sharing.current = false; }
+    } finally { if (sharing.current === panel) sharing.current = null; }
   };
   return <div className="share-overlay" onKeyDown={event => event.stopPropagation()} onKeyUp={event => event.stopPropagation()} onClick={event => event.stopPropagation()} onPointerDown={event => event.stopPropagation()}>
     <section className={`share-dialog ${panel.kind === "result" ? "share-result-dialog" : ""}`} role="dialog" aria-modal="true" aria-labelledby="share-title">
