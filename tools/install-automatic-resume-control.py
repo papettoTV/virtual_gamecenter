@@ -441,7 +441,9 @@ def maintain(data, baseline, jwt, token, *, api=maintenance_request, app_api=req
                 report['stage'] = 'complete'
         except (Exception, KeyboardInterrupt) as error:
             report['configurationRequired'] = True
-            report['configurationReason'] = str(error) if isinstance(error, Stop) else '配置後の確認で停止しました。認証値・元応答は表示しません。'
+            report['configurationReason'] = ('配置後の確認がCtrl+Cで中断されました。' if isinstance(error, KeyboardInterrupt)
+                                             else str(error) if isinstance(error, Stop)
+                                             else '配置後の確認で停止しました。認証値・元応答は表示しません。')
             report['configurationMessage'] = 'strict復帰後の配置・変数を確定できません。再配置せず--cleanupで確認してください。'
     return report
 
@@ -485,16 +487,23 @@ def human_maintenance(archive, data, baseline, cleaning=False):
     need(input('bypass・信頼定義3件・2変数の人用保守を実行する場合 ci-control と入力: ') == 'ci-control', '中止しました。')
     token = hidden('管理端末専用のFine-grained token（非表示・保存なし）: ')
     need(token.startswith('github_pat_'), '管理端末専用のFine-grained tokenを使用してください。')
+    calls = 0
+    def progress_api(method, path, auth=None, body=None):
+        nonlocal calls
+        calls += 1
+        if calls == 1 or calls % 5 == 0:
+            print(f'GitHub確認 {calls}件目を実行中です。完了表示までお待ちください。', file=sys.stderr, flush=True)
+        return maintenance_request(method, path, auth, body)
     try:
         print('処理中: GitHubの保護設定・配置・2変数を確認しています。通信確認には数分かかる場合があります。', file=sys.stderr, flush=True)
         if cleaning:
             path = maintenance_state_path(archive)
             need(path.is_file() and not path.is_symlink() and path.stat().st_size < 65536, '保守記録がありません。GitHub画面でbypassを確認してください。')
-            result = cleanup_maintenance(data, baseline, token, json.loads(path.read_text()))
+            result = cleanup_maintenance(data, baseline, token, json.loads(path.read_text()), api=progress_api)
         else:
             pem = Path(hidden('人が保管するpulbase-releaseのPEMファイルのパス（非表示）: ')).expanduser().absolute()
             need(pem.is_file() and not pem.is_symlink() and pem.stat().st_size < 16384, '通常の鍵ファイルではありません。')
-            result = maintain(data, baseline, sign(pem), token,
+            result = maintain(data, baseline, sign(pem), token, api=progress_api,
                               checkpoint=lambda state: save_maintenance_state(archive, state))
             if result.get('installation', {}).get('success'):
                 save_receipt(archive, result['installation'])

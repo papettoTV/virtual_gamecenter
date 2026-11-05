@@ -23,13 +23,18 @@ spec.loader.exec_module(m)
 with tempfile.TemporaryDirectory() as directory:
     archive = Path(directory) / 'bundle.zip'
     m.maintenance_state_path(archive).write_text('{}')
-    with patch('builtins.input', return_value='ci-control'), patch.object(m, 'hidden', return_value='github_pat_fake_do_not_print'), patch.object(m, 'cleanup_maintenance', return_value={'mode':'human-maintenance-cleanup','success':True}):
+    def cleanup(*args, api, **kwargs):
+        for i in range(5):
+            api('GET', m.CONTROL_RULE, 'github_pat_fake_do_not_print')
+        return {'mode':'human-maintenance-cleanup','success':True}
+    with patch('builtins.input', return_value='ci-control'), patch.object(m, 'hidden', return_value='github_pat_fake_do_not_print'), patch.object(m, 'cleanup_maintenance', side_effect=cleanup), patch.object(m, 'maintenance_request', return_value=(200,{})):
         m.human_maintenance(archive, {}, {}, cleaning=True)
 ''' % str(path)
         result = subprocess.run([sys.executable, '-c', script], capture_output=True, text=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(json.loads(result.stdout)['success'])
         self.assertIn('処理中:', result.stderr)
+        self.assertIn('GitHub確認 5件目', result.stderr)
         self.assertIn('ツールは終了します。Ctrl+Cは不要', result.stderr)
         self.assertNotIn('github_pat_fake', result.stdout + result.stderr)
 
@@ -427,6 +432,26 @@ class MaintenanceTests(unittest.TestCase):
         self.assertTrue(result['success'], result)
         self.assertTrue(result['installationTokenRevocationConfirmed'])
         self.assertFalse(any(method != 'GET' for method, path, body in f.calls))
+
+    def test_interrupt_after_first_variable_can_finish_only_remaining_variable(self):
+        f = MaintenanceFixture()
+        def interrupt(method, path, auth=None, body=None):
+            if (path == M.STAGING_VARIABLE and f.put_number == 2
+                    and f.variables[M.REPOSITORY_VARIABLE]['value'] != M.BASE):
+                raise KeyboardInterrupt()
+            return f.api(method, path, auth, body)
+        result = M.maintain(f.data, f.baseline, 'fake-jwt', 'fake-token', api=interrupt,
+                           app_api=f.app_api, checkpoint=lambda state: f.states.append(state))
+        self.assertTrue(result['installation']['success'])
+        self.assertTrue(result['bypassRemoved'])
+        self.assertFalse(result['success'])
+        self.assertEqual(result['configurationStage'], 'verify-and-update-variables')
+        self.assertIn('Ctrl+C', result['configurationReason'])
+        f.calls.clear()
+        recovered = M.cleanup_maintenance(f.data, f.baseline, 'fake-token', f.states[-1], api=f.api)
+        self.assertTrue(recovered['success'], recovered)
+        self.assertEqual(recovered['configuration']['updatedVariables'], ['PULBASE_CONTROL_RULE_VERSIONS'])
+        self.assertFalse(any(method not in ('GET', 'PATCH') for method, path, body in f.calls))
 
     def test_missing_administration_write_does_not_begin_installation(self):
         f = MaintenanceFixture()
