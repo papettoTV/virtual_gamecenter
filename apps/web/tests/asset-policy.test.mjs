@@ -94,3 +94,4 @@ test("GLB inspection distinguishes embedded and external resources and rejects b
   assert.deepEqual(inspectGlb(bytes), { generator: "fixture", copyright: null, externalResources: ["texture.png"], embeddedDataUris: 1, imageCount: 1 });
   assert.throws(() => inspectGlb(Buffer.from("broken")), /Invalid GLB/);
 });
+import "./result-overlay-layer.test.mjs";

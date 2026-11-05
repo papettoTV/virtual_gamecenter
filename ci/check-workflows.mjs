@@ -4,6 +4,42 @@ import { resolve } from 'node:path';
 import { parseDocument } from 'yaml';
 import assert from 'node:assert/strict';
 const root = fileURLToPath(new URL('../', import.meta.url));
+// The existing required check remains the final gate, including skipped/cancelled matrix jobs.
+export function checkWebWorkflow(web) {
+  assert.ok(!JSON.stringify(web).includes('secrets.'));
+  assert.deepEqual(web.permissions, {contents: 'read'});
+  assert.deepEqual(web.jobs.verify.needs, ['unit', 'ui']);
+  assert.equal(web.jobs.verify.if, 'always()');
+  assert.deepEqual(web.jobs.ui.strategy.matrix, {project: ['desktop', 'mobile']});
+  assert.equal(web.jobs.ui.strategy['fail-fast'], false);
+  assert.equal(web.jobs.ui.needs, undefined);
+  assert.equal(web.jobs.unit.needs, undefined);
+  for (const job of Object.values(web.jobs)) {
+    assert.equal(job.environment, undefined);
+    assert.equal(job['continue-on-error'], undefined);
+    for (const step of job.steps ?? []) {
+      assert.equal(step['continue-on-error'], undefined);
+      if (step.uses) assert.match(step.uses, /@[a-f0-9]{40}$/);
+    }
+  }
+  const unit = web.jobs.unit.steps;
+  assert.ok(unit.some(s => s.run === 'npm test'));
+  assert.ok(unit.some(s => s.run?.includes('for iteration in 1 2 3')));
+  const ui = web.jobs.ui.steps.find(s => s.run?.includes('test --config ci/ui-local.config.mjs'));
+  assert.equal(ui.run, 'node ci/node_modules/@playwright/test/cli.js test --config ci/ui-local.config.mjs --project=${{ matrix.project }} --reporter=list,blob');
+  const steps = web.jobs.verify.steps;
+  const gate = steps.findIndex(s => s.env?.UNIT_RESULT);
+  assert.ok(gate > 0);
+  assert.equal(steps[gate].if, 'always()');
+  assert.deepEqual(steps[gate].env, {UNIT_RESULT: '${{ needs.unit.result }}', UI_RESULT: '${{ needs.ui.result }}'});
+  assert.equal(steps[gate].run, 'test "$UNIT_RESULT" = success && test "$UI_RESULT" = success');
+  const build = steps.findIndex(s => s.run === 'npm run build:${PULBASE_TARGET_ENVIRONMENT}');
+  const pack = steps.findIndex(s => s.run === 'node ci/staging-artifact.mjs');
+  assert.ok(build > gate && pack > build);
+  assert.equal(steps[build].if, undefined);
+  assert.equal(steps[pack].if, "env.PULBASE_TARGET_ENVIRONMENT == 'staging'");
+  assert.ok(steps.some(s => s.with?.name === 'ui-evidence-${{ github.sha }}-${{ github.run_attempt }}' && s.if === 'always()'));
+}
 export async function checkWorkflows() {
   const entries = [];
   for (const directory of ['.github/workflows', '.github/workflow-templates']) {
@@ -33,6 +69,10 @@ export async function checkWorkflows() {
   assert.equal(issue.jobs.implement.if, "needs.intake.outputs.eligible == 'true'");
   assert.ok(issue.jobs.publish.steps.some(step => step.run === undefined && step.with?.script?.includes('assertAutomaticAssignment')));
   assert.ok(!JSON.stringify(issue).includes('refs/heads/main'));
+  const implementation = issue.jobs.implement.steps.find(step => step.uses?.startsWith('openai/codex-action@'));
+  assert.equal(implementation.with['allow-bots'], "${{ needs.intake.outputs.repair == 'true' && github.actor == 'github-actions[bot]' }}");
+  assert.equal(implementation.with['allow-users'], undefined);
+  assert.equal(implementation.with['allow-bot-users'], undefined);
   const pr = entries.find(item => item.file === 'codex-pr.yml').data;
   assert.deepEqual(pr.on.pull_request.branches, ['develop']);
   for (const name of ['staging', 'regression', 'merge', 'report']) assert.equal(pr.jobs[name], undefined);
@@ -49,8 +89,18 @@ export async function checkWorkflows() {
   assert.ok(!JSON.stringify(develop).includes('secrets.'));
   assert.ok(develop.jobs.retired.steps.some(step => step.run?.includes('exit 1')));
   const web = entries.find(item => item.file === 'web-checks.yml').data;
-  assert.ok(!JSON.stringify(web).includes('secrets.'));
-  assert.ok(JSON.stringify(web.jobs.verify).includes('staging-artifact.mjs'));
+  checkWebWorkflow(web);
+
+  const repair=entries.find(item=>item.file==='automatic-repair.yml').data;
+  assert.deepEqual(repair.permissions,{contents:'read',actions:'write',issues:'write'});
+  assert.equal(repair.concurrency.group,'automatic-repair-repository');
+  assert.equal(repair.concurrency['cancel-in-progress'],false);
+  assert.equal(repair.jobs.coordinate.environment,undefined);
+  assert.ok(!JSON.stringify(repair).includes('secrets.'));
+  assert.equal(repair.jobs.coordinate.steps.find(s=>s.uses?.startsWith('actions/checkout@')).with.ref,'${{ github.sha }}');
+  assert.ok(JSON.stringify(issue.jobs.implement).includes('trusted-repair/repair-workspace.mjs'));
+  assert.ok(JSON.stringify(issue.jobs.publish).includes('REPAIR_MODE'));
+  assert.ok(!issue.jobs.intake.if.includes("github.event.label.name == '実装:再開'"));
 
   const release = entries.find(item => item.file === 'production-release.yml.disabled').data;
   assert.match(release.jobs.prepare.if, /PULBASE_PRODUCTION_ENABLED/);

@@ -4,6 +4,8 @@ import { getPausePresentation } from "./pause-presentation";
 import { createCyberCanyonBackground } from "./cyber-canyon-background";
 import { drawPlayerShip } from "./player-ship";
 import { createCanvasBossRenderer } from "./boss-geometry";
+import { GRAZE_SPARK_WIDTH, sparkFade, clipSpark } from "../graze-sparks";
+import { drawLevelUpLabel } from "../level-up-label";
 
 export function createCanvasRenderer(options) {
   let { context, getAttackCost, randomRange, createLightningBolt } = options;
@@ -69,6 +71,11 @@ export function createCanvasRenderer(options) {
     }
 
     if (!frame.compact && !frame.sceneRendered) drawParticles();
+    if (!frame.compact) {
+      for (const player of frame.players) {
+        drawLevelUpLabel(context, player.levelUpLabel, player.fieldX, FIELD_WIDTH, FIELD_TOP, FIELD_BOTTOM);
+      }
+    }
     drawHitDebug();
     if (frame.paused) drawPaused();
     if (frame.gameOver) drawGameOver();
@@ -87,9 +94,10 @@ export function createCanvasRenderer(options) {
         drawPlayer(selectedPlayer);
         drawParticles();
       }
+      drawLevelUpLabel(context, selectedPlayer.levelUpLabel, selectedPlayer.fieldX, FIELD_WIDTH, FIELD_TOP, FIELD_BOTTOM);
     });
 
-    drawPlayerHud(selectedPlayer);
+    if (!frame.mobileHud) drawPlayerHud(selectedPlayer);
     if (frame.versusParticipant || frame.versusSpectator) drawOpponentInfoHud(otherPlayer);
     if (playerIndex === 0) drawBossSpawnHint();
     drawCenterInfo();
@@ -465,6 +473,7 @@ export function createCanvasRenderer(options) {
   }
 
   function drawCenterInfo() {
+    if (frame.mobileHud) return;
     context.fillStyle = "rgba(0,0,0,0.34)";
     roundRect(WIDTH / 2 - 48, 24, 96, 50, 16);
     context.fill();
@@ -478,6 +487,20 @@ export function createCanvasRenderer(options) {
   function drawParticles() {
     for (const particle of frame.particles) {
       context.save();
+      if (particle.kind === "spark") {
+        const fieldX = particle.fieldX ?? frame.players.find(player => particle.x >= player.fieldX && particle.x <= player.fieldX + FIELD_WIDTH)?.fieldX;
+        const segment = fieldX === undefined ? null : clipSpark(particle, { left: fieldX, right: fieldX + FIELD_WIDTH, top: FIELD_TOP, bottom: FIELD_BOTTOM });
+        if (!segment) { context.restore(); continue; }
+        context.globalAlpha = sparkFade(particle);
+        context.strokeStyle = particle.color;
+        context.lineWidth = GRAZE_SPARK_WIDTH;
+        context.beginPath();
+        context.moveTo(segment.tail.x, segment.tail.y);
+        context.lineTo(segment.head.x, segment.head.y);
+        context.stroke();
+        context.restore();
+        continue;
+      }
       context.globalAlpha = Math.max(0, particle.life * 2);
       context.fillStyle = particle.color;
       context.beginPath();

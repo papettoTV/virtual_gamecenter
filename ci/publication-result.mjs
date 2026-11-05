@@ -6,7 +6,7 @@ export class PublicationStopped extends Error {
   }
 }
 
-export function validatePublicationResult(result) {
+export function validatePublicationResult(result, {allowSyncOnly=false}={}) {
   if (!result || typeof result.summary !== 'string' || result.summary.length > 4000
     || typeof result.patch !== 'string' || Buffer.byteLength(result.patch) > 90000
     || result.patch.includes('GIT binary patch')) {
@@ -15,7 +15,7 @@ export function validatePublicationResult(result) {
   try { assetPlan(result.assets); } catch {
     throw new PublicationStopped('invalid_result', '画像素材一覧の保存先・取得URL・ハッシュ・件数が不正です。PRは作成していません。');
   }
-  if (!result.patch.trim() && !(result.assets?.length)) {
+  if (!allowSyncOnly && !result.patch.trim() && !(result.assets?.length)) {
     throw new PublicationStopped('no_patch', `実装候補の差分が返されなかったため停止しました。PRは作成していません。\n\n実装側の説明：\n${result.summary || '説明は返されませんでした。'}`);
   }
   return result;
