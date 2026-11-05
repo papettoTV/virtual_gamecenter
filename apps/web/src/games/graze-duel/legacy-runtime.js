@@ -22,6 +22,7 @@ import {
   LEVEL_UP_INVINCIBLE_TIME,
 } from "./core";
 import { createGrazeAudio } from "./audio";
+import { emitGrazeSparks } from "./graze-sparks";
 import { BUZZ_BARRIER } from "../../domain/game";
 import { recordWatchStarted } from "../../features/engagement/engagement-client";
 import { createCanvasRenderer } from "./rendering/canvas-renderer";
@@ -3187,7 +3188,7 @@ export function mountGame(context) {
         const gaugeGain = Math.round(42 * player.multiplier);
         player.score += 42;
         player.gauge = Math.min(getAttackCost(player) * 3, player.gauge + gaugeGain);
-        burst(player.x, player.y, player.color, 3);
+        emitGrazeSparks(particles, player.x, player.y, bullet.x, bullet.y, MAX_PARTICLES);
         playGrazeSound(player.combo);
         if (player.gauge >= getAttackCost(player) && player.attackCooldown <= 0) {
           tryAutoAttack(player, getOpponent(player));

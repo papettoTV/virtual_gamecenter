@@ -1,6 +1,7 @@
 import { createPlayerEffects } from "./three-player-effects";
 import * as THREE from "three";
 import { drawPlayerShip } from "./player-ship";
+import { sparkFade, sparkTail } from "../graze-sparks";
 import { createBossModels, getBossAppearance, getBossRotation, writeBossPositions, type BossModel } from "./boss-geometry";
 import type {
   BossRenderState,
@@ -14,6 +15,7 @@ import type {
 
 const MAX_BULLETS = 12_000;
 const MAX_PARTICLES = 512;
+const SPARK_CORNERS = [0, 1, 2, 2, 1, 3];
 
 type BulletAttributes = {
   center: THREE.InstancedBufferAttribute;
@@ -56,7 +58,7 @@ export function createThreeGameRenderer(width: number, height: number): GameScen
   const bossModels = createBossModels();
   const bossVisuals = [createBossVisual(bossModels), createBossVisual(bossModels)];
   const particleVisual = createParticleVisual();
-  scene.add(mesh, particleVisual.points, ...playerVisuals.map((visual) => visual.root), ...bossVisuals.map((visual) => visual.root));
+  scene.add(mesh, particleVisual.points, particleVisual.sparks, ...playerVisuals.map((visual) => visual.root), ...bossVisuals.map((visual) => visual.root));
 
   const colorCache = new Map<string, THREE.Color>();
   let referenceCanvas: HTMLCanvasElement | null = null;
@@ -196,6 +198,9 @@ type ParticleVisual = {
   points: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>;
   positions: THREE.BufferAttribute;
   colors: THREE.BufferAttribute;
+  sparks: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
+  sparkPositions: THREE.BufferAttribute;
+  sparkColors: THREE.BufferAttribute;
 };
 
 function createPlayerVisual(): PlayerVisual {
@@ -315,7 +320,18 @@ function createParticleVisual(): ParticleVisual {
   const points = new THREE.Points(geometry, material);
   points.frustumCulled = false;
   points.renderOrder = 5;
-  return { points, positions, colors };
+  const sparkPositions = new THREE.BufferAttribute(new Float32Array(MAX_PARTICLES * 18), 3).setUsage(THREE.DynamicDrawUsage);
+  const sparkColors = new THREE.BufferAttribute(new Float32Array(MAX_PARTICLES * 18), 3).setUsage(THREE.DynamicDrawUsage);
+  const sparkGeometry = new THREE.BufferGeometry();
+  sparkGeometry.setAttribute("position", sparkPositions);
+  sparkGeometry.setAttribute("color", sparkColors);
+  sparkGeometry.setDrawRange(0, 0);
+  const sparks = new THREE.Mesh(sparkGeometry, new THREE.MeshBasicMaterial({
+    vertexColors: true, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthTest: false, depthWrite: false,
+  }));
+  sparks.frustumCulled = false;
+  sparks.renderOrder = 5;
+  return { points, positions, colors, sparks, sparkPositions, sparkColors };
 }
 
 function updatePlayerVisuals(
@@ -412,17 +428,46 @@ function updateParticleVisual(
   colorCache: Map<string, THREE.Color>,
 ) {
   const count = Math.min(MAX_PARTICLES, particles.length);
+  let pointCount = 0;
+  let sparkCount = 0;
   for (let index = 0; index < count; index += 1) {
     const particle = particles[index]!;
     const point = transformPoint(particle.x, particle.y, transform);
     const color = cachedColor(colorCache, particle.color);
-    visual.positions.setXYZ(index, point.x - width / 2, height / 2 - point.y, 0);
-    visual.colors.setXYZ(index, color.r, color.g, color.b);
+    if (particle.kind === "spark") {
+      const tail = sparkTail(particle);
+      const transformedTail = transformPoint(tail.x, tail.y, transform);
+      const fade = sparkFade(particle);
+      const deltaX = point.x - transformedTail.x;
+      const deltaY = point.y - transformedTail.y;
+      const length = Math.hypot(deltaX, deltaY) || 1;
+      const normalX = -deltaY / length * 0.6 * transform.scale;
+      const normalY = deltaX / length * 0.6 * transform.scale;
+      for (let corner = 0; corner < SPARK_CORNERS.length; corner += 1) {
+        const endpoint = SPARK_CORNERS[corner]!;
+        const head = endpoint >= 2;
+        const side = endpoint % 2 === 0 ? 1 : -1;
+        const vertex = sparkCount * 6 + corner;
+        visual.sparkPositions.setXYZ(vertex,
+          (head ? point.x : transformedTail.x) + normalX * side - width / 2,
+          height / 2 - (head ? point.y : transformedTail.y) - normalY * side, 0);
+        const brightness = fade * (head ? 1 : 0.2);
+        visual.sparkColors.setXYZ(vertex, color.r * brightness, color.g * brightness, color.b * brightness);
+      }
+      sparkCount += 1;
+    } else {
+      visual.positions.setXYZ(pointCount, point.x - width / 2, height / 2 - point.y, 0);
+      visual.colors.setXYZ(pointCount, color.r, color.g, color.b);
+      pointCount += 1;
+    }
   }
-  visual.points.geometry.setDrawRange(0, count);
+  visual.points.geometry.setDrawRange(0, pointCount);
+  visual.sparks.geometry.setDrawRange(0, sparkCount * 6);
   visual.points.material.size = 6 * transform.scale;
   visual.positions.needsUpdate = true;
   visual.colors.needsUpdate = true;
+  visual.sparkPositions.needsUpdate = true;
+  visual.sparkColors.needsUpdate = true;
 }
 
 function disposeVisuals(playerVisuals: PlayerVisual[], bossVisuals: BossVisual[], particleVisual: ParticleVisual) {
@@ -434,6 +479,8 @@ function disposeVisuals(playerVisuals: PlayerVisual[], bossVisuals: BossVisual[]
   for (const visual of bossVisuals) disposeObject(visual.root);
   particleVisual.points.geometry.dispose();
   particleVisual.points.material.dispose();
+  particleVisual.sparks.geometry.dispose();
+  particleVisual.sparks.material.dispose();
 }
 
 function disposeObject(object: THREE.Object3D) {

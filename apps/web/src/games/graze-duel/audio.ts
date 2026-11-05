@@ -5,6 +5,8 @@ type AudioWindow = Window & typeof globalThis & {
 export function createGrazeAudio() {
   let audioContext: AudioContext | null = null;
   let disposed = false;
+  let grazeNoise: AudioBuffer | null = null;
+  let lastGrazeTime = -Infinity;
 
   function getAudioContext(): AudioContext {
     if (!audioContext) {
@@ -23,20 +25,30 @@ export function createGrazeAudio() {
     if (disposed) return;
     const audio = getAudioContext();
     const now = audio.currentTime;
-    const oscillator = audio.createOscillator();
+    if (now - lastGrazeTime < 0.03) return;
+    lastGrazeTime = now;
+    if (!grazeNoise) {
+      grazeNoise = audio.createBuffer(1, Math.ceil(audio.sampleRate * 0.06), audio.sampleRate);
+      const data = grazeNoise.getChannelData(0);
+      for (let index = 0; index < data.length; index += 1) data[index] = Math.random() * 2 - 1;
+    }
+    const noise = audio.createBufferSource();
+    const filter = audio.createBiquadFilter();
     const gainNode = audio.createGain();
-    const pitch = 520 + Math.min(combo, 24) * 18;
-
-    oscillator.type = "triangle";
-    oscillator.frequency.setValueAtTime(pitch, now);
-    oscillator.frequency.exponentialRampToValueAtTime(pitch * 1.35, now + 0.045);
+    noise.buffer = grazeNoise;
+    filter.type = "bandpass";
+    filter.Q.setValueAtTime(0.7, now);
+    filter.frequency.setValueAtTime(5600, now);
+    filter.frequency.exponentialRampToValueAtTime(2200, now + 0.045);
     gainNode.gain.setValueAtTime(0.0001, now);
-    gainNode.gain.exponentialRampToValueAtTime(0.045, now + 0.006);
+    gainNode.gain.exponentialRampToValueAtTime(0.028 + Math.min(combo, 24) * 0.0003, now + 0.002);
     gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.055);
-    oscillator.connect(gainNode);
+    noise.connect(filter);
+    filter.connect(gainNode);
     gainNode.connect(audio.destination);
-    oscillator.start(now);
-    oscillator.stop(now + 0.06);
+    noise.onended = () => { noise.disconnect(); filter.disconnect(); gainNode.disconnect(); };
+    noise.start(now);
+    noise.stop(now + 0.06);
   }
 
   function playAttackSound(): void {
@@ -114,6 +126,7 @@ export function createGrazeAudio() {
       disposed = true;
       const closingContext = audioContext;
       audioContext = null;
+      grazeNoise = null;
       if (closingContext && closingContext.state !== "closed") {
         void closingContext.close().catch(() => {});
       }
