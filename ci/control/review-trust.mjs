@@ -4,7 +4,7 @@ const sha=v=>/^[a-f0-9]{40}$/.test(v??'');
 const required=['AGENTS.md','.github/workflows/codex-pr.yml','.github/workflows/web-checks.yml','ci/prompts/review.md','ci/schemas/review.json','ci/review-receipt.mjs','ci/github.mjs','ci/policy.mjs','ci/issue-routing.mjs','ci/ci-evidence.mjs','ci/staging-artifact.mjs','ci/check-workflows.mjs','ci/package.json','ci/package-lock.json','apps/web/package.json','apps/web/package-lock.json','apps/web/scripts/release-config.mjs','apps/web/scripts/release.mjs','apps/web/scripts/build-pages.mjs','apps/web/scripts/pages-targets.mjs','apps/web/src/pages/gateway.mjs','apps/web/wrangler.jsonc','apps/web/pages/wrangler.jsonc','apps/web/config/pages-targets.json','apps/web/vite.config.ts','.github/workflows/codex-issue.yml','ci/prompts/implement.md','ci/automatic-resume.mjs','ci/publish-patch.mjs','ci/ui-tests.mjs','ci/ui-local.config.mjs','ci/ui-fixtures.mjs','ci/image-assets.mjs','ci/publication-result.mjs','ci/schemas/implementation.json','.github/workflows/automatic-repair.yml','ci/automatic-repair.mjs','ci/repair-ticket.mjs','ci/repair-diagnostics.mjs','ci/repair-workspace.mjs'];
 function need(v,m){if(!v)throw Error(m);}
 export function trustPolicy(value){
- need(value?.version===1&&value.repository===repo&&value.policyId==='review-trust-2026-11-03-v6'
+ need(value?.version===1&&value.repository===repo&&value.policyId==='review-trust-2026-11-04-v7'
   &&value.maxEvidenceAgeMs===86400000&&value.codexVersion==='0.164.0'
   &&value.codexAction==='openai/codex-action@bdf19a4a223ec2549a3e2274a0cf61556bc07675'
   &&JSON.stringify(Object.keys(value.files??{}).sort())===JSON.stringify([...required].sort())

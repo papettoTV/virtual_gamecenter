@@ -102,6 +102,8 @@ jobs:
       - uses: openai/codex-action@bdf19a4a223ec2549a3e2274a0cf61556bc07675
         id: codex
         with:
+          # Only the intake-validated repair ticket may admit the Actions service actor.
+          allow-bots: ${{ needs.intake.outputs.repair == 'true' && github.actor == 'github-actions[bot]' }}
           codex-version: '0.164.0'
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           prompt-file: ci/request.md

@@ -73,6 +73,9 @@ test('発行済みticketの診断と競合snapshotを、権限のない実装エ
  globalThis.fetch=async url=>new Response(JSON.stringify(url.endsWith('/issues/comments/6590000000')?comment:{path:'.github/workflows/automatic-repair.yml',head_sha:base,head_repository:{full_name:repository},event:'workflow_run',run_attempt:1,created_at:new Date().toISOString(),conclusion:null}));
  try{
   const outputs={};await intake({github:f.github,context:{repo,actor:'github-actions[bot]',eventName:'workflow_dispatch',payload:{}},core:{setOutput:(k,v)=>outputs[k]=v},issueInput:'82',resumeInput:'true',repairTicket:'6590000000',bot});
+  for (const actor of ['papettoTV','other[bot]']) {
+   await assert.rejects(intake({github:f.github,context:{repo,actor,eventName:'workflow_dispatch',payload:{}},core:{setOutput(){throw Error('must not accept');}},issueInput:'82',resumeInput:'true',repairTicket:'6590000000',bot}),/検証済みActions bot/);
+  }
   assert.equal(outputs.repair,'true');assert.equal(outputs.base,head);assert.equal(outputs.trusted_base,base);assert.equal(outputs.observed_base,'d'.repeat(40));assert.equal(JSON.parse(outputs.request).repair.diagnostics[0].message,'isMobile is not defined');
  }finally{globalThis.fetch=beforeFetch;if(beforeToken===undefined)delete process.env.GH_TOKEN;else process.env.GH_TOKEN=beforeToken;}
 });
