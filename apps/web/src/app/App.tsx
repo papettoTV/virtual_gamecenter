@@ -18,7 +18,6 @@ import { SharedResultPage } from "../features/sharing/SharedResultPage";
 import { SharePanel } from "../features/sharing/ShareActions";
 import { sharePanel } from "../features/sharing/share-service";
 import { AnalyticsConsent } from "../features/analytics/AnalyticsConsent";
-import { installLeaveGameConfirmation } from "../features/game/leave-game";
 import { Feedback } from "../features/feedback/Feedback";
 import { SiteFooter } from "../features/platform/PlatformPolicies";
 
@@ -28,7 +27,6 @@ const ThreeBulletLab = lazy(async () => {
 });
 
 export function App() {
-  useEffect(installLeaveGameConfirmation, []);
   const [address, setAddress] = useState(() => location.pathname + location.search);
   useEffect(() => {
     const sync = () => setAddress(location.pathname + location.search);
