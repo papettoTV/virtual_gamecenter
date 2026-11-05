@@ -94,6 +94,25 @@ beforeEach(() => {
 afterEach(() => { lifetime.dispose(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe("深海サルベージのmount契約", () => {
+  it("変化していないステータスのDOMを毎フレーム書き換えず、値の変化は表示する", () => {
+    let text = "";
+    const write = vi.fn((value: string) => { text = value; });
+    selectors.set("#salvage-status", { get textContent() { return text; }, set textContent(value: string) { write(value); } });
+    mountGame({ game: DEEP_SEA_SALVAGE, lifetime });
+    const tick = () => {
+      const [handle, callback] = [...frames.entries()][0]!;
+      frames.delete(handle); callback(performance.now() + 16);
+    };
+    tick();
+    expect(write).toHaveBeenCalledTimes(1);
+    tick();
+    expect(write).toHaveBeenCalledTimes(1);
+    mocks.states[0]!.earnedScore += 10;
+    tick();
+    expect(write).toHaveBeenCalledTimes(2);
+    expect(text).toContain("SCORE 10");
+  });
+
   it("縦長でも全体表示なら横移動を制限せず、通常の切り抜き表示では既存範囲を維持する", () => {
     Object.assign(canvas, { getBoundingClientRect: () => ({ width: 390, height: 600 }) });
     mountGame({ game: DEEP_SEA_SALVAGE, lifetime });

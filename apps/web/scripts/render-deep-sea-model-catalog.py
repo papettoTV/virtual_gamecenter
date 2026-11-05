@@ -10,6 +10,7 @@ from mathutils import Vector
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 MODEL_DIR = PROJECT_ROOT / "public" / "assets" / "deep-sea-salvage" / "models"
+ARCHIVE_DIR = PROJECT_ROOT.parents[1] / "assets" / "archive" / "site-public" / "assets" / "deep-sea-salvage" / "models"
 ICON_DIR = PROJECT_ROOT / "public" / "assets" / "deep-sea-salvage" / "encyclopedia"
 ICON_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -89,6 +90,7 @@ def render_icon(name):
 
 
 def build_catalog():
+    ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
     clear_scene()
     for index, name in enumerate(CATALOG_MODELS):
         root = import_glb(name)
@@ -101,7 +103,7 @@ def build_catalog():
         root.location.x += (index % 5) * 5.2
         root.location.y += -(index // 5) * 4.3
         root["catalog_label"] = name
-    bpy.ops.wm.save_as_mainfile(filepath=str(MODEL_DIR / "deep-sea-model-catalog.blend"))
+    bpy.ops.wm.save_as_mainfile(filepath=str(ARCHIVE_DIR / "deep-sea-model-catalog.blend"))
 
 
 parser = argparse.ArgumentParser()

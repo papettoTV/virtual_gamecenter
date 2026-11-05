@@ -72,10 +72,14 @@ test('salvage: book isolation, canvas cancellation, authorized duplicate start a
   // Pausing and auxiliary controls cannot become movement/start input.
   await screen.locator('#touch-pause').click();
   await expect.poll(() => phase(page)).toBe('paused');
+  const statusNodeIsStable = await screen.locator('#salvage-status').evaluate(async status => {
+    const text = status.firstChild;
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    return status.firstChild === text;
+  });
+  expect(statusNodeIsStable).toBe(true);
   await screen.locator('#touch-collection').click();
   await expect(screen).toHaveAttribute('data-salvage-collection', 'true');
-  await screen.locator('#touch-collection').click();
-  await expect(screen).toHaveAttribute('data-salvage-collection', 'false');
   for (const viewport of [{ width: 320, height: 568 }, { width: 844, height: 390 }, { width: 390, height: 700 }]) {
     await page.setViewportSize(viewport);
     const status = await screen.locator('#salvage-status').boundingBox();
@@ -85,12 +89,24 @@ test('salvage: book isolation, canvas cancellation, authorized duplicate start a
     const pause = await screen.locator('#touch-pause').boundingBox();
     const collection = await screen.locator('#touch-collection').boundingBox();
     expect(pause.y).toBeGreaterThanOrEqual(status.y + status.height);
+    expect(collection.y).toBeGreaterThanOrEqual(status.y + status.height);
+    expect(collection.y + collection.height).toBeLessThanOrEqual(viewport.height);
+    expect(collection.x + collection.width).toBeLessThanOrEqual(pause.x);
+    await expect(screen.locator('#touch-collection')).toHaveAccessibleName('図鑑を閉じる');
     expect(collection.width).toBeGreaterThanOrEqual(44);
     expect(collection.height).toBeGreaterThanOrEqual(44);
     const canvas = await screen.locator('#game').boundingBox();
     expect(canvas.width).toBeGreaterThan(0); expect(canvas.height).toBeGreaterThan(0);
     await info.attach(`salvage-${viewport.width}`, { body: await page.screenshot(), contentType: 'image/png' });
+    await screen.locator('#touch-collection').click();
+    await expect(screen).toHaveAttribute('data-salvage-collection', 'false');
+    await expect.poll(() => phase(page)).toBe('paused');
+    await screen.locator('#touch-collection').click();
+    await expect(screen).toHaveAttribute('data-salvage-collection', 'true');
   }
+  await screen.locator('#touch-collection').click();
+  await expect(screen).toHaveAttribute('data-salvage-collection', 'false');
+  expect(writes.filter(u => u.endsWith('/credit-reservations'))).toHaveLength(1);
   await screen.locator('#touch-pause').click();
   await expect.poll(() => phase(page)).toBe('playing');
   await screen.getByRole('button', { name: '通常表示に戻る' }).click();

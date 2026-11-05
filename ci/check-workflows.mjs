@@ -100,6 +100,7 @@ export async function checkWorkflows() {
   assert.equal(repair.jobs.coordinate.steps.find(s=>s.uses?.startsWith('actions/checkout@')).with.ref,'${{ github.sha }}');
   assert.ok(JSON.stringify(issue.jobs.implement).includes('trusted-repair/repair-workspace.mjs'));
   assert.ok(JSON.stringify(issue.jobs.publish).includes('REPAIR_MODE'));
+  assert.equal(issue.jobs.publish.steps.find(s=>s.uses?.startsWith('actions/checkout@')).with['fetch-depth'],0);
   assert.ok(!issue.jobs.intake.if.includes("github.event.label.name == '実装:再開'"));
 
   const release = entries.find(item => item.file === 'production-release.yml.disabled').data;

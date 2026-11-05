@@ -83,7 +83,7 @@ export function readPorts(token){
   const r=await fetch(`https://api.github.com/repos/${repository}/${path}`,{headers:{Authorization:`Bearer ${token}`,Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'},redirect:'error',signal:AbortSignal.timeout(20000)});
   if(!r.ok){await r.body?.cancel();throw Error('診断APIの読み取りに失敗しました');}return r.json();
  };
- const get=(path,maxBuffer)=>execFileSync('gh',['api',`repos/${repository}/${path}`],{env:{PATH:process.env.PATH,HOME:process.env.HOME,GH_HOST:'github.com',GH_TOKEN:token},maxBuffer,stdio:['ignore','pipe','pipe']});
+ const get=(path,maxBuffer)=>execFileSync('gh',['api',`repos/${repository}/${path}`],{env:{PATH:process.env.PATH,HOME:process.env.HOME,GH_HOST:'github.com',GH_TOKEN:token},maxBuffer,timeout:20000,stdio:['ignore','pipe','pipe']});
  return {api,artifact:id=>get(`actions/artifacts/${numericId(id)}/zip`,262144000),log:id=>get(`actions/jobs/${numericId(id)}/logs`,16*1024*1024).toString('utf8')};
 }
 // Runtime is invoked by github-script with its authenticated, trusted API client.

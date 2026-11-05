@@ -1,0 +1,901 @@
+{
+  "checkedOn": "2026-11-03",
+  "sourceRevision": "dd6657d508f1139d237022d1e16c1c63f384abf8",
+  "scope": "Local staging build; no deployment or production access; rights approval not granted",
+  "videos": [
+    {
+      "path": "demos/buzz-barrier/boss-demo-v1.mp4",
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "codec_name": "h264",
+          "codec_type": "video",
+          "width": 392,
+          "height": 536
+        }
+      ],
+      "format": {
+        "duration": "12.000000"
+      }
+    },
+    {
+      "path": "dot-wave-promo.mp4",
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "codec_name": "h264",
+          "codec_type": "video",
+          "width": 1040,
+          "height": 500
+        }
+      ],
+      "format": {
+        "duration": "6.666667"
+      }
+    },
+    {
+      "path": "graze-duel-promo.mp4",
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "codec_name": "h264",
+          "codec_type": "video",
+          "width": 960,
+          "height": 640
+        }
+      ],
+      "format": {
+        "duration": "9.866667"
+      }
+    }
+  ],
+  "dependencies": [
+    {
+      "name": "react",
+      "version": "19.2.7",
+      "license": "MIT"
+    },
+    {
+      "name": "react-dom",
+      "version": "19.2.7",
+      "license": "MIT"
+    },
+    {
+      "name": "scheduler",
+      "version": "0.27.0",
+      "license": "MIT"
+    },
+    {
+      "name": "three",
+      "version": "0.185.1",
+      "license": "MIT"
+    }
+  ],
+  "schemaVersion": 1,
+  "fileCount": 92,
+  "totalBytes": 48467560,
+  "extensions": {
+    "": {
+      "count": 1,
+      "bytes": 24
+    },
+    ".js": {
+      "count": 1,
+      "bytes": 4919
+    },
+    ".png": {
+      "count": 36,
+      "bytes": 10091022
+    },
+    ".json": {
+      "count": 4,
+      "bytes": 8311
+    },
+    ".md": {
+      "count": 1,
+      "bytes": 3444
+    },
+    ".glb": {
+      "count": 26,
+      "bytes": 9927372
+    },
+    ".blend": {
+      "count": 3,
+      "bytes": 24911725
+    },
+    ".svg": {
+      "count": 6,
+      "bytes": 7729
+    },
+    ".jpg": {
+      "count": 7,
+      "bytes": 425548
+    },
+    ".ico": {
+      "count": 1,
+      "bytes": 1794
+    },
+    ".mp4": {
+      "count": 3,
+      "bytes": 3047296
+    },
+    ".html": {
+      "count": 3,
+      "bytes": 38376
+    }
+  },
+  "files": [
+    {
+      "path": ".assetsignore",
+      "extension": "",
+      "bytes": 24,
+      "sha256": "24936f52d53ec14b114e9c4494f0ac06a642df12b0ade2a8a673525acdab11d9"
+    },
+    {
+      "path": "analytics.js",
+      "extension": ".js",
+      "bytes": 4919,
+      "sha256": "69fe4644ecdd9e169296d2c25de1b1d03a17872b5177372a0daffcf7e9c45b16"
+    },
+    {
+      "path": "assets/buzz-barrier/bosses/aerial-fortress.png",
+      "extension": ".png",
+      "bytes": 1630609,
+      "sha256": "c9ce93ce1d651f75f0ea817cf9daf1e9cc042f57430ab37804a8381329ef5b21"
+    },
+    {
+      "path": "assets/buzz-barrier/bosses/heavy-interceptor.png",
+      "extension": ".png",
+      "bytes": 1040219,
+      "sha256": "d145ec888e57c35e24ae885ed3a9de42112315c1c0c0613b668701a7ffc67b6d"
+    },
+    {
+      "path": "assets/buzz-barrier/bosses/provenance.json",
+      "extension": ".json",
+      "bytes": 3817,
+      "sha256": "fae9a7ef24a9c93c61b545af9f57eb78725f7aa26d266b87b8381f96763a327f"
+    },
+    {
+      "path": "assets/buzz-barrier/bosses/stealth-flying-boat.png",
+      "extension": ".png",
+      "bytes": 1094999,
+      "sha256": "53e7ce551d56897ad3738e2abedec12e4ecd8fb36e45d0c45226d262a0763eac"
+    },
+    {
+      "path": "assets/buzz-barrier-icon.png",
+      "extension": ".png",
+      "bytes": 113431,
+      "sha256": "63e236af270afd694c6cc12a1e8b72297ab8fac69084fdc477b365e524ba77ce"
+    },
+    {
+      "path": "assets/deep-sea-salvage/encyclopedia/abyss-eel.png",
+      "extension": ".png",
+      "bytes": 172288,
+      "sha256": "f79c233f25658a45b08a14bc55f7df54e73988b069d32611a9af686be9610224"
+    },
+    {
+      "path": "assets/deep-sea-salvage/encyclopedia/black-fang.png",
+      "extension": ".png",
+      "bytes": 187296,
+      "sha256": "99319a538371ebdc9f5351279dcfc8a02e4f00b90e42cf8c5337db8f1347d75a"
+    },
+    {
+      "path": "assets/deep-sea-salvage/encyclopedia/blue-puffer.png",
+      "extension": ".png",
+      "bytes": 335398,
+      "sha256": "102ff5c371453b2579281eda8fdd2cedf82e0536165e4c3098c733a19d25a9f4"
+    },
+    {
+      "path": "assets/deep-sea-salvage/encyclopedia/cliff-detail.png",
+      "extension": ".png",
+      "bytes": 147930,
+      "sha256": "711ea13e4cb83badff3b5f89a457b2fe58db45b2701cc80637a818f755f622b9"
+    },
+    {
+      "path": "assets/deep-sea-salvage/encyclopedia/comet-eel.png",
+      "extension": ".png",
+      "bytes": 188584,
+      "sha256": "4870adc2777aff32a77e6a832a84c7dd6ad73846ae3c1f1bc9a3c09d0529a213"
+    },
+    {
+      "path": "assets/deep-sea-salvage/encyclopedia/coral-ray.png",
+      "extension": ".png",
+      "bytes": 161894,
+      "sha256": "663827a4af436490868721512db71c7f4990e7b79afbce49464c78245386a29e"
+    },
+    {
+      "path": "assets/deep-sea-salvage/encyclopedia/crown-jelly.png",
+      "extension": ".png",
+      "bytes": 208000,
+      "sha256": "b4db74dff8ad3d8bbdcc6e84cdc0be8adf5c50f7dd59b395bcc52bd888b01105"
+    },
+    {
+      "path": "assets/deep-sea-salvage/encyclopedia/deep-ray.png",
+      "extension": ".png",
+      "bytes": 151750,
+      "sha256": "d62692df55c7d81e29016acdaba0fec9254f89385c68dca3c3474ab1e071cb89"
+    },
+    {
+      "path": "assets/deep-sea-salvage/encyclopedia/ghost-squid.png",
+      "extension": ".png",
+      "bytes": 216542,
+      "sha256": "5bb1453adafb4863de24dea4a692aabe7cce1c6a672e8975b133e5a1856d99b7"
+    },
+    {
+      "path": "assets/deep-sea-salvage/encyclopedia/glass-bream.png",
+      "extension": ".png",
+      "bytes": 246424,
+      "sha256": "7447ce829f1a10c6deb7bc11a8cd9e0314e26ab57c453f1dc8b117d3849d352a"
+    },
+    {
+      "path": "assets/deep-sea-salvage/encyclopedia/kelp.png",
+      "extension": ".png",
+      "bytes": 207278,
+      "sha256": "5d2dba79ec42c2a264adf09bf6dd357d7ac43eef79946a669af31232c6f15525"
+    },
+    {
+      "path": "assets/deep-sea-salvage/encyclopedia/lantern-cod.png",
+      "extension": ".png",
+      "bytes": 210927,
+      "sha256": "c4e2570e27e9a5fc6289c9afcc0699ebd63ee86d76aa0f4fc1730d9c4be71424"
+    },
+    {
+      "path": "assets/deep-sea-salvage/encyclopedia/leviathan.png",
+      "extension": ".png",
+      "bytes": 146355,
+      "sha256": "a8a81b18ca8b0bfe53a6fe4f21bcf12d332a1d74cb8472c59a52deb014725b0c"
+    },
+    {
+      "path": "assets/deep-sea-salvage/encyclopedia/moon-jelly.png",
+      "extension": ".png",
+      "bytes": 189600,
+      "sha256": "e23e7a7b79561d8a78e47f1be3cc66f73d9e4b3b30b667ff77664d09cb1f2e34"
+    },
+    {
+      "path": "assets/deep-sea-salvage/encyclopedia/prism-fish.png",
+      "extension": ".png",
+      "bytes": 222327,
+      "sha256": "c919e8443fa8fe29439c9b79be788dd722abb5e6021027dee2ec4e325c9a8392"
+    },
+    {
+      "path": "assets/deep-sea-salvage/encyclopedia/ribbon-goby.png",
+      "extension": ".png",
+      "bytes": 187947,
+      "sha256": "9dc01ab8b464ff5da9598b8cc59a5e55f997518ad1d0a4fc4d1a03af17651751"
+    },
+    {
+      "path": "assets/deep-sea-salvage/encyclopedia/ruby-angler.png",
+      "extension": ".png",
+      "bytes": 274705,
+      "sha256": "7819f0217f67c9fd96a51253fdfcc5759278a917d337b1ec2fc804bd9a7d8d18"
+    },
+    {
+      "path": "assets/deep-sea-salvage/encyclopedia/saw-shrimp.png",
+      "extension": ".png",
+      "bytes": 145221,
+      "sha256": "8bb298f3343a3ad15886b647be43644686cbe099516b1ff3a65a408cedaae6eb"
+    },
+    {
+      "path": "assets/deep-sea-salvage/encyclopedia/silver-hatchet.png",
+      "extension": ".png",
+      "bytes": 284151,
+      "sha256": "f93a2b5ccdb80c73a6ae366d06891bc6aa32572bde0c244bd39c707a3b5aaceb"
+    },
+    {
+      "path": "assets/deep-sea-salvage/encyclopedia/star-mouth.png",
+      "extension": ".png",
+      "bytes": 257068,
+      "sha256": "cf9fc1bb97ed5c4c9fde90605470530e8e206c2e336bf02c6e4300382b437c74"
+    },
+    {
+      "path": "assets/deep-sea-salvage/encyclopedia/sun-sardine.png",
+      "extension": ".png",
+      "bytes": 196683,
+      "sha256": "4350ad0ac6d3dc975d5cae4312b399c3be6346e2a01ee6371b68387075c5cbe6"
+    },
+    {
+      "path": "assets/deep-sea-salvage/encyclopedia/veil-squid.png",
+      "extension": ".png",
+      "bytes": 221046,
+      "sha256": "003a657cd544333939ee2d0153b7288bd4ffa97a1e47f7411d0daa6504b179d2"
+    },
+    {
+      "path": "assets/deep-sea-salvage/encyclopedia/vent.png",
+      "extension": ".png",
+      "bytes": 226829,
+      "sha256": "e948bd158d823645c9d6d52597488bf424af4ef8346513748bb2620f418f4743"
+    },
+    {
+      "path": "assets/deep-sea-salvage/encyclopedia/void-manta.png",
+      "extension": ".png",
+      "bytes": 176301,
+      "sha256": "71f1825c7cb122f88e4fe77521451edc80d5b9cd6adc8ba0efe3710543eb4423"
+    },
+    {
+      "path": "assets/deep-sea-salvage/models/README.md",
+      "extension": ".md",
+      "bytes": 3444,
+      "sha256": "08401d87d495b82031b055d84163c50b627dc09cc2771ea9a4132fe7614c45c8"
+    },
+    {
+      "path": "assets/deep-sea-salvage/models/abyss-eel.glb",
+      "extension": ".glb",
+      "bytes": 514380,
+      "sha256": "ca04a412627fb49ab6def4f364e455ad5b1efcc7a487171d2e5fb94ec36261b9",
+      "glb": {
+        "generator": "THREE.GLTFExporter r185",
+        "copyright": null,
+        "externalResources": [],
+        "embeddedDataUris": 0,
+        "imageCount": 0
+      }
+    },
+    {
+      "path": "assets/deep-sea-salvage/models/black-fang.glb",
+      "extension": ".glb",
+      "bytes": 454652,
+      "sha256": "91dfe1432d7e09940a0222be63da2c0bdc3da286b94c05d5326d1076f978c8be",
+      "glb": {
+        "generator": "THREE.GLTFExporter r185",
+        "copyright": null,
+        "externalResources": [],
+        "embeddedDataUris": 0,
+        "imageCount": 0
+      }
+    },
+    {
+      "path": "assets/deep-sea-salvage/models/blue-puffer.glb",
+      "extension": ".glb",
+      "bytes": 397452,
+      "sha256": "04fb1ba6ee1e9b12137943ed50953fbc66727698738c435a023af4e2e38181c1",
+      "glb": {
+        "generator": "THREE.GLTFExporter r185",
+        "copyright": null,
+        "externalResources": [],
+        "embeddedDataUris": 0,
+        "imageCount": 0
+      }
+    },
+    {
+      "path": "assets/deep-sea-salvage/models/cliff-detail.glb",
+      "extension": ".glb",
+      "bytes": 121992,
+      "sha256": "ef07eb641a33775d91c4b11ff5d0e7268f1a14b70d0cad5fd228e600c417faa6",
+      "glb": {
+        "generator": "THREE.GLTFExporter r185",
+        "copyright": null,
+        "externalResources": [],
+        "embeddedDataUris": 0,
+        "imageCount": 0
+      }
+    },
+    {
+      "path": "assets/deep-sea-salvage/models/comet-eel.glb",
+      "extension": ".glb",
+      "bytes": 527352,
+      "sha256": "7bf54b5317da3815796a8c9d847156e654da0e14a60644b41b266074cc33bbb1",
+      "glb": {
+        "generator": "THREE.GLTFExporter r185",
+        "copyright": null,
+        "externalResources": [],
+        "embeddedDataUris": 0,
+        "imageCount": 0
+      }
+    },
+    {
+      "path": "assets/deep-sea-salvage/models/coral-ray.glb",
+      "extension": ".glb",
+      "bytes": 216052,
+      "sha256": "886d3c2228fc0e60ba7d735b8aea112a2f7df270c9bd8e4c44d929ef85fb64d0",
+      "glb": {
+        "generator": "THREE.GLTFExporter r185",
+        "copyright": null,
+        "externalResources": [],
+        "embeddedDataUris": 0,
+        "imageCount": 0
+      }
+    },
+    {
+      "path": "assets/deep-sea-salvage/models/crown-jelly.glb",
+      "extension": ".glb",
+      "bytes": 352140,
+      "sha256": "0db0f7e91963f74dd59633aaf22bad841a6bad2987aec7141878fbeded40740d",
+      "glb": {
+        "generator": "THREE.GLTFExporter r185",
+        "copyright": null,
+        "externalResources": [],
+        "embeddedDataUris": 0,
+        "imageCount": 0
+      }
+    },
+    {
+      "path": "assets/deep-sea-salvage/models/deep-ray.glb",
+      "extension": ".glb",
+      "bytes": 216064,
+      "sha256": "34b33b727555977a06d32e102a0f53666ea0d0cf37f82dac073862bb88431da2",
+      "glb": {
+        "generator": "THREE.GLTFExporter r185",
+        "copyright": null,
+        "externalResources": [],
+        "embeddedDataUris": 0,
+        "imageCount": 0
+      }
+    },
+    {
+      "path": "assets/deep-sea-salvage/models/deep-sea-model-catalog.blend",
+      "extension": ".blend",
+      "bytes": 21800805,
+      "sha256": "9893715e7056ae13a72fe3ac2bbbc768a76231ab15cde69e8d3b1643dfb2bfd5"
+    },
+    {
+      "path": "assets/deep-sea-salvage/models/fish-blender-preview.png",
+      "extension": ".png",
+      "bytes": 589516,
+      "sha256": "3176b688eac6de1308ba3fcc40806aca51b7b9d9f35b6deba021a0558e727722"
+    },
+    {
+      "path": "assets/deep-sea-salvage/models/fish.blend",
+      "extension": ".blend",
+      "bytes": 1257049,
+      "sha256": "7aa93f77ba3c7480b7dcd73c87442dd7f988280788c55008fdc73220f426a005"
+    },
+    {
+      "path": "assets/deep-sea-salvage/models/fish.glb",
+      "extension": ".glb",
+      "bytes": 219648,
+      "sha256": "3e64f0254880b24f02491383610b2f5bd85e7db45da2bf5d7bd1b351b9074584",
+      "glb": {
+        "generator": "THREE.GLTFExporter r185",
+        "copyright": null,
+        "externalResources": [],
+        "embeddedDataUris": 0,
+        "imageCount": 0
+      }
+    },
+    {
+      "path": "assets/deep-sea-salvage/models/ghost-squid.glb",
+      "extension": ".glb",
+      "bytes": 560972,
+      "sha256": "e259722f648f7c95f7bfddbc115f11e1bcb34dd0f61f9a8cf815e05fdb9de3f9",
+      "glb": {
+        "generator": "THREE.GLTFExporter r185",
+        "copyright": null,
+        "externalResources": [],
+        "embeddedDataUris": 0,
+        "imageCount": 0
+      }
+    },
+    {
+      "path": "assets/deep-sea-salvage/models/glass-bream.glb",
+      "extension": ".glb",
+      "bytes": 449740,
+      "sha256": "b35416fab08b4dc8f58f32bfccde7e5802d6db054798318291c01f63d89866ee",
+      "glb": {
+        "generator": "THREE.GLTFExporter r185",
+        "copyright": null,
+        "externalResources": [],
+        "embeddedDataUris": 0,
+        "imageCount": 0
+      }
+    },
+    {
+      "path": "assets/deep-sea-salvage/models/kelp.glb",
+      "extension": ".glb",
+      "bytes": 159440,
+      "sha256": "de80579b2818a1765ffd61780f237f76cb2b03f9995e669f609eae6c61e46c04",
+      "glb": {
+        "generator": "THREE.GLTFExporter r185",
+        "copyright": null,
+        "externalResources": [],
+        "embeddedDataUris": 0,
+        "imageCount": 0
+      }
+    },
+    {
+      "path": "assets/deep-sea-salvage/models/lantern-cod.glb",
+      "extension": ".glb",
+      "bytes": 478900,
+      "sha256": "e9e314143bba02468e50ea40f10324c2f715b15789a4c1a3dc13c3d3db369e0f",
+      "glb": {
+        "generator": "THREE.GLTFExporter r185",
+        "copyright": null,
+        "externalResources": [],
+        "embeddedDataUris": 0,
+        "imageCount": 0
+      }
+    },
+    {
+      "path": "assets/deep-sea-salvage/models/leviathan.glb",
+      "extension": ".glb",
+      "bytes": 241068,
+      "sha256": "d02539a04f290004a9a6c05f469fa9d2dca765e7c4aa494a1c9ec995c91ceb08",
+      "glb": {
+        "generator": "THREE.GLTFExporter r185",
+        "copyright": null,
+        "externalResources": [],
+        "embeddedDataUris": 0,
+        "imageCount": 0
+      }
+    },
+    {
+      "path": "assets/deep-sea-salvage/models/manifest.json",
+      "extension": ".json",
+      "bytes": 2403,
+      "sha256": "bac124c052b7582c2d7173da48658df86caf1f7bdd99f4ad073f2e4fd3d74409"
+    },
+    {
+      "path": "assets/deep-sea-salvage/models/moon-jelly.glb",
+      "extension": ".glb",
+      "bytes": 316840,
+      "sha256": "21d835fefa0fe7806a1cfbfc1e18ecc7d079b717ad9a5dbff2d880b664e6e159",
+      "glb": {
+        "generator": "THREE.GLTFExporter r185",
+        "copyright": null,
+        "externalResources": [],
+        "embeddedDataUris": 0,
+        "imageCount": 0
+      }
+    },
+    {
+      "path": "assets/deep-sea-salvage/models/prism-fish.glb",
+      "extension": ".glb",
+      "bytes": 449972,
+      "sha256": "c75ef47d6272b8fa4b0417ff76d172b179ad05cc4b37894c3c9023248c91dbd3",
+      "glb": {
+        "generator": "THREE.GLTFExporter r185",
+        "copyright": null,
+        "externalResources": [],
+        "embeddedDataUris": 0,
+        "imageCount": 0
+      }
+    },
+    {
+      "path": "assets/deep-sea-salvage/models/ribbon-goby.glb",
+      "extension": ".glb",
+      "bytes": 456648,
+      "sha256": "22f77522b74cd033bbdaf5f9cd660682800e25bd4a120f240a6bce6201d6108a",
+      "glb": {
+        "generator": "THREE.GLTFExporter r185",
+        "copyright": null,
+        "externalResources": [],
+        "embeddedDataUris": 0,
+        "imageCount": 0
+      }
+    },
+    {
+      "path": "assets/deep-sea-salvage/models/ruby-angler.glb",
+      "extension": ".glb",
+      "bytes": 406400,
+      "sha256": "fdab3af1a6275b33a0efa9df62fe8fad2101230f288f5b6915b3bc0932370805",
+      "glb": {
+        "generator": "THREE.GLTFExporter r185",
+        "copyright": null,
+        "externalResources": [],
+        "embeddedDataUris": 0,
+        "imageCount": 0
+      }
+    },
+    {
+      "path": "assets/deep-sea-salvage/models/saw-shrimp.glb",
+      "extension": ".glb",
+      "bytes": 855600,
+      "sha256": "779bdf875a71adc899b2cd98278c780013ffdde6b6fc0f0e4a39a89f72ab8b07",
+      "glb": {
+        "generator": "THREE.GLTFExporter r185",
+        "copyright": null,
+        "externalResources": [],
+        "embeddedDataUris": 0,
+        "imageCount": 0
+      }
+    },
+    {
+      "path": "assets/deep-sea-salvage/models/silver-hatchet.glb",
+      "extension": ".glb",
+      "bytes": 471644,
+      "sha256": "34ec02c36f09ecdcf8a1cf4e6f20cf33c589e25f4c4ac4ca60354bdfec10f1a5",
+      "glb": {
+        "generator": "THREE.GLTFExporter r185",
+        "copyright": null,
+        "externalResources": [],
+        "embeddedDataUris": 0,
+        "imageCount": 0
+      }
+    },
+    {
+      "path": "assets/deep-sea-salvage/models/star-mouth.glb",
+      "extension": ".glb",
+      "bytes": 406396,
+      "sha256": "45f2d538dd903c55f7a8348ea000e004736d993e057451464f3a1e0d9f0dc1c6",
+      "glb": {
+        "generator": "THREE.GLTFExporter r185",
+        "copyright": null,
+        "externalResources": [],
+        "embeddedDataUris": 0,
+        "imageCount": 0
+      }
+    },
+    {
+      "path": "assets/deep-sea-salvage/models/submarine-blender-preview.png",
+      "extension": ".png",
+      "bytes": 598783,
+      "sha256": "98ee12d17a299536996a10d512f46f9d4d83ce90518af6da8a1d5c36fbb9a057"
+    },
+    {
+      "path": "assets/deep-sea-salvage/models/submarine.blend",
+      "extension": ".blend",
+      "bytes": 1853871,
+      "sha256": "3eaca218d092ee423d0b18b2df10ec22a3815424d11aaf909719f3f0a72bc23b"
+    },
+    {
+      "path": "assets/deep-sea-salvage/models/submarine.glb",
+      "extension": ".glb",
+      "bytes": 358924,
+      "sha256": "8b0f45293467bf513d0eca35ffb5c41a16dc9c778f76b376f6391e5fa18d9376",
+      "glb": {
+        "generator": "THREE.GLTFExporter r185",
+        "copyright": null,
+        "externalResources": [],
+        "embeddedDataUris": 0,
+        "imageCount": 0
+      }
+    },
+    {
+      "path": "assets/deep-sea-salvage/models/sun-sardine.glb",
+      "extension": ".glb",
+      "bytes": 461416,
+      "sha256": "398f3ed881316e6c5da67b6ed7e4f57c6262dbcd6d31c967f32a5b9a92dd5a36",
+      "glb": {
+        "generator": "THREE.GLTFExporter r185",
+        "copyright": null,
+        "externalResources": [],
+        "embeddedDataUris": 0,
+        "imageCount": 0
+      }
+    },
+    {
+      "path": "assets/deep-sea-salvage/models/veil-squid.glb",
+      "extension": ".glb",
+      "bytes": 560960,
+      "sha256": "1d312b264b202672d857c52c56c636414140cb5bef89c37f5993969e49aa69f4",
+      "glb": {
+        "generator": "THREE.GLTFExporter r185",
+        "copyright": null,
+        "externalResources": [],
+        "embeddedDataUris": 0,
+        "imageCount": 0
+      }
+    },
+    {
+      "path": "assets/deep-sea-salvage/models/vent.glb",
+      "extension": ".glb",
+      "bytes": 43692,
+      "sha256": "a87da0c77832bc292f3d8344a992c68772ac5c084195bc97923daa61529b8d77",
+      "glb": {
+        "generator": "THREE.GLTFExporter r185",
+        "copyright": null,
+        "externalResources": [],
+        "embeddedDataUris": 0,
+        "imageCount": 0
+      }
+    },
+    {
+      "path": "assets/deep-sea-salvage/models/void-manta.glb",
+      "extension": ".glb",
+      "bytes": 229028,
+      "sha256": "7896eb341a9a9156e6052d7433e5edcc435596cd308eb0b06f9b2869055bc16f",
+      "glb": {
+        "generator": "THREE.GLTFExporter r185",
+        "copyright": null,
+        "externalResources": [],
+        "embeddedDataUris": 0,
+        "imageCount": 0
+      }
+    },
+    {
+      "path": "assets/deep-sea-salvage-icon.svg",
+      "extension": ".svg",
+      "bytes": 840,
+      "sha256": "ceb18ac3172a927e4bf9727ab8c9429689791ffd25d93013ece513c7d712b44d"
+    },
+    {
+      "path": "assets/dot-wave-icon.svg",
+      "extension": ".svg",
+      "bytes": 1676,
+      "sha256": "d6fe43d838335deac0d6cc0fbd9c7d65d8444245b0174a3596d1209eed137bce"
+    },
+    {
+      "path": "assets/mochi-beat-icon.svg",
+      "extension": ".svg",
+      "bytes": 2845,
+      "sha256": "ca13fd7a74214e228a554aa8d898514cf013284950f5ced818470e8ef8c75e42"
+    },
+    {
+      "path": "assets/showroom/arcade-ambient-v1.jpg",
+      "extension": ".jpg",
+      "bytes": 115751,
+      "sha256": "19d839c1bb0a6d8d1643ba08b0606d985495567527ba23fcc5cc3d1cf4795d21"
+    },
+    {
+      "path": "assets/showroom/arcade-ambient-v1.json",
+      "extension": ".json",
+      "bytes": 807,
+      "sha256": "d7c1d3e8dd972d9727c9dd9ba00762c136a1a4ce6c38218a1515f5b6b20abdbc"
+    },
+    {
+      "path": "brand/favicon-16.png",
+      "extension": ".png",
+      "bytes": 356,
+      "sha256": "4275691d929823ad0746ab317f489c49df0121f5f635be6ad86be0804c46db6c"
+    },
+    {
+      "path": "brand/favicon-180.png",
+      "extension": ".png",
+      "bytes": 3193,
+      "sha256": "c59a4d4cb7503e0ed4bfa6658b0606264b52aacf51b219b16e0a82361f119fde"
+    },
+    {
+      "path": "brand/favicon-192.png",
+      "extension": ".png",
+      "bytes": 3415,
+      "sha256": "348063f84a8ab2e246796e30e5506bf6ba8402db70be7dac219d26bb9b8c4e37"
+    },
+    {
+      "path": "brand/favicon-32.png",
+      "extension": ".png",
+      "bytes": 544,
+      "sha256": "dcbdbcdaed25967178feaadea41e99b137bea0d160ae0c9e90d911039ebb6c79"
+    },
+    {
+      "path": "brand/favicon-512.png",
+      "extension": ".png",
+      "bytes": 13775,
+      "sha256": "ec345d28cfdb5987661764a438e0430a4de8e2d1b054c4e4e8ed1009a37fbcaf"
+    },
+    {
+      "path": "brand/favicon.ico",
+      "extension": ".ico",
+      "bytes": 1794,
+      "sha256": "15a0a24c48d3926a24a42c55bb9f8b52c3057855288c5865b03846368851914f"
+    },
+    {
+      "path": "brand/favicon.svg",
+      "extension": ".svg",
+      "bytes": 643,
+      "sha256": "4303a26e8c5d5db35a2b934e579eed414831b1e18fb5b50d9879e06a53f22266"
+    },
+    {
+      "path": "brand/pulbase-logo.svg",
+      "extension": ".svg",
+      "bytes": 296,
+      "sha256": "d9501135e4d94c3c7cc835988e54936c99fa3487ddebbcace44fead391383b57"
+    },
+    {
+      "path": "brand/pulbase-wordmark.svg",
+      "extension": ".svg",
+      "bytes": 1429,
+      "sha256": "2c13717ece992cd5b2cf31c1236a3240a50a6f6f95430fccc2387aec0f8c6a6e"
+    },
+    {
+      "path": "brand/social-card.png",
+      "extension": ".png",
+      "bytes": 39638,
+      "sha256": "09be4a9fbd3469b485cb663a4ad6ab7b82f22debb6edb7f65b9e823a7dca5715"
+    },
+    {
+      "path": "demos/buzz-barrier/boss-demo-v1.jpg",
+      "extension": ".jpg",
+      "bytes": 18335,
+      "sha256": "bae9ab2216562028d58255434d5850905fc1bc14d8065fc13e9863ec04232073"
+    },
+    {
+      "path": "demos/buzz-barrier/boss-demo-v1.json",
+      "extension": ".json",
+      "bytes": 1284,
+      "sha256": "57fa21a3409b0b52b307727261be157882baceb938d2a0f44e12b30352be2106"
+    },
+    {
+      "path": "demos/buzz-barrier/boss-demo-v1.mp4",
+      "extension": ".mp4",
+      "bytes": 1725327,
+      "sha256": "b73d55e3d7afc9f501d10f133976107e8e7f068063818b090e2e7ac4b9525e63"
+    },
+    {
+      "path": "dot-wave-promo-poster.jpg",
+      "extension": ".jpg",
+      "bytes": 113161,
+      "sha256": "44fee045f4f672f4344c92ef7d3619580078f2607431ab4397a09f2bc25c57bd"
+    },
+    {
+      "path": "dot-wave-promo.mp4",
+      "extension": ".mp4",
+      "bytes": 469597,
+      "sha256": "911993e59808c8800caffccd2f7b64a45967945a539cc491b04a0ccf1435b1f7"
+    },
+    {
+      "path": "graze-duel-promo-poster.jpg",
+      "extension": ".jpg",
+      "bytes": 24521,
+      "sha256": "6a72f5db3281af5af6e138533a98a7fa8e963b12e35c07fdd1fbfe48d1856455"
+    },
+    {
+      "path": "graze-duel-promo.mp4",
+      "extension": ".mp4",
+      "bytes": 852372,
+      "sha256": "d8d7e511da2caa87d7ac66cd9c1a88f82b1d44e0b1ddf3c78c9494c1b6c6d6ba"
+    },
+    {
+      "path": "legal/privacy.html",
+      "extension": ".html",
+      "bytes": 20825,
+      "sha256": "f69393ce87674abe5d6a9908b815de5dd7c2bc32b217a93a62840a6f85ecc363"
+    },
+    {
+      "path": "legal/terms.html",
+      "extension": ".html",
+      "bytes": 12386,
+      "sha256": "ee45283ba29cae7639faa63a9dfe3e0c50a1a417dc78983244da2bbabfbb0971"
+    },
+    {
+      "path": "social/buzz-barrier-ogp-v2.jpg",
+      "extension": ".jpg",
+      "bytes": 48809,
+      "sha256": "78936b2ab3f306b4646e6ef72dc168bb5b7a79a3a3c1e42f7d82f5de6fe28dc8"
+    },
+    {
+      "path": "social/deep-sea-salvage-ogp-v2.jpg",
+      "extension": ".jpg",
+      "bytes": 34426,
+      "sha256": "3041d2378eddda0aed1a8a9d2d1f3a8b06d6b9daf260f41b47d29cf61faf5251"
+    },
+    {
+      "path": "social/dot-wave-ogp-v2.jpg",
+      "extension": ".jpg",
+      "bytes": 70545,
+      "sha256": "dd016c80592ca966d5bd47a8f3e6096314772e0d8526124fed2fe117b234c7b2"
+    },
+    {
+      "path": "third-party-notices.html",
+      "extension": ".html",
+      "bytes": 5165,
+      "sha256": "73507dbd606ee49d1f8a9b8742997f3525fb2a87502788a1406106d872e65463"
+    }
+  ],
+  "build": {
+    "matched": 91,
+    "missing": [],
+    "changed": [],
+    "configurationChanges": [
+      ".assetsignore"
+    ],
+    "additionalPaths": [
+      "_routes.json",
+      "_worker.js",
+      "assets/GLTFLoader-BUPLtcZo.js",
+      "assets/ThreeBulletLab-BlnMbhbX.js",
+      "assets/ThreeBulletLab-C_RhwqZb.css",
+      "assets/boss-geometry-_gMa-EzJ.js",
+      "assets/entry-CaGxqHw7.js",
+      "assets/entry-cfW19Mgg.css",
+      "assets/game-B_0EbI9D.js",
+      "assets/index-Bo2XNeCj.css",
+      "assets/index-DcqAyRIn.js",
+      "assets/model-catalog-preview-CdFh34nd.js",
+      "assets/ranking-client-DmYA36QX.js",
+      "assets/renderer-CBLn7L1O.js",
+      "assets/result-summary-BXKpmvQ3.js",
+      "assets/runtime-6vbz0YkH.js",
+      "assets/runtime-GP5cd0tT.js",
+      "assets/sharing-image-DDwsCYtg.js",
+      "assets/showcase-demo-C0b55DTZ.js",
+      "assets/species-IDN1c22o.js",
+      "assets/three-game-layer-DVDCf7jS.js",
+      "assets/three-game-renderer-K0T93qvg.js",
+      "assets/three-preview-CZ7CfTab.js",
+      "assets/three.module-CDlGjO_q.js",
+      "index.html"
+    ]
+  }
+}

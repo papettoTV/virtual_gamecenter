@@ -45,9 +45,16 @@
   font: 700 14px / 1.4 system-ui;
   color: #e9fffc;
 }
-#game-screen[data-mobile-play].salvage-screen .touch-actions { flex-wrap: wrap; }
-#game-screen[data-mobile-play].salvage-screen .salvage-status { flex: 1 0 100%; }
-#game-screen[data-mobile-play].salvage-screen .salvage-book { flex: 0 0 44px; }
+#game-screen[data-mobile-play].salvage-screen .touch-actions {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+}
+#game-screen[data-mobile-play].salvage-screen .salvage-status { grid-column: 1 / -1; }
+#game-screen[data-mobile-play].salvage-screen .salvage-book {
+  width: 44px;
+  height: 44px;
+  padding: 8px;
+}
 @media (max-width: 820px), (pointer: coarse) {
   .salvage-screen .salvage-touch-help { display: block; }
   .salvage-screen .salvage-key-help { display: none; }

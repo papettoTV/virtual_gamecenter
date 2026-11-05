@@ -376,7 +376,8 @@ export function mountGame(context: GameContext): GameInstance {
         else { ctx.fillStyle = "#04101c"; ctx.fillRect(0, 0, W, H); drawOverlay("LIVE", [spectatorStatus?.textContent ?? "プレイヤーのゲーム開始を待っています"]); }
       } else { update(dt); draw(); }
     }
-    if (status) status.textContent = `深度 ${Math.floor(state.subDepth)}m　SCORE ${state.earnedScore}　POWER ${Math.ceil(state.power)}%　耐久 ${state.hull}/${MAX_HULL}`;
+    const statusText = `深度 ${Math.floor(state.subDepth)}m　SCORE ${state.earnedScore}　POWER ${Math.ceil(state.power)}%　耐久 ${state.hull}/${MAX_HULL}`;
+    if (status && status.textContent !== statusText) status.textContent = statusText;
     publishLiveState(now);
     updateLiveShareContext();
     scope.frame(loop);
