@@ -26,3 +26,4 @@ test("all public MP4 demos match the files checked for absent audio streams", as
     assert.equal(hash, file.sha256, `Recheck audio streams and update the audit for ${file.path}`);
   }
 });
+import "./result-overlay-layer.test.mjs";
