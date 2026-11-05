@@ -9,7 +9,7 @@ import importlib.util
 import re
 
 ROOT = Path(__file__).resolve().parents[1]
-BASE = '3972989c7144c3cd56bd0149e89f0c7f19e1eefb'
+BASE = '80efe3b4fcfa2997eee4695742124a63445334e4'
 FILES = ('ci/control/review-trust.mjs', 'ci/control/review-trust.json', 'ci/production-candidate/policy.json')
 
 
@@ -48,8 +48,8 @@ def package(destination):
     return plan, data
 
 
-def package_installer(destination, plan, data, rule_version):
-    if not re.fullmatch(r'\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z', rule_version):
+def package_installer(destination, plan, data, rule_version=None):
+    if rule_version is not None and not re.fullmatch(r'\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z', rule_version):
         raise RuntimeError('一時例外のUTC設定版が不正です。')
     manifest = {'version': 1, 'mode': 'automatic-resume-control-update-only',
                 'parent': BASE, 'sourceSha': plan['sourceSha'],
@@ -66,8 +66,9 @@ def package_installer(destination, plan, data, rule_version):
     bundle_digest = hashlib.sha256(archive_path.read_bytes()).hexdigest()
     template = git('show', plan['sourceSha'] + ':tools/install-automatic-resume-control.py').decode()
     script = template.replace("BUNDLE_DIGEST = 'PACKAGED_BUNDLE_DIGEST'", 'BUNDLE_DIGEST = ' + repr(bundle_digest))
-    script = script.replace('APPLY_RULE_VERSION = None ', 'APPLY_RULE_VERSION = ' + repr(rule_version) + ' ')
-    if script == template or 'PACKAGED_BUNDLE_DIGEST' in script or 'APPLY_RULE_VERSION = None ' in script:
+    if rule_version is not None:
+        script = script.replace('APPLY_RULE_VERSION = None ', 'APPLY_RULE_VERSION = ' + repr(rule_version) + ' ')
+    if script == template or 'PACKAGED_BUNDLE_DIGEST' in script or (rule_version is not None and 'APPLY_RULE_VERSION = None ' in script):
         raise RuntimeError('配置用の固定値を設定できません。')
     script_path = destination / 'install-automatic-resume-control.py'
     script_path.write_text(script)
@@ -78,7 +79,7 @@ def package_installer(destination, plan, data, rule_version):
     if checked != data or baseline != plan['baselineFiles'] or installer.APPLY_RULE_VERSION != rule_version:
         raise RuntimeError('生成した単独配置ツールの検査が不一致です。')
     print(json.dumps({'mode': 'installer-packaged-not-executed', 'sourceSha': plan['sourceSha'],
-                      'ruleVersion': rule_version, 'targetFiles': len(checked),
+                      'ruleVersion': rule_version, 'automaticHumanBypass': rule_version is None, 'targetFiles': len(checked),
                       'changedFiles': sum(blobs != baseline[path] for path, blobs in plan['replacementBlobs'].items()),
                       'preservedFiles': len(baseline) - sum(blobs != baseline[path] for path, blobs in plan['replacementBlobs'].items()),
                       'archiveSha256': bundle_digest,
@@ -88,8 +89,8 @@ def package_installer(destination, plan, data, rule_version):
 
 if __name__ == '__main__':
     if len(sys.argv) not in (2, 3):
-        raise SystemExit('Usage: python3 tools/package-automatic-resume-control.py OUTPUT_DIRECTORY [REVIEWED_RULE_VERSION_UTC]')
+        raise SystemExit('Usage: python3 tools/package-automatic-resume-control.py OUTPUT_DIRECTORY [--human-maintenance | REVIEWED_RULE_VERSION_UTC]')
     destination = Path(sys.argv[1])
     plan, data = package(destination)
     if len(sys.argv) == 3:
-        package_installer(destination, plan, data, sys.argv[2])
+        package_installer(destination, plan, data, None if sys.argv[2] == '--human-maintenance' else sys.argv[2])

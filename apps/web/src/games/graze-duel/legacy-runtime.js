@@ -22,6 +22,8 @@ import {
   LEVEL_UP_INVINCIBLE_TIME,
 } from "./core";
 import { createGrazeAudio } from "./audio";
+import { emitGrazeSparks } from "./graze-sparks";
+import { createLevelUpLabel, tickLevelUpLabel } from "./level-up-label";
 import { BUZZ_BARRIER } from "../../domain/game";
 import { recordWatchStarted } from "../../features/engagement/engagement-client";
 import { createCanvasRenderer } from "./rendering/canvas-renderer";
@@ -45,7 +47,7 @@ export function mountGame(context) {
     notifications.clearScope(BUZZ_BARRIER.id);
   });
   const audio = createGrazeAudio();
-  const { playAttackSound, playBossAttackSound, playBossHitSound, playExplosionSound, playGrazeSound } = audio;
+  const { playBossAttackSound, playBossHitSound, playExplosionSound, playGrazeSound } = audio;
   scope.own(() => audio.dispose());
   const canvas = document.querySelector("#game");
   const arcadeScreen = document.querySelector("#arcade-screen");
@@ -353,7 +355,7 @@ export function mountGame(context) {
       player.lives = MAX_LIVES;
       player.score = 0;
       player.gauge = 0;
-      player.level = 1;
+      player.level = 0;
       player.nextBossLevel = BOSS_ATTACK_INTERVAL;
       player.combo = 0;
       player.multiplier = 1;
@@ -370,6 +372,7 @@ export function mountGame(context) {
       player.attackFlash = 0;
       player.attackCooldown = 0;
       player.levelUpFlash = 0;
+      player.levelUpLabel = null;
       player.tilt = 0;
       player.targetTilt = 0;
       player.grazeIds.clear();
@@ -423,6 +426,7 @@ export function mountGame(context) {
       player.attackFlash = 0;
       player.attackCooldown = 0;
       player.levelUpFlash = 0;
+      player.levelUpLabel = null;
       player.tilt = 0;
       player.targetTilt = 0;
       player.grazeIds.clear();
@@ -1646,6 +1650,7 @@ export function mountGame(context) {
         hitInvincible: player.hitInvincible,
         attackFlash: player.attackFlash,
         levelUpFlash: player.levelUpFlash,
+        levelUpLabel: player.levelUpLabel,
         tilt: player.tilt,
         bullets: player.bullets.map((bullet) => ({
           id: bullet.id,
@@ -1723,6 +1728,7 @@ export function mountGame(context) {
         hitInvincible: player.hitInvincible,
         attackFlash: player.attackFlash,
         levelUpFlash: player.levelUpFlash,
+        levelUpLabel: player.levelUpLabel,
         tilt: player.tilt,
       })),
       boss: createBossSyncState(),
@@ -1943,6 +1949,7 @@ export function mountGame(context) {
       player.y += (player.spectatorTargetY - player.y) * correctionRatio;
       player.invincible = Math.max(0, player.invincible - delta);
       player.levelUpInvincible = Math.max(0, player.levelUpInvincible - delta);
+      player.levelUpLabel = tickLevelUpLabel(player.levelUpLabel, delta);
 
       if (!sceneRenderer) {
         for (const bullet of player.bullets) {
@@ -2098,6 +2105,7 @@ export function mountGame(context) {
         hitInvincible: player.hitInvincible,
         attackFlash: player.attackFlash,
         levelUpFlash: player.levelUpFlash,
+        levelUpLabel: player.levelUpLabel,
         tilt: player.tilt,
         bullets: player.bullets.map((bullet) => ({
           id: bullet.id,
@@ -2237,6 +2245,8 @@ export function mountGame(context) {
     updateLiveShareContext();
     if (!touchPause) return;
     touchPause.textContent = waitingForStart ? "ゲーム開始" : paused ? "再開" : "一時停止";
+    touchPause.setAttribute("aria-label", touchPause.textContent);
+    touchPause.dataset.icon = waitingForStart || paused ? "▶" : "Ⅱ";
   }
 
   function getGameDelta(delta) {
@@ -3186,7 +3196,7 @@ export function mountGame(context) {
         const gaugeGain = Math.round(42 * player.multiplier);
         player.score += 42;
         player.gauge = Math.min(getAttackCost(player) * 3, player.gauge + gaugeGain);
-        burst(player.x, player.y, player.color, 3);
+        emitGrazeSparks(particles, player.x, player.y, bullet.x, bullet.y, MAX_PARTICLES, Math.random, player.fieldX);
         playGrazeSound(player.combo);
         if (player.gauge >= getAttackCost(player) && player.attackCooldown <= 0) {
           tryAutoAttack(player, getOpponent(player));
@@ -3226,10 +3236,10 @@ export function mountGame(context) {
     attacker.level += 1;
     attacker.levelUpInvincible = getNextInvincibleTime(attacker.levelUpInvincible);
     attacker.levelUpFlash = 0.42;
+    attacker.levelUpLabel = createLevelUpLabel(attacker);
     attacker.attackFlash = 0.35;
     attacker.attackCooldown = AUTO_ATTACK_COOLDOWN;
     if (!attackingBoss) defender.attackFlash = 0.55;
-    playAttackSound();
 
     if (boss.encounterState === "active" && attacker === players[0]) {
       boss.shieldAttackCharges += 1;
@@ -3386,7 +3396,24 @@ export function mountGame(context) {
     if (currentScreen !== "game") return;
     updateRenderStressBullets();
     renderThreeBulletLayer();
+    const mobileHud = Boolean(canvas.closest('[data-mobile-play="true"][data-game-id="graze-duel"]'));
+    if (mobileHud) {
+      const player = players[0];
+      const values = { score: `S ${Math.round(player.score)}`, time: `${Math.floor(elapsedRound)}s`,
+        level: `LV${player.level} ×${player.multiplier.toFixed(1)} / ${player.combo}`, lives: `♥${player.lives}` };
+      for (const [name, value] of Object.entries(values)) {
+        const node = document.querySelector(`[data-buzz-status="${name}"]`);
+        if (node && node.textContent !== value) node.textContent = value;
+        if (node) node.setAttribute("aria-label", name === "score" ? `${player.label} スコア ${Math.round(player.score)}` : name === "lives" ? `残機 ${player.lives}` : value);
+      }
+      const gauge = document.querySelector('[data-buzz-status="gauge"]');
+      if (gauge) {
+        gauge.value = Math.min(1, player.gauge / getAttackCost(player));
+        gauge.setAttribute("aria-valuetext", player.gauge >= getAttackCost(player) ? "AUTO ATTACK" : `GAUGE ${Math.floor(player.gauge)} / ${getAttackCost(player)}`);
+      }
+    }
     canvasRenderer.render({
+      mobileHud,
       players,
       boss,
       opponentBoss,

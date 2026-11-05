@@ -25,3 +25,12 @@
 ## マージ後の受け入れ確認
 
 実デプロイ、関連PR・修正SHA・公開SHA照合、iPhone Safari/Android Chromeでの操作・共有URL・プロフィール・全画面解除・終了退出・スクロール復帰、PC/観戦/深海ゲームの回帰、証跡取得・Issueコメントは未実施。人によるstaging承認後に検証環境で日時・端末・条件別合否・証跡を記録し、未確認が残る間はIssueをopenに保つ。main・本番公開は対象外。
+
+## PR #125 修復ラウンド1
+
+- 受付済みのdevelop同期候補でmobile-play.cssの競合を解消。READYの高さ再配分とdevelopのBUZZステータス・一時停止アイコンを両方維持した。
+- READYボタンはSpace/Enterのみ伝播を止める。取消後にフォーカスが戻ってもShiftがdocumentへ届くことを既存の実キー検証で確認する。
+- DOT WAVEレイアウト比較テストのBUZZ開始操作を新ボタンへ更新し、横画面でもcoarse pointerを含む実装と同じ判定を使う。観戦テストのisMobile引数漏れを修正した。
+- 招待レイアウトテストは実際の同意パネルで拒否を選んでから操作する。同意未選択の全画面・退出テストはそのまま維持する。開始確認の開いた状態を独立CIでスクリーンショット添付する。
+- ローカル検証: UI spec 3ファイルの構文検査、spectator-ui-layout、git diff --checkは成功。npm run build:stagingは成功（Wranglerログ保存先の権限警告・既存チャンクサイズ警告あり）。集中Vitestとnpm testはlisten EPERM 127.0.0.1で起動失敗し、テスト合格とは扱わない。
+- Playwrightがsandboxに未導入で、ローカル待受も禁止されているためブラウザケース・スクリーンショットは未実行。独立CIの再検証、実機・検証環境での受け入れ確認と公開SHA照合は未完了。デプロイ・Issueコメント・クローズは実施していない。

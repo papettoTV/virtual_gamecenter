@@ -88,7 +88,9 @@ for (const size of sizes) {
     // Use the real local server, guest bootstrap and cabinet connection.
     await enter(page, 'graze-duel');
     await expect(page.locator('#game-screen')).toBeVisible();
-    if (size.width <= 820) await page.getByRole('button', { name: 'ゲーム開始', exact: true }).click();
+    if (await page.evaluate(() => matchMedia('(max-width: 820px), (pointer: coarse)').matches)) {
+      await page.getByRole('button', { name: 'タップして開始（1枚）', exact: true }).click();
+    }
     else await page.keyboard.press('Space');
     await claimGift(page);
     await page.getByRole('button', { name: '1クレジットで開始', exact: true }).click();

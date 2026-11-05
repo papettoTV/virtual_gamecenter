@@ -48,13 +48,14 @@
 #game-screen[data-mobile-play] > .mobile-play-toggle { flex: 0 0 auto; min-height: 44px; }
 
 #game-screen[data-mobile-play][data-game-id="graze-duel"] {
-  padding-top: calc(max(8px, env(safe-area-inset-top)) + 52px);
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  gap: 0;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
 }
 #game-screen[data-mobile-play][data-game-id="graze-duel"] > .game-frame {
   flex: 0 1 auto;
-  width: min(100%, calc((100dvh - max(8px, env(safe-area-inset-top)) - max(8px, env(safe-area-inset-bottom)) - 52px) * 0.65));
+  width: min(100%, calc((100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 0.65));
   height: auto;
   aspect-ratio: 416 / 640;
 }
@@ -70,16 +71,18 @@
 }
 #game-screen[data-mobile-play][data-game-id="graze-duel"] > .touch-controls {
   position: absolute;
-  top: max(8px, env(safe-area-inset-top));
-  right: max(8px, env(safe-area-inset-right));
+  top: env(safe-area-inset-top);
+  left: env(safe-area-inset-left);
+  right: env(safe-area-inset-right);
   z-index: 6;
 }
 #game-screen[data-mobile-play][data-game-id="graze-duel"] #touch-pause {
-  width: auto;
+  width: 44px;
+  flex: 0 0 44px;
   min-width: 44px;
   min-height: 44px;
-  padding: 8px 12px;
-  font-size: 14px;
+  padding: 0;
+  font-size: 0;
 }
 body:has(#game-screen[data-mobile-play][data-game-id="graze-duel"]) .notification-center {
   left: max(8px, env(safe-area-inset-left));
@@ -141,4 +144,29 @@ body:has(#game-screen[data-mobile-play][data-game-id="graze-duel"]) .notificatio
 body.is-game-screen:has(#game-screen[data-game-id="graze-duel"]) .platform-profile { position: absolute; }
 @media (max-width: 820px), (pointer: coarse) {
   #game-screen[data-game-id="graze-duel"]:not([data-mobile-play]) { padding-top: 64px; }
+}
+.buzz-mobile-status { display: none; }
+#game-screen[data-mobile-play][data-game-id="graze-duel"] .touch-actions {
+  width: 100%;
+  max-width: calc((100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 0.65);
+  margin: 0 auto;
+  container-type: inline-size;
+  gap: 2px;
+  background: rgba(5, 7, 19, .94);
+  border-bottom: 1px solid rgba(105, 247, 255, .3);
+}
+#game-screen[data-mobile-play] .buzz-mobile-status {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 2px;
+  color: #b5fbff;
+  font: 700 clamp(7px, 2.6cqw, 12px) / 1.2 system-ui;
+  white-space: nowrap;
+}
+.buzz-mobile-status meter { position: absolute; bottom: 0; left: 0; width: 100%; height: 4px; }
+#game-screen[data-mobile-play][data-game-id="graze-duel"] #touch-pause::after {
+  content: attr(data-icon);
+  font-size: 22px;
 }

@@ -46,6 +46,12 @@ export type ParticleRenderState = {
   color: string;
   life: number;
   size?: number;
+  kind?: "spark";
+  vx?: number;
+  vy?: number;
+  length?: number;
+  maxLife?: number;
+  fieldX?: number;
 };
 
 export type SceneRenderFrame = {

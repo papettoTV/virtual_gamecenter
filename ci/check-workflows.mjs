@@ -69,6 +69,10 @@ export async function checkWorkflows() {
   assert.equal(issue.jobs.implement.if, "needs.intake.outputs.eligible == 'true'");
   assert.ok(issue.jobs.publish.steps.some(step => step.run === undefined && step.with?.script?.includes('assertAutomaticAssignment')));
   assert.ok(!JSON.stringify(issue).includes('refs/heads/main'));
+  const implementation = issue.jobs.implement.steps.find(step => step.uses?.startsWith('openai/codex-action@'));
+  assert.equal(implementation.with['allow-bots'], "${{ needs.intake.outputs.repair == 'true' && github.actor == 'github-actions[bot]' }}");
+  assert.equal(implementation.with['allow-users'], undefined);
+  assert.equal(implementation.with['allow-bot-users'], undefined);
   const pr = entries.find(item => item.file === 'codex-pr.yml').data;
   assert.deepEqual(pr.on.pull_request.branches, ['develop']);
   for (const name of ['staging', 'regression', 'merge', 'report']) assert.equal(pr.jobs[name], undefined);
@@ -86,6 +90,18 @@ export async function checkWorkflows() {
   assert.ok(develop.jobs.retired.steps.some(step => step.run?.includes('exit 1')));
   const web = entries.find(item => item.file === 'web-checks.yml').data;
   checkWebWorkflow(web);
+
+  const repair=entries.find(item=>item.file==='automatic-repair.yml').data;
+  assert.deepEqual(repair.permissions,{contents:'read',actions:'write',issues:'write'});
+  assert.equal(repair.concurrency.group,'automatic-repair-repository');
+  assert.equal(repair.concurrency['cancel-in-progress'],false);
+  assert.equal(repair.jobs.coordinate.environment,undefined);
+  assert.ok(!JSON.stringify(repair).includes('secrets.'));
+  assert.equal(repair.jobs.coordinate.steps.find(s=>s.uses?.startsWith('actions/checkout@')).with.ref,'${{ github.sha }}');
+  assert.ok(JSON.stringify(issue.jobs.implement).includes('trusted-repair/repair-workspace.mjs'));
+  assert.ok(JSON.stringify(issue.jobs.publish).includes('REPAIR_MODE'));
+  assert.equal(issue.jobs.publish.steps.find(s=>s.uses?.startsWith('actions/checkout@')).with['fetch-depth'],0);
+  assert.ok(!issue.jobs.intake.if.includes("github.event.label.name == '実装:再開'"));
 
   const release = entries.find(item => item.file === 'production-release.yml.disabled').data;
   assert.match(release.jobs.prepare.if, /PULBASE_PRODUCTION_ENABLED/);

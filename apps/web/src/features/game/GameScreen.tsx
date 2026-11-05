@@ -66,8 +66,8 @@ export function GameScreen({ game }: GameScreenProps) {
         <canvas id="game" width="960" height="640" aria-label={`${game.title} game canvas`} />
         {tapReady && <button className="mobile-ready-start" type="button"
           onPointerDown={event => event.stopPropagation()}
-          onKeyDown={event => event.stopPropagation()}
-          onKeyUp={event => event.stopPropagation()}
+          onKeyDown={event => { if (event.code === "Space" || event.code === "Enter") event.stopPropagation(); }}
+          onKeyUp={event => { if (event.code === "Space" || event.code === "Enter") event.stopPropagation(); }}
           onClick={event => {
             event.stopPropagation();
             if (document.querySelector(".platform-overlay, .share-overlay, .platform-profile-menu")) return;
@@ -149,6 +149,11 @@ export function GameScreen({ game }: GameScreenProps) {
 
       <div className="touch-controls" aria-label="スマホ操作">
         <div className="touch-actions">
+          {game.id === "graze-duel" && <div className="buzz-mobile-status" aria-label="ゲームステータス">
+            <span data-buzz-status="score" /><span data-buzz-status="time" />
+            <span data-buzz-status="level" /><span data-buzz-status="lives" />
+            <meter data-buzz-status="gauge" aria-label="攻撃ゲージ" min="0" max="1" />
+          </div>}
           <TouchActions game={game} />
           <button id="touch-pause" className="touch-button" type="button">一時停止</button>
         </div>
