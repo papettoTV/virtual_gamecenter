@@ -74,7 +74,8 @@ test.beforeEach(async ({ page }) => {
 });
 // Keep real accounting APIs and sockets: this helper only operates existing UI.
 async function leaveToDirectory(page, gameId, selector = null) {
-  const cabinetPath = `${new URL(page.url()).pathname}/ws`;
+  // The browser route is /cabinets/<id>; the real socket uses /api/cabinets/<id>/ws.
+  const cabinetPath = `/api${new URL(page.url()).pathname}/ws`;
   await expect.poll(() => [...cabinetSockets.get(page)]
     .filter(socket => new URL(socket.url()).pathname === cabinetPath).length).toBe(1);
   const sockets = [...cabinetSockets.get(page)];

@@ -36,3 +36,9 @@
 - 開始確認の取消・承認・実会計・退出・再入場をまとめたケースは全体上限を60秒にした。各アサーションの通常の待機上限は維持し、DEEP SEA SALVAGE の複数遷移を含むケース全体が30秒で打ち切られることを避ける。
 - 修復後の `node --check apps/web/tests/ui/play-confirmation.spec.mjs` と `git diff --check` は成功。focused Vitest（play-service、graze-duel-lifecycle、cabinetRouteLifecycle）と `npm test` はともに Worker 起動時の `listen EPERM 127.0.0.1` で停止し、テスト本体の合否は未確認。Wrangler のログディレクトリ作成エラーも発生した。
 - `npm run build:staging` は型検査・Vite・Pages 成果物生成まで終了コード0（ログ書き込みとチャンク容量の警告あり）。Playwright が利用できず、修復した desktop / mobile ブラウザケースはローカル未実行。独立 CI の再実行・独立レビュー、実デプロイ SHA 照合、実端末・実環境の受け入れ確認は未実施であり、成功とは扱わない。
+
+## PR #129 修復ラウンド2（2026-11-05）
+
+- 報告された開始前退出テストの接続待ち失敗は、期待パスに `/api` が欠けていたことが原因。実クライアント `src/realtime/cabinet-client.ts` と Worker のルートに合わせて `/api/cabinets/<id>/ws` を待つよう修正した。筐体接続が存在することと退出後に切断されることの検証は維持し、アプリの退出・会計・認可処理は変更していない。
+- `node --check apps/web/tests/ui/play-confirmation.spec.mjs` と `git diff --check` は成功。focused Vitest（play-service、graze-duel-lifecycle、cabinetRouteLifecycle）および `apps/web` の `npm test` はローカル Worker の `listen EPERM 127.0.0.1` で停止し、合否は未確認。
+- `apps/web` の `npm run build:staging` は終了コード0。型検査・Vite・Pages成果物生成が成功（ログ書き込み・チャンク容量の警告あり）。Playwright が利用できず、desktop / mobile のブラウザケースはローカル未実行。独立 CI の成功、実デプロイ SHA 照合、実端末・実残高の受け入れ確認、Issue への記録は未実施。
