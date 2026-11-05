@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "approvedOn": "2026-11-03",
+  "originalRoot": "apps/web/public",
+  "archiveRoot": "assets/archive/site-public",
+  "files": [
+    { "path": "assets/deep-sea-salvage/models/deep-sea-model-catalog.blend", "bytes": 21800805, "sha256": "9893715e7056ae13a72fe3ac2bbbc768a76231ab15cde69e8d3b1643dfb2bfd5" },
+    { "path": "assets/deep-sea-salvage/models/fish.blend", "bytes": 1257049, "sha256": "7aa93f77ba3c7480b7dcd73c87442dd7f988280788c55008fdc73220f426a005" },
+    { "path": "assets/deep-sea-salvage/models/submarine.blend", "bytes": 1853871, "sha256": "3eaca218d092ee423d0b18b2df10ec22a3815424d11aaf909719f3f0a72bc23b" },
+    { "path": "assets/deep-sea-salvage/models/fish-blender-preview.png", "bytes": 589516, "sha256": "3176b688eac6de1308ba3fcc40806aca51b7b9d9f35b6deba021a0558e727722" },
+    { "path": "assets/deep-sea-salvage/models/submarine-blender-preview.png", "bytes": 598783, "sha256": "98ee12d17a299536996a10d512f46f9d4d83ce90518af6da8a1d5c36fbb9a057" },
+    { "path": "graze-duel-promo.mp4", "bytes": 852372, "sha256": "d8d7e511da2caa87d7ac66cd9c1a88f82b1d44e0b1ddf3c78c9494c1b6c6d6ba" },
+    { "path": "graze-duel-promo-poster.jpg", "bytes": 24521, "sha256": "6a72f5db3281af5af6e138533a98a7fa8e963b12e35c07fdd1fbfe48d1856455" },
+    { "path": "assets/mochi-beat-icon.svg", "bytes": 2845, "sha256": "ca13fd7a74214e228a554aa8d898514cf013284950f5ced818470e8ef8c75e42" }
+  ]
+}
