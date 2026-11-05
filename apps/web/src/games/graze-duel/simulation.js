@@ -1,4 +1,5 @@
 import { LEVEL_UP_INVINCIBLE_TIME } from "./core";
+import { tickLevelUpLabel } from "./level-up-label";
 
 export function createSimulation({ state, settings }) {
   const { players, boss, particles } = state;
@@ -31,6 +32,7 @@ export function createSimulation({ state, settings }) {
     player.attackFlash = Math.max(0, player.attackFlash - delta);
     player.attackCooldown = Math.max(0, player.attackCooldown - delta);
     player.levelUpFlash = Math.max(0, player.levelUpFlash - delta);
+    player.levelUpLabel = tickLevelUpLabel(player.levelUpLabel, delta);
     player.tilt += (player.targetTilt - player.tilt) * PLAYER_TILT_LERP;
   }
 

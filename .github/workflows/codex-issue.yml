@@ -13,6 +13,10 @@ on:
         description: 既存の自動PRがあれば同じPRを修正する
         type: boolean
         default: false
+      repair_ticket:
+        description: 信頼された修正受付が発行したコメントID
+        type: string
+        default: ''
 permissions:
   contents: read
 concurrency:
@@ -23,10 +27,16 @@ jobs:
     if: >-
       vars.PULBASE_CODEX_ENABLED == 'true' &&
       (github.event_name == 'workflow_dispatch' ||
-       (github.event.action == 'labeled' && (github.event.label.name == '実装:自動' || github.event.label.name == '実装:再開')))
+       (github.event.action == 'labeled' && github.event.label.name == '実装:自動'))
     runs-on: ubuntu-latest
     timeout-minutes: 3
+    permissions:
+      contents: read
+      actions: read
+      issues: read
     outputs:
+      repair: ${{ steps.request.outputs.repair }}
+      observed_base: ${{ steps.request.outputs.observed_base }}
       eligible: ${{ steps.request.outputs.eligible }}
       issue: ${{ steps.request.outputs.issue }}
       base: ${{ steps.request.outputs.base }}
@@ -44,11 +54,13 @@ jobs:
         env:
           ISSUE_INPUT: ${{ inputs.issue }}
           RESUME_INPUT: ${{ inputs.resume }}
+          REPAIR_TICKET: ${{ inputs.repair_ticket }}
+          GH_TOKEN: ${{ github.token }}
           AUTOMATION_BOT: ${{ vars.PULBASE_AUTOMATION_BOT }}
         with:
           script: |
             const { intake } = await import(`${process.env.GITHUB_WORKSPACE}/ci/github.mjs`);
-            await intake({ github, context, core, issueInput: process.env.ISSUE_INPUT, resumeInput: process.env.RESUME_INPUT, bot: process.env.AUTOMATION_BOT });
+            await intake({ github, context, core, issueInput: process.env.ISSUE_INPUT, resumeInput: process.env.RESUME_INPUT, repairTicket: process.env.REPAIR_TICKET, bot: process.env.AUTOMATION_BOT });
   implement:
     needs: intake
     if: needs.intake.outputs.eligible == 'true'
@@ -61,22 +73,37 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ needs.intake.outputs.base }}
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
+      - name: 信頼された定義で隔離した同期・競合修正候補を準備
+        if: needs.intake.outputs.repair == 'true'
+        env:
+          TRUSTED_BASE_SHA: ${{ needs.intake.outputs.trusted_base }}
+          PR_HEAD_SHA: ${{ needs.intake.outputs.head }}
+        run: |
+          git fetch --no-tags origin "$TRUSTED_BASE_SHA"
+          mkdir -p "$RUNNER_TEMP/trusted-repair"
+          git show "$TRUSTED_BASE_SHA:ci/policy.mjs" > "$RUNNER_TEMP/trusted-repair/policy.mjs"
+          git show "$TRUSTED_BASE_SHA:ci/repair-workspace.mjs" > "$RUNNER_TEMP/trusted-repair/repair-workspace.mjs"
+          node "$RUNNER_TEMP/trusted-repair/repair-workspace.mjs"
       - run: npm ci
         working-directory: apps/web
       - name: Prepare isolated request and disposable credentials
         env:
           ISSUE_REQUEST: ${{ needs.intake.outputs.request }}
         run: |
-          node -e 'const fs = require("fs"); fs.writeFileSync("ci/request.md", fs.readFileSync("ci/prompts/implement.md", "utf8") + "\nUntrusted issue JSON:\n" + process.env.ISSUE_REQUEST)'
+          node -e 'const fs = require("fs"); fs.writeFileSync("ci/request.md", fs.readFileSync("ci/prompts/implement.md", "utf8") + "\nUntrusted issue JSON:\n" + process.env.ISSUE_REQUEST + (fs.existsSync("ci/repair-context.json") ? "\nIsolated repair workspace:\n" + fs.readFileSync("ci/repair-context.json", "utf8") : ""))'
+          rm -f ci/repair-context.json
           printf '%s\n' 'GOOGLE_CLIENT_ID=ci-example.apps.googleusercontent.com' 'GOOGLE_CLIENT_SECRET=ci-example' 'STRIPE_SECRET_KEY=sk_test_ci_example' 'STRIPE_WEBHOOK_SECRET=whsec_ci_example' > apps/web/.dev.vars
       # Last step: do not run code in a runner modified by Codex afterward.
       - uses: openai/codex-action@bdf19a4a223ec2549a3e2274a0cf61556bc07675
         id: codex
         with:
+          # Only the intake-validated repair ticket may admit the Actions service actor.
+          allow-bots: ${{ needs.intake.outputs.repair == 'true' && github.actor == 'github-actions[bot]' }}
           codex-version: '0.164.0'
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           prompt-file: ci/request.md
@@ -120,6 +147,8 @@ jobs:
           TRUSTED_BASE_SHA: ${{ needs.intake.outputs.trusted_base }}
           PULL_NUMBER: ${{ needs.intake.outputs.pull }}
           PR_HEAD_SHA: ${{ needs.intake.outputs.head }}
+          REPAIR_MODE: ${{ needs.intake.outputs.repair }}
+          OBSERVED_BASE_SHA: ${{ needs.intake.outputs.observed_base }}
           AUTOMATION_BOT: ${{ vars.PULBASE_AUTOMATION_BOT }}
           ISSUE_NUMBER: ${{ needs.intake.outputs.issue }}
           RESULT_FILE: ${{ runner.temp }}/codex-result.json
@@ -132,6 +161,9 @@ jobs:
           node ci/publish-patch.mjs
           if [ -z "$PULL_NUMBER" ]; then
             gh pr create --base develop --head "codex/issue-$ISSUE_NUMBER" --title "Issue #$ISSUE_NUMBER の対応" --body-file "$PR_BODY_FILE"
+          else
+            node -e 'const fs=require("fs");fs.writeFileSync(process.env.PR_BODY_FILE+".json",JSON.stringify({body:fs.readFileSync(process.env.PR_BODY_FILE,"utf8")}))'
+            gh api --method PATCH "repos/$GH_REPO/pulls/$PULL_NUMBER" --input "$PR_BODY_FILE.json" > /dev/null
           fi
   failure:
     needs: [intake, implement, publish]

@@ -36,7 +36,7 @@ export function createCyberCanyonBackground(width, height) {
     draw(context, fieldX, fieldTop, elapsed) {
       context.save();
       context.translate(fieldX, fieldTop);
-      const scrollTime = elapsed * 2.5;
+      const scrollTime = elapsed * 1.25;
       const offset = (scrollTime * 46) % tile.height;
       context.drawImage(tile, 0, offset - tile.height);
       context.drawImage(tile, 0, offset);

@@ -1,3 +1,5 @@
+import grazeSoundUrl from "./assets/graze-u3.wav?url";
+
 type AudioWindow = Window & typeof globalThis & {
   webkitAudioContext?: typeof AudioContext;
 };
@@ -5,6 +7,10 @@ type AudioWindow = Window & typeof globalThis & {
 export function createGrazeAudio() {
   let audioContext: AudioContext | null = null;
   let disposed = false;
+  let grazeBuffer: Promise<AudioBuffer> | null = null;
+  let lastGrazeTime = -Infinity;
+  let pendingGrazes = 0;
+  const grazeVoices = new Map<AudioBufferSourceNode, GainNode>();
 
   function getAudioContext(): AudioContext {
     if (!audioContext) {
@@ -19,24 +25,43 @@ export function createGrazeAudio() {
     return audioContext;
   }
 
-  function playGrazeSound(combo: number): void {
+  async function playGrazeSound(_combo: number): Promise<void> {
     if (disposed) return;
     const audio = getAudioContext();
     const now = audio.currentTime;
-    const oscillator = audio.createOscillator();
-    const gainNode = audio.createGain();
-    const pitch = 520 + Math.min(combo, 24) * 18;
-
-    oscillator.type = "triangle";
-    oscillator.frequency.setValueAtTime(pitch, now);
-    oscillator.frequency.exponentialRampToValueAtTime(pitch * 1.35, now + 0.045);
-    gainNode.gain.setValueAtTime(0.0001, now);
-    gainNode.gain.exponentialRampToValueAtTime(0.045, now + 0.006);
-    gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.055);
-    oscillator.connect(gainNode);
-    gainNode.connect(audio.destination);
-    oscillator.start(now);
-    oscillator.stop(now + 0.06);
+    if (now - lastGrazeTime < 0.03 || pendingGrazes + grazeVoices.size >= 8) return;
+    lastGrazeTime = now;
+    pendingGrazes += 1;
+    try {
+      if (!grazeBuffer) {
+        grazeBuffer = fetch(grazeSoundUrl)
+          .then(response => {
+            if (!response.ok) throw new Error("Graze sound could not be loaded.");
+            return response.arrayBuffer();
+          })
+          .then(data => audio.decodeAudioData(data));
+      }
+      const buffer = await grazeBuffer;
+      if (disposed) return;
+      const source = audio.createBufferSource();
+      const gain = audio.createGain();
+      source.buffer = buffer;
+      gain.gain.setValueAtTime(0.4, audio.currentTime);
+      source.connect(gain);
+      gain.connect(audio.destination);
+      grazeVoices.set(source, gain);
+      source.onended = () => {
+        if (!grazeVoices.delete(source)) return;
+        source.disconnect();
+        gain.disconnect();
+      };
+      source.start(audio.currentTime);
+    } catch (error) {
+      grazeBuffer = null;
+      if (!disposed) console.warn("Graze sound playback failed.", error);
+    } finally {
+      pendingGrazes -= 1;
+    }
   }
 
   function playAttackSound(): void {
@@ -114,6 +139,14 @@ export function createGrazeAudio() {
       disposed = true;
       const closingContext = audioContext;
       audioContext = null;
+      grazeBuffer = null;
+      for (const [source, gain] of grazeVoices) {
+        source.onended = null;
+        source.stop();
+        source.disconnect();
+        gain.disconnect();
+      }
+      grazeVoices.clear();
       if (closingContext && closingContext.state !== "closed") {
         void closingContext.close().catch(() => {});
       }

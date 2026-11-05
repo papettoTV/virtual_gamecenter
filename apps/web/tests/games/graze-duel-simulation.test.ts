@@ -20,6 +20,8 @@ describe("BUZZ BARRIER extracted state/simulation dependencies", () => {
     const second = fixture();
     expect(first.state.players[0]!.y).toBe(632);
     expect(first.state.players[0]!.lives).toBe(3);
+    expect(first.state.players[0]!.level).toBe(0);
+    expect(first.state.players[1]!.level).toBe(0);
     expect(first.state.players[1]!.cpu).toBe(true);
     expect(first.state.boss.nextSpawnLevel).toBe(10);
     expect(first.state.boss.hp).toBe(100);
