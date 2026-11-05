@@ -76,9 +76,9 @@ export async function collectDiagnostics({api,artifact,log},pr){
    const artifacts=await api(`actions/runs/${run.id}/artifacts?per_page=100`);
    const evidence=artifacts.artifacts.filter(a=>a.name.startsWith('ui-evidence-')&&!a.expired&&a.workflow_run?.id===run.id&&a.workflow_run.head_sha===pr.head.sha);
    if(evidence.length===1&&evidence[0].size_in_bytes<=250*1024*1024)try{entries.push(...archiveDiagnostic(await artifact(evidence[0].id)));}catch{entries.push({kind:'diagnostic-unavailable',message:'UI証跡を容量制限内で読み取れません。テスト条件は緩和しないでください。'});}
-   const unit=jobs.jobs.find(j=>j.name==='unit'&&j.conclusion==='failure');if(unit)entries.push(...unitDiagnostic(await log(unit.id)));
+   const unit=jobs.jobs.find(j=>j.name==='unit'&&j.conclusion==='failure');if(unit)try{entries.push(...unitDiagnostic(await log(unit.id)));}catch{entries.push({kind:'diagnostic-unavailable',message:'通常テストの失敗ログを取得できません。CI成功として扱わないでください。'});}
   }else{
-   const gate=jobs.jobs.find(j=>j.name==='review-gate'&&j.conclusion==='failure');if(gate)entries.push(...reviewDiagnostic(await log(gate.id)));
+   const gate=jobs.jobs.find(j=>j.name==='review-gate'&&j.conclusion==='failure');if(gate)try{entries.push(...reviewDiagnostic(await log(gate.id)));}catch{entries.push({kind:'diagnostic-unavailable',message:'レビュー不合格のログを取得できません。レビュー成功として扱わないでください。'});}
   }
  }
  return {ready:true,failed,entries:boundedDiagnostics(entries)};

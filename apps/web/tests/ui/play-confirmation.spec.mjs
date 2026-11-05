@@ -44,7 +44,13 @@ async function prepareGuest(page) {
   const decline = page.getByRole('button', { name: '拒否する', exact: true });
   if (await decline.isVisible()) await decline.click();
   if (!account.welcomeCreditGranted) {
-    return (await page.evaluate(async () => (await import('/src/features/platform/platform-client.ts')).claimWelcomeCredit())).wallet;
+    const granted = await page.evaluate(async () => {
+      const result = await (await import('/src/features/platform/platform-client.ts')).claimWelcomeCredit();
+      window.dispatchEvent(new Event('platform-wallet-changed'));
+      return result.wallet;
+    });
+    await expect(page.locator('.platform-credit-badge')).toHaveText(String(granted.availableTotal));
+    return granted;
   }
   return account.wallet;
 }
@@ -59,12 +65,18 @@ test.beforeEach(async ({ page }) => {
   const sockets = new Set();
   cabinetSockets.set(page, sockets);
   page.on('websocket', socket => {
+    // Vite's HMR connection stays open across client-side navigation. Only
+    // cabinet connections belong to the game lifetime under test.
+    if (!/^\/api\/cabinets\/[^/]+\/ws$/.test(new URL(socket.url()).pathname)) return;
     sockets.add(socket);
     socket.on('close', () => sockets.delete(socket));
   });
 });
 // Keep real accounting APIs and sockets: this helper only operates existing UI.
 async function leaveToDirectory(page, gameId, selector = null) {
+  const cabinetPath = `${new URL(page.url()).pathname}/ws`;
+  await expect.poll(() => [...cabinetSockets.get(page)]
+    .filter(socket => new URL(socket.url()).pathname === cabinetPath).length).toBe(1);
   const sockets = [...cabinetSockets.get(page)];
   const dialogs = [];
   const onDialog = async dialog => { dialogs.push(dialog.message()); await dialog.dismiss(); };
@@ -111,6 +123,10 @@ for (const game of games) {
   });
   for (const input of ['primary', 'keyboard']) {
     test(`${game.id}: ${input}, ready, cancel, delayed duplicate and authorized start`, async ({ page, isMobile }, testInfo) => {
+      // This case includes reload, cancellation, real accounting, exit and
+      // re-entry (plus mobile layout checks). Keep individual assertions at
+      // their normal timeout while allowing the full sequence to finish.
+      test.setTimeout(60000);
       // Only the disposable local guest and the real welcome-credit API are used.
       await test.step('初期guest: 実bootstrapと財布', () => prepareGuest(page));
       const writes = [];
@@ -424,7 +440,9 @@ for (const game of games) {
         expect(await persistedWallet(page)).toBe(balance);
         expect(writes).toHaveLength(0);
         if (!occupied) await expect(waiting).toBeVisible();
-        await leaveToDirectory(page, game.id, game.id === 'dot-wave' ? null : '#spectator-game-back');
+        await leaveToDirectory(page, game.id, !occupied
+          ? '.spectator-availability .showcase-actions button:last-child'
+          : game.id === 'dot-wave' ? null : '#spectator-game-back');
         expect(await persistedWallet(page)).toBe(balance);
         expect(writes).toHaveLength(0);
       } finally {

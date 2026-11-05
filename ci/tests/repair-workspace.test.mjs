@@ -21,3 +21,14 @@ test('保護定義を改変したPRと変更されたheadを拒否',()=>fixture(
  git('checkout','codex/issue-1');await writeFile('ci/protected.mjs','unsafe\n');git('add','.');git('commit','-m','attempt control change');const modified=git('rev-parse','HEAD');
  assert.throws(()=>prepareRepairWorkspace({head:modified,base}),/protected path/);assert.throws(()=>prepareRepairWorkspace({head,base}),/head/);
 }));
+
+test('浅い反映checkoutは共通祖先を欠き、完全履歴なら固定head/baseを同期できる',()=>fixture(async({dir,head,base})=>{
+ const destination=join(dir,'shallow');
+ git('clone','--depth=1','--branch','develop',new URL('file://'+dir).href,destination);
+ const run=(...args)=>execFileSync('git',['-C',destination,...args],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
+ run('fetch','--no-tags','origin',head);
+ assert.throws(()=>run('merge-base',base,head));
+ run('fetch','--unshallow','origin');
+ assert.match(run('merge-base',base,head),/^[a-f0-9]{40}$/);
+ const previous=process.cwd();try{process.chdir(destination);run('checkout','--detach',head);const info=prepareRepairWorkspace({head,base});assert.deepEqual(info.conflicts,[]);assert.equal(run('rev-parse','HEAD^2'),base);}finally{process.chdir(previous);}
+}));
