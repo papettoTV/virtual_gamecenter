@@ -1,6 +1,55 @@
 import { createHash } from 'node:crypto';
 import { test, expect } from '../../../../ci/ui-fixtures.mjs';
 
+// Unlike toBeInViewport, require the whole control inside its scroll clip
+// and visual viewport, including when the keyboard pans the visible area.
+async function expectFullyVisible(locator, container) {
+  await expect(locator).toBeVisible();
+  await expect.poll(() => locator.evaluate((element, selector) => {
+    const rect = element.getBoundingClientRect();
+    const viewport = window.visualViewport;
+    const clip = element.closest(selector).getBoundingClientRect();
+    const top = Math.max(viewport.offsetTop, clip.top);
+    const bottom = Math.min(viewport.offsetTop + viewport.height, clip.bottom);
+    const left = Math.max(viewport.offsetLeft, clip.left);
+    const right = Math.min(viewport.offsetLeft + viewport.width, clip.right);
+    return rect.width > 0 && rect.height > 0 && rect.top >= top - 1 && rect.bottom <= bottom + 1 && rect.left >= left - 1 && rect.right <= right + 1;
+  }, container)).toBe(true);
+}
+
+async function checkResultLayout(page, dialog, testInfo, name, url) {
+  const primary = dialog.getByRole('button', { name: '共有する', exact: true });
+  const copy = dialog.getByRole('button', { name: 'リンクをコピー', exact: true });
+  const controls = async () => {
+    await expectFullyVisible(primary, '.share-footer');
+    await expectFullyVisible(copy, '.share-footer');
+    await primary.click({ trial: true });
+  };
+  const capture = async suffix => testInfo.attach(`${name}-${suffix}`, {
+    body: await page.screenshot(), contentType: 'image/png',
+  });
+  await controls();
+  await capture('open');
+  const text = dialog.locator('#share-text');
+  await text.scrollIntoViewIfNeeded();
+  await expectFullyVisible(text, '.share-body');
+  await text.fill(`到達性の確認: ${name}`);
+  await expect(text).toHaveValue(`到達性の確認: ${name}`);
+  await controls();
+  await capture('editing');
+  // Real clicks also catch intercepting overlays; no system clipboard needed.
+  await copy.click();
+  expect(await page.evaluate(() => window.__copied)).toBe(url);
+  await expect(dialog.getByRole('status')).toHaveText('コピーしました。');
+  const body = dialog.locator('.share-body');
+  await body.evaluate(element => { element.scrollTop = element.scrollHeight; });
+  await expect.poll(() => body.evaluate(element =>
+    Math.abs(element.scrollHeight - element.clientHeight - element.scrollTop) <= 1)).toBe(true);
+  await expectFullyVisible(body.locator(':scope > :last-child'), '.share-body');
+  await controls();
+  await capture('body-end');
+}
+
 const artwork = [
   ['graze-duel', 'buzz-barrier', '78936b2ab3f306b4646e6ef72dc168bb5b7a79a3a3c1e42f7d82f5de6fe28dc8'],
   ['dot-wave', 'dot-wave', 'dd016c80592ca966d5bd47a8f3e6096314772e0d8526124fed2fe117b234c7b2'],
@@ -30,7 +79,7 @@ for (const [game, filename, hash] of artwork) {
 // without replacing authentication, accounting or game-start APIs.
 for (const [game, filename] of artwork) {
   for (const kind of ['live', 'result']) {
-    test(`${game} ${kind} panel preview, handoff and accessibility`, async ({ page, baseURL }) => {
+    test(`${game} ${kind} panel preview, handoff and accessibility`, async ({ page, baseURL }, testInfo) => {
       // Use the project's real desktop/mobile viewport, without booting App.
       const origin = new URL(baseURL);
       expect(['127.0.0.1', '[::1]']).toContain(origin.hostname);
@@ -104,18 +153,49 @@ for (const [game, filename] of artwork) {
           await expect(dialog.locator('.shared-result-card')).toContainText('45');
           await expect(dialog.locator('.shared-result-card')).not.toContainText('SCORE');
         }
-        for (const size of [{ width: 320, height: 568 }, { width: 844, height: 390 }, { width: 390, height: 300 }]) {
-          await page.setViewportSize(size);
-          await expect(dialog.getByRole('button', { name: '共有する', exact: true })).toBeInViewport();
-          await expect(dialog.getByRole('button', { name: 'リンクをコピー', exact: true })).toBeInViewport();
-        }
-        await page.setViewportSize({ width: 390, height: 844 });
-        await dialog.evaluate(el => { el.style.fontSize = '200%'; });
-        await expect(dialog.getByRole('button', { name: '共有する', exact: true })).toBeInViewport();
-        await dialog.evaluate(el => { el.style.fontSize = ''; });
         await page.evaluate(() => {
           Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
           Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async text => { window.__copied = text; } } });
+        });
+        await checkResultLayout(page, dialog, testInfo, 'initial', shareUrl.href);
+        for (const [name, size] of [
+          ['narrow', { width: 320, height: 568 }],
+          ['landscape', { width: 844, height: 390 }],
+          ['layout-keyboard', { width: 390, height: 300 }],
+        ]) {
+          await page.setViewportSize(size);
+          await checkResultLayout(page, dialog, testInfo, name, shareUrl.href);
+        }
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.evaluate(() => { document.documentElement.style.fontSize = '200%'; });
+        await checkResultLayout(page, dialog, testInfo, 'large-text', shareUrl.href);
+        await page.evaluate(() => { document.documentElement.style.fontSize = ''; });
+        // Keyboard simulation with an unchanged layout viewport, separately
+        // from setViewportSize above. Dispatch the real viewport events.
+        const layoutHeight = await page.evaluate(() => innerHeight);
+        await page.evaluate(() => {
+          const viewport = window.visualViewport;
+          window.__restoreShareViewport = () => {
+            delete viewport.height;
+            delete viewport.offsetTop;
+            viewport.dispatchEvent(new Event('resize'));
+            viewport.dispatchEvent(new Event('scroll'));
+          };
+          Object.defineProperty(viewport, 'height', { configurable: true, value: 360 });
+          Object.defineProperty(viewport, 'offsetTop', { configurable: true, value: 0 });
+          viewport.dispatchEvent(new Event('resize'));
+        });
+        expect(await page.evaluate(() => innerHeight)).toBe(layoutHeight);
+        await checkResultLayout(page, dialog, testInfo, 'visual-keyboard', shareUrl.href);
+        await page.evaluate(() => {
+          Object.defineProperty(window.visualViewport, 'offsetTop', { configurable: true, value: 80 });
+          window.visualViewport.dispatchEvent(new Event('scroll'));
+        });
+        expect(await page.evaluate(() => innerHeight)).toBe(layoutHeight);
+        await checkResultLayout(page, dialog, testInfo, 'visual-keyboard-panned', shareUrl.href);
+        await page.evaluate(() => {
+          window.__restoreShareViewport();
+          delete window.__restoreShareViewport;
         });
         await dialog.getByRole('button', { name: 'リンクをコピー', exact: true }).click();
         expect(await page.evaluate(() => window.__copied)).toBe(shareUrl.href);
@@ -148,6 +228,10 @@ for (const [game, filename] of artwork) {
         await dialog.locator('#share-text').fill('編集した投稿文');
         await dialog.getByRole('button', { name: '共有する', exact: true }).click();
         await expect(dialog.getByRole('status')).toContainText('共有先を選んでください');
+        await page.setViewportSize({ width: 320, height: 568 });
+        await checkResultLayout(page, dialog, testInfo, 'fallback-expanded', shareUrl.href);
+        await dialog.locator('#share-text').fill('編集した投稿文');
+        await page.setViewportSize({ width: 390, height: 844 });
       }
       expect(shareUrl.origin).toBe(new URL(page.url()).origin);
       expect(shareUrl.pathname).toBe(`/${kind === 'result' ? 'results' : 'cabinets'}/12345678-1234-4234-8234-123456789012`);
