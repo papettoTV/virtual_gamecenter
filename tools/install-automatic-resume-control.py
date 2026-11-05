@@ -20,12 +20,12 @@ import warnings
 import zipfile
 
 REPO = '/repos/papettoTV/virtual_gamecenter'
-BASE = 'd2b6dafd43935e30eae661482ecee166aa76e680'
+BASE = '80efe3b4fcfa2997eee4695742124a63445334e4'
 MAIN = '73cb5d9267c56f06f9f1150327ec6b8b3caa2bb9'
 APP = 5405029
 BUNDLE_DIGEST = 'PACKAGED_BUNDLE_DIGEST'
 APPLY_RULE_VERSION = None  # Pin only after the sole human-managed App bypass is verified.
-STRICT_RULE_VERSION = '2026-11-03T11:10:27.241Z'
+STRICT_RULE_VERSION = '2026-11-04T21:11:49.782Z'
 MAIN_RULE_VERSION = '2026-10-21T20:32:35.191Z'
 MANIFEST = 'automatic-resume-installation.json'
 FILES = {'ci/control/review-trust.mjs', 'ci/control/review-trust.json', 'ci/production-candidate/policy.json'}
@@ -441,7 +441,9 @@ def maintain(data, baseline, jwt, token, *, api=maintenance_request, app_api=req
                 report['stage'] = 'complete'
         except (Exception, KeyboardInterrupt) as error:
             report['configurationRequired'] = True
-            report['configurationReason'] = str(error) if isinstance(error, Stop) else '配置後の確認で停止しました。認証値・元応答は表示しません。'
+            report['configurationReason'] = ('配置後の確認がCtrl+Cで中断されました。' if isinstance(error, KeyboardInterrupt)
+                                             else str(error) if isinstance(error, Stop)
+                                             else '配置後の確認で停止しました。認証値・元応答は表示しません。')
             report['configurationMessage'] = 'strict復帰後の配置・変数を確定できません。再配置せず--cleanupで確認してください。'
     return report
 
@@ -485,16 +487,23 @@ def human_maintenance(archive, data, baseline, cleaning=False):
     need(input('bypass・信頼定義3件・2変数の人用保守を実行する場合 ci-control と入力: ') == 'ci-control', '中止しました。')
     token = hidden('管理端末専用のFine-grained token（非表示・保存なし）: ')
     need(token.startswith('github_pat_'), '管理端末専用のFine-grained tokenを使用してください。')
+    calls = 0
+    def progress_api(method, path, auth=None, body=None):
+        nonlocal calls
+        calls += 1
+        if calls == 1 or calls % 5 == 0:
+            print(f'GitHub確認 {calls}件目を実行中です。完了表示までお待ちください。', file=sys.stderr, flush=True)
+        return maintenance_request(method, path, auth, body)
     try:
         print('処理中: GitHubの保護設定・配置・2変数を確認しています。通信確認には数分かかる場合があります。', file=sys.stderr, flush=True)
         if cleaning:
             path = maintenance_state_path(archive)
             need(path.is_file() and not path.is_symlink() and path.stat().st_size < 65536, '保守記録がありません。GitHub画面でbypassを確認してください。')
-            result = cleanup_maintenance(data, baseline, token, json.loads(path.read_text()))
+            result = cleanup_maintenance(data, baseline, token, json.loads(path.read_text()), api=progress_api)
         else:
             pem = Path(hidden('人が保管するpulbase-releaseのPEMファイルのパス（非表示）: ')).expanduser().absolute()
             need(pem.is_file() and not pem.is_symlink() and pem.stat().st_size < 16384, '通常の鍵ファイルではありません。')
-            result = maintain(data, baseline, sign(pem), token,
+            result = maintain(data, baseline, sign(pem), token, api=progress_api,
                               checkpoint=lambda state: save_maintenance_state(archive, state))
             if result.get('installation', {}).get('success'):
                 save_receipt(archive, result['installation'])
