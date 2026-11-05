@@ -238,7 +238,13 @@ for (const game of games) {
         await expect(screen.getByRole('button', { name: '通常表示に戻る' })).toHaveCount(0);
         const pauseRect = await pause.boundingBox();
         expect(await pause.evaluate((button, rect) => button === document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2), pauseRect)).toBe(true);
+        await page.evaluate(() => {
+          window.pauseCanvasInputs = 0;
+          document.querySelector('#game').addEventListener('pointerdown', () => window.pauseCanvasInputs++);
+        });
+        await expect(pause).toHaveAccessibleName('一時停止');
         await pause.tap();
+        expect(await page.evaluate(() => window.pauseCanvasInputs)).toBe(0);
         await expect.poll(() => phase(page, game.id)).toBe('paused');
         await expect(pause).toHaveText('再開');
         await expect(screen.getByRole('button', { name: '別のゲームをする', exact: true }).filter({ visible: true })).toBeVisible();
@@ -250,13 +256,23 @@ for (const game of games) {
           expect(control.width).toBeGreaterThanOrEqual(44);
           expect(control.height).toBeGreaterThanOrEqual(44);
           expect(control.x + control.width).toBeLessThanOrEqual(viewport.width);
-          expect(frame.y).toBeGreaterThanOrEqual(control.y + control.height);
+          expect(frame.y).toBeCloseTo(control.y, 0);
+          const status = screen.locator('.buzz-mobile-status');
+          await expect(status).toContainText('LV');
+          await expect(status).toContainText('♥');
+          const cells = await status.locator('span').evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().toJSON()));
+          for (let i = 1; i < cells.length; i++) expect(cells[i].x).toBeGreaterThanOrEqual(cells[i - 1].right);
+          expect(cells.at(-1).right).toBeLessThanOrEqual(control.x);
+          const previousHeight = Math.min((viewport.width - 16) / .65, viewport.height - 68);
+          expect(frame.height).toBeGreaterThan(previousHeight);
           expect(frame.y + frame.height).toBeLessThanOrEqual(viewport.height);
           expect(frame.width / frame.height).toBeCloseTo(416 / 640, 2);
           if (viewport.width === 390) expect(frame.width).toBeGreaterThan(350);
           await testInfo.attach(`buzz-paused-${viewport.width}`, { body: await page.screenshot(), contentType: 'image/png' });
         }
-        await pause.tap();
+        await expect(pause).toHaveAccessibleName('再開');
+        await pause.focus();
+        await page.keyboard.press('Enter');
         await expect.poll(() => phase(page, game.id)).toBe('playing');
         await expect(pause).toHaveText('一時停止');
         await expect(screen.locator('.mobile-play-leave')).toHaveCount(0);
