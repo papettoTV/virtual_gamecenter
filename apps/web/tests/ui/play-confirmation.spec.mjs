@@ -135,7 +135,7 @@ for (const game of games) {
         if (request.method() === 'POST' && request.url().includes('/api/platform/credit-reservations')) writes.push(request.url());
       });
       const cabinet = `${origin}/cabinets/${randomUUID()}?game=${game.id}&start=1`;
-      const start = page.getByRole('button', { name: game.button, exact: true });
+      const start = page.getByRole('button', { name: game.id === 'graze-duel' && isMobile ? 'タップして開始（1枚）' : game.button, exact: true });
       const ready = game.id === 'dot-wave' ? 'intro' : 'ready';
       await test.step('初回ready: 新document・bootstrap・phase', async () => {
         await navigateGuest(page, cabinet);
@@ -151,6 +151,16 @@ for (const game of games) {
         expect(writes).toHaveLength(0);
       });
       const balance = await wallet(page);
+      if (game.id === 'graze-duel' && isMobile) {
+        await expect(page.locator('#touch-pause')).toBeHidden();
+        await expect(page.locator('.game-share-button')).toHaveCount(0);
+        await page.getByRole('button', { name: '観戦に招待', exact: true }).tap();
+        const share = page.getByRole('dialog', { name: '観戦に招待', exact: true });
+        await expect(share).toBeVisible();
+        await expect.poll(() => phase(page, game.id)).toBe(ready);
+        expect(writes).toHaveLength(0);
+        await share.getByRole('button', { name: '× 閉じる' }).tap();
+      }
       const intent = async () => {
         if (input === 'primary' && isMobile) await start.tap();
         else if (input === 'primary' && game.id === 'dot-wave') await start.click();
@@ -160,6 +170,16 @@ for (const game of games) {
       await test.step('取消: キー抑止・再入力・財布不変', async () => {
         await intent();
         await expect(dialog).toBeVisible();
+        await testInfo.attach('start-confirmation-open', {
+          body: await page.screenshot({ fullPage: true }), contentType: 'image/png',
+        });
+        if (game.id === 'graze-duel' && isMobile) {
+          await start.evaluate(button => {
+            for (const pointerId of [1, 2]) button.dispatchEvent(new PointerEvent('pointerdown', { pointerId, bubbles: true }));
+            button.click(); button.click();
+          });
+          expect(writes).toHaveLength(0);
+        }
         await page.evaluate(code => window.dispatchEvent(new KeyboardEvent('keydown', { code, repeat: true, bubbles: true })), game.key === 'p' ? 'KeyP' : 'Space');
         await expect.poll(() => phase(page, game.id)).toBe(ready);
         expect(writes).toHaveLength(0);
@@ -315,7 +335,7 @@ for (const game of games) {
   test(`${game.id}: failed capture keeps play stopped and releases the unused reservation`, async ({ page, isMobile }) => {
     await prepareGuest(page);
     await page.goto(`${origin}/cabinets/${randomUUID()}?game=${game.id}`);
-    const start = page.getByRole('button', { name: game.button, exact: true });
+    const start = page.getByRole('button', { name: game.id === 'graze-duel' && isMobile ? 'タップして開始（1枚）' : game.button, exact: true });
     if (isMobile || game.id === 'dot-wave') { await expect(start).toBeVisible(); await expect(start).toBeEnabled(); }
     await expect.poll(() => phase(page, game.id)).toBe(game.id === 'dot-wave' ? 'intro' : 'ready');
     const balance = await wallet(page);
@@ -332,7 +352,7 @@ for (const game of games) {
     expect(await persistedWallet(page)).toBe(balance);
   });
   for (const occupied of [false, true]) {
-    test(`${game.id}: spectator never requests a start (${occupied ? 'live player' : 'empty cabinet'})`, async ({ page, browser }, testInfo) => {
+    test(`${game.id}: spectator never requests a start (${occupied ? 'live player' : 'empty cabinet'})`, async ({ page, browser, isMobile }, testInfo) => {
       const cabinet = `${origin}/cabinets/${randomUUID()}?game=${game.id}`;
       const playerContext = occupied ? await browser.newContext() : null;
       const playerEvents = [];
@@ -426,7 +446,7 @@ for (const game of games) {
           if (game.id === 'dot-wave') await expect(page.locator('.dot-cabinet-bar > span')).toContainText('観戦中');
           else await expect(page.locator('#spectator-banner')).toBeVisible();
         }
-        const start = page.getByRole('button', { name: game.button, exact: true });
+        const start = page.getByRole('button', { name: game.id === 'graze-duel' && isMobile ? 'タップして開始（1枚）' : game.button, exact: true });
         const dialog = page.getByRole('dialog', { name: 'ゲームを開始しますか？' });
         await expect(start).toBeHidden();
         await expect(dialog).toBeHidden();
@@ -493,8 +513,18 @@ for (const game of games.filter(game => game.id === 'graze-duel')) {
       page.on('request', request => {
         if (request.method() === 'POST' && request.url().includes('/api/platform/credit-reservations')) writes.push(request.url());
       });
+      if (game.id === 'graze-duel' && isMobile) {
+        await expect(page.locator('#touch-pause')).toBeHidden();
+        await expect(page.locator('.game-share-button')).toHaveCount(0);
+        await page.getByRole('button', { name: '観戦に招待', exact: true }).tap();
+        const share = page.getByRole('dialog', { name: '観戦に招待', exact: true });
+        await expect(share).toBeVisible();
+        await expect.poll(() => phase(page, game.id)).toBe(ready);
+        expect(writes).toHaveLength(0);
+        await share.getByRole('button', { name: '× 閉じる' }).tap();
+      }
       const intent = async () => {
-        if (isMobile) await page.getByRole('button', { name: game.button, exact: true }).tap();
+        if (isMobile) await page.getByRole('button', { name: game.id === 'graze-duel' && isMobile ? 'タップして開始（1枚）' : game.button, exact: true }).tap();
         else {
           await page.locator('body').click({ position: { x: 2, y: 2 } });
           await page.keyboard.press(game.key);

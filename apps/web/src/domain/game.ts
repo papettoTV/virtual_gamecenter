@@ -41,7 +41,7 @@ export const BUZZ_BARRIER: GameDefinition = {
     action: "弾をかすってレベルアップ。無敵シールドをボスに当てて攻撃する。",
     ending: "ラスボス撃破でクリア。ライフがなくなるとゲームオーバー。",
     desktop: ["移動：矢印キー / WASD", "低速移動：Shift", "開始・一時停止：Space"],
-    mobile: ["画面内をタッチし、スライドして移動", "画面下のボタンで開始、右上のボタンで一時停止"],
+    mobile: ["画面内をタッチし、スライドして移動", "ゲーム領域をタップして開始、右上のボタンで一時停止"],
     tips: ["レベルアップの無敵時間を活用して、弾幕とボスに近づこう。"],
   },
   currentVersion: "prototype-score-ranking-1",
