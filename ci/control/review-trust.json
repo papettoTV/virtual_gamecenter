@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "policyId": "review-trust-2026-11-04-v7",
+  "policyId": "review-trust-2026-11-06-v8",
   "repository": "papettoTV/virtual_gamecenter",
   "maxEvidenceAgeMs": 86400000,
   "files": {
@@ -15,7 +15,7 @@
     "ci/issue-routing.mjs": "2249309f414984a7a47057e6b869a4c5bec2df95",
     "ci/ci-evidence.mjs": "c9940d6615e1a2a9242a16c835964dedf0064a66",
     "ci/staging-artifact.mjs": "8e7c5c6530f54c82e345b90ad7afd4d83cfda825",
-    "ci/check-workflows.mjs": "515d18909a6515d063cfdab895d912ab6c5f6b3b",
+    "ci/check-workflows.mjs": "100079dd8aa09f452597b14908d2f1dadae2d78a",
     "ci/package.json": "7a3095aeb8ef4c236ca8e813313338026775becb",
     "ci/package-lock.json": "f24bd7c4b6bb4de691e9b2ddcc0abffd7a857dff",
     "apps/web/package.json": "f6b9371154eee01a1605c87016faeffe0f0a4237",
@@ -29,7 +29,7 @@
     "apps/web/pages/wrangler.jsonc": "a8ca82a1c3588b3b7da740aaa3f6603f4606177a",
     "apps/web/config/pages-targets.json": "f833d605e9fa1c9a85bbd542184f2b94240cbb6f",
     "apps/web/vite.config.ts": "72c2f8fd96e386c4d22669b5461aee4e2faaead5",
-    ".github/workflows/codex-issue.yml": "ecc733ed42d7da5050d6a13d642927a7c25deff0",
+    ".github/workflows/codex-issue.yml": "255c61bece8915f90b4509433a23b1764bb5c65b",
     "ci/prompts/implement.md": "c7e7bff5562ab56730af3a5796c57c87c61a8507",
     "ci/automatic-resume.mjs": "c35044a5174184f20a00d1e1eab21c2677e525b8",
     "ci/publish-patch.mjs": "1d694b22148f649ad8c4f8e174de70ca50672b79",
@@ -40,9 +40,9 @@
     "ci/publication-result.mjs": "b2257ec6630fb5b85257ef49d28873d2039f2067",
     "ci/schemas/implementation.json": "f9c32197de5d9279b642961ef0ff7abcca46f76d",
     ".github/workflows/automatic-repair.yml": "622116f2e2b5a84c8e1b764aa5f7b7939a6da1c9",
-    "ci/automatic-repair.mjs": "bd57097c49f2624cecdcbfd225570f31831b120a",
-    "ci/repair-ticket.mjs": "a12509edd28797e8e91233a274eb4d10a49648cf",
-    "ci/repair-diagnostics.mjs": "be9026309c17fcb1b46ee418de9ec45e3ace0fc0",
+    "ci/automatic-repair.mjs": "838d76dcee016bfe8618172f6b6b68b3b630c06b",
+    "ci/repair-ticket.mjs": "e30cb31bebf6e77dbdab7d17bfc79e3e1cd2127c",
+    "ci/repair-diagnostics.mjs": "2ae8656f4f576e0837a0d8af59310765a23523b7",
     "ci/repair-workspace.mjs": "df9c442eed030a762acef05b02ac2f6261c9cf96"
   },
   "codexAction": "openai/codex-action@bdf19a4a223ec2549a3e2274a0cf61556bc07675",

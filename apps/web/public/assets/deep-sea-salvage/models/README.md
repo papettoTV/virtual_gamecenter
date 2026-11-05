@@ -34,6 +34,7 @@ BlenderからglTF 2.0 Binary（`.glb`）で書き出し、このフォルダー�
 
 ## 初稿モデルの再生成
 
+- 編集用Blender原本と制作プレビューは、リポジトリの`assets/archive/site-public/assets/deep-sea-salvage/models/`へ保存する。生成スクリプトも同じ保存先を使用する。サイトへ配布するGLB・manifest・図鑑PNGとは分離し、原本を`public/`へ戻さない。
 - `node scripts/generate-deep-sea-creatures.mjs`で、潜水艦を変更せず魚20種、ボス、環境モデルを再生成する。
 - Blenderをバックグラウンド実行して`scripts/render-deep-sea-model-catalog.py`を実行すると、図鑑PNGと`deep-sea-model-catalog.blend`を再生成する。
 - 個別調整中は`-- --asset sun-sardine`のように指定し、対象の高解像度PNGだけを再撮影できる。`--asset`は複数指定可。

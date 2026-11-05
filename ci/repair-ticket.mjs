@@ -11,8 +11,13 @@ export function parseTicket(comment){
  }catch{return null;}
 }
 export function repairBudget(comments,{issue,pull,head,base}){
- const tickets=comments.map(parseTicket).filter(x=>x&&x.issue===Number(issue)&&x.pull===Number(pull));
- if(tickets.some(t=>t.head===head&&t.base===base))return {eligible:false,reason:'duplicate-snapshot'};
+ // Human approval on 2026-11-06: at most THREE further attempts, only for
+ // these existing PRs. Exempt only the exact pre-approval failed tickets;
+ // changing head/base or posting a new comment never renews the allowance.
+ const prior={124:{pull:125,ids:[6602548641,6646553769,6649212086]},128:{pull:129,ids:[6602545305,6646551631,6649210050]}}[issue];
+ const history=comments.map(c=>({id:c.id,ticket:parseTicket(c)})).filter(x=>x.ticket&&x.ticket.issue===Number(issue)&&x.ticket.pull===Number(pull));
+ const tickets=history.filter(x=>!(prior?.pull===Number(pull)&&prior.ids.includes(x.id))).map(x=>x.ticket);
+ if(history.some(({ticket:t})=>t.head===head&&t.base===base))return {eligible:false,reason:'duplicate-snapshot'};
  if(tickets.length>=3)return {eligible:false,reason:'repair-limit'};
  return {eligible:true,round:tickets.length+1};
 }
