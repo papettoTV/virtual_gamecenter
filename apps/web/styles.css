@@ -964,13 +964,14 @@ canvas {
 
 .ranking-overlay {
   position: absolute;
+  z-index: 6;
   left: 50%;
   top: 57%;
   width: min(520px, calc(100% - 48px));
   transform: translate(-50%, -50%);
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 16px;
-  background: rgba(8, 10, 24, 0.84);
+  background: #080a18;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.42);
   padding: 14px 16px 16px;
   text-align: center;
