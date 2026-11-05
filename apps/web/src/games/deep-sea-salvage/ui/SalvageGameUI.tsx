@@ -1,3 +1,23 @@
+import { gameHost } from "../../../game-sdk/game-host";
+import "./salvage-play.css";
+
+export function SalvageIntro() {
+  return <>
+    <div className="salvage-intro">
+      <strong>深海サルベージ</strong>
+      <p>魚に近づくと自動で調査</p>
+      <p className="salvage-touch-help">画面を押したまま、進みたい方向へ指を動かす</p>
+      <p className="salvage-key-help">WASD / 矢印: 移動　P: 一時停止</p>
+      <button type="button" aria-label="潜航開始" onClick={event => { event.stopPropagation(); gameHost.requestPlay("start"); }}>
+        <span className="salvage-touch-help">タップして潜航開始</span>
+        <span className="salvage-key-help">潜航開始（P）</span>
+      </button>
+      <small>確認画面で承認すると1クレジットを使用します</small>
+    </div>
+    <button id="salvage-ready-collection" className="salvage-book" type="button" aria-label="図鑑を開く" title="図鑑">📖</button>
+  </>;
+}
+
 export function SalvageResultCollection() {
   return (
     <button id="salvage-result-collection" className="ranking-result-collection-button" type="button">
@@ -54,7 +74,10 @@ export function SalvageTerrainEditor() {
 
 export function SalvageTouchCollection() {
   return (
-    <button id="touch-collection" className="touch-button" type="button">図鑑</button>
+    <>
+    <div id="salvage-status" className="salvage-status" aria-label="ゲームステータス" />
+    <button id="touch-collection" className="touch-button salvage-book" type="button" aria-label="図鑑を開く" title="図鑑">📖</button>
+    </>
   );
 }
 
