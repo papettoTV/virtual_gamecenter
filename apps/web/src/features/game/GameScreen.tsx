@@ -75,7 +75,7 @@ export function GameScreen({ game }: GameScreenProps) {
           }}>
           <span>タップして開始（{game.creditCost}枚）</span>
         </button>}
-        {["graze-duel", "deep-sea-salvage"].includes(game.id) && play.active && play.paused && <button
+        {game.id === "graze-duel" && play.active && play.paused && <button
           className="mobile-play-leave secondary-button"
           type="button"
           onClickCapture={event => { event.stopPropagation(); navigate("/"); }}
@@ -156,6 +156,11 @@ export function GameScreen({ game }: GameScreenProps) {
           </div>}
           <TouchActions game={game} />
           <button id="touch-pause" className="touch-button" type="button">一時停止</button>
+          {game.id === "deep-sea-salvage" && play.active && play.paused && <button
+            className="mobile-play-leave secondary-button"
+            type="button"
+            onClickCapture={event => { event.stopPropagation(); navigate("/"); }}
+          >別のゲームをする</button>}
         </div>
       </div>
       <Settings game={game} />

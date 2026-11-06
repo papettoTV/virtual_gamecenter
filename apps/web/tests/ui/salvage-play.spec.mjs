@@ -141,7 +141,28 @@ for (const viewport of [{ width: 320, height: 568 }, { width: 844, height: 390 }
     expect(collection.height).toBeGreaterThanOrEqual(44);
     const canvas = await screen.locator('#game').boundingBox();
     expect(canvas.width).toBeGreaterThan(0); expect(canvas.height).toBeGreaterThan(0);
+    // The collection (including the last row) is drawn inside this canvas.
+    // Checking its entire bounds catches overlays even when controls miss each other.
+    const leave = screen.locator('.mobile-play-leave');
+    await expect(leave).toBeVisible();
+    const exit = await leave.boundingBox();
+    expect(exit.y).toBeGreaterThanOrEqual(canvas.y + canvas.height);
+    expect(exit.y).toBeGreaterThanOrEqual(pause.y + pause.height);
+    expect(exit.y + exit.height).toBeLessThanOrEqual(viewport.height);
+    expect(exit.height).toBeGreaterThanOrEqual(44);
+    // Let transient credit notifications expire naturally before collecting evidence.
+    await expect(page.locator('.notification')).toHaveCount(0, { timeout: 15000 });
     await info.attach(`salvage-${viewport.width}`, { body: await page.screenshot(), contentType: 'image/png' });
+    await screen.getByRole('button', { name: '通常表示に戻る' }).click();
+    await expect(screen).not.toHaveAttribute('data-mobile-play');
+    await expect(screen).toHaveAttribute('data-salvage-collection', 'true');
+    await expect(leave).toBeHidden();
+    await screen.getByRole('button', { name: '全画面でプレイ' }).click();
+    await expect(screen).toHaveAttribute('data-mobile-play', 'true');
+    await expect(leave).toBeVisible();
+    const restoredCanvas = await screen.locator('#game').boundingBox();
+    const restoredExit = await leave.boundingBox();
+    expect(restoredExit.y).toBeGreaterThanOrEqual(restoredCanvas.y + restoredCanvas.height);
     await screen.locator('#touch-collection').click();
     await expect(screen).toHaveAttribute('data-salvage-collection', 'false');
     await expect.poll(() => phase(page)).toBe('paused');
@@ -173,6 +194,8 @@ test('salvage: restore, reenter fullscreen and exit directly with connection cle
   await expect(screen).toHaveAttribute('data-mobile-play', 'true');
   await screen.locator('#touch-pause').click();
   await expect.poll(() => phase(page)).toBe('paused');
+  await screen.locator('#touch-collection').click();
+  await expect(screen).toHaveAttribute('data-salvage-collection', 'true');
   const dialogs = [];
   page.on('dialog', async dialog => { dialogs.push(dialog.message()); await dialog.dismiss(); });
   await screen.locator('.mobile-play-leave').click();

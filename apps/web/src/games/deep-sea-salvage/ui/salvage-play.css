@@ -66,3 +66,12 @@
   /* Keep the complete collection, including every column, visible. */
   .salvage-screen[data-salvage-collection="true"] #game { object-fit: contain; }
 }
+
+/* Reserve a control row outside the canvas, including the collection's last row. */
+#game-screen[data-mobile-play].salvage-screen .mobile-play-leave {
+  position: static;
+  transform: none;
+  grid-column: 1 / -1;
+  width: 100%;
+  max-width: none;
+}
