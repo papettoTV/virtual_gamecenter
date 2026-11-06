@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { test, expect } from '../../../../ci/ui-fixtures.mjs';
 import { localUiUrl } from '../../../../ci/ui-tests.mjs';
-import { respectReadBudget, finishReadBudget } from './api-read-budget.mjs';
+import { respectReadBudget, finishReadBudget, readBudgetTimeout } from './api-read-budget.mjs';
 
 const origin = 'http://127.0.0.1:5174';
 const games = [
@@ -56,11 +56,18 @@ async function prepareGuest(page) {
   const decline = page.getByRole('button', { name: '拒否する', exact: true });
   if (await decline.isVisible()) await decline.click();
   if (!account.welcomeCreditGranted) {
+    const refreshed = page.waitForResponse(response =>
+      response.url() === `${origin}/api/platform/bootstrap`
+      && response.request().method() === 'GET'
+      && response.frame() === page.mainFrame(), { timeout: readBudgetTimeout });
     const granted = await page.evaluate(async () => {
       const result = await (await import('/src/features/platform/platform-client.ts')).claimWelcomeCredit();
       window.dispatchEvent(new Event('platform-wallet-changed'));
       return result.wallet;
     });
+    const response = await refreshed;
+    expect(response.ok()).toBe(true);
+    expect((await response.json()).wallet.availableTotal).toBe(granted.availableTotal);
     await expect(page.locator('.platform-credit-badge')).toHaveText(String(granted.availableTotal));
     return granted;
   }
