@@ -9,11 +9,18 @@ export async function copySharedText(text: string, id: string, scope?: string) {
       field.value = text;
       field.style.position = "fixed";
       field.style.opacity = "0";
-      document.body.appendChild(field);
+      const previous = document.activeElement;
+      // A modal makes the background inert, so keep the legacy copy field
+      // inside the active dialog where selection is still permitted.
+      const container = previous?.closest('[role="dialog"]') ?? document.body;
+      container.appendChild(field);
       try {
         field.select();
         if (!document.execCommand("copy")) throw new Error("copy_failed");
-      } finally { field.remove(); }
+      } finally {
+        field.remove();
+        if (previous instanceof HTMLElement) previous.focus({ preventScroll: true });
+      }
     }
     if (isActive()) notifications.show({ id, scope, type: "success", message: "コピーしました。" });
   } catch (error) {
