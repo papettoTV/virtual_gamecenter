@@ -585,6 +585,9 @@ export function createRenderer(canvas: HTMLCanvasElement, state: State, queries:
     ctx.fillStyle = state.power > 25 ? "#63f4d9" : "#ff526f"; ctx.fillRect(barX, barY + barH * (1 - state.power / 100), 8, barH * state.power / 100);
     ctx.save(); ctx.translate(barX - 11, H / 2); ctx.rotate(-Math.PI / 2); ctx.fillStyle = "#efffff"; ctx.textAlign = "center"; ctx.font = "900 12px system-ui"; ctx.fillText(`POWER ${Math.ceil(state.power)}%`, 0, 0); ctx.restore();
     }
+    // Player ready instructions live in the responsive HTML intro. Do not
+    // repeat the initial keyboard-only state.message beneath that panel.
+    if (state.phase === "ready" && !isWatching() && debugParams.get("terrainPreview") !== "1") return;
     ctx.fillStyle = "rgba(1,10,18,.8)"; ctx.fillRect(0, H - 34, W, 34); ctx.fillStyle = state.messageTimer > 0 ? "#ffe48b" : "#8eb7bd"; ctx.textAlign = "center";
     const message = isWatching() && state.phase === "ready" ? "プレイヤーの開始を待っています" : state.messageTimer > 0 ? state.message : "魚を調査して電力を補充";
     ctx.fillText(message, W / 2, H - 12); ctx.textAlign = "left";

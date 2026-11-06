@@ -29,7 +29,7 @@ describe("BUZZ BARRIERの開始・再開待ち", () => {
   });
 });
 
-function renderSalvage(watching: boolean, mode: "ready" | "pause" | "collection") {
+function renderSalvage(watching: boolean, mode: "ready" | "pause" | "collection", compact = true) {
   const texts: string[] = [];
   const context = new Proxy<Record<string, unknown>>({
     fillText: (text: string) => texts.push(text),
@@ -38,7 +38,7 @@ function renderSalvage(watching: boolean, mode: "ready" | "pause" | "collection"
   }, { get: (target, property: string) => target[property] ?? (() => {}) });
   const canvas = {
     width: 960, height: 640, getContext: () => context,
-    getBoundingClientRect: () => ({ width: 375, height: 560 }),
+    getBoundingClientRect: () => compact ? ({ width: 375, height: 560 }) : ({ width: 960, height: 640 }),
   } as unknown as HTMLCanvasElement;
   vi.stubGlobal("document", { createElement: () => canvas });
   vi.stubGlobal("Image", class { src = ""; });
@@ -67,10 +67,10 @@ describe("深海サルベージの観戦案内", () => {
     expect(texts.join(" ")).not.toMatch(/WASD|潜航開始|ボタンで再開|ボタンで閉じる|クリックでリザルト/);
   });
 
-  it("プレイヤーのready画面はHTMLにタッチ・キーボードの操作説明と開始ボタンを維持する", () => {
+  it.each([true, false])("プレイヤーのready画面はcompact=%sでもHTMLにタッチ・キーボードの操作説明と開始ボタンを維持する", compact => {
     // Ready instructions moved to responsive HTML so they remain readable on phones.
     // The canvas must not add a second, keyboard-only start prompt underneath it.
-    expect(renderSalvage(false, "ready").join(" ")).not.toMatch(/プレイヤーの開始を待っています|潜航開始/);
+    expect(renderSalvage(false, "ready", compact).join(" ")).not.toMatch(/プレイヤーの開始を待っています|潜航開始/);
     const html = renderToStaticMarkup(createElement(SalvageIntro));
     expect(html).toContain('class="salvage-touch-help">画面を押したまま、進みたい方向へ指を動かす');
     expect(html).toContain('class="salvage-touch-help">タップして潜航開始');

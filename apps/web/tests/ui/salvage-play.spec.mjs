@@ -5,15 +5,17 @@ const origin = 'http://127.0.0.1:5174';
 const phase = page => page.evaluate(async () =>
   (await import('/src/features/sharing/share-service.ts')).liveSharing.getSnapshot()?.phase);
 
-test('salvage: book isolation, canvas cancellation, authorized duplicate start and restoration', async ({ page }, info) => {
+// Each viewport gets an independent authorized run and its own bounded waits.
+for (const viewport of [{ width: 320, height: 568 }, { width: 844, height: 390 }, { width: 390, height: 700 }]) {
+test(`salvage ${viewport.width}: book isolation, cancellation, duplicate start and restoration`, async ({ page }, info) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const bootstrap = page.waitForResponse(r => r.url() === `${origin}/api/platform/bootstrap` && r.request().method() === 'GET');
-  await page.goto(origin);
+  await page.goto(origin, { waitUntil: 'domcontentloaded' });
   const account = await (await bootstrap).json();
   if (!account.welcomeCreditGranted) await page.evaluate(async () =>
     (await import('/src/features/platform/platform-client.ts')).claimWelcomeCredit());
   const loaded = page.waitForResponse(r => r.url() === `${origin}/api/platform/bootstrap` && r.request().method() === 'GET');
-  await page.goto(`${origin}/cabinets/${randomUUID()}?game=deep-sea-salvage`);
+  await page.goto(`${origin}/cabinets/${randomUUID()}?game=deep-sea-salvage`, { waitUntil: 'domcontentloaded' });
   const localAccount = await (await loaded).json();
   const decline = page.getByRole('button', { name: '拒否する', exact: true });
   if (await decline.isVisible()) await decline.click();
@@ -80,7 +82,7 @@ test('salvage: book isolation, canvas cancellation, authorized duplicate start a
   expect(statusNodeIsStable).toBe(true);
   await screen.locator('#touch-collection').click();
   await expect(screen).toHaveAttribute('data-salvage-collection', 'true');
-  for (const viewport of [{ width: 320, height: 568 }, { width: 844, height: 390 }, { width: 390, height: 700 }]) {
+  {
     await page.setViewportSize(viewport);
     const status = await screen.locator('#salvage-status').boundingBox();
     expect(status.y).toBeGreaterThanOrEqual(0);
@@ -122,3 +124,4 @@ test('salvage: book isolation, canvas cancellation, authorized duplicate start a
   await expect(page).toHaveURL(`${origin}/`);
   expect(await page.evaluate(() => document.body.style.position)).not.toBe('fixed');
 });
+}
