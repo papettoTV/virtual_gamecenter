@@ -1,9 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { getPausePresentation } from "../../src/games/graze-duel/rendering/pause-presentation";
 import { createRenderer } from "../../src/games/deep-sea-salvage/renderer";
 import { createState } from "../../src/games/deep-sea-salvage/state";
 import { createDefaultTerrain } from "../../src/games/deep-sea-salvage/terrain";
 import type { Simulation } from "../../src/games/deep-sea-salvage/simulation";
+import { SalvageIntro } from "../../src/games/deep-sea-salvage/ui/SalvageGameUI";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -26,7 +29,7 @@ describe("BUZZ BARRIERの開始・再開待ち", () => {
   });
 });
 
-function renderSalvage(watching: boolean, mode: "ready" | "pause" | "collection") {
+function renderSalvage(watching: boolean, mode: "ready" | "pause" | "collection", compact = true) {
   const texts: string[] = [];
   const context = new Proxy<Record<string, unknown>>({
     fillText: (text: string) => texts.push(text),
@@ -35,7 +38,7 @@ function renderSalvage(watching: boolean, mode: "ready" | "pause" | "collection"
   }, { get: (target, property: string) => target[property] ?? (() => {}) });
   const canvas = {
     width: 960, height: 640, getContext: () => context,
-    getBoundingClientRect: () => ({ width: 375, height: 560 }),
+    getBoundingClientRect: () => compact ? ({ width: 375, height: 560 }) : ({ width: 960, height: 640 }),
   } as unknown as HTMLCanvasElement;
   vi.stubGlobal("document", { createElement: () => canvas });
   vi.stubGlobal("Image", class { src = ""; });
@@ -64,8 +67,20 @@ describe("深海サルベージの観戦案内", () => {
     expect(texts.join(" ")).not.toMatch(/WASD|潜航開始|ボタンで再開|ボタンで閉じる|クリックでリザルト/);
   });
 
+  it.each([true, false])("プレイヤーのready画面はcompact=%sでもHTMLにタッチ・キーボードの操作説明と開始ボタンを維持する", compact => {
+    // Ready instructions moved to responsive HTML so they remain readable on phones.
+    // The canvas must not add a second, keyboard-only start prompt underneath it.
+    expect(renderSalvage(false, "ready", compact).join(" ")).not.toMatch(/プレイヤーの開始を待っています|潜航開始/);
+    const html = renderToStaticMarkup(createElement(SalvageIntro));
+    expect(html).toContain('class="salvage-touch-help">画面を押したまま、進みたい方向へ指を動かす');
+    expect(html).toContain('class="salvage-touch-help">タップして潜航開始');
+    expect(html).toContain('class="salvage-key-help">WASD / 矢印: 移動　P: 一時停止');
+    expect(html).toContain('class="salvage-key-help">潜航開始（P）');
+    expect(html).toContain('<button type="button" aria-label="潜航開始">');
+    expect(html).toContain("確認画面で承認すると1クレジットを使用します");
+  });
+
   it.each([
-    ["ready", "P または画面下のボタンで潜航開始"],
     ["pause", "P / 一時停止ボタンで再開"],
     ["collection", "F / 図鑑ボタンで閉じる"],
   ] as const)("プレイヤーの%s画面は操作説明を維持する", (mode, message) => {

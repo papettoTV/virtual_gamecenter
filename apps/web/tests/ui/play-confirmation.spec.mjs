@@ -135,9 +135,29 @@ for (const game of games) {
       expect(writes).toHaveLength(0);
     }
   });
+  test(`${game.id}: reload remains unpaid and ready`, async ({ page, isMobile }) => {
+    await prepareGuest(page);
+    const writes = [];
+    page.on('request', request => {
+      if (request.method() === 'POST' && request.url().includes('/api/platform/credit-reservations')) writes.push(request.url());
+    });
+    const cabinet = `${origin}/cabinets/${randomUUID()}?game=${game.id}&start=1`;
+    const ready = game.id === 'dot-wave' ? 'intro' : 'ready';
+    const start = page.getByRole('button', { name: game.id === 'graze-duel' && isMobile ? 'タップして開始（1枚）' : game.button, exact: true });
+    await navigateGuest(page, cabinet);
+    const balance = await wallet(page);
+    await expect.poll(() => phase(page, game.id)).toBe(ready);
+    await navigateGuest(page, cabinet, true);
+    if (isMobile || game.id === 'dot-wave') await expect(start).toBeVisible();
+    await expect.poll(() => phase(page, game.id)).toBe(ready);
+    await expect(page.getByRole('dialog', { name: 'ゲームを開始しますか？' })).toBeHidden();
+    expect(await persistedWallet(page)).toBe(balance);
+    expect(writes).toHaveLength(0);
+    await leaveToDirectory(page, game.id);
+  });
   for (const input of ['primary', 'keyboard']) {
     test(`${game.id}: ${input}, ready, cancel, delayed duplicate and authorized start`, async ({ page, isMobile }, testInfo) => {
-      // This case includes reload, cancellation, real accounting, exit and
+      // This case includes cancellation, real accounting, exit and
       // re-entry (plus mobile layout checks). Keep individual assertions at
       // their normal timeout while allowing the full sequence to finish.
       test.setTimeout(60000);
@@ -155,12 +175,6 @@ for (const game of games) {
         if (isMobile || game.id === 'dot-wave') { await expect(start).toBeVisible(); await expect(start).toBeEnabled(); }
         await expect.poll(() => phase(page, game.id)).toBe(ready);
         await expect(page.getByRole('dialog', { name: 'ゲームを開始しますか？' })).toBeHidden();
-        expect(writes).toHaveLength(0);
-      });
-      await test.step('再読込ready: 新document・bootstrap・phase', async () => {
-        await navigateGuest(page, cabinet, true);
-        if (isMobile || game.id === 'dot-wave') await expect(start).toBeVisible();
-        await expect.poll(() => phase(page, game.id)).toBe(ready);
         expect(writes).toHaveLength(0);
       });
       const balance = await wallet(page);

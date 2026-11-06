@@ -102,6 +102,51 @@ describe("深海サルベージの分離されたシミュレーション", () =
 });
 
 describe("深海サルベージのリソース解放", () => {
+  it("図鑑・一時停止では背後の3D描画を止め、実績・画像・表示モードの変化を再描画する", () => {
+    const { state, simulation } = setup();
+    const fillRect = vi.fn();
+    const context = new Proxy({ fillRect }, {
+      get(target, property) { return property in target ? Reflect.get(target, property) : () => {}; },
+    });
+    const images: Array<{ complete: boolean; naturalWidth: number }> = [];
+    vi.stubGlobal("Image", class {
+      src = ""; complete = true; naturalWidth = 100;
+      constructor() { images.push(this); }
+    });
+    vi.stubGlobal("document", { createElement: () => ({ getContext: () => context }) });
+    const canvas = { width: 960, height: 640, getContext: () => context } as unknown as HTMLCanvasElement;
+    const renderer = createRenderer(canvas, state, simulation, new URLSearchParams(), () => false);
+    const render = vi.fn();
+    renderer.setThreeLayer({ render, dispose: vi.fn() } as unknown as DeepSeaThreeLayer);
+    state.phase = "dive"; state.paused = true; state.collectionOpen = true;
+    renderer.draw();
+    expect(fillRect).toHaveBeenCalled();
+    expect(render).not.toHaveBeenCalled();
+    fillRect.mockClear(); renderer.draw();
+    expect(fillRect).not.toHaveBeenCalled();
+    renderer.drawOverlay("LIVE", ["プレイヤーの開始を待っています"]);
+    fillRect.mockClear(); renderer.draw();
+    expect(fillRect).toHaveBeenCalled();
+    fillRect.mockClear();
+    state.discovered.add("sun-sardine"); renderer.draw();
+    expect(fillRect).toHaveBeenCalled();
+    fillRect.mockClear();
+    images[0]!.complete = false; renderer.draw();
+    expect(fillRect).toHaveBeenCalled();
+    fillRect.mockClear();
+    images[0]!.complete = true; renderer.draw();
+    expect(fillRect).toHaveBeenCalled();
+    fillRect.mockClear();
+    state.collectionOpen = false; renderer.draw();
+    expect(fillRect).toHaveBeenCalled();
+    fillRect.mockClear(); renderer.draw();
+    expect(fillRect).not.toHaveBeenCalled();
+    state.collectionOpen = true; renderer.draw();
+    expect(fillRect).toHaveBeenCalled();
+    expect(render).not.toHaveBeenCalled();
+    renderer.dispose();
+  });
+
   it("Three.jsの共有資源・後処理・WebGLコンテキストを一度だけ解放する", () => {
     const geometry = new THREE.BoxGeometry(); const texture = new THREE.Texture();
     const material = new THREE.MeshStandardMaterial({ map: texture });
