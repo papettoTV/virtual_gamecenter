@@ -143,6 +143,7 @@ export function mountGame(context) {
   const INVINCIBLE_RING_OUTER_RADIUS = 24;
   const INVINCIBLE_RING_OUTER_SCALE = 42;
   const PLAYER_SPEED_SCALE = 0.75;
+  const HUMAN_PLAYER_SPEED_SCALE = 0.85;
   const BULLET_SPEED_SCALE = 0.75;
   const ATTACK_BULLET_COUNT_SCALE = 0.35;
   const ATTACK_BULLET_CLEAR_BONUS = 0.15;
@@ -212,7 +213,7 @@ export function mountGame(context) {
   const { players, boss, opponentBoss, particles } = state;
   const { movePlayer, updatePlayerState, findClosestBullet, updateParticles } = createSimulation({
     state,
-    settings: { FIELD_TOP, FIELD_BOTTOM, FIELD_MARGIN, FIELD_WIDTH, PLAYER_SPEED_SCALE, PLAYER_TILT_MAX, PLAYER_TILT_LERP, MAX_PARTICLES },
+    settings: { FIELD_TOP, FIELD_BOTTOM, FIELD_MARGIN, FIELD_WIDTH, PLAYER_SPEED_SCALE, HUMAN_PLAYER_SPEED_SCALE, PLAYER_TILT_MAX, PLAYER_TILT_LERP, MAX_PARTICLES },
   });
   let bulletDensity = 2;
   let playerHitboxEnabled = true;

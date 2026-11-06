@@ -46,6 +46,24 @@ describe("BUZZ BARRIER extracted state/simulation dependencies", () => {
     expect(() => simulation.movePlayer(player, 0, 0, false, 0)).not.toThrow();
   });
 
+  it("raises human movement speed without changing CPU speed or slow movement ratios", () => {
+    const { state, settings } = fixture();
+    const simulation = createSimulation({ state, settings: { ...settings, HUMAN_PLAYER_SPEED_SCALE: 0.85 } });
+    const human = state.players[0]!;
+    const cpu = state.players[1]!;
+    human.x = human.fieldX + settings.FIELD_WIDTH / 2;
+    cpu.x = cpu.fieldX + settings.FIELD_WIDTH / 2;
+    const humanStart = human.x;
+    const cpuStart = cpu.x;
+    simulation.movePlayer(human, 1, 0, false, 0.1);
+    simulation.movePlayer(cpu, 1, 0, false, 0.1);
+    expect(human.x - humanStart).toBeCloseTo(255 * 0.85 * 0.1);
+    expect(cpu.x - cpuStart).toBeCloseTo(255 * 0.75 * 0.1);
+    const slowStart = human.x;
+    simulation.movePlayer(human, 1, 0, true, 0.1);
+    expect(human.x - slowStart).toBeCloseTo(155 * 0.85 * 0.1);
+  });
+
   it("updates every player timer, combo, core-based barrier ratio and tilt", () => {
     const { state, simulation } = fixture();
     const player = state.players[0]!;
