@@ -157,7 +157,15 @@ for (const viewport of [{ width: 320, height: 568 }, { width: 844, height: 390 }
     await expect(screen).not.toHaveAttribute('data-mobile-play');
     await expect(screen).toHaveAttribute('data-salvage-collection', 'true');
     await expect(leave).toBeHidden();
-    await screen.getByRole('button', { name: '全画面でプレイ' }).click();
+    const fullscreen = screen.getByRole('button', { name: '全画面でプレイ' });
+    const eligible = await page.evaluate(() => matchMedia('(max-width: 820px), (pointer: coarse)').matches);
+    if (eligible) await expect(fullscreen).toBeVisible({ timeout: 5000 });
+    else await expect(fullscreen).toHaveCount(0, { timeout: 5000 });
+    // Preserve the landscape book checks above; reentry uses an eligible width
+    // even in the desktop project's fine-pointer browser.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(fullscreen).toBeVisible({ timeout: 5000 });
+    await fullscreen.click({ timeout: 5000 });
     await expect(screen).toHaveAttribute('data-mobile-play', 'true');
     await expect(leave).toBeVisible();
     const restoredCanvas = await screen.locator('#game').boundingBox();

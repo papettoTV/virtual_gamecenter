@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { test, expect } from '../../../../ci/ui-fixtures.mjs';
 import { localUiUrl } from '../../../../ci/ui-tests.mjs';
-import { respectReadBudget } from './api-read-budget.mjs';
+import { respectReadBudget, finishReadBudget } from './api-read-budget.mjs';
 
 const origin = 'http://127.0.0.1:5174';
 const games = [
@@ -73,6 +73,7 @@ async function phase(page, game) {
 }
 // Observe real cabinet connections, including connections opened before exit.
 const cabinetSockets = new WeakMap();
+test.afterEach(async ({ context }) => { await finishReadBudget(context); });
 test.beforeEach(async ({ page, context }, testInfo) => {
   await respectReadBudget(context, testInfo);
   const sockets = new Set();
@@ -501,7 +502,10 @@ for (const game of games) {
           }
           await testInfo.attach('local-player-start', { body: JSON.stringify(playerEvents), contentType: 'application/json' });
         }
-        await playerContext?.close();
+        if (playerContext) {
+          try { await finishReadBudget(playerContext); }
+          finally { await playerContext.close(); }
+        }
       }
     });
   }

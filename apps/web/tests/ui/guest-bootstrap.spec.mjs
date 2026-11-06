@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { test, expect } from '../../../../ci/ui-fixtures.mjs';
-import { respectReadBudget } from './api-read-budget.mjs';
+import { respectReadBudget, finishReadBudget } from './api-read-budget.mjs';
 
 // Keep real API coverage for the reproducible race; long initialization and
 // cancellation are covered with fake timers in cabinet-bootstrap.test.ts.
 test.use({ screenshot: 'only-on-failure' });
+test.afterEach(async ({ context }) => { await finishReadBudget(context); });
 test.beforeEach(async ({ context }, testInfo) => respectReadBudget(context, testInfo));
 
 for (const game of ['graze-duel', 'deep-sea-salvage', 'dot-wave']) {
