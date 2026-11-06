@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => ({
   rendererDispose: vi.fn(), draw: vi.fn(), reset: vi.fn(), startDive: vi.fn(), continueRun: vi.fn(),
   editorCleanup: vi.fn(), renderers: [] as Array<{ dispose: ReturnType<typeof vi.fn>; setThreeLayer: ReturnType<typeof vi.fn> }>,
   createThreeLayer: vi.fn(), fetchRanking: vi.fn(async () => []),
+  inputs: [] as Array<{ keys: Set<string>; pointer: { active: boolean; x: number; y: number } }>,
+  bounds: [] as Array<() => [number, number]>,
   states: [] as Array<ReturnType<typeof createState>>,
   finishes: [] as Array<(title: string, multiplier: number) => void>,
   messages: [] as Array<(message: unknown) => void>,
@@ -40,8 +42,9 @@ vi.mock("../../src/games/deep-sea-salvage/renderer", () => ({
   },
 }));
 vi.mock("../../src/games/deep-sea-salvage/simulation", () => ({
-  createSimulation: (state: ReturnType<typeof createState>, _config: unknown, _input: unknown, _geometry: unknown, hooks: { onFinish: (title: string, multiplier: number) => void }) => {
-    mocks.states.push(state);
+  createSimulation: (state: ReturnType<typeof createState>, _config: unknown, input: { keys: Set<string>; pointer: { active: boolean; x: number; y: number } }, geometry: { horizontalBounds: () => [number, number] }, hooks: { onFinish: (title: string, multiplier: number) => void }) => {
+    mocks.bounds.push(geometry.horizontalBounds);
+    mocks.states.push(state); mocks.inputs.push(input);
     mocks.finishes.push(hooks.onFinish);
     return { reset: mocks.reset, update: vi.fn(), ensureChunks: vi.fn(), startDive: mocks.startDive, continueRun: mocks.continueRun, setMessage: vi.fn() };
   },
@@ -68,7 +71,10 @@ let selectors: Map<string, unknown>;
 
 beforeEach(() => {
   vi.stubGlobal("Element", class {});
+  vi.stubGlobal("getComputedStyle", () => ({ objectFit: "cover" }));
   vi.clearAllMocks(); mocks.sessions.length = 0; mocks.renderers.length = 0; mocks.states.length = 0;
+  mocks.inputs.length = 0;
+  mocks.bounds.length = 0;
   mocks.finishes.length = 0; mocks.messages.length = 0;
   lifetime = new GameLifetime(); frames = new Map(); let nextFrame = 1;
   const classList = { toggle: vi.fn(), add: vi.fn(), remove: vi.fn() };
@@ -88,6 +94,35 @@ beforeEach(() => {
 afterEach(() => { lifetime.dispose(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe("深海サルベージのmount契約", () => {
+  it("変化していないステータスのDOMを毎フレーム書き換えず、値の変化は表示する", () => {
+    let text = "";
+    const write = vi.fn((value: string) => { text = value; });
+    selectors.set("#salvage-status", { get textContent() { return text; }, set textContent(value: string) { write(value); } });
+    mountGame({ game: DEEP_SEA_SALVAGE, lifetime });
+    const tick = () => {
+      const [handle, callback] = [...frames.entries()][0]!;
+      frames.delete(handle); callback(performance.now() + 16);
+    };
+    tick();
+    expect(write).toHaveBeenCalledTimes(1);
+    tick();
+    expect(write).toHaveBeenCalledTimes(1);
+    mocks.states[0]!.earnedScore += 10;
+    tick();
+    expect(write).toHaveBeenCalledTimes(2);
+    expect(text).toContain("SCORE 10");
+  });
+
+  it("縦長でも全体表示なら横移動を制限せず、通常の切り抜き表示では既存範囲を維持する", () => {
+    Object.assign(canvas, { getBoundingClientRect: () => ({ width: 390, height: 600 }) });
+    mountGame({ game: DEEP_SEA_SALVAGE, lifetime });
+    expect(mocks.bounds[0]!()).toEqual([325, 635]);
+    vi.stubGlobal("getComputedStyle", () => ({ objectFit: "contain" }));
+    expect(mocks.bounds[0]!()).toEqual([42, 918]);
+    Object.assign(canvas, { getBoundingClientRect: () => ({ width: 844, height: 250 }) });
+    expect(mocks.bounds[0]!()).toEqual([42, 918]);
+  });
+
   it("registers zero-score completed runs without ranking and uses a new ID after continue", async () => {
     const instance = mountGame({ game: DEEP_SEA_SALVAGE, lifetime });
     await instance.play("start", "reservation");
@@ -206,11 +241,28 @@ describe("深海サルベージのmount契約", () => {
     await vi.waitFor(() => expect(layer.dispose).toHaveBeenCalledTimes(1));
   });
 
-  it("dispose後のランキング応答で古いDOMを書き換えない", async () => {
-    let finishRanking!: (entries: []) => void;
-    mocks.fetchRanking.mockImplementationOnce(() => new Promise(resolve => { finishRanking = resolve; }));
-    const instance = mountGame({ game: DEEP_SEA_SALVAGE, lifetime }); instance.dispose(); finishRanking([]);
-    await Promise.resolve(); await Promise.resolve();
+  it("readyの開始ジェスチャーは認可要求だけを出し、指の移動を潜航へ持ち越さない", () => {
+    mountGame({ game: DEEP_SEA_SALVAGE, lifetime });
+    const request = vi.spyOn(gameHost, "requestPlay");
+    const input = mocks.inputs[0]!;
+    const down = () => canvas.dispatchEvent(Object.assign(new Event("pointerdown"), { clientX: 500, clientY: 400 }));
+    down();
+    canvas.dispatchEvent(Object.assign(new Event("pointermove"), { clientX: 600, clientY: 500 }));
+    expect(request).toHaveBeenCalledWith("start");
+    expect(input.pointer.active).toBe(false);
+    expect(mocks.startDive).not.toHaveBeenCalled();
+    expect(mocks.sessions[0]!.startSolo).not.toHaveBeenCalled();
+    selectors.set(".platform-overlay", {}); down();
+    expect(request).toHaveBeenCalledTimes(1);
+    selectors.delete(".platform-overlay");
+    mocks.states[0]!.collectionOpen = true; down();
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(input.pointer.active).toBe(false);
+  });
+
+  it("ランキングは取得せず既存データにもアクセスしない", () => {
+    mountGame({ game: DEEP_SEA_SALVAGE, lifetime });
+    expect(mocks.fetchRanking).not.toHaveBeenCalled();
     expect((selectors.get("#ranking-list") as { innerHTML: string }).innerHTML).toBe("");
   });
 });

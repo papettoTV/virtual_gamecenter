@@ -11,7 +11,6 @@ import type { CabinetRole, CabinetState } from "../../domain/cabinet";
 import type { ServerMessage } from "../../shared/protocol";
 import { SalvageLiveBuffer, type SalvageLiveState, type SalvageLiveWorld } from "./live-state";
 import { DEEP_SEA_SALVAGE } from "../../domain/game";
-import { fetchScoreRanking, submitRankingEntry, loadRankingWithNotice } from "../../features/ranking/ranking-client";
 import {
   BASE_POWER_DRAIN,
   MAX_HULL,
@@ -42,11 +41,9 @@ export function mountGame(context: GameContext): GameInstance {
   const cabinetScreen = document.querySelector<HTMLElement>("#cabinet-screen");
   const gameScreen = document.querySelector<HTMLElement>("#game-screen");
   const rankingPanel = document.querySelector<HTMLElement>("#ranking-submit-panel");
-  const rankingSubmit = document.querySelector<HTMLButtonElement>("#ranking-submit");
-  const rankingName = document.querySelector<HTMLInputElement>("#ranking-name");
-  const rankingList = document.querySelector<HTMLElement>("#ranking-list");
-  const rankingSubmitList = document.querySelector<HTMLElement>("#ranking-submit-list");
   const rankingRetry = document.querySelector<HTMLButtonElement>("#ranking-retry");
+  const readyCollection = document.querySelector<HTMLButtonElement>("#salvage-ready-collection");
+  const status = document.querySelector<HTMLElement>("#salvage-status");
   const touchPause = document.querySelector<HTMLButtonElement>("#touch-pause");
   const touchCollection = document.querySelector<HTMLButtonElement>("#touch-collection");
   const resultCollectionButton = document.querySelector<HTMLButtonElement>("#salvage-result-collection");
@@ -214,7 +211,7 @@ export function mountGame(context: GameContext): GameInstance {
       bossProgress: debugNumber("bossProgress", 0), terrainPreview: debugParams.get("terrainPreview") === "1",
     });
     rankingPanel?.classList.remove("is-visible", "is-submitted");
-    ensureChunks(); setMessage("P / 画面下のボタンで潜航開始", 99); updateButtons();
+    ensureChunks(); setMessage("", 0); updateButtons();
     if (debugParams.get("terrainPreview") === "1") setMessage("地形確認（明るく表示） / Pで通常の潜航開始 / 岩壁エディタで編集へ戻る", 99);
   }
 
@@ -236,7 +233,6 @@ export function mountGame(context: GameContext): GameInstance {
       ["適用前スコア", state.finalSubtotal.toLocaleString()], ["倍率", `${(multiplier * 100).toFixed(0)}%`],
     ] });
     rankingPanel?.classList.add("is-visible"); rankingPanel?.classList.remove("is-submitted");
-    if (rankingSubmit) rankingSubmit.disabled = !rankingName?.value.trim() || state.finalScore <= 0;
     if (rankingRetry) rankingRetry.textContent = state.cleared ? "1クレジットでもう一度" : "1クレジットでリトライ";
   }
 
@@ -252,6 +248,7 @@ export function mountGame(context: GameContext): GameInstance {
   function togglePause() {
     if (watching) return;
     if (state.collectionOpen) { toggleCollection(); return; }
+    keys.clear(); pointer.active = false;
     if (state.phase === "ready") gameHost.requestPlay("start"); else if (state.phase === "dive") state.paused = !state.paused;
     updateButtons();
   }
@@ -259,7 +256,7 @@ export function mountGame(context: GameContext): GameInstance {
   function toggleCollection(force?: boolean) {
     if (watching) return;
     if (state.phase === "hull-break") return;
-    if (state.paused && state.phase === "dive" && force === undefined) return;
+    keys.clear(); pointer.active = false;
     const next = force ?? !state.collectionOpen;
     state.collectionOpen = next;
     if (next) {
@@ -289,35 +286,24 @@ export function mountGame(context: GameContext): GameInstance {
       touchPause.textContent = state.phase === "ready" ? "潜航開始" : state.phase === "boss-clear" ? "調査完了" : state.phase === "hull-break" ? "大破" : state.paused ? "再開" : "一時停止";
       touchPause.disabled = state.phase === "boss-clear" || state.phase === "hull-break";
     }
-    if (touchCollection) { touchCollection.textContent = state.collectionOpen ? "図鑑を閉じる" : "図鑑"; touchCollection.disabled = state.phase === "hull-break"; }
+    if (gameScreen) {
+      gameScreen.dataset.salvagePhase = state.phase;
+      gameScreen.dataset.salvageCollection = String(state.collectionOpen);
+    }
+    for (const button of [touchCollection, readyCollection]) if (button) {
+      button.setAttribute("aria-label", state.collectionOpen ? "図鑑を閉じる" : "図鑑を開く");
+      button.setAttribute("aria-expanded", String(state.collectionOpen));
+      button.disabled = state.phase === "hull-break";
+    }
   }
 
-  function isCompactCanvas() { const rect = canvas.getBoundingClientRect(); return rect.height > rect.width * 1.2; }
+  function isCompactCanvas() {
+    // A contained image shows the entire world even inside a portrait element.
+    if (getComputedStyle(canvas).objectFit === "contain") return false;
+    const rect = canvas.getBoundingClientRect();
+    return rect.height > rect.width * 1.2;
+  }
   function horizontalBounds(): [number, number] { return isCompactCanvas() ? [325, 635] : [42, W - 42]; }
-
-  async function submitScore() {
-    if (!state.finalScore || !rankingSubmit || !rankingName?.value.trim()) return;
-    rankingSubmit.disabled = true;
-    try {
-      await submitRankingEntry({ gameId: DEEP_SEA_SALVAGE.id, elapsedTimeMs: Math.round(state.elapsed * 1000), cleared: state.cleared, score: state.finalScore, maxLevel: Math.floor(state.maxDepth), defeatedBossCount: state.cleared ? 1 : 0, clientVersion: DEEP_SEA_SALVAGE.currentVersion });
-      if (scope.disposed) return;
-      rankingPanel?.classList.add("is-submitted"); await loadRanking();
-    } catch { if (!scope.disposed) rankingSubmit.disabled = false; }
-  }
-
-  async function loadRanking() {
-    if (scope.disposed) return;
-    await loadRankingWithNotice(DEEP_SEA_SALVAGE.id, async () => {
-      if (scope.disposed) return;
-      const entries = await fetchScoreRanking(DEEP_SEA_SALVAGE.id, 20, DEEP_SEA_SALVAGE.currentVersion);
-      if (!scope.disposed) renderRanking(entries);
-    });
-  }
-  function renderRanking(entries: Awaited<ReturnType<typeof fetchScoreRanking>>) {
-    const html = entries.map((entry, index) => `<tr><td>${index + 1}</td><td>${escapeHtml(entry.player_name)}</td><td>${entry.score.toLocaleString()}</td><td>${new Date(entry.created_at).toLocaleDateString("ja-JP")}</td></tr>`).join("") || '<tr><td colspan="4">まだ記録がありません</td></tr>';
-    for (const element of [rankingList, rankingSubmitList]) if (element) element.innerHTML = html;
-  }
-  function escapeHtml(value: string) { const element = document.createElement("span"); element.textContent = value; return element.innerHTML; }
 
   scope.listen(window, "keydown", (event) => {
     if (watching || event.repeat || (document.querySelector(".share-overlay") || document.querySelector(".platform-overlay"))) return;
@@ -329,8 +315,14 @@ export function mountGame(context: GameContext): GameInstance {
   });
   scope.listen(window, "keyup", (event) => keys.delete(event.code));
   scope.listen(canvas, "pointerdown", (event) => {
-    if (watching) return;
+    if (watching || document.querySelector(".platform-overlay") || document.querySelector(".share-overlay")) return;
+    if (state.phase === "ready" && !state.collectionOpen) {
+      pointer.active = false;
+      gameHost.requestPlay("start");
+      return;
+    }
     if (state.collectionOpen && state.returnToResult) { toggleCollection(false); return; }
+    if (state.collectionOpen || state.paused || state.phase !== "dive") return;
     updateCanvasPointer(canvas, pointer, event, true);
   });
   scope.listen(canvas, "pointermove", (event) => {
@@ -339,10 +331,8 @@ export function mountGame(context: GameContext): GameInstance {
   scope.listen(canvas, "pointercancel", () => { pointer.active = false; });
   scope.listen(window, "pointerup", () => { pointer.active = false; });
   if (touchPause) scope.listen(touchPause, "click", togglePause);
-  if (touchCollection) scope.listen(touchCollection, "click", () => toggleCollection());
+  for (const button of [touchCollection, readyCollection]) if (button) scope.listen(button, "click", event => { event.stopPropagation(); pointer.active = false; keys.clear(); toggleCollection(); });
   if (resultCollectionButton) scope.listen(resultCollectionButton, "click", () => toggleCollection(true));
-  if (rankingName) scope.listen(rankingName, "input", () => { if (rankingSubmit) rankingSubmit.disabled = !rankingName.value.trim() || !state.finalScore; });
-  if (rankingSubmit) scope.listen(rankingSubmit, "click", () => void submitScore());
   const spectatorBack = document.querySelector("#spectator-game-back");
   if (spectatorBack) scope.listen(spectatorBack, "click", () => {
     watching = false; autoWatch = false; showScreen("cabinet");
@@ -386,6 +376,8 @@ export function mountGame(context: GameContext): GameInstance {
         else { ctx.fillStyle = "#04101c"; ctx.fillRect(0, 0, W, H); drawOverlay("LIVE", [spectatorStatus?.textContent ?? "プレイヤーのゲーム開始を待っています"]); }
       } else { update(dt); draw(); }
     }
+    const statusText = `深度 ${Math.floor(state.subDepth)}m　SCORE ${state.earnedScore}　POWER ${Math.ceil(state.power)}%　耐久 ${state.hull}/${MAX_HULL}`;
+    if (status && status.textContent !== statusText) status.textContent = statusText;
     publishLiveState(now);
     updateLiveShareContext();
     scope.frame(loop);
@@ -414,7 +406,7 @@ export function mountGame(context: GameContext): GameInstance {
     }
   }
   else syncInitialScreen();
-  void loadRanking(); scope.frame(loop);
+  scope.frame(loop);
 
   async function prepareSolo(): Promise<boolean> {
     if (scope.disposed || playPending) return false;
