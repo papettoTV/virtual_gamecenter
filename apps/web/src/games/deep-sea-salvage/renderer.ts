@@ -24,8 +24,26 @@ export function createRenderer(canvas: HTMLCanvasElement, state: State, queries:
     return [species.id, image];
   }));
 
+  let collectionFrameKey: string | null = null;
   function draw() {
     if (disposed) return;
+    if (state.collectionOpen || (state.paused && state.phase === "dive")) {
+      const mode = state.collectionOpen ? "collection" : "pause";
+      // This opaque screen covers the world. Avoid rendering WebGL and filtered
+      // portraits on every RAF while paused, including in software renderers.
+      // Image readiness remains part of the key so late portraits still appear.
+      const key = JSON.stringify([mode, isWatching(), state.returnToResult,
+        SPECIES.map(species => {
+          const image = speciesIcons.get(species.id);
+          return [state.discovered.has(species.id), Boolean(image?.complete && image.naturalWidth > 0)];
+        })]);
+      if (key !== collectionFrameKey) {
+        drawCollection(mode);
+        collectionFrameKey = key;
+      }
+      return;
+    }
+    collectionFrameKey = null;
     drawBackground();
     const renderedInThree = drawThreeGameObjects();
     if (!renderedInThree) {
@@ -38,11 +56,9 @@ export function createRenderer(canvas: HTMLCanvasElement, state: State, queries:
     drawHud();
     if ((state.boss.active && state.bossGaugeVisible) || state.phase === "boss-clear") drawBossResearchGauge();
     if (state.phase === "ready" && debugParams.get("terrainPreview") !== "1") drawStartOverlay();
-    if (state.paused && state.phase === "dive" && !state.collectionOpen) drawCollection("pause");
     if (state.phase === "result" && !state.collectionOpen) drawOverlay(state.message, [`SCORE ${state.finalScore.toLocaleString()}`, isWatching() ? "プレイヤーの選択を待っています" : `図鑑 ${state.discovered.size} / 21　最大深度 ${Math.floor(state.maxDepth).toLocaleString()}m`]);
     if (state.phase === "boss-clear") drawBossClearSequence();
     if (state.phase === "hull-break") drawHullBreakSequence();
-    if (state.collectionOpen) drawCollection();
   }
 
   function drawThreeGameObjects() {
@@ -569,13 +585,16 @@ export function createRenderer(canvas: HTMLCanvasElement, state: State, queries:
     ctx.fillStyle = state.power > 25 ? "#63f4d9" : "#ff526f"; ctx.fillRect(barX, barY + barH * (1 - state.power / 100), 8, barH * state.power / 100);
     ctx.save(); ctx.translate(barX - 11, H / 2); ctx.rotate(-Math.PI / 2); ctx.fillStyle = "#efffff"; ctx.textAlign = "center"; ctx.font = "900 12px system-ui"; ctx.fillText(`POWER ${Math.ceil(state.power)}%`, 0, 0); ctx.restore();
     }
+    // Player ready instructions live in the responsive HTML intro. Do not
+    // repeat the initial keyboard-only state.message beneath that panel.
+    if (state.phase === "ready" && !isWatching() && debugParams.get("terrainPreview") !== "1") return;
     ctx.fillStyle = "rgba(1,10,18,.8)"; ctx.fillRect(0, H - 34, W, 34); ctx.fillStyle = state.messageTimer > 0 ? "#ffe48b" : "#8eb7bd"; ctx.textAlign = "center";
     const message = isWatching() && state.phase === "ready" ? "プレイヤーの開始を待っています" : state.messageTimer > 0 ? state.message : "魚を調査して電力を補充";
     ctx.fillText(message, W / 2, H - 12); ctx.textAlign = "left";
   }
 
   function drawCollection(mode: "collection" | "pause" = "collection") {
-    ctx.fillStyle = "rgba(0,5,13,.96)"; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "#00050d"; ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = "#6effe9"; ctx.font = "900 34px system-ui"; ctx.textAlign = "center"; ctx.fillText(`${mode === "pause" ? "PAUSED　" : ""}今回の調査図鑑　${state.discovered.size} / 21`, W / 2, 48);
     const cols = 7; const cellW = 122; const cellH = 156; const startX = (W - cols * cellW) / 2;
     SPECIES.forEach((species, index) => {
@@ -607,6 +626,7 @@ export function createRenderer(canvas: HTMLCanvasElement, state: State, queries:
   }
 
   function drawOverlay(title: string, lines: string[]) {
+    collectionFrameKey = null;
     ctx.fillStyle = "rgba(0,5,13,.78)"; ctx.fillRect(0, 0, W, H); ctx.textAlign = "center";
     ctx.fillStyle = "#71ffe8"; ctx.font = "900 46px system-ui"; ctx.fillText(title, W / 2, H / 2 - 74);
     ctx.fillStyle = "#e9fffc"; ctx.font = "700 18px system-ui"; lines.forEach((line, index) => ctx.fillText(line, W / 2, H / 2 - 14 + index * 34)); ctx.textAlign = "left";
@@ -617,16 +637,7 @@ export function createRenderer(canvas: HTMLCanvasElement, state: State, queries:
       drawOverlay("LIVE", ["プレイヤーの開始を待っています"]);
       return;
     }
-    const panelX = W / 2 - 300;
-    // Center the instructions between the HUD and the sea surface.
-    const panelY = Math.max(76, (76 + screenY(0) - 154) / 2);
-    ctx.fillStyle = "rgba(0,18,30,.76)"; ctx.strokeStyle = "rgba(123,255,238,.42)"; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.roundRect(panelX, panelY, 600, 154, 18); ctx.fill(); ctx.stroke();
-    ctx.textAlign = "center"; ctx.fillStyle = "#71ffe8"; ctx.font = "900 34px system-ui"; ctx.fillText("深海サルベージ", W / 2, panelY + 43);
-    ctx.fillStyle = "#e9fffc"; ctx.font = "700 16px system-ui";
-    ctx.fillText("魚に近づくと自動で調査", W / 2, panelY + 78);
-    ctx.fillText("WASD / 矢印: 移動　F: 図鑑", W / 2, panelY + 105);
-    ctx.fillStyle = "#ffe48b"; ctx.fillText("P または画面下のボタンで潜航開始", W / 2, panelY + 133); ctx.textAlign = "left";
+    // The accessible HTML intro remains readable at phone sizes.
   }
 
   function oceanPalette(depth: number) {
