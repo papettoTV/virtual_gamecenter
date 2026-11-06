@@ -1,6 +1,8 @@
 import { localUiUrl } from '../../../../ci/ui-tests.mjs';
 
 const cleanups = new WeakMap();
+// Two bounded fetches plus the maximum accepted Retry-After and timer margin.
+export const readBudgetTimeout = 2 * 10000 + 60000 + 100 + 5000;
 
 export async function finishReadBudget(context) {
   await cleanups.get(context)?.();
@@ -49,12 +51,14 @@ export async function respectReadBudget(context, testInfo) {
   await context.route(pattern, handler);
   cleanups.set(context, async () => {
     closing = true;
-    // Remove only this helper's route, preserving the local-only boundary.
-    await context.unroute(pattern, handler);
     for (const wake of wakeups) wake();
     // Fetches have a 10s bound. Do not close the context while one owns a route,
     // and propagate failures rather than silencing route callback errors.
-    await Promise.all([...pending]);
+    while (pending.size) await Promise.all([...pending]);
+    // Keep the handler registered until its owned routes have settled. Unroute
+    // must not race a retry wakeup or a fetch delivering its actual response.
+    await context.unroute(pattern, handler);
+    while (pending.size) await Promise.all([...pending]);
     cleanups.delete(context);
   });
 }

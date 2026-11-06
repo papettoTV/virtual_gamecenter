@@ -37,7 +37,7 @@ test('cleanup drains its in-flight read before the owner closes the context', as
   assert.equal(finished, false);
   release();
   await Promise.all([read, cleanup]);
-  assert.deepEqual(h.calls, ['unroute', 'fulfill']);
+  assert.deepEqual(h.calls, ['fulfill', 'unroute']);
 });
 
 test('cleanup cancels a Retry-After wait without another read', async () => {
