@@ -3,6 +3,9 @@ import { test, expect } from '../../../../ci/ui-fixtures.mjs';
 import { localUiUrl } from '../../../../ci/ui-tests.mjs';
 import { respectReadBudget, finishReadBudget, readBudgetTimeout } from './api-read-budget.mjs';
 
+import { claimWelcomeAndRefresh } from './welcome-wallet.mjs';
+import { instrument, backpressure } from './read-budget-instrument.mjs';
+
 const origin = 'http://127.0.0.1:5174';
 const games = [
   { id: 'graze-duel', button: 'ゲーム開始', key: 'Space' },
@@ -29,7 +32,7 @@ async function navigateGuest(page, url, reload = false) {
   const loaded = page.waitForResponse(response =>
     response.url() === `${origin}/api/platform/bootstrap`
     && response.request().method() === 'GET'
-    && response.frame() === page.mainFrame(), { timeout: 70000 });
+    && response.frame() === page.mainFrame(), { timeout: readBudgetTimeout });
   if (reload) await page.reload({ waitUntil: 'domcontentloaded' });
   else await page.goto(url, { waitUntil: 'domcontentloaded' });
   const canonicalUrl = new URL(url);
@@ -56,20 +59,7 @@ async function prepareGuest(page) {
   const decline = page.getByRole('button', { name: '拒否する', exact: true });
   if (await decline.isVisible()) await decline.click();
   if (!account.welcomeCreditGranted) {
-    const refreshed = page.waitForResponse(response =>
-      response.url() === `${origin}/api/platform/bootstrap`
-      && response.request().method() === 'GET'
-      && response.frame() === page.mainFrame(), { timeout: readBudgetTimeout });
-    const granted = await page.evaluate(async () => {
-      const result = await (await import('/src/features/platform/platform-client.ts')).claimWelcomeCredit();
-      window.dispatchEvent(new Event('platform-wallet-changed'));
-      return result.wallet;
-    });
-    const response = await refreshed;
-    expect(response.ok()).toBe(true);
-    expect((await response.json()).wallet.availableTotal).toBe(granted.availableTotal);
-    await expect(page.locator('.platform-credit-badge')).toHaveText(String(granted.availableTotal));
-    return granted;
+    return claimWelcomeAndRefresh(page);
   }
   return account.wallet;
 }
@@ -82,6 +72,7 @@ async function phase(page, game) {
 const cabinetSockets = new WeakMap();
 test.afterEach(async ({ context }) => { await finishReadBudget(context); });
 test.beforeEach(async ({ page, context }, testInfo) => {
+  testInfo.setTimeout(testInfo.timeout + readBudgetTimeout);
   await respectReadBudget(context, testInfo);
   const sockets = new Set();
   cabinetSockets.set(page, sockets);
@@ -595,12 +586,24 @@ for (const game of games.filter(game => game.id === 'graze-duel')) {
       await intent();
       await skipWelcome();
       await insufficient.getByRole('button', { name: '閉じる', exact: true }).click();
-      const grant = await page.evaluate(async () => {
-        const result = await (await import('/src/features/platform/platform-client.ts')).claimWelcomeCredit();
-        window.dispatchEvent(new Event('platform-wallet-changed'));
-        return result.wallet;
+      // Force a valid >5s read delay on both cancellation paths. All reads
+      // still reach the local Worker; only backpressure metadata is injected.
+      const reads = [];
+      const scope = instrument(page.context(), async fetch => {
+        const response = await fetch();
+        reads.push(response.status());
+        return reads.length === 1 ? backpressure(response, 6) : response;
       });
-      await expect(page.locator('.platform-credit-badge')).toHaveText(String(grant.availableTotal));
+      await respectReadBudget(scope, test.info());
+      const started = Date.now();
+      let grant;
+      try {
+        grant = await claimWelcomeAndRefresh(page);
+        expect(Date.now() - started).toBeGreaterThanOrEqual(6000);
+        expect(reads).toEqual([200, 200]);
+      } finally {
+        await finishReadBudget(scope);
+      }
       await intent();
       const confirm = page.getByRole('dialog', { name: 'ゲームを開始しますか？', exact: true });
       await expect(confirm).toBeVisible();
