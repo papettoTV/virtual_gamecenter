@@ -35,22 +35,16 @@ it("稲妻のフレーム上下限・10本各7節・決定性・終了を維持�
   expect(empty.save).not.toHaveBeenCalled();
 });
 
-it("共有シールドは線ではなく濃淡のある膜の縁を描き縮小と透明点滅を維持する", () => {
+it("共有シールドは外側ほど透明になる単一の膜だけを描き縮小と透明点滅を維持する", () => {
   const context = brush();
-  const opacities: number[] = [];
-  context.fill.mockImplementation(() => { opacities.push(context.globalAlpha); });
   drawPlayerShield(asContext(context), 0, 0, 46);
   expect(context.createRadialGradient.mock.results[0]!.value.addColorStop.mock.calls).toEqual([
     [0, "rgba(105, 247, 255, 0.46)"], [0.48, "rgba(105, 247, 255, 0.28)"], [0.78, "rgba(105, 247, 255, 0.12)"], [1, "rgba(105, 247, 255, 0)"],
   ]);
-  expect(context.createRadialGradient.mock.results[1]!.value.addColorStop.mock.calls).toEqual([
-    [0, "rgba(105, 247, 255, 0)"], [0.68, "rgba(105, 247, 255, 0)"], [0.82, "rgba(105, 247, 255, 0.08)"],
-    [0.91, "rgba(105, 247, 255, 0.4)"], [0.965, "rgba(105, 247, 255, 0.22)"], [1, "rgba(105, 247, 255, 0)"],
-  ]);
-  expect(context.fill).toHaveBeenCalledTimes(65);
-  expect(new Set(opacities.slice(1)).size).toBeGreaterThan(32);
-  expect(Math.max(...opacities.slice(1))).toBeLessThan(1);
-  expect(context.arc.mock.calls.every(call => (call as number[])[2]! <= 46)).toBe(true);
+  expect(context.createRadialGradient).toHaveBeenCalledOnce();
+  expect(context.fill).toHaveBeenCalledOnce();
+  expect(context.arc).toHaveBeenCalledWith(0, 0, 46, 0, Math.PI * 2);
+  expect(context.moveTo).not.toHaveBeenCalled();
   expect(context.stroke).not.toHaveBeenCalled();
   expect(shieldAppearance(1, 1, 0).radius - shieldAppearance(0, 1, 0).radius).toBe(28);
   expect(shieldAppearance(0, 0.5, 0).opacity).toBe(0.28);
@@ -69,7 +63,7 @@ it("Three.jsは共有Canvasアトラスを再利用してUV更新し色変更・
     return canvas;
   } });
   const effects = createPlayerEffects();
-  expect(contexts[0]!.createRadialGradient).toHaveBeenCalledTimes(2);
+  expect(contexts[0]!.createRadialGradient).toHaveBeenCalledOnce();
   effects.update(player, 0);
   const lightning = effects.root.children[1] as THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
   const texture = lightning.material.map!;
