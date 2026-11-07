@@ -28,9 +28,10 @@ APPLY_RULE_VERSION = None  # Pin only after the sole human-managed App bypass is
 STRICT_RULE_VERSION = '2026-11-05T21:06:15.947Z'
 MAIN_RULE_VERSION = '2026-10-21T20:32:35.191Z'
 MANIFEST = 'automatic-resume-installation.json'
-FILES = {'ci/control/review-trust.mjs', 'ci/control/review-trust.json', 'ci/production-candidate/policy.json'}
+FILES = {'ci/control/review-trust.mjs', 'ci/control/review-trust.json', 'ci/production-candidate/policy.json',
+         'ci/control/toolchain/browser/regression.spec.mjs'}
 SHA = re.compile(r'^[a-f0-9]{40}$')
-MESSAGE = 'ci: 自動修正継続の信頼定義3件を更新（公開なし）'
+MESSAGE = 'ci: 信頼定義3件と検証回帰1件を更新（公開なし）'
 
 
 class Stop(RuntimeError):
@@ -484,7 +485,7 @@ def save_maintenance_state(archive, state):
 
 
 def human_maintenance(archive, data, baseline, cleaning=False):
-    need(input('bypass・信頼定義3件・2変数の人用保守を実行する場合 ci-control と入力: ') == 'ci-control', '中止しました。')
+    need(input('bypass・信頼定義3件・検証回帰1件・2変数の人用保守を実行する場合 ci-control と入力: ') == 'ci-control', '中止しました。')
     token = hidden('管理端末専用のFine-grained token（非表示・保存なし）: ')
     need(token.startswith('github_pat_'), '管理端末専用のFine-grained tokenを使用してください。')
     calls = 0
@@ -568,7 +569,7 @@ def main():
         finish(archive, data, baseline)
         return
     guards(request, baseline, True)
-    need(input('信頼定義3件だけを更新する場合 ci-control と入力: ') == 'ci-control', '中止しました。')
+    need(input('信頼定義3件と検証回帰1件を更新する場合 ci-control と入力: ') == 'ci-control', '中止しました。')
     pem = Path(hidden('人が保管するpulbase-releaseのPEMファイルのパス（非表示）: ')).expanduser().absolute()
     need(pem.is_file() and not pem.is_symlink() and pem.stat().st_size < 16384, '通常の鍵ファイルではありません。')
     result = apply(data, baseline, sign(pem))
