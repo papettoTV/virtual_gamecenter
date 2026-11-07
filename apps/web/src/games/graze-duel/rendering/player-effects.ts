@@ -17,15 +17,40 @@ export function shieldAppearance(ratio: number, remaining: number, elapsed: numb
 }
 
 export function drawPlayerShield(context: CanvasRenderingContext2D, x: number, y: number, radius: number) {
+  if (!(radius > 0)) return;
   context.save();
   const gradient = context.createRadialGradient(x, y, 0, x, y, radius);
   gradient.addColorStop(0, "rgba(105, 247, 255, 0.46)");
   gradient.addColorStop(0.48, "rgba(105, 247, 255, 0.28)");
-  gradient.addColorStop(1, "rgba(105, 247, 255, 0.12)");
+  gradient.addColorStop(0.78, "rgba(105, 247, 255, 0.12)");
+  gradient.addColorStop(1, "rgba(105, 247, 255, 0)");
   context.fillStyle = gradient;
   context.beginPath();
   context.arc(x, y, radius, 0, Math.PI * 2);
   context.fill();
+  const edge = context.createRadialGradient(x, y, 0, x, y, radius);
+  edge.addColorStop(0, "rgba(105, 247, 255, 0)");
+  edge.addColorStop(0.68, "rgba(105, 247, 255, 0)");
+  edge.addColorStop(0.82, "rgba(105, 247, 255, 0.08)");
+  edge.addColorStop(0.91, "rgba(105, 247, 255, 0.4)");
+  edge.addColorStop(0.965, "rgba(105, 247, 255, 0.22)");
+  edge.addColorStop(1, "rgba(105, 247, 255, 0)");
+  context.fillStyle = edge;
+  const opacity = context.globalAlpha;
+  const segments = 64;
+  const step = Math.PI * 2 / segments;
+  for (let segment = 0; segment < segments; segment += 1) {
+    const angle = segment * step;
+    const middle = angle + step / 2;
+    context.globalAlpha = opacity * (0.6 + Math.sin(middle * 3 + 0.5) * 0.22 + Math.sin(middle * 7 - 0.7) * 0.12);
+    context.beginPath();
+    context.moveTo(x + Math.cos(angle) * radius * 0.68, y + Math.sin(angle) * radius * 0.68);
+    context.lineTo(x + Math.cos(angle) * radius, y + Math.sin(angle) * radius);
+    context.arc(x, y, radius, angle, angle + step);
+    context.arc(x, y, radius * 0.68, angle + step, angle, true);
+    context.closePath();
+    context.fill();
+  }
   context.restore();
 }
 
@@ -64,11 +89,5 @@ export function drawLevelUpLightning(context: CanvasRenderingContext2D, x: numbe
     }
     context.stroke();
   }
-  context.strokeStyle = "#ffffff";
-  context.lineWidth = 5;
-  context.globalAlpha *= 0.7;
-  context.beginPath();
-  context.arc(x, y, 72 - progress * 22, 0, Math.PI * 2);
-  context.stroke();
   context.restore();
 }
