@@ -532,6 +532,7 @@ export function createCanvasRenderer(options) {
   }
 
   function drawPaused() {
+    if (frame.htmlPauseOverlay && !frame.waitingForStart) return;
     const compact = frame.compact;
     const title = frame.waitingForStart ? "READY" : "PAUSED";
     const { action, instructions } = getPausePresentation(frame);

@@ -121,6 +121,31 @@ describe("BUZZ BARRIER instance lifecycle", () => {
     expect(await instance.play("retry", "reservation")).toBe(false);
   });
 
+  it("keeps the top pause/resume button, Space and READY credit confirmation working", async () => {
+    const pauseButton = Object.assign(new EventTarget(), { textContent: "", dataset: {}, setAttribute: vi.fn() });
+    const previousDocument = document;
+    vi.stubGlobal("document", { ...previousDocument, querySelector: (selector: string) => selector === "#touch-pause" ? pauseButton : previousDocument.querySelector(selector) });
+    const lifetime = new GameLifetime();
+    const instance = mountGame({ game: BUZZ_BARRIER, lifetime });
+    await instance.prepareSolo?.();
+    pauseButton.dispatchEvent(new Event("click"));
+    expect(mocks.requestPlay).toHaveBeenCalledWith("start");
+    await instance.play("start", "reservation");
+    expect(pauseButton.textContent).toBe("一時停止");
+    pauseButton.dispatchEvent(new Event("click"));
+    expect(pauseButton.textContent).toBe("再開");
+    pauseButton.dispatchEvent(new Event("click"));
+    expect(pauseButton.textContent).toBe("一時停止");
+    keyboard.dispatchEvent(keyEvent("Space"));
+    expect(pauseButton.textContent).toBe("再開");
+    keyboard.dispatchEvent(keyEvent("Space"));
+    expect(pauseButton.textContent).toBe("一時停止");
+    instance.dispose();
+    const sent = mocks.send.mock.calls.length;
+    pauseButton.dispatchEvent(new Event("click"));
+    expect(mocks.send).toHaveBeenCalledTimes(sent);
+  });
+
   it("parent disposal prevents old input from reaching a remounted instance", async () => {
     const oldLifetime = new GameLifetime();
     mountGame({ game: BUZZ_BARRIER, lifetime: oldLifetime });

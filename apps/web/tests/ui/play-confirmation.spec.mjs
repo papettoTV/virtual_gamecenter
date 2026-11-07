@@ -351,13 +351,13 @@ for (const game of games) {
         await page.keyboard.press('Enter');
         await expect.poll(() => phase(page, game.id)).toBe('playing');
         await expect(pause).toHaveText('一時停止');
-        await expect(screen.locator('.mobile-play-leave')).toHaveCount(0);
+        await expect(screen.locator('#buzz-pause-overlay .buzz-pause-leave')).toHaveCount(0);
         expect(await wallet(page)).toBe(balance - 1);
         await pause.tap();
         await expect.poll(() => phase(page, game.id)).toBe('paused');
       }
       await test.step('直接退出・連打: 消費済み残高と表示復帰', async () => {
-        await leaveToDirectory(page, game.id, isMobile && game.id === 'graze-duel' ? '.mobile-play-leave' : null);
+        await leaveToDirectory(page, game.id, isMobile && game.id === 'graze-duel' ? '#buzz-pause-overlay .buzz-pause-leave' : null);
         expect(await persistedWallet(page)).toBe(balance - 1);
         expect(writes.filter(url => url.endsWith('/credit-reservations'))).toHaveLength(1);
         expect(writes.filter(url => url.endsWith('/capture'))).toHaveLength(1);
