@@ -2,7 +2,7 @@ import { test, expect } from '../../../../ci/ui-fixtures.mjs';
 import { respectReadBudget, finishReadBudget, readBudgetTimeout } from './api-read-budget.mjs';
 
 import { claimWelcomeAndRefresh } from './welcome-wallet.mjs';
-import { instrument, backpressure } from './read-budget-instrument.mjs';
+import { instrument, backpressure, delayedReadProbe } from './read-budget-instrument.mjs';
 
 test.beforeEach(async ({}, testInfo) => {
   testInfo.setTimeout(testInfo.timeout + readBudgetTimeout);
@@ -30,18 +30,12 @@ test('welcome refresh survives one Retry-After and renders the real wallet', asy
   test.setTimeout(120000);
   // Bootstrap the real guest, including its HttpOnly session cookie.
   await loadGuest(page, context, testInfo);
-  const reads = [];
-  const scope = instrument(context, async fetch => {
-    const response = await fetch();
-    reads.push(response.status());
-    return reads.length === 1 ? backpressure(response, 6) : response;
-  });
+  const probe = delayedReadProbe('/api/platform/bootstrap');
+  const scope = instrument(context, probe.intercept);
   await respectReadBudget(scope, testInfo);
   try {
-    const started = Date.now();
     const wallet = await claimWelcomeAndRefresh(page);
-    expect(Date.now() - started).toBeGreaterThanOrEqual(6000);
-    expect(reads).toEqual([200, 200]);
+    probe.verify();
     await expect(page.locator('.platform-credit-badge')).toHaveText(String(wallet.availableTotal));
     const persisted = await page.evaluate(async () => (await (await fetch('/api/platform/credits')).json()).wallet);
     expect(persisted).toEqual(wallet);
