@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { test, expect } from '../../../../ci/ui-fixtures.mjs';
 import { localUiUrl } from '../../../../ci/ui-tests.mjs';
+import { respectReadBudget, finishReadBudget, readBudgetTimeout } from './api-read-budget.mjs';
 
 const origin = 'http://127.0.0.1:5174';
 const games = [
@@ -15,7 +16,11 @@ async function wallet(page) {
   return Number(await badge.textContent());
 }
 async function persistedWallet(page) {
-  return page.evaluate(async () => (await (await import('/src/features/platform/platform-client.ts')).fetchPlatformBootstrap()).wallet.availableTotal);
+  return page.evaluate(async () => {
+    const response = await fetch('/api/platform/credits', { credentials: 'same-origin' });
+    if (!response.ok) throw new Error(`Persisted wallet read failed: ${response.status()}`);
+    return (await response.json()).wallet.availableTotal;
+  });
 }
 // Register the real bootstrap before navigation, then verify the new document
 // and rendered wallet. Unrelated images/fonts need not finish loading first.
@@ -24,11 +29,18 @@ async function navigateGuest(page, url, reload = false) {
   const loaded = page.waitForResponse(response =>
     response.url() === `${origin}/api/platform/bootstrap`
     && response.request().method() === 'GET'
-    && response.frame() === page.mainFrame());
+    && response.frame() === page.mainFrame(), { timeout: 70000 });
   if (reload) await page.reload({ waitUntil: 'domcontentloaded' });
   else await page.goto(url, { waitUntil: 'domcontentloaded' });
   const canonicalUrl = new URL(url);
-  canonicalUrl.searchParams.delete('start');
+  // PlatformExperience skips solo preparation (including URL cleanup) for
+  // spectators. DOT WAVE's standalone controller removes start in both roles.
+  // Neither URL behavior authorizes a play; spectator cases below verify real
+  // accounting stays untouched even when start=1 remains in the address bar.
+  if (canonicalUrl.searchParams.get('watch') !== '1'
+    || canonicalUrl.searchParams.get('game') === 'dot-wave') {
+    canonicalUrl.searchParams.delete('start');
+  }
   await expect(page).toHaveURL(canonicalUrl.href);
   expect(await page.evaluate(() => performance.timeOrigin)).not.toBe(previousDocument);
   expect(await page.evaluate(() => document.readyState)).not.toBe('loading');
@@ -44,7 +56,20 @@ async function prepareGuest(page) {
   const decline = page.getByRole('button', { name: '拒否する', exact: true });
   if (await decline.isVisible()) await decline.click();
   if (!account.welcomeCreditGranted) {
-    return (await page.evaluate(async () => (await import('/src/features/platform/platform-client.ts')).claimWelcomeCredit())).wallet;
+    const refreshed = page.waitForResponse(response =>
+      response.url() === `${origin}/api/platform/bootstrap`
+      && response.request().method() === 'GET'
+      && response.frame() === page.mainFrame(), { timeout: readBudgetTimeout });
+    const granted = await page.evaluate(async () => {
+      const result = await (await import('/src/features/platform/platform-client.ts')).claimWelcomeCredit();
+      window.dispatchEvent(new Event('platform-wallet-changed'));
+      return result.wallet;
+    });
+    const response = await refreshed;
+    expect(response.ok()).toBe(true);
+    expect((await response.json()).wallet.availableTotal).toBe(granted.availableTotal);
+    await expect(page.locator('.platform-credit-badge')).toHaveText(String(granted.availableTotal));
+    return granted;
   }
   return account.wallet;
 }
@@ -53,9 +78,97 @@ async function phase(page, game) {
     ? document.querySelector('main.dot-wave[data-phase]')?.dataset.phase
     : (await import('/src/features/sharing/share-service.ts')).liveSharing.getSnapshot()?.phase, game);
 }
+// Observe real cabinet connections, including connections opened before exit.
+const cabinetSockets = new WeakMap();
+test.afterEach(async ({ context }) => { await finishReadBudget(context); });
+test.beforeEach(async ({ page, context }, testInfo) => {
+  await respectReadBudget(context, testInfo);
+  const sockets = new Set();
+  cabinetSockets.set(page, sockets);
+  page.on('websocket', socket => {
+    // Vite's HMR connection stays open across client-side navigation. Only
+    // cabinet connections belong to the game lifetime under test.
+    if (!/^\/api\/cabinets\/[^/]+\/ws$/.test(new URL(socket.url()).pathname)) return;
+    sockets.add(socket);
+    socket.on('close', () => sockets.delete(socket));
+  });
+});
+// Keep real accounting APIs and sockets: this helper only operates existing UI.
+async function leaveToDirectory(page, gameId, selector = null) {
+  // The browser route is /cabinets/<id>; the real socket uses /api/cabinets/<id>/ws.
+  const cabinetPath = `/api${new URL(page.url()).pathname}/ws`;
+  await expect.poll(() => [...cabinetSockets.get(page)]
+    .filter(socket => new URL(socket.url()).pathname === cabinetPath).length).toBe(1);
+  const sockets = [...cabinetSockets.get(page)];
+  const dialogs = [];
+  const onDialog = async dialog => { dialogs.push(dialog.message()); await dialog.dismiss(); };
+  page.on('dialog', onDialog);
+  try {
+    if (!selector && gameId !== 'dot-wave') await page.keyboard.press('Escape');
+    const leave = selector ? page.locator(selector)
+      : gameId === 'dot-wave' ? page.getByRole('link', { name: 'ゲーム一覧へ', exact: true })
+      : page.locator('#game-back-to-arcade');
+    await expect(leave).toBeVisible();
+    // Native clicks in one task exercise duplicate input on the same control.
+    await leave.evaluate(button => { button.click(); button.click(); });
+    await expect(page).toHaveURL(`${origin}/`);
+    await expect(page.locator('#game-screen, main.dot-wave')).toHaveCount(0);
+    await expect.poll(() => page.evaluate(async () => (await import('/src/features/sharing/share-service.ts')).liveSharing.getSnapshot())).toBeNull();
+    await expect.poll(() => page.evaluate(() => ({
+      fixed: document.body.style.position === 'fixed',
+      hidden: document.body.style.overflow === 'hidden',
+      inert: document.querySelectorAll('[inert]').length,
+      fullscreen: Boolean(document.fullscreenElement),
+    }))).toEqual({ fixed: false, hidden: false, inert: 0, fullscreen: false });
+    await expect.poll(() => sockets.filter(socket => cabinetSockets.get(page).has(socket)).length).toBe(0);
+    await wallet(page);
+    expect(dialogs).toEqual([]);
+  } finally {
+    page.off('dialog', onDialog);
+  }
+}
 for (const game of games) {
+  test(`${game.id}: unpaid ready exits immediately and another game remains unpaid`, async ({ page }) => {
+    await prepareGuest(page);
+    const balance = await wallet(page);
+    const writes = [];
+    page.on('request', request => {
+      if (request.method() === 'POST' && request.url().includes('/credit-reservations')) writes.push(request.url());
+    });
+    for (const id of [game.id, games[(games.indexOf(game) + 1) % games.length].id]) {
+      await navigateGuest(page, `${origin}/cabinets/${randomUUID()}?game=${id}`);
+      await expect.poll(() => phase(page, id)).toBe(id === 'dot-wave' ? 'intro' : 'ready');
+      await leaveToDirectory(page, id);
+      expect(await persistedWallet(page)).toBe(balance);
+      expect(writes).toHaveLength(0);
+    }
+  });
+  test(`${game.id}: reload remains unpaid and ready`, async ({ page, isMobile }) => {
+    await prepareGuest(page);
+    const writes = [];
+    page.on('request', request => {
+      if (request.method() === 'POST' && request.url().includes('/api/platform/credit-reservations')) writes.push(request.url());
+    });
+    const cabinet = `${origin}/cabinets/${randomUUID()}?game=${game.id}&start=1`;
+    const ready = game.id === 'dot-wave' ? 'intro' : 'ready';
+    const start = page.getByRole('button', { name: game.id === 'graze-duel' && isMobile ? 'タップして開始（1枚）' : game.button, exact: true });
+    await navigateGuest(page, cabinet);
+    const balance = await wallet(page);
+    await expect.poll(() => phase(page, game.id)).toBe(ready);
+    await navigateGuest(page, cabinet, true);
+    if (isMobile || game.id === 'dot-wave') await expect(start).toBeVisible();
+    await expect.poll(() => phase(page, game.id)).toBe(ready);
+    await expect(page.getByRole('dialog', { name: 'ゲームを開始しますか？' })).toBeHidden();
+    expect(await persistedWallet(page)).toBe(balance);
+    expect(writes).toHaveLength(0);
+    await leaveToDirectory(page, game.id);
+  });
   for (const input of ['primary', 'keyboard']) {
     test(`${game.id}: ${input}, ready, cancel, delayed duplicate and authorized start`, async ({ page, isMobile }, testInfo) => {
+      // This case includes cancellation, real accounting, exit and
+      // re-entry (plus mobile layout checks). Keep individual assertions at
+      // their normal timeout while allowing the full sequence to finish.
+      test.setTimeout(60000);
       // Only the disposable local guest and the real welcome-credit API are used.
       await test.step('初期guest: 実bootstrapと財布', () => prepareGuest(page));
       const writes = [];
@@ -63,7 +176,7 @@ for (const game of games) {
         if (request.method() === 'POST' && request.url().includes('/api/platform/credit-reservations')) writes.push(request.url());
       });
       const cabinet = `${origin}/cabinets/${randomUUID()}?game=${game.id}&start=1`;
-      const start = page.getByRole('button', { name: game.button, exact: true });
+      const start = page.getByRole('button', { name: game.id === 'graze-duel' && isMobile ? 'タップして開始（1枚）' : game.button, exact: true });
       const ready = game.id === 'dot-wave' ? 'intro' : 'ready';
       await test.step('初回ready: 新document・bootstrap・phase', async () => {
         await navigateGuest(page, cabinet);
@@ -72,13 +185,17 @@ for (const game of games) {
         await expect(page.getByRole('dialog', { name: 'ゲームを開始しますか？' })).toBeHidden();
         expect(writes).toHaveLength(0);
       });
-      await test.step('再読込ready: 新document・bootstrap・phase', async () => {
-        await navigateGuest(page, cabinet, true);
-        if (isMobile || game.id === 'dot-wave') await expect(start).toBeVisible();
+      const balance = await wallet(page);
+      if (game.id === 'graze-duel' && isMobile) {
+        await expect(page.locator('#touch-pause')).toBeHidden();
+        await expect(page.locator('.game-share-button')).toHaveCount(0);
+        await page.getByRole('button', { name: '観戦に招待', exact: true }).tap();
+        const share = page.getByRole('dialog', { name: '観戦に招待', exact: true });
+        await expect(share).toBeVisible();
         await expect.poll(() => phase(page, game.id)).toBe(ready);
         expect(writes).toHaveLength(0);
-      });
-      const balance = await wallet(page);
+        await share.getByRole('button', { name: '× 閉じる' }).tap();
+      }
       const intent = async () => {
         if (input === 'primary' && isMobile) await start.tap();
         else if (input === 'primary' && game.id === 'dot-wave') await start.click();
@@ -88,6 +205,16 @@ for (const game of games) {
       await test.step('取消: キー抑止・再入力・財布不変', async () => {
         await intent();
         await expect(dialog).toBeVisible();
+        await testInfo.attach('start-confirmation-open', {
+          body: await page.screenshot({ fullPage: true }), contentType: 'image/png',
+        });
+        if (game.id === 'graze-duel' && isMobile) {
+          await start.evaluate(button => {
+            for (const pointerId of [1, 2]) button.dispatchEvent(new PointerEvent('pointerdown', { pointerId, bubbles: true }));
+            button.click(); button.click();
+          });
+          expect(writes).toHaveLength(0);
+        }
         await page.evaluate(code => window.dispatchEvent(new KeyboardEvent('keydown', { code, repeat: true, bubbles: true })), game.key === 'p' ? 'KeyP' : 'Space');
         await expect.poll(() => phase(page, game.id)).toBe(ready);
         expect(writes).toHaveLength(0);
@@ -193,10 +320,6 @@ for (const game of games) {
         await expect.poll(() => phase(page, game.id)).toBe('paused');
         await expect(pause).toHaveText('再開');
         await expect(screen.getByRole('button', { name: '別のゲームをする', exact: true }).filter({ visible: true })).toBeVisible();
-        page.once('dialog', dialog => dialog.dismiss());
-        await screen.locator('.mobile-play-leave').tap();
-        await expect.poll(() => phase(page, game.id)).toBe('paused');
-        await expect(screen).toHaveAttribute('data-mobile-play', 'true');
         await expect(page.locator('.notification-center')).not.toContainText('1クレジットを使用しました。', { timeout: 7000 });
         for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 568 }, { width: 844, height: 390 }]) {
           await page.setViewportSize(viewport);
@@ -226,13 +349,28 @@ for (const game of games) {
         await expect(pause).toHaveText('一時停止');
         await expect(screen.locator('.mobile-play-leave')).toHaveCount(0);
         expect(await wallet(page)).toBe(balance - 1);
+        await pause.tap();
+        await expect.poll(() => phase(page, game.id)).toBe('paused');
       }
+      await test.step('直接退出・連打: 消費済み残高と表示復帰', async () => {
+        await leaveToDirectory(page, game.id, isMobile && game.id === 'graze-duel' ? '.mobile-play-leave' : null);
+        expect(await persistedWallet(page)).toBe(balance - 1);
+        expect(writes.filter(url => url.endsWith('/credit-reservations'))).toHaveLength(1);
+        expect(writes.filter(url => url.endsWith('/capture'))).toHaveLength(1);
+        expect(writes.filter(url => url.endsWith('/release'))).toHaveLength(0);
+        // A new visit must be unpaid and ready; leaving it cannot refund the old run.
+        await navigateGuest(page, cabinet);
+        await expect.poll(() => phase(page, game.id)).toBe(ready);
+        await leaveToDirectory(page, game.id);
+        expect(await persistedWallet(page)).toBe(balance - 1);
+        expect(writes.filter(url => url.endsWith('/credit-reservations'))).toHaveLength(1);
+      });
     });
   }
   test(`${game.id}: failed capture keeps play stopped and releases the unused reservation`, async ({ page, isMobile }) => {
     await prepareGuest(page);
-    await page.goto(`${origin}/cabinets/${randomUUID()}?game=${game.id}`);
-    const start = page.getByRole('button', { name: game.button, exact: true });
+    await navigateGuest(page, `${origin}/cabinets/${randomUUID()}?game=${game.id}`);
+    const start = page.getByRole('button', { name: game.id === 'graze-duel' && isMobile ? 'タップして開始（1枚）' : game.button, exact: true });
     if (isMobile || game.id === 'dot-wave') { await expect(start).toBeVisible(); await expect(start).toBeEnabled(); }
     await expect.poll(() => phase(page, game.id)).toBe(game.id === 'dot-wave' ? 'intro' : 'ready');
     const balance = await wallet(page);
@@ -249,7 +387,7 @@ for (const game of games) {
     expect(await persistedWallet(page)).toBe(balance);
   });
   for (const occupied of [false, true]) {
-    test(`${game.id}: spectator never requests a start (${occupied ? 'live player' : 'empty cabinet'})`, async ({ page, browser }, testInfo) => {
+    test(`${game.id}: spectator never requests a start (${occupied ? 'live player' : 'empty cabinet'})`, async ({ page, browser, isMobile }, testInfo) => {
       const cabinet = `${origin}/cabinets/${randomUUID()}?game=${game.id}`;
       const playerContext = occupied ? await browser.newContext() : null;
       const playerEvents = [];
@@ -260,6 +398,7 @@ for (const game of games) {
           // Extra contexts need the same local-only network boundary as the fixture.
           await playerContext.route('**/*', route => localUiUrl(route.request().url()) ? route.continue() : route.abort());
           await playerContext.routeWebSocket('**/*', socket => localUiUrl(socket.url()) ? socket.connectToServer() : socket.close());
+          await respectReadBudget(playerContext, testInfo);
           player = await playerContext.newPage();
           // Record local accounting and connection transitions for failed CI diagnosis.
           player.on('request', request => {
@@ -287,7 +426,7 @@ for (const game of games) {
             });
           });
           await prepareGuest(player);
-          await player.goto(cabinet);
+          await navigateGuest(player, cabinet);
           await expect.poll(() => phase(player, game.id)).toBe(game.id === 'dot-wave' ? 'intro' : 'ready');
           if (game.id === 'dot-wave') {
             // intro renders before the socket's joinedCabinet assigns the seat.
@@ -333,7 +472,7 @@ for (const game of games) {
         const balance = (await prepareGuest(page)).availableTotal;
         const writes = [];
         page.on('request', request => { if (request.method() === 'POST' && request.url().includes('credit-reservations')) writes.push(request.url()); });
-        await page.goto(`${cabinet}&watch=1&start=1`);
+        await navigateGuest(page, `${cabinet}&watch=1&start=1`);
         const waiting = page.getByRole('region', { name: 'プレイの開始待ち・終了', exact: true });
         if (!occupied) {
           await expect(waiting).toBeVisible();
@@ -343,7 +482,7 @@ for (const game of games) {
           if (game.id === 'dot-wave') await expect(page.locator('.dot-cabinet-bar > span')).toContainText('観戦中');
           else await expect(page.locator('#spectator-banner')).toBeVisible();
         }
-        const start = page.getByRole('button', { name: game.button, exact: true });
+        const start = page.getByRole('button', { name: game.id === 'graze-duel' && isMobile ? 'タップして開始（1枚）' : game.button, exact: true });
         const dialog = page.getByRole('dialog', { name: 'ゲームを開始しますか？' });
         await expect(start).toBeHidden();
         await expect(dialog).toBeHidden();
@@ -358,6 +497,11 @@ for (const game of games) {
         expect(await persistedWallet(page)).toBe(balance);
         expect(writes).toHaveLength(0);
         if (!occupied) await expect(waiting).toBeVisible();
+        await leaveToDirectory(page, game.id, !occupied
+          ? '.spectator-availability .showcase-actions button:last-child'
+          : game.id === 'dot-wave' ? null : '#spectator-game-back');
+        expect(await persistedWallet(page)).toBe(balance);
+        expect(writes).toHaveLength(0);
       } finally {
         if (playerContext) {
           if (player && !player.isClosed()) {
@@ -365,7 +509,10 @@ for (const game of games) {
           }
           await testInfo.attach('local-player-start', { body: JSON.stringify(playerEvents), contentType: 'application/json' });
         }
-        await playerContext?.close();
+        if (playerContext) {
+          try { await finishReadBudget(playerContext); }
+          finally { await playerContext.close(); }
+        }
       }
     });
   }
@@ -380,9 +527,7 @@ for (const game of games.filter(game => game.id === 'graze-duel')) {
   for (const closeAt of ['consent', 'registration']) {
     test(`${game.id}: insufficient credit registration cancellation at ${closeAt} recovers without reload`, async ({ page, isMobile }) => {
       // Keep the welcome grant unclaimed so it can fund the final authorized play.
-      const loaded = page.waitForResponse(response => response.url().endsWith('/api/platform/bootstrap'));
-      await page.goto(origin);
-      const initial = await (await loaded).json();
+      const initial = await navigateGuest(page, `${origin}/`);
       expect(initial.accountRegistered).toBe(false);
       expect(initial.consent.accepted).toBe(false);
       expect(initial.welcomeCreditGranted).toBe(false);
@@ -397,7 +542,7 @@ for (const game of games.filter(game => game.id === 'graze-duel')) {
           if (result.status !== 'captured') throw new Error('Local guest setup capture failed');
         }
       }, { balance: initial.wallet.availableTotal, gameId: game.id });
-      await page.goto(`${origin}/cabinets/${randomUUID()}?game=${game.id}`);
+      await navigateGuest(page, `${origin}/cabinets/${randomUUID()}?game=${game.id}`);
       const ready = game.id === 'dot-wave' ? 'intro' : 'ready';
       await expect.poll(() => phase(page, game.id)).toBe(ready);
       expect(await wallet(page)).toBe(0);
@@ -405,8 +550,18 @@ for (const game of games.filter(game => game.id === 'graze-duel')) {
       page.on('request', request => {
         if (request.method() === 'POST' && request.url().includes('/api/platform/credit-reservations')) writes.push(request.url());
       });
+      if (game.id === 'graze-duel' && isMobile) {
+        await expect(page.locator('#touch-pause')).toBeHidden();
+        await expect(page.locator('.game-share-button')).toHaveCount(0);
+        await page.getByRole('button', { name: '観戦に招待', exact: true }).tap();
+        const share = page.getByRole('dialog', { name: '観戦に招待', exact: true });
+        await expect(share).toBeVisible();
+        await expect.poll(() => phase(page, game.id)).toBe(ready);
+        expect(writes).toHaveLength(0);
+        await share.getByRole('button', { name: '× 閉じる' }).tap();
+      }
       const intent = async () => {
-        if (isMobile) await page.getByRole('button', { name: game.button, exact: true }).tap();
+        if (isMobile) await page.getByRole('button', { name: game.id === 'graze-duel' && isMobile ? 'タップして開始（1枚）' : game.button, exact: true }).tap();
         else {
           await page.locator('body').click({ position: { x: 2, y: 2 } });
           await page.keyboard.press(game.key);

@@ -1,3 +1,4 @@
+import { gameHost } from "../../game-sdk/game-host";
 import { useRef } from "react";
 import { useMobilePlay } from "./use-mobile-play";
 import "./mobile-play.css";
@@ -15,10 +16,11 @@ export interface GameScreenProps {
 export function GameScreen({ game }: GameScreenProps) {
   const screen = useRef<HTMLElement>(null);
   const play = useMobilePlay(screen);
+  const tapReady = game.id === "graze-duel" && play.mobile && play.ready;
   const ui = getGameUI(game.id);
   const { FrameIntro, SetIntro, ResultPresentation, ResultSummaryAction, AfterFrame, TouchActions, Settings, FooterAction, RetryAction } = ui;
   return (
-    <section ref={screen} data-game-id={game.id} data-mobile-play={play.active || undefined} className={`game-screen is-hidden${ui.screenClassName ? ` ${ui.screenClassName}` : ""}`} id="game-screen">
+    <section ref={screen} data-tap-ready={tapReady || undefined} data-invite-only={play.inviteOnly || undefined} data-game-id={game.id} data-mobile-play={play.active || undefined} className={`game-screen is-hidden${ui.screenClassName ? ` ${ui.screenClassName}` : ""}`} id="game-screen">
       <div className="spectator-banner is-hidden" id="spectator-banner">
         <div>
           <strong id="spectator-view-label">観戦中</strong>
@@ -47,7 +49,7 @@ export function GameScreen({ game }: GameScreenProps) {
 
       <div className="game-frame">
         <div className="player-crowd-pulse is-hidden" id="player-crowd-pulse" aria-hidden="true" />
-        <button
+        {!play.inviteOnly && <button
           className="cabinet-share-button game-share-button"
           type="button"
           aria-label="観戦用画面を共有"
@@ -60,8 +62,19 @@ export function GameScreen({ game }: GameScreenProps) {
             <circle cx="18" cy="19" r="3" />
             <path d="m8.7 10.7 6.6-4.2M8.7 13.3l6.6 4.2" />
           </svg>
-        </button>
+        </button>}
         <canvas id="game" width="960" height="640" aria-label={`${game.title} game canvas`} />
+        {tapReady && <button className="mobile-ready-start" type="button"
+          onPointerDown={event => event.stopPropagation()}
+          onKeyDown={event => { if (event.code === "Space" || event.code === "Enter") event.stopPropagation(); }}
+          onKeyUp={event => { if (event.code === "Space" || event.code === "Enter") event.stopPropagation(); }}
+          onClick={event => {
+            event.stopPropagation();
+            if (document.querySelector(".platform-overlay, .share-overlay, .platform-profile-menu")) return;
+            gameHost.requestPlay("start");
+          }}>
+          <span>タップして開始（{game.creditCost}枚）</span>
+        </button>}
         {game.id === "graze-duel" && play.active && play.paused && <button
           className="mobile-play-leave secondary-button"
           type="button"
@@ -89,7 +102,7 @@ export function GameScreen({ game }: GameScreenProps) {
             <ResultSummaryAction game={game} />
           </div>
           <p id="ranking-status" role="status" />
-          <div className="ranking-registration-section">
+          {game.id !== "deep-sea-salvage" && <div className="ranking-registration-section">
             <h3>ランキング</h3>
             <div className="ranking-form">
               <input id="ranking-name" type="hidden" />
@@ -111,7 +124,7 @@ export function GameScreen({ game }: GameScreenProps) {
             <div className="ranking-submit-list">
               <RankingTable bodyId="ranking-submit-list" label="登録後のスコアランキング" />
             </div>
-          </div>
+          </div>}
           <div className="ranking-next-actions">
             <RetryAction game={game} />
             <button id="ranking-another-game" className="clear-restart-button" type="button" onClickCapture={event => { event.stopPropagation(); navigate("/"); }}>別のゲームを探す</button>
@@ -143,16 +156,21 @@ export function GameScreen({ game }: GameScreenProps) {
           </div>}
           <TouchActions game={game} />
           <button id="touch-pause" className="touch-button" type="button">一時停止</button>
+          {game.id === "deep-sea-salvage" && play.active && play.paused && <button
+            className="mobile-play-leave secondary-button"
+            type="button"
+            onClickCapture={event => { event.stopPropagation(); navigate("/"); }}
+          >別のゲームをする</button>}
         </div>
       </div>
       <Settings game={game} />
 
-      <section className="ranking-panel">
+      {game.id !== "deep-sea-salvage" && <section className="ranking-panel">
         <div className="ranking-list">
           <h2>スコアランキング</h2>
           <RankingTable bodyId="ranking-list" label="スコアランキング" />
         </div>
-      </section>
+      </section>}
 
       <div className="game-footer-actions">
         <FooterAction game={game} />

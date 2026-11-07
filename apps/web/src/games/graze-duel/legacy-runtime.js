@@ -330,6 +330,7 @@ export function mountGame(context) {
       versusParticipant: isVersusParticipant() && !document.querySelector(".share-overlay"),
       screen: currentScreen,
       gameOver,
+      waitingForStart,
       compact: isCompactView(),
     }),
     togglePause: togglePauseState,

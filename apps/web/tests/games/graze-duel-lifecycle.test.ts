@@ -177,6 +177,30 @@ describe("BUZZ BARRIER instance lifecycle", () => {
     instance.dispose();
   });
 
+  it("does not carry READY multi-pointer input into authorized play", () => {
+    const lifetime = new GameLifetime();
+    const movePlayer = vi.fn();
+    let waitingForStart = true;
+    const input = createInputController({ lifetime, canvas, keyboardTarget: keyboard,
+      getState: () => ({ spectator: false, compact: true, screen: "game", gameOver: false, waitingForStart }),
+      togglePause: vi.fn(), requestRetry: vi.fn(), movePlayer });
+    for (const pointerId of [1, 2]) {
+      canvas.dispatchEvent(Object.assign(new Event("pointerdown"), { pointerId, clientX: 100, clientY: 100 }));
+    }
+    expect(canvas.setPointerCapture).not.toHaveBeenCalled();
+    waitingForStart = false;
+    canvas.dispatchEvent(Object.assign(new Event("pointermove"), { clientX: 172, clientY: 172 }));
+    input.updateHuman({}, .016);
+    expect(input.touchMove.active).toBe(false);
+    expect(movePlayer).toHaveBeenLastCalledWith({}, 0, 0, false, .016);
+    canvas.dispatchEvent(new Event("pointerup"));
+    canvas.dispatchEvent(Object.assign(new Event("pointerdown"), { pointerId: 3, clientX: 100, clientY: 100 }));
+    canvas.dispatchEvent(Object.assign(new Event("pointermove"), { clientX: 172, clientY: 100 }));
+    input.updateHuman({}, .016);
+    expect(movePlayer).toHaveBeenLastCalledWith({}, 1, 0, false, .016);
+    lifetime.dispose();
+  });
+
   it("keeps keyboard and touch behavior and clears input on disposal", () => {
     const lifetime = new GameLifetime();
     const movePlayer = vi.fn();
