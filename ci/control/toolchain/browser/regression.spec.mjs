@@ -52,7 +52,7 @@ test('game navigation allows declining credit and returning before play', async 
   else await expect(page.locator('#game-screen')).toBeVisible();
   expect(reservations).toEqual([]);
   if (game === 'dot-wave') await page.getByRole('button', { name: /^START \// }).click();
-  else if (isMobile) await page.getByRole('button', { name: game === 'graze-duel' ? 'ゲーム開始' : '潜航開始', exact: true }).tap();
+  else if (isMobile) await page.getByRole('button', { name: game === 'graze-duel' ? 'タップして開始（1枚）' : '潜航開始', exact: true }).tap();
   else await page.keyboard.press(game === 'graze-duel' ? 'Space' : 'p');
   await expect(welcome).toBeVisible();
   await welcome.getByRole('button', { name: '受け取らない', exact: true }).click();

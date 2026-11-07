@@ -25,13 +25,32 @@ export async function ciEvidence({ api, repository, checkSha, buildSha, event, r
   if (matching.length !== 1 || !Number.isSafeInteger(matching[0].size_in_bytes) || matching[0].size_in_bytes < 1 || matching[0].size_in_bytes > 250 * 1024 * 1024) throw Error('Exact CI artifact is missing or ambiguous');
   return { runId: String(run.id), attempt: String(run.run_attempt), artifactId: String(matching[0].id) };
 }
-export async function waitForCi(options, { attempts = 60, wait = ms => new Promise(resolve => setTimeout(resolve, ms)) } = {}) {
+// Web checks allow UI=15m followed by verify=5m. Leave 5m for queue/API lag;
+// Candidate tests has a separate 30m job limit, including its own setup.
+export const ciEvidenceTimeoutMs = 25 * 60 * 1000;
+export async function waitForCi(options, { timeoutMs = ciEvidenceTimeoutMs, attempts = 151, now = Date.now, wait = ms => new Promise(resolve => setTimeout(resolve, ms)) } = {}) {
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || !Number.isSafeInteger(attempts) || attempts < 1) throw Error('Invalid CI wait budget');
+  const deadline = now() + timeoutMs;
   for (let i = 0; i < attempts; i++) {
     const result = await ciEvidence(options);
     if (result) return result;
-    if (i < attempts - 1) await wait(10000);
+    const remaining = deadline - now();
+    if (remaining <= 0 || i === attempts - 1) break;
+    await wait(Math.min(10000, remaining));
   }
   throw Error('CI evidence timed out');
+}
+export function ciEvidenceFailure(error) {
+  const codes = {
+    'CI evidence timed out': 'ci-evidence-timeout',
+    'GitHub read failed': 'ci-api-unavailable',
+    'Latest CI run is not eligible': 'ci-evidence-rejected',
+    'Required CI jobs did not succeed': 'ci-evidence-rejected',
+    'Exact CI artifact is missing or ambiguous': 'ci-artifact-rejected',
+    'develop moved before deployment': 'ci-target-changed',
+    'PR changed before deployment': 'ci-target-changed',
+  };
+  return { code: codes[error?.message] ?? 'ci-evidence-unavailable' };
 }
 export async function assertCurrentTarget({ api, expectedBase, checkSha, pullNumber }) {
   assertSha(expectedBase); assertSha(checkSha);
@@ -62,5 +81,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     await assertCurrentTarget({ api: options.api, expectedBase: process.env.PULBASE_EXPECTED_BASE, checkSha: options.checkSha, pullNumber: process.env.PULBASE_PR_NUMBER });
     if (process.env.GITHUB_OUTPUT) await appendFile(process.env.GITHUB_OUTPUT, Object.entries(evidence).map(([key, value]) => `${key}=${value}\n`).join(''));
     console.log('同じSHAの必須CI成功・成果物・現在のdevelopを確認しました。');
-  } catch { console.error('公開条件を満たす同じSHAのCI・成果物を確認できません。公開を停止します。'); process.exitCode = 1; }
+  } catch (error) {
+    console.error(`CI_EVIDENCE_RESULT: ${JSON.stringify(ciEvidenceFailure(error))}`);
+    console.error('公開条件を満たす同じSHAのCI・成果物を確認できません。公開を停止します。'); process.exitCode = 1;
+  }
 }

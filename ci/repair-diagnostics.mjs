@@ -21,6 +21,24 @@ export function unitDiagnostic(log){
  }
  return out;
 }
+export function candidateDiagnostic(log) {
+ const messages = {
+  'ci-evidence-timeout': '同じSHAの通常CI・成果物の照合待ちが期限に達しました。アプリ不具合と扱わず、CIの所要時間・待機上限・API反映を確認してください。',
+  'ci-api-unavailable': 'CI照合のGitHub読取APIが失敗しました。認証・API利用枠・サービス状態を確認してください。',
+  'ci-evidence-rejected': '同じSHAの最新CIまたは必須jobが不合格です。古い成功や再実行で置き換えず、通常CIの失敗を確認してください。',
+  'ci-artifact-rejected': '対象SHA・run・attemptに一致する成果物を一意に照合できませんでした。成果物条件を緩和せず確認してください。',
+  'ci-target-changed': '照合中にdevelopまたはPRが変わりました。古い候補を公開せず、最新の対象を確認してください。',
+  'ci-evidence-unavailable': 'CI照合の証跡を取得できませんでした。アプリ変更を依頼せず、照合処理の実行結果を確認してください。',
+ };
+ const lines=String(log).split('\n').filter(x=>x.includes('CI_EVIDENCE_RESULT:')&&x.length<2000);
+ for(const line of lines){
+  let value;try{value=JSON.parse(line.slice(line.indexOf('CI_EVIDENCE_RESULT:')+'CI_EVIDENCE_RESULT:'.length).trim());}catch{continue;}
+  if(Object.hasOwn(messages,value?.code))return [{kind:'ci-control',title:value.code,message:messages[value.code]}];
+ }
+ // Older runs predate the structured marker. Report the known failed job,
+ // without guessing its cause or forwarding arbitrary candidate log text.
+ return [{kind:'ci-control',title:'candidate-verification-failed',message:'Candidate testsが不合格ですが詳細な分類証跡がありません。CI待機・候補の親SHA・成果物照合を確認してください。アプリ修正の診断として流用しません。'}];
+}
 export function reportDiagnostic(report){
  const out=[];const visit=suites=>{for(const suite of suites??[]){
   for(const spec of suite.specs??[])for(const test of spec.tests??[])for(const result of test.results??[]){
@@ -78,6 +96,8 @@ export async function collectDiagnostics({api,artifact,log},pr){
    if(evidence.length===1&&evidence[0].size_in_bytes<=250*1024*1024)try{entries.push(...archiveDiagnostic(await artifact(evidence[0].id)));}catch{entries.push({kind:'diagnostic-unavailable',message:'UI証跡を容量制限内で読み取れません。テスト条件は緩和しないでください。'});}
    const unit=jobs.jobs.find(j=>j.name==='unit'&&j.conclusion==='failure');if(unit)try{entries.push(...unitDiagnostic(await log(unit.id)));}catch{entries.push({kind:'diagnostic-unavailable',message:'通常テストの失敗ログを取得できません。CI成功として扱わないでください。'});}
   }else{
+   const candidate=jobs.jobs.find(j=>j.name==='Candidate tests'&&j.conclusion==='failure');
+   if(candidate)try{entries.push(...candidateDiagnostic(await log(candidate.id)));}catch{entries.push({kind:'diagnostic-unavailable',message:'Candidate testsの診断ログを取得できません。照合成功として扱わないでください。'});}
    const gate=jobs.jobs.find(j=>j.name==='review-gate'&&j.conclusion==='failure');if(gate)try{entries.push(...reviewDiagnostic(await log(gate.id)));}catch{entries.push({kind:'diagnostic-unavailable',message:'レビュー不合格のログを取得できません。レビュー成功として扱わないでください。'});}
   }
  }
