@@ -40,7 +40,7 @@
     "ci/publication-result.mjs": "b2257ec6630fb5b85257ef49d28873d2039f2067",
     "ci/schemas/implementation.json": "f9c32197de5d9279b642961ef0ff7abcca46f76d",
     ".github/workflows/automatic-repair.yml": "622116f2e2b5a84c8e1b764aa5f7b7939a6da1c9",
-    "ci/automatic-repair.mjs": "fca5e809a8a9928844704954f2ebd7fd85335f29",
+    "ci/automatic-repair.mjs": "b3d8671723fb75147dc92247b653b57846642ddc",
     "ci/repair-ticket.mjs": "e30cb31bebf6e77dbdab7d17bfc79e3e1cd2127c",
     "ci/repair-diagnostics.mjs": "c4e5546f27c318161b591284fe7b67fd0ae7993f",
     "ci/repair-workspace.mjs": "df9c442eed030a762acef05b02ac2f6261c9cf96"

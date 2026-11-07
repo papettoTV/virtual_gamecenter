@@ -46,7 +46,7 @@ export async function coordinateRepair({github,repo,event,eventName,runId,bot,ac
  const needsSync=!baseIncluded;
  if(!result.ready&&!(result.reason==='missing-ci'&&needsSync))return {status:'waiting',reason:'checks-in-progress',issue,pull:pull.number};
  if(!result.failed&&!needsSync)return {status:'ignored',reason:'no-repair-needed'};
- if(result.failed&&result.entries.some(x=>x.kind==='ci-control')&&!result.entries.some(x=>['ui','unit','review'].includes(x.kind))){
+ if(result.failed&&!needsSync&&result.entries.some(x=>x.kind==='ci-control')&&!result.entries.some(x=>['ui','unit','review'].includes(x.kind))){
   const key=`<!-- pulbase-repair-stop:${issue}:${head}:${base}:ci-control -->`;
   const entries=boundedDiagnostics(result.entries.filter(x=>x.kind==='ci-control'));
   if(!comments.some(c=>c.user?.login==='github-actions[bot]'&&c.body?.startsWith(key)))await notify(issue,`${key}\nPR #${pull.number}のCI照合処理が停止しました。アプリの自動修正は起動しません。\n${entries.map(x=>`- ${x.title}: ${x.message}`).join('\n')}\n承認・strict・bypass空は維持しています。`);
