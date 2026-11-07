@@ -443,8 +443,13 @@ export class CabinetRoom extends DurableObject<Env & { LOCAL_MULTIPLAYER_ENABLED
     }
   }
 
-  async webSocketClose(socket: WebSocket): Promise<void> {
+  async webSocketClose(socket: WebSocket, code: number, reason: string): Promise<void> {
     try {
+      // Complete the transport handshake before asynchronous room/DB cleanup.
+      // 1005/1006 are event-only codes and must never be sent on the wire.
+      if (socket.readyState !== WebSocket.CLOSED) {
+        socket.close(code === 1005 ? 1000 : code === 1006 ? 1011 : code, reason);
+      }
       await this.ready;
       if (!this.recoverySuspended) await this.leave(socket);
     } finally {
