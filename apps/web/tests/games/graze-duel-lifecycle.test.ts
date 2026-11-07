@@ -121,6 +121,27 @@ describe("BUZZ BARRIER instance lifecycle", () => {
     expect(await instance.play("retry", "reservation")).toBe(false);
   });
 
+  it("resumes through the central button event without starting READY or pausing a running game", async () => {
+    const lifetime = new GameLifetime();
+    const instance = mountGame({ game: BUZZ_BARRIER, lifetime });
+    await instance.prepareSolo?.();
+    keyboard.dispatchEvent(new Event("request-buzz-resume"));
+    expect(mocks.requestPlay).not.toHaveBeenCalled();
+    await instance.play("start", "reservation");
+    keyboard.dispatchEvent(new Event("request-buzz-resume"));
+    const pausedCount = () => mocks.send.mock.calls.flatMap(([message]) => message.events ?? []).filter(event => event.type === "pauseChanged" && event.paused === false).length;
+    const before = pausedCount();
+    keyboard.dispatchEvent(keyEvent("Space"));
+    keyboard.dispatchEvent(new Event("request-buzz-resume"));
+    expect(pausedCount()).toBe(before + 1);
+    keyboard.dispatchEvent(new Event("request-buzz-resume"));
+    expect(pausedCount()).toBe(before + 1);
+    instance.dispose();
+    const sent = mocks.send.mock.calls.length;
+    keyboard.dispatchEvent(new Event("request-buzz-resume"));
+    expect(mocks.send).toHaveBeenCalledTimes(sent);
+  });
+
   it("parent disposal prevents old input from reaching a remounted instance", async () => {
     const oldLifetime = new GameLifetime();
     mountGame({ game: BUZZ_BARRIER, lifetime: oldLifetime });

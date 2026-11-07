@@ -8,6 +8,7 @@ import { DebugPanel, getGameUI } from "../../games/ui-registry";
 import { navigate } from "../../shared/navigation";
 import { LiveShareButton, ResultShareButton } from "../sharing/ShareActions";
 import { ResultFeedbackButton } from "../feedback/ResultFeedbackButton";
+import { BuzzPauseOverlay } from "../../games/graze-duel/ui/BuzzPauseOverlay";
 
 export interface GameScreenProps {
   game: GameDefinition;
@@ -75,11 +76,7 @@ export function GameScreen({ game }: GameScreenProps) {
           }}>
           <span>タップして開始（{game.creditCost}枚）</span>
         </button>}
-        {game.id === "graze-duel" && play.active && play.paused && <button
-          className="mobile-play-leave secondary-button"
-          type="button"
-          onClickCapture={event => { event.stopPropagation(); navigate("/"); }}
-        >別のゲームをする</button>}
+        {game.id === "graze-duel" && <BuzzPauseOverlay compact={play.mobile || play.active} />}
         <FrameIntro game={game} />
         <SetIntro game={game} />
         <div className="versus-overlay is-hidden" id="versus-overlay" role="dialog" aria-modal="true">

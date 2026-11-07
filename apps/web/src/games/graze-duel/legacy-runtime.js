@@ -74,6 +74,7 @@ export function mountGame(context) {
   const gaugeGrowthValue = document.querySelector("#gauge-growth-value");
   const gaugeGrowthLabel = document.querySelector("#gauge-growth-label");
   const touchPause = document.querySelector("#touch-pause");
+  const htmlPauseOverlay = document.querySelector("#buzz-pause-overlay");
   const rankingAnotherGame = document.querySelector("#ranking-another-game");
   const rankingRetry = document.querySelector("#ranking-retry");
   const rankingNameInput = document.querySelector("#ranking-name");
@@ -687,6 +688,12 @@ export function mountGame(context) {
       togglePauseState();
     });
   }
+
+  scope.listen(window, "request-buzz-resume", () => {
+    if (currentScreen !== "game" || !paused || waitingForStart || gameOver) return;
+    if (cabinetRole === "spectator" && !isVersusParticipant()) return;
+    togglePauseState();
+  });
 
   if (rankingSubmitButton) {
     scope.listen(rankingSubmitButton, "click", () => {
@@ -3414,6 +3421,7 @@ export function mountGame(context) {
       }
     }
     canvasRenderer.render({
+      htmlPauseOverlay: Boolean(htmlPauseOverlay),
       mobileHud,
       players,
       boss,

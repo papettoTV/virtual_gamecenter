@@ -1,0 +1,28 @@
+.buzz-pause-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  display: grid;
+  place-items: center;
+  padding: 24px 20px;
+  overflow-y: auto;
+  border-radius: 20px;
+  background: rgba(3, 7, 19, .88);
+  color: #f4f7ff;
+  touch-action: pan-y;
+}
+.buzz-pause-overlay[hidden] { display: none; }
+#game-screen[data-mobile-play][data-game-id="graze-duel"] .buzz-pause-overlay { top: 44px; border-top-left-radius: 0; border-top-right-radius: 0; }
+.buzz-pause-content { width: min(100%, 340px); text-align: center; }
+.buzz-pause-content h2 { margin: 0 0 16px; font: 800 clamp(30px, 5vw, 48px) / 1.1 system-ui; }
+.buzz-pause-hint { margin: 0 0 20px; color: #b5eaf0; font-size: 14px; line-height: 1.7; }
+.buzz-pause-instructions { margin: 0 0 24px; padding: 0; list-style: none; text-align: left; font-size: 14px; line-height: 1.9; }
+.buzz-pause-actions { display: grid; gap: 10px; }
+.buzz-pause-resume { min-height: 52px; width: 100%; border: 1px solid #69f7ff; border-radius: 12px; background: #214c59; color: #ecfeff; font-size: 19px; font-weight: 700; }
+.buzz-pause-leave { min-height: 44px; justify-self: center; padding: 8px 16px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: #abb8ce; font-size: 14px; font-weight: 400; }
+.buzz-pause-resume:focus-visible, .buzz-pause-leave:focus-visible { outline: 2px solid #69f7ff; outline-offset: 3px; }
+@media (max-height: 480px) {
+  .buzz-pause-overlay { padding: 16px; place-items: start center; }
+  .buzz-pause-content h2 { margin-bottom: 10px; }
+  .buzz-pause-hint, .buzz-pause-instructions { margin-bottom: 12px; }
+}
