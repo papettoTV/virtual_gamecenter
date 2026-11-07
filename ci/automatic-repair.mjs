@@ -46,6 +46,12 @@ export async function coordinateRepair({github,repo,event,eventName,runId,bot,ac
  const needsSync=!baseIncluded;
  if(!result.ready&&!(result.reason==='missing-ci'&&needsSync))return {status:'waiting',reason:'checks-in-progress',issue,pull:pull.number};
  if(!result.failed&&!needsSync)return {status:'ignored',reason:'no-repair-needed'};
+ if(result.failed&&!needsSync&&result.entries.some(x=>x.kind==='ci-control')&&!result.entries.some(x=>['ui','unit','review'].includes(x.kind))){
+  const key=`<!-- pulbase-repair-stop:${issue}:${head}:${base}:ci-control -->`;
+  const entries=boundedDiagnostics(result.entries.filter(x=>x.kind==='ci-control'));
+  if(!comments.some(c=>c.user?.login==='github-actions[bot]'&&c.body?.startsWith(key)))await notify(issue,`${key}\nPR #${pull.number}のCI照合処理が停止しました。アプリの自動修正は起動しません。\n${entries.map(x=>`- ${x.title}: ${x.message}`).join('\n')}\n承認・strict・bypass空は維持しています。`);
+  return {status:'stopped',reason:'ci-control-failure',issue,pull:pull.number,diagnostics:entries};
+ }
  if(result.failed&&!needsSync&&!result.entries.some(x=>['ui','unit','review'].includes(x.kind))){
   const key=`<!-- pulbase-repair-stop:${issue}:${head}:${base}:diagnostics -->`;
   if(!comments.some(c=>c.user?.login==='github-actions[bot]'&&c.body?.startsWith(key)))await notify(issue,`${key}\n自動修正に必要なアプリ検査・レビュー診断を取得できませんでした。実行環境・API利用枠・保護対象の失敗を確認してください。失敗を無視したマージや盲目的な再試行は行いません。`);

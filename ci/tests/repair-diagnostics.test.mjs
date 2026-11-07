@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {safeText,reviewDiagnostic,unitDiagnostic,reportDiagnostic,boundedDiagnostics,archiveDiagnostic,collectDiagnostics} from '../repair-diagnostics.mjs';
+import {safeText,reviewDiagnostic,unitDiagnostic,reportDiagnostic,boundedDiagnostics,archiveDiagnostic,collectDiagnostics,candidateDiagnostic} from '../repair-diagnostics.mjs';
 import {execFileSync} from 'node:child_process';
 test('診断から認証値・URL・base64を除去し、長さを制限する',()=>{
  const value=safeText('Bearer ABC password=hidden sk-'+ 'a'.repeat(50)+' https://example.com/private '+ 'X'.repeat(400));
@@ -34,4 +34,17 @@ test('失敗ログの読取停止を成功へ読み替えず、診断不足と�
  assert.equal(result.failed,true);assert.equal(result.ready,true);assert.equal(result.entries.length,2);
  assert.ok(result.entries.every(x=>x.kind==='diagnostic-unavailable'));
  assert.ok(!JSON.stringify(result).includes('secret-do-not-print'));
+});
+test('Candidate testsの待機失敗をアプリ診断と区別し、生ログを引き継がない',async()=>{
+ const log='Cookie: private\nCI_EVIDENCE_RESULT: {"code":"ci-evidence-timeout","message":"sk-private"}\n';
+ const result=candidateDiagnostic(log);assert.equal(result[0].kind,'ci-control');assert.equal(result[0].title,'ci-evidence-timeout');
+ assert.ok(!JSON.stringify(result).includes('private'));
+ for(const value of ['old generic log','CI_EVIDENCE_RESULT: invalid','CI_EVIDENCE_RESULT: {"code":"attacker"}'])assert.equal(candidateDiagnostic(value)[0].title,'candidate-verification-failed');
+ const head='a'.repeat(40),repository='papettoTV/virtual_gamecenter';let reads=0;
+ const api=async path=>path.startsWith('actions/runs?')?{total_count:2,workflow_runs:[
+  {id:1,path:'.github/workflows/web-checks.yml',conclusion:'success'},
+  {id:2,path:'.github/workflows/codex-pr.yml',conclusion:'failure'}].map(r=>({...r,head_sha:head,head_repository:{full_name:repository},status:'completed',run_attempt:1}))}
+  :{total_count:1,jobs:[{id:3,name:'Candidate tests',conclusion:'failure'}]};
+ const collected=await collectDiagnostics({api,artifact:async()=>assert.fail('不要な成果物は読まない'),log:async id=>{assert.equal(id,3);reads++;return log;}},{head:{sha:head}});
+ assert.equal(reads,1);assert.equal(collected.failed,true);assert.equal(collected.entries[0].title,'ci-evidence-timeout');
 });
