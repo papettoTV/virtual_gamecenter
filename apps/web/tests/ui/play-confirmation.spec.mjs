@@ -100,8 +100,21 @@ async function leaveToDirectory(page, gameId, selector = null) {
       : gameId === 'dot-wave' ? page.getByRole('link', { name: 'ゲーム一覧へ', exact: true })
       : page.locator('#game-back-to-arcade');
     await expect(leave).toBeVisible();
+    // DOT WAVE remounts PlatformExperience on return. Subscribe before exit:
+    // the real read may need the full bounded Retry-After budget even though
+    // the directory URL and game teardown have already finished.
+    const loaded = page.waitForResponse(response =>
+      response.url() === `${origin}/api/platform/bootstrap`
+      && response.request().method() === 'GET'
+      && response.frame() === page.mainFrame(), { timeout: readBudgetTimeout });
     // Native clicks in one task exercise duplicate input on the same control.
-    await leave.evaluate(button => { button.click(); button.click(); });
+    const [response] = await Promise.all([
+      loaded,
+      leave.evaluate(button => { button.click(); button.click(); }),
+    ]);
+    expect(response.ok()).toBe(true);
+    const account = await response.json();
+    await expect(page.locator('.platform-credit-badge')).toHaveText(String(account.wallet.availableTotal));
     await expect(page).toHaveURL(`${origin}/`);
     await expect(page.locator('#game-screen, main.dot-wave')).toHaveCount(0);
     await expect.poll(() => page.evaluate(async () => (await import('/src/features/sharing/share-service.ts')).liveSharing.getSnapshot())).toBeNull();
@@ -377,8 +390,12 @@ for (const game of games) {
     expect(await wallet(page)).toBe(balance);
     expect(await persistedWallet(page)).toBe(balance);
   });
-  for (const occupied of [false, true]) {
-    test(`${game.id}: spectator never requests a start (${occupied ? 'live player' : 'empty cabinet'})`, async ({ page, browser, isMobile }, testInfo) => {
+  for (const { occupied, delayedExit } of [
+    { occupied: false, delayedExit: false },
+    { occupied: true, delayedExit: false },
+    ...(game.id === 'dot-wave' ? [{ occupied: true, delayedExit: true }] : []),
+  ]) {
+    test(`${game.id}: spectator never requests a start (${occupied ? 'live player' : 'empty cabinet'}${delayedExit ? ', exit read backpressure' : ''})`, async ({ page, context, browser, isMobile }, testInfo) => {
       const cabinet = `${origin}/cabinets/${randomUUID()}?game=${game.id}`;
       const playerContext = occupied ? await browser.newContext() : null;
       const playerEvents = [];
@@ -488,11 +505,35 @@ for (const game of games) {
         expect(await persistedWallet(page)).toBe(balance);
         expect(writes).toHaveLength(0);
         if (!occupied) await expect(waiting).toBeVisible();
-        await leaveToDirectory(page, game.id, !occupied
-          ? '.spectator-availability .showcase-actions button:last-child'
-          : game.id === 'dot-wave' ? null : '#spectator-game-back');
-        expect(await persistedWallet(page)).toBe(balance);
-        expect(writes).toHaveLength(0);
+        // Exercise the same live spectator → directory path with a genuine
+        // Worker fetch on both attempts. Only the first read's status/header
+        // are instrumented; cookies, wallet and successful retry stay real.
+        const exitReads = [];
+        let exitScope;
+        if (delayedExit) {
+          await finishReadBudget(context);
+          exitScope = instrument(context, async fetch => {
+            const response = await fetch();
+            exitReads.push(response.status());
+            return exitReads.length === 1 ? backpressure(response, 6) : response;
+          });
+          await respectReadBudget(exitScope, testInfo);
+        }
+        const exitStarted = Date.now();
+        try {
+          await leaveToDirectory(page, game.id, !occupied
+            ? '.spectator-availability .showcase-actions button:last-child'
+            : game.id === 'dot-wave' ? null : '#spectator-game-back');
+          if (delayedExit) {
+            expect(Date.now() - exitStarted).toBeGreaterThanOrEqual(6000);
+            expect(exitReads).toEqual([200, 200]);
+          }
+          expect(await wallet(page)).toBe(balance);
+          expect(await persistedWallet(page)).toBe(balance);
+          expect(writes).toHaveLength(0);
+        } finally {
+          if (exitScope) await finishReadBudget(exitScope);
+        }
       } finally {
         if (playerContext) {
           if (player && !player.isClosed()) {
