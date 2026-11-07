@@ -508,14 +508,21 @@ for (const game of games) {
         // Exercise the same live spectator → directory path with a genuine
         // Worker fetch on both attempts. Only the first read's status/header
         // are instrumented; cookies, wallet and successful retry stay real.
-        const exitReads = [];
+        const exitReads = new Map();
+        let delayedRead;
         let exitScope;
         if (delayedExit) {
           await finishReadBudget(context);
-          exitScope = instrument(context, async fetch => {
+          exitScope = instrument(context, async (fetch, request) => {
+            // Count attempts per browser GET, rather than combining independent
+            // reads (including reads from duplicate exit input) into one retry.
+            const attempts = exitReads.get(request) ?? [];
+            exitReads.set(request, attempts);
+            const delay = !delayedRead && new URL(request.url()).pathname === '/api/platform/bootstrap';
+            if (delay) delayedRead = request;
             const response = await fetch();
-            exitReads.push(response.status());
-            return exitReads.length === 1 ? backpressure(response, 6) : response;
+            attempts.push(response.status());
+            return delay ? backpressure(response, 6) : response;
           });
           await respectReadBudget(exitScope, testInfo);
         }
@@ -526,7 +533,12 @@ for (const game of games) {
             : game.id === 'dot-wave' ? null : '#spectator-game-back');
           if (delayedExit) {
             expect(Date.now() - exitStarted).toBeGreaterThanOrEqual(6000);
-            expect(exitReads).toEqual([200, 200]);
+            expect(delayedRead).toBeDefined();
+            expect(exitReads.get(delayedRead)).toEqual([200, 200]);
+            for (const [request, attempts] of exitReads) {
+              expect(request.method()).toBe('GET');
+              if (request !== delayedRead) expect(attempts).toEqual([200]);
+            }
           }
           expect(await wallet(page)).toBe(balance);
           expect(await persistedWallet(page)).toBe(balance);

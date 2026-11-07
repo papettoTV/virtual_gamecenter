@@ -13,7 +13,7 @@ export function instrument(context, intercept) {
       wrapped = async route => {
         owned++;
         const fetch = route.fetch.bind(route);
-        route.fetch = options => intercept(() => fetch(options));
+        route.fetch = options => intercept(() => fetch(options), route.request());
         try { await handler(route); } finally { owned--; }
       };
       await context.route(pattern, wrapped);
