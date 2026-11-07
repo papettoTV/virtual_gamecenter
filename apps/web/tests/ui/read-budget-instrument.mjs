@@ -40,7 +40,12 @@ export function backpressure(response, seconds) {
 
 
 // Observe each browser GET separately, including its one permitted route retry.
-export function delayedReadProbe(pathname, seconds = 6) {
+// A successful first fetch may spend the actor's last read in the Worker's
+// minute window (AbuseGuard.consume). An artificial 6s delay can then make the
+// sole retry hit a genuine 429 in that same window. Give injected backpressure
+// a full window, within readBudgetTimeout, so the retry gets a fresh budget.
+// backpressure still preserves a genuine 429 and its actual Retry-After.
+export function delayedReadProbe(pathname, seconds = 60) {
   const reads = new Map();
   let selected;
   return {
