@@ -9,7 +9,7 @@ import importlib.util
 import re
 
 ROOT = Path(__file__).resolve().parents[1]
-BASE = '80efe3b4fcfa2997eee4695742124a63445334e4'
+BASE = '828ac87708a57a208b9f06cf55f1b479a51ce492'
 FILES = ('ci/control/review-trust.mjs', 'ci/control/review-trust.json', 'ci/production-candidate/policy.json')
 
 

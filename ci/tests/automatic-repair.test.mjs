@@ -32,6 +32,15 @@ test('診断取得中のhead変更は書込前に拒否する',async()=>{
  const f=fixture();f.options.diagnostics=async()=>{f.pr.head.sha=base;return{ready:true,failed:true,entries:[{kind:'unit',message:'assert failed'}]};};
  await assert.rejects(coordinateRepair(f.options));assert.equal(f.sent.length,0);assert.equal(f.notices.length,0);
 });
+test('CI照合だけの失敗は理由を通知し、モデルへアプリ修正を依頼しない',async()=>{
+ const f=fixture();f.pr.base.sha=base;f.pr.mergeable=true;
+ f.options.diagnostics=async()=>({ready:true,failed:true,entries:[{kind:'ci-control',title:'ci-evidence-timeout',message:'照合待ちが期限切れ'}]});
+ const result=await coordinateRepair(f.options);assert.equal(result.reason,'ci-control-failure');assert.equal(f.sent.length,0);assert.match(f.notices[0].body,/ci-evidence-timeout/);
+ await coordinateRepair(f.options);assert.equal(f.notices.length,1);
+ const g=fixture();g.pr.base.sha=base;g.pr.mergeable=true;
+ g.options.diagnostics=async()=>({ready:true,failed:true,entries:[{kind:'ci-control',title:'ci-evidence-rejected',message:'通常CIが不合格'},{kind:'ui',message:'開始UIの不整合'}]});
+ assert.equal((await coordinateRepair(g.options)).status,'dispatched');assert.equal(g.sent.length,1);
+});
 test('合格済みheadもdevelop更新後は同期し、古いpushや古い制御checkoutでは起動しない',async()=>{
  const f=fixture();f.options.eventName='push';f.options.event={ref:'refs/heads/develop',after:base,inputs:{issue:'124'}};f.options.diagnostics=async()=>({ready:true,failed:false,entries:[]});
  assert.equal((await coordinateRepair(f.options)).status,'dispatched');assert.equal(f.sent.length,1);

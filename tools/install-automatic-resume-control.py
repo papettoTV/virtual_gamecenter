@@ -20,7 +20,7 @@ import warnings
 import zipfile
 
 REPO = '/repos/papettoTV/virtual_gamecenter'
-BASE = '80efe3b4fcfa2997eee4695742124a63445334e4'
+BASE = '828ac87708a57a208b9f06cf55f1b479a51ce492'
 MAIN = '73cb5d9267c56f06f9f1150327ec6b8b3caa2bb9'
 APP = 5405029
 BUNDLE_DIGEST = 'PACKAGED_BUNDLE_DIGEST'
