@@ -9,8 +9,9 @@ import importlib.util
 import re
 
 ROOT = Path(__file__).resolve().parents[1]
-BASE = '80efe3b4fcfa2997eee4695742124a63445334e4'
-FILES = ('ci/control/review-trust.mjs', 'ci/control/review-trust.json', 'ci/production-candidate/policy.json')
+BASE = '828ac87708a57a208b9f06cf55f1b479a51ce492'
+FILES = ('ci/control/review-trust.mjs', 'ci/control/review-trust.json', 'ci/production-candidate/policy.json',
+         'ci/control/toolchain/browser/regression.spec.mjs')
 
 
 def git(*args):
@@ -26,6 +27,10 @@ def package(destination):
     data = {path: git('show', source + ':' + path) for path in FILES}
     blobs = {path: hashlib.sha1(b'blob ' + str(len(raw)).encode() + b'\0' + raw).hexdigest()
              for path, raw in data.items()}
+    policy = json.loads(data['ci/production-candidate/policy.json'])
+    expected = baseline | blobs
+    if len(policy['controlFiles']) != 28 or any(expected.get(path) != value for path, value in policy['controlFiles'].items()):
+        raise RuntimeError('配置予定の信頼定義・検証回帰と本番候補の読取定義が不一致です。')
     if all(blobs[path] == baseline[path] for path in FILES):
         raise RuntimeError('信頼定義の差分がありません。')
     plan = {'mode': 'review-only', 'parent': BASE, 'sourceSha': source,

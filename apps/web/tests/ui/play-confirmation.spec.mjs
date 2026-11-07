@@ -3,6 +3,9 @@ import { test, expect } from '../../../../ci/ui-fixtures.mjs';
 import { localUiUrl } from '../../../../ci/ui-tests.mjs';
 import { respectReadBudget, finishReadBudget, readBudgetTimeout } from './api-read-budget.mjs';
 
+import { claimWelcomeAndRefresh } from './welcome-wallet.mjs';
+import { instrument, delayedReadProbe } from './read-budget-instrument.mjs';
+
 const origin = 'http://127.0.0.1:5174';
 const games = [
   { id: 'graze-duel', button: 'ゲーム開始', key: 'Space' },
@@ -29,7 +32,7 @@ async function navigateGuest(page, url, reload = false) {
   const loaded = page.waitForResponse(response =>
     response.url() === `${origin}/api/platform/bootstrap`
     && response.request().method() === 'GET'
-    && response.frame() === page.mainFrame(), { timeout: 70000 });
+    && response.frame() === page.mainFrame(), { timeout: readBudgetTimeout });
   if (reload) await page.reload({ waitUntil: 'domcontentloaded' });
   else await page.goto(url, { waitUntil: 'domcontentloaded' });
   const canonicalUrl = new URL(url);
@@ -56,20 +59,7 @@ async function prepareGuest(page) {
   const decline = page.getByRole('button', { name: '拒否する', exact: true });
   if (await decline.isVisible()) await decline.click();
   if (!account.welcomeCreditGranted) {
-    const refreshed = page.waitForResponse(response =>
-      response.url() === `${origin}/api/platform/bootstrap`
-      && response.request().method() === 'GET'
-      && response.frame() === page.mainFrame(), { timeout: readBudgetTimeout });
-    const granted = await page.evaluate(async () => {
-      const result = await (await import('/src/features/platform/platform-client.ts')).claimWelcomeCredit();
-      window.dispatchEvent(new Event('platform-wallet-changed'));
-      return result.wallet;
-    });
-    const response = await refreshed;
-    expect(response.ok()).toBe(true);
-    expect((await response.json()).wallet.availableTotal).toBe(granted.availableTotal);
-    await expect(page.locator('.platform-credit-badge')).toHaveText(String(granted.availableTotal));
-    return granted;
+    return claimWelcomeAndRefresh(page);
   }
   return account.wallet;
 }
@@ -82,6 +72,7 @@ async function phase(page, game) {
 const cabinetSockets = new WeakMap();
 test.afterEach(async ({ context }) => { await finishReadBudget(context); });
 test.beforeEach(async ({ page, context }, testInfo) => {
+  testInfo.setTimeout(testInfo.timeout + readBudgetTimeout);
   await respectReadBudget(context, testInfo);
   const sockets = new Set();
   cabinetSockets.set(page, sockets);
@@ -109,8 +100,21 @@ async function leaveToDirectory(page, gameId, selector = null) {
       : gameId === 'dot-wave' ? page.getByRole('link', { name: 'ゲーム一覧へ', exact: true })
       : page.locator('#game-back-to-arcade');
     await expect(leave).toBeVisible();
+    // DOT WAVE remounts PlatformExperience on return. Subscribe before exit:
+    // the real read may need the full bounded Retry-After budget even though
+    // the directory URL and game teardown have already finished.
+    const loaded = page.waitForResponse(response =>
+      response.url() === `${origin}/api/platform/bootstrap`
+      && response.request().method() === 'GET'
+      && response.frame() === page.mainFrame(), { timeout: readBudgetTimeout });
     // Native clicks in one task exercise duplicate input on the same control.
-    await leave.evaluate(button => { button.click(); button.click(); });
+    const [response] = await Promise.all([
+      loaded,
+      leave.evaluate(button => { button.click(); button.click(); }),
+    ]);
+    expect(response.ok()).toBe(true);
+    const account = await response.json();
+    await expect(page.locator('.platform-credit-badge')).toHaveText(String(account.wallet.availableTotal));
     await expect(page).toHaveURL(`${origin}/`);
     await expect(page.locator('#game-screen, main.dot-wave')).toHaveCount(0);
     await expect.poll(() => page.evaluate(async () => (await import('/src/features/sharing/share-service.ts')).liveSharing.getSnapshot())).toBeNull();
@@ -386,8 +390,12 @@ for (const game of games) {
     expect(await wallet(page)).toBe(balance);
     expect(await persistedWallet(page)).toBe(balance);
   });
-  for (const occupied of [false, true]) {
-    test(`${game.id}: spectator never requests a start (${occupied ? 'live player' : 'empty cabinet'})`, async ({ page, browser, isMobile }, testInfo) => {
+  for (const { occupied, delayedExit } of [
+    { occupied: false, delayedExit: false },
+    { occupied: true, delayedExit: false },
+    ...(game.id === 'dot-wave' ? [{ occupied: true, delayedExit: true }] : []),
+  ]) {
+    test(`${game.id}: spectator never requests a start (${occupied ? 'live player' : 'empty cabinet'}${delayedExit ? ', exit read backpressure' : ''})`, async ({ page, context, browser, isMobile }, testInfo) => {
       const cabinet = `${origin}/cabinets/${randomUUID()}?game=${game.id}`;
       const playerContext = occupied ? await browser.newContext() : null;
       const playerEvents = [];
@@ -439,6 +447,12 @@ for (const game of games) {
           // Register both real accounting responses before any start operation.
           const reserved = player.waitForResponse(response => response.request().method() === 'POST' && response.url().endsWith('/credit-reservations'));
           const captured = player.waitForResponse(response => response.request().method() === 'POST' && response.url().endsWith('/capture'));
+          // DOT WAVE dispatches wallet-changed after capture; PlatformExperience
+          // reloads bootstrap asynchronously, potentially waiting Retry-After.
+          const refreshed = game.id === 'dot-wave' ? player.waitForResponse(response =>
+            response.url() === `${origin}/api/platform/bootstrap`
+            && response.request().method() === 'GET'
+            && response.frame() === player.mainFrame(), { timeout: readBudgetTimeout }) : null;
           if (game.id === 'dot-wave') {
             // Space on keydown opens a dialog that autofocuses Cancel; use the
             // rendered primary control here. Dedicated cases above cover keys.
@@ -466,7 +480,12 @@ for (const game of games) {
           expect(playerWrites.filter(url => url.endsWith('/release'))).toHaveLength(0);
           if (game.id === 'dot-wave') expect(playerEvents).toContainEqual({ type: 'dotWaveSoloStarted' });
           playerEvents.push({ type: 'authorized-phase', phase: await phase(player, game.id) });
-          await expect(player.locator('.platform-credit-badge')).toHaveText(String(playerBalance - 1));
+          if (refreshed) {
+            const response = await refreshed;
+            expect(response.ok()).toBe(true);
+            expect((await response.json()).wallet).toEqual(capture.wallet);
+          }
+          await expect(player.locator('.platform-credit-badge')).toHaveText(String(playerBalance - 1), { timeout: readBudgetTimeout });
           expect(await persistedWallet(player)).toBe(playerBalance - 1);
         }
         const balance = (await prepareGuest(page)).availableTotal;
@@ -497,11 +516,27 @@ for (const game of games) {
         expect(await persistedWallet(page)).toBe(balance);
         expect(writes).toHaveLength(0);
         if (!occupied) await expect(waiting).toBeVisible();
-        await leaveToDirectory(page, game.id, !occupied
-          ? '.spectator-availability .showcase-actions button:last-child'
-          : game.id === 'dot-wave' ? null : '#spectator-game-back');
-        expect(await persistedWallet(page)).toBe(balance);
-        expect(writes).toHaveLength(0);
+        // Exercise the same live spectator → directory path with a genuine
+        // Worker fetch on both attempts. Only the first read's status/header
+        // are instrumented; cookies, wallet and successful retry stay real.
+        const exitProbe = delayedReadProbe('/api/platform/bootstrap');
+        let exitScope;
+        if (delayedExit) {
+          await finishReadBudget(context);
+          exitScope = instrument(context, exitProbe.intercept);
+          await respectReadBudget(exitScope, testInfo);
+        }
+        try {
+          await leaveToDirectory(page, game.id, !occupied
+            ? '.spectator-availability .showcase-actions button:last-child'
+            : game.id === 'dot-wave' ? null : '#spectator-game-back');
+          if (delayedExit) exitProbe.verify();
+          expect(await wallet(page)).toBe(balance);
+          expect(await persistedWallet(page)).toBe(balance);
+          expect(writes).toHaveLength(0);
+        } finally {
+          if (exitScope) await finishReadBudget(exitScope);
+        }
       } finally {
         if (playerContext) {
           if (player && !player.isClosed()) {
@@ -595,12 +630,18 @@ for (const game of games.filter(game => game.id === 'graze-duel')) {
       await intent();
       await skipWelcome();
       await insufficient.getByRole('button', { name: '閉じる', exact: true }).click();
-      const grant = await page.evaluate(async () => {
-        const result = await (await import('/src/features/platform/platform-client.ts')).claimWelcomeCredit();
-        window.dispatchEvent(new Event('platform-wallet-changed'));
-        return result.wallet;
-      });
-      await expect(page.locator('.platform-credit-badge')).toHaveText(String(grant.availableTotal));
+      // Inject a >5s delay unless the Worker supplies its own Retry-After. Reads
+      // still reach the local Worker; only backpressure metadata is injected.
+      const probe = delayedReadProbe('/api/platform/bootstrap');
+      const scope = instrument(page.context(), probe.intercept);
+      await respectReadBudget(scope, test.info());
+      let grant;
+      try {
+        grant = await claimWelcomeAndRefresh(page);
+        probe.verify();
+      } finally {
+        await finishReadBudget(scope);
+      }
       await intent();
       const confirm = page.getByRole('dialog', { name: 'ゲームを開始しますか？', exact: true });
       await expect(confirm).toBeVisible();
