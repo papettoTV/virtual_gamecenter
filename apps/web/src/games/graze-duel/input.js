@@ -7,6 +7,8 @@ export function createInputController({ lifetime, canvas, keyboardTarget, getSta
   const keys = new Set();
   const touchMove = { active: false, startX: 0, startY: 0, x: 0, y: 0 };
   let pointerId = null;
+  let activeTouchId = null;
+  const directTouch = "ontouchstart" in canvas;
 
   scope.listen(keyboardTarget, "keydown", (event) => {
     if (event.repeat || (document.querySelector(".platform-overlay") || document.querySelector(".share-overlay"))) return;
@@ -23,33 +25,66 @@ export function createInputController({ lifetime, canvas, keyboardTarget, getSta
   });
   scope.listen(keyboardTarget, "keyup", (event) => keys.delete(event.code));
   scope.listen(canvas, "pointerdown", (event) => {
-    const state = getState();
-    if (state.waitingForStart || document.querySelector(".platform-overlay, .share-overlay")) return;
-    // Fullscreen stays active after rotation beyond the legacy compact width.
-    const fullscreen = canvas.closest?.('[data-mobile-play="true"]');
-    if ((state.compact || fullscreen) && (!state.spectator || state.versusParticipant)) {
+    if (directTouch && event.pointerType === "touch") return;
+    if (!touchMove.active && canStartTouch()) {
       event.preventDefault();
       canvas.setPointerCapture(event.pointerId);
       pointerId = event.pointerId;
-      touchMove.active = true;
-      touchMove.startX = event.clientX;
-      touchMove.startY = event.clientY;
-      updateTouchMove(event);
+      startTouchMove(event);
     }
   });
   scope.listen(canvas, "pointermove", (event) => {
-    if (touchMove.active) {
+    if (touchMove.active && activeTouchId === null && (event.pointerId === undefined || event.pointerId === pointerId)) {
       event.preventDefault();
       updateTouchMove(event);
     }
   });
-  scope.listen(canvas, "pointerup", resetTouchMove);
-  scope.listen(canvas, "pointercancel", resetTouchMove);
+  const finishPointer = (event) => {
+    if (pointerId !== null && (event.pointerId === undefined || event.pointerId === pointerId)) resetTouchMove();
+  };
+  scope.listen(canvas, "pointerup", finishPointer);
+  scope.listen(canvas, "pointercancel", finishPointer);
+  scope.listen(canvas, "lostpointercapture", finishPointer);
+  if (directTouch) {
+    scope.listen(canvas, "touchstart", (event) => {
+      if (touchMove.active || !canStartTouch()) return;
+      const touch = event.changedTouches[0];
+      if (!touch) return;
+      event.preventDefault();
+      activeTouchId = touch.identifier;
+      startTouchMove(touch);
+    }, { passive: false });
+    scope.listen(canvas, "touchmove", (event) => {
+      if (activeTouchId === null) return;
+      const touch = Array.from(event.changedTouches).find(candidate => candidate.identifier === activeTouchId);
+      if (!touch) return;
+      event.preventDefault();
+      updateTouchMove(touch);
+    }, { passive: false });
+    const finishTouch = (event) => {
+      if (activeTouchId !== null && Array.from(event.changedTouches).some(touch => touch.identifier === activeTouchId)) resetTouchMove();
+    };
+    scope.listen(canvas, "touchend", finishTouch);
+    scope.listen(canvas, "touchcancel", finishTouch);
+  }
   scope.own(() => {
-    if (pointerId !== null && canvas.hasPointerCapture(pointerId)) canvas.releasePointerCapture(pointerId);
     keys.clear();
     resetTouchMove();
   });
+
+  function canStartTouch() {
+    const state = getState();
+    if (state.waitingForStart || document.querySelector(".platform-overlay, .share-overlay")) return false;
+    const fullscreen = canvas.closest?.('[data-mobile-play="true"]');
+    return (state.compact || fullscreen) && (!state.spectator || state.versusParticipant);
+  }
+
+  function startTouchMove(position) {
+    touchMove.active = true;
+    touchMove.startX = position.clientX;
+    touchMove.startY = position.clientY;
+    updateTouchMove(position);
+  }
 
   function updateTouchMove(event) {
     const maxDistance = 72;
@@ -63,6 +98,10 @@ export function createInputController({ lifetime, canvas, keyboardTarget, getSta
   }
 
   function resetTouchMove() {
+    const capturedPointer = pointerId;
+    pointerId = null;
+    activeTouchId = null;
+    if (capturedPointer !== null && canvas.hasPointerCapture(capturedPointer)) canvas.releasePointerCapture(capturedPointer);
     touchMove.active = false;
     touchMove.startX = 0;
     touchMove.startY = 0;

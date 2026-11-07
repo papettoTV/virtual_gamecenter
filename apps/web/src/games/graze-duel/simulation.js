@@ -3,11 +3,11 @@ import { tickLevelUpLabel } from "./level-up-label";
 
 export function createSimulation({ state, settings }) {
   const { players, boss, particles } = state;
-  const { FIELD_TOP, FIELD_BOTTOM, FIELD_MARGIN, FIELD_WIDTH, PLAYER_SPEED_SCALE, PLAYER_TILT_MAX, PLAYER_TILT_LERP, MAX_PARTICLES } = settings;
+  const { FIELD_TOP, FIELD_BOTTOM, FIELD_MARGIN, FIELD_WIDTH, PLAYER_SPEED_SCALE, HUMAN_PLAYER_SPEED_SCALE = PLAYER_SPEED_SCALE, PLAYER_TILT_MAX, PLAYER_TILT_LERP, MAX_PARTICLES } = settings;
 
   function movePlayer(player, moveX, moveY, slow, delta) {
     const length = Math.hypot(moveX, moveY) || 1;
-    const speed = (slow ? 155 : 255) * PLAYER_SPEED_SCALE;
+    const speed = (slow ? 155 : 255) * (player.cpu ? PLAYER_SPEED_SCALE : HUMAN_PLAYER_SPEED_SCALE);
     player.targetTilt = clamp(moveX, -1, 1) * PLAYER_TILT_MAX;
     player.x += (moveX / length) * speed * delta;
     player.y += (moveY / length) * speed * delta;
