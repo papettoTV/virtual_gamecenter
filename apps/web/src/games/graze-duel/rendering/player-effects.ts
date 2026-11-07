@@ -17,11 +17,13 @@ export function shieldAppearance(ratio: number, remaining: number, elapsed: numb
 }
 
 export function drawPlayerShield(context: CanvasRenderingContext2D, x: number, y: number, radius: number) {
+  if (!(radius > 0)) return;
   context.save();
   const gradient = context.createRadialGradient(x, y, 0, x, y, radius);
   gradient.addColorStop(0, "rgba(105, 247, 255, 0.46)");
   gradient.addColorStop(0.48, "rgba(105, 247, 255, 0.28)");
-  gradient.addColorStop(1, "rgba(105, 247, 255, 0.12)");
+  gradient.addColorStop(0.78, "rgba(105, 247, 255, 0.12)");
+  gradient.addColorStop(1, "rgba(105, 247, 255, 0)");
   context.fillStyle = gradient;
   context.beginPath();
   context.arc(x, y, radius, 0, Math.PI * 2);
@@ -64,11 +66,5 @@ export function drawLevelUpLightning(context: CanvasRenderingContext2D, x: numbe
     }
     context.stroke();
   }
-  context.strokeStyle = "#ffffff";
-  context.lineWidth = 5;
-  context.globalAlpha *= 0.7;
-  context.beginPath();
-  context.arc(x, y, 72 - progress * 22, 0, Math.PI * 2);
-  context.stroke();
   context.restore();
 }

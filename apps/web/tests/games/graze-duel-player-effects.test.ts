@@ -7,7 +7,7 @@ import type { PlayerRenderState } from "../../src/games/graze-duel/rendering/sce
 function brush() {
   return {
     globalAlpha: 1, fillStyle: "", strokeStyle: "", lineWidth: 1, shadowBlur: 0, shadowColor: "",
-    save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), arc: vi.fn(), fill: vi.fn(), stroke: vi.fn(),
+    save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), closePath: vi.fn(), arc: vi.fn(), fill: vi.fn(), stroke: vi.fn(),
     moveTo: vi.fn(), lineTo: vi.fn(), translate: vi.fn(), rect: vi.fn(), clip: vi.fn(),
     createRadialGradient: vi.fn(() => ({ addColorStop: vi.fn() })),
   };
@@ -28,19 +28,23 @@ it("稲妻のフレーム上下限・10本各7節・決定性・終了を維持�
   expect(a.moveTo).toHaveBeenCalledTimes(10);
   expect(a.lineTo).toHaveBeenCalledTimes(70);
   expect(a.lineTo.mock.calls).toEqual(b.lineTo.mock.calls);
-  expect(a.stroke).toHaveBeenCalledTimes(11);
-  expect(a.arc).toHaveBeenCalledTimes(2);
+  expect(a.stroke).toHaveBeenCalledTimes(10);
+  expect(a.arc).toHaveBeenCalledTimes(1);
   const empty = brush();
   for (const remaining of [0, -1]) drawLevelUpLightning(asContext(empty), 0, 0, player.color, remaining);
   expect(empty.save).not.toHaveBeenCalled();
 });
 
-it("共有シールドは透明膜だけを描き縮小と透明点滅を維持する", () => {
+it("共有シールドは外側ほど透明になる単一の膜だけを描き縮小と透明点滅を維持する", () => {
   const context = brush();
   drawPlayerShield(asContext(context), 0, 0, 46);
   expect(context.createRadialGradient.mock.results[0]!.value.addColorStop.mock.calls).toEqual([
-    [0, "rgba(105, 247, 255, 0.46)"], [0.48, "rgba(105, 247, 255, 0.28)"], [1, "rgba(105, 247, 255, 0.12)"],
+    [0, "rgba(105, 247, 255, 0.46)"], [0.48, "rgba(105, 247, 255, 0.28)"], [0.78, "rgba(105, 247, 255, 0.12)"], [1, "rgba(105, 247, 255, 0)"],
   ]);
+  expect(context.createRadialGradient).toHaveBeenCalledOnce();
+  expect(context.fill).toHaveBeenCalledOnce();
+  expect(context.arc).toHaveBeenCalledWith(0, 0, 46, 0, Math.PI * 2);
+  expect(context.moveTo).not.toHaveBeenCalled();
   expect(context.stroke).not.toHaveBeenCalled();
   expect(shieldAppearance(1, 1, 0).radius - shieldAppearance(0, 1, 0).radius).toBe(28);
   expect(shieldAppearance(0, 0.5, 0).opacity).toBe(0.28);
