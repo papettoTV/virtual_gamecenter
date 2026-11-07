@@ -23,6 +23,7 @@ export interface SharePanelState {
   status: "loading" | "ready" | "error";
   result?: SharedResult;
   retry?: () => void;
+  compactLive?: boolean;
 }
 
 let panel: SharePanelState | null = null;
@@ -74,7 +75,8 @@ export async function getShareOrigin(): Promise<string> {
 
 export async function shareLive(context: LiveShareContext) {
   const shareId = createUuid();
-  const state: SharePanelState = { kind: "live", gameId: context.gameId, targetId: context.cabinetId, shareId, title: "観戦に招待", text: liveShareText(context), url: "", status: "loading" };
+  const compactLive = context.gameId === "graze-duel" && context.role === "player" && context.phase === "ready";
+  const state: SharePanelState = { kind: "live", gameId: context.gameId, targetId: context.cabinetId, shareId, title: compactLive ? "観戦リンクを共有" : "観戦に招待", text: liveShareText(context), url: "", status: "loading", compactLive };
   updatePanel(state);
   recordSharingEvent("share_opened", state);
   window.dispatchEvent(new CustomEvent("before-live-share", { detail: context }));

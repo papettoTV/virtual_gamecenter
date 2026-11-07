@@ -34,16 +34,18 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 412, height: 915 }
     const screen = await mount(page, 'graze-duel');
     // Resolve the real consent panel before exercising the invitation below it.
     await page.getByRole('button', { name: '拒否する', exact: true }).click();
+    await phase(page, 'graze-duel', 'ready');
     const invite = screen.getByRole('button', { name: '観戦に招待', exact: true });
     await expect(invite).toBeVisible();
-    await expect(screen.getByRole('button', { name: 'タップして開始（1枚）', exact: true })).toBeVisible();
+    await expect(screen.locator('.mobile-ready-start')).toHaveCount(0);
+    await expect(screen.getByRole('button', { name: 'ゲーム開始', exact: true })).toBeVisible();
     await expect(screen.locator('#touch-pause')).toBeHidden();
     await expect(screen.locator('.game-share-button')).toHaveCount(0);
     const frame = await screen.locator('.game-frame').boundingBox();
     expect(frame.height).toBeGreaterThan(Math.min(viewport.height * .72, 760));
     expect((await invite.boundingBox()).y).toBeGreaterThanOrEqual(frame.y + frame.height);
     await invite.click();
-    await expect(page.getByRole('dialog', { name: '観戦に招待', exact: true })).toBeVisible();
+    await expect(page.getByRole('dialog', { name: '観戦リンクを共有', exact: true })).toBeVisible();
     await page.getByRole('button', { name: '× 閉じる' }).click();
     await phase(page, 'graze-duel', 'playing');
     await expect(screen).toHaveAttribute('data-mobile-play', 'true');

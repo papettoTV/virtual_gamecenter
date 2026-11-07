@@ -155,7 +155,7 @@ for (const game of games) {
     });
     const cabinet = `${origin}/cabinets/${randomUUID()}?game=${game.id}&start=1`;
     const ready = game.id === 'dot-wave' ? 'intro' : 'ready';
-    const start = page.getByRole('button', { name: game.id === 'graze-duel' && isMobile ? 'タップして開始（1枚）' : game.button, exact: true });
+    const start = page.getByRole('button', { name: game.button, exact: true });
     await navigateGuest(page, cabinet);
     const balance = await wallet(page);
     await expect.poll(() => phase(page, game.id)).toBe(ready);
@@ -180,7 +180,7 @@ for (const game of games) {
         if (request.method() === 'POST' && request.url().includes('/api/platform/credit-reservations')) writes.push(request.url());
       });
       const cabinet = `${origin}/cabinets/${randomUUID()}?game=${game.id}&start=1`;
-      const start = page.getByRole('button', { name: game.id === 'graze-duel' && isMobile ? 'タップして開始（1枚）' : game.button, exact: true });
+      const start = page.getByRole('button', { name: game.button, exact: true });
       const ready = game.id === 'dot-wave' ? 'intro' : 'ready';
       await test.step('初回ready: 新document・bootstrap・phase', async () => {
         await navigateGuest(page, cabinet);
@@ -194,7 +194,7 @@ for (const game of games) {
         await expect(page.locator('#touch-pause')).toBeHidden();
         await expect(page.locator('.game-share-button')).toHaveCount(0);
         await page.getByRole('button', { name: '観戦に招待', exact: true }).tap();
-        const share = page.getByRole('dialog', { name: '観戦に招待', exact: true });
+        const share = page.getByRole('dialog', { name: '観戦リンクを共有', exact: true });
         await expect(share).toBeVisible();
         await expect.poll(() => phase(page, game.id)).toBe(ready);
         expect(writes).toHaveLength(0);
@@ -213,6 +213,44 @@ for (const game of games) {
           body: await page.screenshot({ fullPage: true }), contentType: 'image/png',
         });
         if (game.id === 'graze-duel' && isMobile) {
+          const invite = dialog.getByRole('button', { name: '観戦用画面を共有' });
+          const confirm = dialog.getByRole('button', { name: '1クレジットで開始' });
+          const inviteBox = await invite.boundingBox();
+          const confirmBox = await confirm.boundingBox();
+          expect(inviteBox.y + inviteBox.height).toBeLessThan(confirmBox.y);
+          expect(confirmBox.x + confirmBox.width).toBeCloseTo(inviteBox.x + inviteBox.width, 0);
+          await invite.tap();
+          const sharing = page.getByRole('dialog', { name: '観戦リンクを共有' });
+          for (const name of ['Xに投稿', 'Facebookに投稿', '投稿文とリンクをコピー']) {
+            const action = sharing.getByRole('button', { name, exact: true });
+            await expect(action).toBeVisible();
+            await expect(action.locator('svg')).toBeVisible();
+          }
+          await expect(sharing.locator('textarea, .social-preview, .share-url')).toHaveCount(0);
+          await page.evaluate(() => {
+            window.startShareLinks = [];
+            window.open = url => { window.startShareLinks.push(String(url)); return null; };
+            Object.defineProperty(navigator, 'clipboard', {
+              configurable: true, value: { writeText: async text => { window.startShareCopied = text; } },
+            });
+          });
+          await sharing.getByRole('button', { name: 'Xに投稿' }).tap();
+          await sharing.getByRole('button', { name: 'Facebookに投稿' }).tap();
+          await sharing.getByRole('button', { name: '投稿文とリンクをコピー' }).tap();
+          await expect(sharing.getByText('コピーしました。')).toBeVisible();
+          const { links, copied } = await page.evaluate(() => ({ links: window.startShareLinks, copied: window.startShareCopied }));
+          const [x, facebook] = links.map(url => new URL(url));
+          expect(x.origin + x.pathname).toBe('https://x.com/intent/tweet');
+          expect(facebook.origin + facebook.pathname).toBe('https://www.facebook.com/sharer/sharer.php');
+          const watchUrl = x.searchParams.get('url');
+          expect(new URL(watchUrl).searchParams.get('watch')).toBe('1');
+          expect(facebook.searchParams.get('u')).toBe(watchUrl);
+          expect(copied).toBe(x.searchParams.get('text') + '\n' + watchUrl);
+          await page.keyboard.press('Escape');
+          await expect(sharing).toBeHidden();
+          await expect(invite).toBeFocused();
+          await invite.blur();
+          expect(await wallet(page)).toBe(balance);
           await start.evaluate(button => {
             for (const pointerId of [1, 2]) button.dispatchEvent(new PointerEvent('pointerdown', { pointerId, bubbles: true }));
             button.click(); button.click();
@@ -374,7 +412,7 @@ for (const game of games) {
   test(`${game.id}: failed capture keeps play stopped and releases the unused reservation`, async ({ page, isMobile }) => {
     await prepareGuest(page);
     await navigateGuest(page, `${origin}/cabinets/${randomUUID()}?game=${game.id}`);
-    const start = page.getByRole('button', { name: game.id === 'graze-duel' && isMobile ? 'タップして開始（1枚）' : game.button, exact: true });
+    const start = page.getByRole('button', { name: game.button, exact: true });
     if (isMobile || game.id === 'dot-wave') { await expect(start).toBeVisible(); await expect(start).toBeEnabled(); }
     await expect.poll(() => phase(page, game.id)).toBe(game.id === 'dot-wave' ? 'intro' : 'ready');
     const balance = await wallet(page);
@@ -501,7 +539,7 @@ for (const game of games) {
           if (game.id === 'dot-wave') await expect(page.locator('.dot-cabinet-bar > span')).toContainText('観戦中');
           else await expect(page.locator('#spectator-banner')).toBeVisible();
         }
-        const start = page.getByRole('button', { name: game.id === 'graze-duel' && isMobile ? 'タップして開始（1枚）' : game.button, exact: true });
+        const start = page.getByRole('button', { name: game.button, exact: true });
         const dialog = page.getByRole('dialog', { name: 'ゲームを開始しますか？' });
         await expect(start).toBeHidden();
         await expect(dialog).toBeHidden();
@@ -589,14 +627,14 @@ for (const game of games.filter(game => game.id === 'graze-duel')) {
         await expect(page.locator('#touch-pause')).toBeHidden();
         await expect(page.locator('.game-share-button')).toHaveCount(0);
         await page.getByRole('button', { name: '観戦に招待', exact: true }).tap();
-        const share = page.getByRole('dialog', { name: '観戦に招待', exact: true });
+        const share = page.getByRole('dialog', { name: '観戦リンクを共有', exact: true });
         await expect(share).toBeVisible();
         await expect.poll(() => phase(page, game.id)).toBe(ready);
         expect(writes).toHaveLength(0);
         await share.getByRole('button', { name: '× 閉じる' }).tap();
       }
       const intent = async () => {
-        if (isMobile) await page.getByRole('button', { name: game.id === 'graze-duel' && isMobile ? 'タップして開始（1枚）' : game.button, exact: true }).tap();
+        if (isMobile) await page.getByRole('button', { name: game.button, exact: true }).tap();
         else {
           await page.locator('body').click({ position: { x: 2, y: 2 } });
           await page.keyboard.press(game.key);

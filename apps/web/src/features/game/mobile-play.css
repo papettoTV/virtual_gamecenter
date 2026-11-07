@@ -108,38 +108,23 @@ body:has(#game-screen[data-mobile-play][data-game-id="graze-duel"]) .notificatio
   white-space: nowrap;
 }
 
-/* READY reuses the height formerly occupied by the external start row. */
 #game-screen[data-tap-ready] > .touch-controls { display: none; }
+#game-screen .buzz-ready-trigger {
+  position: absolute;
+  top: 60px;
+  right: 8px;
+  z-index: 6;
+  width: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  font-size: 22px;
+}
 #game-screen[data-tap-ready] #game {
   height: min(calc(72vh + 48px), 808px);
   aspect-ratio: auto;
   object-fit: cover;
 }
-.mobile-ready-start {
-  position: absolute;
-  inset: 0;
-  z-index: 4;
-  width: 100%;
-  border: 0;
-  border-radius: 20px;
-  background: transparent;
-  color: #fff;
-  font: inherit;
-  font-weight: 800;
-  cursor: pointer;
-  touch-action: manipulation;
-}
-.mobile-ready-start span {
-  position: absolute;
-  left: 50%;
-  top: 65%;
-  transform: translateX(-50%);
-  white-space: nowrap;
-  padding: 12px;
-  border-radius: 10px;
-  background: #101827;
-}
-.mobile-ready-start:focus-visible { outline: 3px solid #69f7ff; outline-offset: -4px; }
 /* The account stays at the page top instead of following over game content. */
 body.is-game-screen:has(#game-screen[data-game-id="graze-duel"]) .platform-profile { position: absolute; }
 @media (max-width: 820px), (pointer: coarse) {

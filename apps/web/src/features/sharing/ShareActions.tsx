@@ -127,7 +127,7 @@ export function SharePanel() {
   if (!panel) return null;
   const track = (event: "share_target_opened" | "share_link_copied" | "share_native_handoff" | "share_image_saved", channel: string) => recordSharingEvent(event, panel, channel);
   const openTarget = (target: SocialTarget) => {
-    window.open(createSocialShareUrl(target, text, panel.url), "_blank", "noopener,noreferrer"); track("share_target_opened", target);
+    window.open(createSocialShareUrl(target, panel.compactLive ? panel.text : text, panel.url), "_blank", "noopener,noreferrer"); track("share_target_opened", target);
   };
   const copy = async (value: string) => {
     try {
@@ -155,11 +155,24 @@ export function SharePanel() {
     } finally { if (sharing.current === panel) sharing.current = null; }
   };
   return <div className="share-overlay" onKeyDown={event => event.stopPropagation()} onKeyUp={event => event.stopPropagation()} onClick={event => event.stopPropagation()} onPointerDown={event => event.stopPropagation()}>
-    <section className={`share-dialog ${panel.kind === "result" ? "share-result-dialog" : ""}`} role="dialog" aria-modal="true" aria-labelledby="share-title">
+    <section className={`share-dialog ${panel.kind === "result" ? "share-result-dialog" : panel.compactLive ? "share-compact-live" : ""}`} role="dialog" aria-modal="true" aria-labelledby="share-title">
       <header className="share-heading"><button ref={closeButton} className="share-close" type="button" onClick={sharePanel.close}>× 閉じる</button>
       <h2 id="share-title">{panel.title}</h2></header>
       <div className="share-body">
-      {panel.status === "loading" ? <p role="status">共有URLを準備しています…</p> : panel.status === "error" ? <><p role="alert">結果を保存できませんでした。ゲームはそのまま続けられます。</p><button type="button" onClick={panel.retry}>再試行</button></> : <>
+      {panel.status === "loading" ? <p role="status">共有URLを準備しています…</p> : panel.status === "error" ? <><p role="alert">結果を保存できませんでした。ゲームはそのまま続けられます。</p><button type="button" onClick={panel.retry}>再試行</button></> : panel.compactLive ? <div className="share-compact-actions">
+        <button type="button" onClick={() => openTarget("x")}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.9 2H22l-6.8 7.8L23 22h-6.2l-4.9-7.4L5.4 22H2.3l7.3-8.4L1 2h6.4l4.5 6.8L18.9 2Zm-1.1 18h1.7L6.4 4H4.6l13.2 16Z" /></svg>
+          Xに投稿
+        </button>
+        <button type="button" onClick={() => openTarget("facebook")}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M24 12a12 12 0 1 0-13.9 11.9v-8.4H7V12h3.1V9.4c0-3.1 1.8-4.8 4.6-4.8 1.4 0 2.8.2 2.8.2v3h-1.6c-1.5 0-2 1-2 1.9V12h3.4l-.5 3.5h-2.9v8.4A12 12 0 0 0 24 12Z" /></svg>
+          Facebookに投稿
+        </button>
+        <button type="button" onClick={() => void copy(`${panel.text}\n${panel.url}`)}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></svg>
+          投稿文とリンクをコピー
+        </button>
+      </div> : <>
         {panel.result && <div className="share-result-preview" aria-label="公開する結果">
           <ResultCard result={panel.result} playerName={panel.result.playerName} />
           <small>保存済みの結果と表示名はURLを知る人が閲覧できます。リンクカードの画像はゲーム共通です。</small>

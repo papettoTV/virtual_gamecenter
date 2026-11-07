@@ -65,16 +65,13 @@ export function GameScreen({ game }: GameScreenProps) {
           </svg>
         </button>}
         <canvas id="game" width="960" height="640" aria-label={`${game.title} game canvas`} />
-        {tapReady && <button className="mobile-ready-start" type="button"
-          onPointerDown={event => event.stopPropagation()}
-          onKeyDown={event => { if (event.code === "Space" || event.code === "Enter") event.stopPropagation(); }}
-          onKeyUp={event => { if (event.code === "Space" || event.code === "Enter") event.stopPropagation(); }}
-          onClick={event => {
-            event.stopPropagation();
-            if (document.querySelector(".platform-overlay, .share-overlay, .platform-profile-menu")) return;
-            gameHost.requestPlay("start");
+        {tapReady && <button className="touch-button buzz-ready-trigger" type="button" aria-label="ゲーム開始"
+          onKeyDown={event => event.stopPropagation()}
+          onKeyUp={event => event.stopPropagation()}
+          onClick={() => {
+            if (!document.querySelector(".platform-overlay, .share-overlay, .platform-profile-menu")) gameHost.requestPlay("start");
           }}>
-          <span>タップして開始（{game.creditCost}枚）</span>
+          <span aria-hidden="true">▶</span>
         </button>}
         {game.id === "graze-duel" && <BuzzPauseOverlay compact={play.mobile || play.active} />}
         <FrameIntro game={game} />
