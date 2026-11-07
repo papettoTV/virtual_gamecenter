@@ -55,6 +55,37 @@ async function registered(cookie: string, subject: string) {
   await registerGoogleAccount(env.DB, { playerId: identity.playerId, token: cookie.split("=")[1]!, secureCookie: false }, { sub: subject, name: "Session test" });
 }
 
+for (const leaveFirst of [false, true]) {
+  for (const explicitCode of [false, true]) {
+    it(`replies to peer Close (leave=${leaveFirst}, explicit code=${explicitCode}) and preserves spectators`, async () => {
+      const cabinet = crypto.randomUUID();
+      const host = await connect(await player(), cabinet, false, "deep-sea-salvage");
+      const viewer = await connect(await player(), cabinet, true, "deep-sea-salvage");
+      const closed = new Promise<{ code: number; wasClean: boolean }>(resolve => {
+        host.socket.addEventListener("close", event => resolve({ code: event.code, wasClean: event.wasClean }), { once: true });
+      });
+      if (leaveFirst) {
+        host.send({ type: "leaveCabinet" });
+        await viewer.next("playerLeft");
+        // leaveCabinet is not a transport shutdown: a caller may rejoin this socket.
+        host.send({ type: "joinCabinet", gameId: "deep-sea-salvage" });
+        await host.next("joinedCabinet");
+        host.send({ type: "leaveCabinet" });
+      }
+      if (explicitCode) host.socket.close(1000, "normal exit");
+      else host.socket.close();
+      const event = await closed;
+      // Automatic replies may echo an empty Close (1005); the explicit reply uses 1000.
+      expect(explicitCode ? [1000] : [1000, 1005]).toContain(event.code);
+      expect(event.wasClean).toBe(true);
+      await viewer.next("playerLeft");
+      viewer.send({ type: "clockPing", sentAt: 123 });
+      expect((await viewer.next("clockPong")).sentAt).toBe(123);
+      expect((await viewer.next("cabinetState", message => message.state.playerCount === 0)).state.spectatorCount).toBe(1);
+    });
+  }
+}
+
 it("logout closes this session's cabinets but preserves spectators and another device", async () => {
   const subject = crypto.randomUUID();
   const hostCookie = await player();
