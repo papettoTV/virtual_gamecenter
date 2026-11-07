@@ -1,6 +1,13 @@
 import { test, expect } from '../../../../ci/ui-fixtures.mjs';
 import { respectReadBudget, finishReadBudget, readBudgetTimeout } from './api-read-budget.mjs';
 
+import { claimWelcomeAndRefresh } from './welcome-wallet.mjs';
+import { instrument, backpressure, delayedReadProbe } from './read-budget-instrument.mjs';
+
+test.beforeEach(async ({}, testInfo) => {
+  testInfo.setTimeout(testInfo.timeout + readBudgetTimeout);
+});
+
 const origin = 'http://127.0.0.1:5174';
 async function loadGuest(page, context, testInfo) {
   await respectReadBudget(context, testInfo);
@@ -19,67 +26,16 @@ const deferred = () => {
   return { promise, resolve };
 };
 
-// Instrument actual Playwright Routes, not a fake route lifecycle. Every fetch
-// still reaches the disposable Worker; only the first read's backpressure is
-// injected, so this is deterministic without exhausting other cases' IP budget.
-function instrument(context, intercept) {
-  let wrapped;
-  let owner;
-  let owned = 0;
-  return {
-    async route(pattern, handler) {
-      owner = handler;
-      wrapped = async route => {
-        owned++;
-        const fetch = route.fetch.bind(route);
-        route.fetch = options => intercept(() => fetch(options));
-        try { await handler(route); } finally { owned--; }
-      };
-      await context.route(pattern, wrapped);
-    },
-    async unroute(pattern, handler) {
-      expect(handler).toBe(owner);
-      expect(owned, 'unroute must follow completion of owned Playwright routes').toBe(0);
-      await context.unroute(pattern, wrapped);
-    },
-  };
-}
-function backpressure(response, seconds) {
-  return new Proxy(response, {
-    get(target, key) {
-      if (key === 'status') return () => 429;
-      if (key === 'headers') return () => ({ ...target.headers(), 'retry-after': String(seconds) });
-      const value = Reflect.get(target, key);
-      return typeof value === 'function' ? value.bind(target) : value;
-    },
-  });
-}
-
 test('welcome refresh survives one Retry-After and renders the real wallet', async ({ page, context }, testInfo) => {
   test.setTimeout(120000);
   // Bootstrap the real guest, including its HttpOnly session cookie.
   await loadGuest(page, context, testInfo);
-  const reads = [];
-  const scope = instrument(context, async fetch => {
-    const response = await fetch();
-    reads.push(response.status());
-    return reads.length === 1 ? backpressure(response, 6) : response;
-  });
+  const probe = delayedReadProbe('/api/platform/bootstrap');
+  const scope = instrument(context, probe.intercept);
   await respectReadBudget(scope, testInfo);
   try {
-    const refreshed = page.waitForResponse(response => response.url() === `${origin}/api/platform/bootstrap`, { timeout: readBudgetTimeout });
-    const started = Date.now();
-    const wallet = await page.evaluate(async () => {
-      const { claimWelcomeCredit } = await import('/src/features/platform/platform-client.ts');
-      const result = await claimWelcomeCredit();
-      window.dispatchEvent(new Event('platform-wallet-changed'));
-      return result.wallet;
-    });
-    const response = await refreshed;
-    expect(response.ok()).toBe(true);
-    expect(Date.now() - started).toBeGreaterThanOrEqual(6000);
-    expect(reads).toEqual([200, 200]);
-    expect((await response.json()).wallet).toEqual(wallet);
+    const wallet = await claimWelcomeAndRefresh(page);
+    probe.verify();
     await expect(page.locator('.platform-credit-badge')).toHaveText(String(wallet.availableTotal));
     const persisted = await page.evaluate(async () => (await (await fetch('/api/platform/credits')).json()).wallet);
     expect(persisted).toEqual(wallet);
