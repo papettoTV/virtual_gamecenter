@@ -18,9 +18,8 @@
 .buzz-pause-hint { margin: 0 0 20px; color: #b5eaf0; font-size: 14px; line-height: 1.7; }
 .buzz-pause-instructions { margin: 0 0 24px; padding: 0; list-style: none; text-align: left; font-size: 14px; line-height: 1.9; }
 .buzz-pause-actions { display: grid; gap: 10px; }
-.buzz-pause-resume { min-height: 52px; width: 100%; border: 1px solid #69f7ff; border-radius: 12px; background: #214c59; color: #ecfeff; font-size: 19px; font-weight: 700; }
 .buzz-pause-leave { min-height: 44px; justify-self: center; padding: 8px 16px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: #abb8ce; font-size: 14px; font-weight: 400; }
-.buzz-pause-resume:focus-visible, .buzz-pause-leave:focus-visible { outline: 2px solid #69f7ff; outline-offset: 3px; }
+.buzz-pause-leave:focus-visible { outline: 2px solid #69f7ff; outline-offset: 3px; }
 @media (max-height: 480px) {
   .buzz-pause-overlay { padding: 16px; place-items: start center; }
   .buzz-pause-content h2 { margin-bottom: 10px; }

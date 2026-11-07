@@ -121,24 +121,28 @@ describe("BUZZ BARRIER instance lifecycle", () => {
     expect(await instance.play("retry", "reservation")).toBe(false);
   });
 
-  it("resumes through the central button event without starting READY or pausing a running game", async () => {
+  it("keeps the top pause/resume button, Space and READY credit confirmation working", async () => {
+    const pauseButton = Object.assign(new EventTarget(), { textContent: "", dataset: {}, setAttribute: vi.fn() });
+    const previousDocument = document;
+    vi.stubGlobal("document", { ...previousDocument, querySelector: (selector: string) => selector === "#touch-pause" ? pauseButton : previousDocument.querySelector(selector) });
     const lifetime = new GameLifetime();
     const instance = mountGame({ game: BUZZ_BARRIER, lifetime });
     await instance.prepareSolo?.();
-    keyboard.dispatchEvent(new Event("request-buzz-resume"));
-    expect(mocks.requestPlay).not.toHaveBeenCalled();
+    pauseButton.dispatchEvent(new Event("click"));
+    expect(mocks.requestPlay).toHaveBeenCalledWith("start");
     await instance.play("start", "reservation");
-    keyboard.dispatchEvent(new Event("request-buzz-resume"));
-    const pausedCount = () => mocks.send.mock.calls.flatMap(([message]) => message.events ?? []).filter(event => event.type === "pauseChanged" && event.paused === false).length;
-    const before = pausedCount();
+    expect(pauseButton.textContent).toBe("一時停止");
+    pauseButton.dispatchEvent(new Event("click"));
+    expect(pauseButton.textContent).toBe("再開");
+    pauseButton.dispatchEvent(new Event("click"));
+    expect(pauseButton.textContent).toBe("一時停止");
     keyboard.dispatchEvent(keyEvent("Space"));
-    keyboard.dispatchEvent(new Event("request-buzz-resume"));
-    expect(pausedCount()).toBe(before + 1);
-    keyboard.dispatchEvent(new Event("request-buzz-resume"));
-    expect(pausedCount()).toBe(before + 1);
+    expect(pauseButton.textContent).toBe("再開");
+    keyboard.dispatchEvent(keyEvent("Space"));
+    expect(pauseButton.textContent).toBe("一時停止");
     instance.dispose();
     const sent = mocks.send.mock.calls.length;
-    keyboard.dispatchEvent(new Event("request-buzz-resume"));
+    pauseButton.dispatchEvent(new Event("click"));
     expect(mocks.send).toHaveBeenCalledTimes(sent);
   });
 

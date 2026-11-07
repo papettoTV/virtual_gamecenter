@@ -17,7 +17,6 @@ export function BuzzPausePanel({ context, compact }: { context: LiveShareContext
         {presentation.instructions.map(instruction => <li key={instruction}>{instruction}</li>)}
       </ul>}
       <div className="buzz-pause-actions">
-        {!spectator && <button className="buzz-pause-resume" type="button" onClick={() => window.dispatchEvent(new Event("request-buzz-resume"))}>▶ 再開</button>}
         <button className="buzz-pause-leave" type="button" onClick={() => navigate("/")}>{spectator ? "ほかのゲームを見る" : "別のゲームをする"}</button>
       </div>
     </div>}

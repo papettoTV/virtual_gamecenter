@@ -689,12 +689,6 @@ export function mountGame(context) {
     });
   }
 
-  scope.listen(window, "request-buzz-resume", () => {
-    if (currentScreen !== "game" || !paused || waitingForStart || gameOver) return;
-    if (cabinetRole === "spectator" && !isVersusParticipant()) return;
-    togglePauseState();
-  });
-
   if (rankingSubmitButton) {
     scope.listen(rankingSubmitButton, "click", () => {
       submitRanking();

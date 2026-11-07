@@ -8,12 +8,12 @@ const context: LiveShareContext = { gameId: "graze-duel", cabinetId: "test", rol
 const render = (state: LiveShareContext | null, compact = true) => renderToStaticMarkup(createElement(BuzzPausePanel, { context: state, compact }));
 
 describe("BUZZ BARRIER pause overlay", () => {
-  it("puts the real resume button before the quieter leave action and names the icon accurately", () => {
+  it("only points to the upper-right resume icon and keeps the leave action quiet", () => {
     const html = render(context);
     expect(html).toContain('role="region" aria-label="一時停止"');
-    expect(html).toContain('class="buzz-pause-resume" type="button">▶ 再開</button>');
+    expect(html).not.toContain("buzz-pause-resume");
     expect(html).toContain('class="buzz-pause-leave" type="button">別のゲームをする</button>');
-    expect(html.indexOf("buzz-pause-resume")).toBeLessThan(html.indexOf("buzz-pause-leave"));
+    expect(html).not.toContain("中央");
     expect(html).toContain("右上の「▶」");
     expect(html).toContain("ゲーム画面をスライド");
     expect(html).not.toContain("「再開」ボタンでゲーム再開");
