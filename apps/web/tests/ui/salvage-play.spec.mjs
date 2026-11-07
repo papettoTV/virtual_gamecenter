@@ -1,6 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import { test, expect } from '../../../../ci/ui-fixtures.mjs';
 
+import { claimWelcomeAndRefresh } from './welcome-wallet.mjs';
+import { respectReadBudget, finishReadBudget, readBudgetTimeout } from './api-read-budget.mjs';
+
+test.beforeEach(async ({ context }, testInfo) => {
+  testInfo.setTimeout(testInfo.timeout + readBudgetTimeout);
+  await respectReadBudget(context, testInfo);
+});
+test.afterEach(async ({ context }) => { await finishReadBudget(context); });
+
 const origin = 'http://127.0.0.1:5174';
 const phase = page => page.evaluate(async () =>
   (await import('/src/features/sharing/share-service.ts')).liveSharing.getSnapshot()?.phase);
@@ -14,14 +23,13 @@ async function prepare(page) {
     socket.on('close', () => sockets.delete(socket));
   });
   await page.setViewportSize({ width: 390, height: 844 });
-  const bootstrap = page.waitForResponse(r => r.url() === `${origin}/api/platform/bootstrap` && r.request().method() === 'GET', { timeout: 10000 });
+  const bootstrap = page.waitForResponse(r => r.url() === `${origin}/api/platform/bootstrap` && r.request().method() === 'GET', { timeout: readBudgetTimeout });
   await page.goto(origin, { waitUntil: 'domcontentloaded' });
   const bootstrapResponse = await bootstrap;
   expect(bootstrapResponse.ok()).toBe(true);
   const account = await bootstrapResponse.json();
-  if (!account.welcomeCreditGranted) await page.evaluate(async () =>
-    (await import('/src/features/platform/platform-client.ts')).claimWelcomeCredit());
-  const loaded = page.waitForResponse(r => r.url() === `${origin}/api/platform/bootstrap` && r.request().method() === 'GET', { timeout: 10000 });
+  if (!account.welcomeCreditGranted) await claimWelcomeAndRefresh(page);
+  const loaded = page.waitForResponse(r => r.url() === `${origin}/api/platform/bootstrap` && r.request().method() === 'GET', { timeout: readBudgetTimeout });
   await page.goto(`${origin}/cabinets/${randomUUID()}?game=deep-sea-salvage`, { waitUntil: 'domcontentloaded' });
   const loadedResponse = await loaded;
   expect(loadedResponse.ok()).toBe(true);
