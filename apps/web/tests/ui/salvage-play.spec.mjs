@@ -16,6 +16,19 @@ const phase = page => page.evaluate(async () =>
 
 // Independent guests keep each scenario below the runner's normal case timeout.
 async function prepare(page) {
+  // Observe native close events; Playwright's websocket 'close' omits code/wasClean.
+  await page.addInitScript(() => {
+    window.cabinetCloseEvents = [];
+    const NativeWebSocket = window.WebSocket;
+    window.WebSocket = class extends NativeWebSocket {
+      constructor(...args) {
+        super(...args);
+        if (/\/api\/cabinets\/[^/]+\/ws\?/.test(this.url)) {
+          this.addEventListener('close', event => window.cabinetCloseEvents.push({ code: event.code, wasClean: event.wasClean }));
+        }
+      }
+    };
+  });
   const sockets = new Set();
   page.on('websocket', socket => {
     if (!/^\/api\/cabinets\/[^/]+\/ws$/.test(new URL(socket.url()).pathname)) return;
@@ -219,6 +232,7 @@ test('salvage: restore, reenter fullscreen and exit directly with connection cle
   await expect(screen).toHaveCount(0);
   await expect.poll(() => phase(page)).toBeUndefined();
   await expect.poll(() => sockets.size).toBe(0);
+  await expect.poll(() => page.evaluate(() => window.cabinetCloseEvents)).toEqual([{ code: 1000, wasClean: true }]);
   await expect.poll(scrollState).toEqual({ fixed: false, hidden: false, inert: 0, fullscreen: false });
   await expect(page.locator('.platform-credit-badge')).toHaveText(String(localAccount.wallet.availableTotal - 1));
   expect(await page.evaluate(async () => {
@@ -230,4 +244,36 @@ test('salvage: restore, reenter fullscreen and exit directly with connection cle
   expect(writes.filter(u => u.endsWith('/credit-reservations'))).toHaveLength(1);
   expect(writes.filter(u => u.endsWith('/capture'))).toHaveLength(1);
   expect(writes.filter(u => u.endsWith('/release'))).toHaveLength(0);
+});
+
+test('salvage: native peer Close with and without leaveCabinet and explicit code', async ({ page }) => {
+  await prepare(page);
+  for (const leaveFirst of [false, true]) {
+    for (const explicitCode of [false, true]) {
+      const result = await page.evaluate(async ({ cabinet, leaveFirst, explicitCode }) => {
+        return new Promise((resolve, reject) => {
+          const socket = new WebSocket(`ws://${location.host}/api/cabinets/${cabinet}/ws?gameId=deep-sea-salvage`);
+          let joined = false;
+          const timeout = setTimeout(() => { socket.close(); reject(Error('Native close handshake timed out')); }, 5000);
+          socket.addEventListener('open', () => socket.send(JSON.stringify({ type: 'joinCabinet', gameId: 'deep-sea-salvage', watch: true })));
+          socket.addEventListener('message', event => {
+            if (JSON.parse(event.data).type !== 'joinedCabinet' || joined) return;
+            joined = true;
+            if (leaveFirst) socket.send(JSON.stringify({ type: 'leaveCabinet' }));
+            if (explicitCode) socket.close(1000, 'normal exit');
+            else socket.close();
+          });
+          socket.addEventListener('close', event => {
+            clearTimeout(timeout);
+            if (!joined) reject(Error('Connection closed before joinedCabinet'));
+            else resolve({ code: event.code, wasClean: event.wasClean, state: socket.readyState });
+          });
+        });
+      }, { cabinet: randomUUID(), leaveFirst, explicitCode });
+      // An empty Close may be echoed by the runtime as 1005 (no status).
+      expect(explicitCode ? [1000] : [1000, 1005]).toContain(result.code);
+      expect(result.wasClean).toBe(true);
+      expect(result.state).toBe(3);
+    }
+  }
 });

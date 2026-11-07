@@ -115,7 +115,7 @@ export function createCabinetClient(handlers: CabinetClientHandlers = {}): Cabin
       generation++;
       connecting = false;
       wantsCabinet = false;
-      socket?.close();
+      socket?.close(1000, "Cabinet changed");
       socket = null;
       cabinetId = nextCabinetId;
       gameId = nextGameId;
@@ -130,7 +130,7 @@ export function createCabinetClient(handlers: CabinetClientHandlers = {}): Cabin
     wantsCabinet = false;
     if (reconnectTimer) clearTimeout(reconnectTimer);
     if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "leaveCabinet" }));
-    socket?.close();
+    socket?.close(1000, "Cabinet left");
     socket = null;
     cabinetId = null;
     gameId = null;
