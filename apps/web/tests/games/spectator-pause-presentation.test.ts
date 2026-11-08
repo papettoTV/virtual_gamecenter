@@ -23,7 +23,7 @@ describe("BUZZ BARRIERの開始・再開待ち", () => {
     for (const waitingForStart of [true, false]) {
       const presentation = getPausePresentation({ cabinetRole: "player", compact, waitingForStart });
       expect(presentation.instructions).toHaveLength(compact ? 2 : 3);
-      expect(presentation.action).toContain(waitingForStart ? "ゲーム開始" : "再開");
+      expect(presentation.action).toContain(waitingForStart ? (compact ? "右上の「▶」をタップして開始" : "ゲーム開始") : "再開");
       expect(presentation.instructions.join(" ")).toContain(compact ? "スライド" : "WASD");
     }
   });

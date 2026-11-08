@@ -9,7 +9,7 @@ import type { PlayAction } from "../../game-sdk/contracts";
 import { gameHost } from "../../game-sdk/game-host";
 import { executePlay } from "./play-service";
 import { notifications } from "../notifications/notifications";
-import { liveSharing, shareLive } from "../sharing/share-service";
+import { liveSharing, shareLive, sharePanel } from "../sharing/share-service";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DataDeletionDialog } from "./DataDeletionDialog";
 import {
@@ -148,6 +148,7 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
   useEffect(() => {
     if (!playDialog && !welcomeDialogOpen && !purchaseDialog) return;
     const blockGameInput = (event: KeyboardEvent) => {
+      if (sharePanel.getSnapshot()) return;
       if (event.code === "Escape" && playDialog) {
         event.preventDefault(); cancelPlay();
       }
@@ -325,7 +326,25 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
       {playDialog && (
         <div className="platform-overlay" role="dialog" aria-modal="true" aria-labelledby="play-credit-title">
           <div className="platform-dialog platform-dialog-small">
-            <p className="eyebrow">1 Credit</p>
+            <div className="play-credit-header">
+              <p className="eyebrow">1 Credit</p>
+              {playDialog === "confirm" && (
+                <button
+                  className="cabinet-share-button platform-share-icon-button"
+                  type="button"
+                  aria-label="観戦用画面を共有"
+                  title="観戦用画面を共有"
+                  onClick={event => { event.currentTarget.focus(); void shareCabinetUrl(); }}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="18" cy="5" r="3" />
+                    <circle cx="6" cy="12" r="3" />
+                    <circle cx="18" cy="19" r="3" />
+                    <path d="m8.7 10.7 6.6-4.2M8.7 13.3l6.6 4.2" />
+                  </svg>
+                </button>
+              )}
+            </div>
             <h2 id="play-credit-title">
               {playDialog === "confirm" ? "ゲームを開始しますか？" : "クレジットが不足しています"}
             </h2>
@@ -340,22 +359,6 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
               </p>
             )}
             <div className={`platform-dialog-actions play-credit-actions${playDialog === "confirm" ? " is-confirm" : ""}`}>
-              {playDialog === "confirm" && (
-                <button
-                  className="cabinet-share-button platform-share-icon-button"
-                  type="button"
-                  aria-label="観戦用画面を共有"
-                  title="観戦用画面を共有"
-                  onClick={() => void shareCabinetUrl()}
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <circle cx="18" cy="5" r="3" />
-                    <circle cx="6" cy="12" r="3" />
-                    <circle cx="18" cy="19" r="3" />
-                    <path d="m8.7 10.7 6.6-4.2M8.7 13.3l6.6 4.2" />
-                  </svg>
-                </button>
-              )}
               <button className="platform-cancel-button" type="button" disabled={busy} onClick={cancelPlay}>
                 {playDialog === "confirm" ? "キャンセル" : purchasesEnabled ? "いいえ" : "閉じる"}
               </button>

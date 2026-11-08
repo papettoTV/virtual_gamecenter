@@ -89,7 +89,7 @@ for (const size of sizes) {
     await enter(page, 'graze-duel');
     await expect(page.locator('#game-screen')).toBeVisible();
     if (await page.evaluate(() => matchMedia('(max-width: 820px), (pointer: coarse)').matches)) {
-      await page.getByRole('button', { name: 'タップして開始（1枚）', exact: true }).click();
+      await page.getByRole('button', { name: 'ゲーム開始', exact: true }).click();
     }
     else await page.keyboard.press('Space');
     await claimGift(page);

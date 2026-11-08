@@ -125,7 +125,7 @@ for (const [game, filename] of artwork) {
             throw new Error(`Unexpected result image: ${JSON.stringify(generated)}`);
           }
         }
-        setLiveContext({ gameId: game, cabinetId: result.id, role: 'player', phase: 'ready' });
+        setLiveContext({ gameId: game, cabinetId: result.id, role: 'player', phase: 'paused' });
         // One real panel and store; no App, guest session or game initialization.
         ReactDOMClient.createRoot(host).render(React.createElement(React.Fragment, null,
           React.createElement(kind === 'result' ? ResultShareButton : LiveShareButton, kind === 'result' ? { draft: result, placement: 'result-page' } : {}),
