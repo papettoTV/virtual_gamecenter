@@ -189,7 +189,10 @@ for (const game of games) {
       // This case includes cancellation, real accounting, exit and
       // re-entry (plus mobile layout checks). Keep individual assertions at
       // their normal timeout while allowing the full sequence to finish.
-      test.setTimeout(60000);
+      // Extend the existing budget: beforeEach has already reserved time for
+      // real Retry-After reads, and respectReadBudget may extend it further.
+      // Resetting it to 60s can cut off the directory bootstrap during exit.
+      testInfo.setTimeout(testInfo.timeout + 30000);
       // Only the disposable local guest and the real welcome-credit API are used.
       await test.step('初期guest: 実bootstrapと財布', () => prepareGuest(page));
       const writes = [];
