@@ -35,7 +35,7 @@ export const BUZZ_BARRIER: GameDefinition = {
   title: "BUZZ BARRIER",
   localizedTitle: "バズバリア",
   shortTitle: "BB",
-  description: "弾幕かすり・無敵体当たり・ボス撃破型シューティング",
+  description: "弾幕かすり・無敵体当たり・対戦型シューティング",
   instructions: {
     objective: "3体のボスを倒し、ハイスコアを目指す。",
     action: "弾をかすってレベルアップ。無敵シールドをボスに当てて攻撃する。",
@@ -58,7 +58,7 @@ export const DEEP_SEA_SALVAGE: GameDefinition = {
   title: "DEEP SEA SALVAGE",
   localizedTitle: "深海サルベージ",
   shortTitle: "DSS",
-  description: "魚を調査して電力を補い、巨大深海魚を追う無限潜航ゲーム",
+  description: "深海に潜む、謎の生物を分析・探索ソロゲーム",
   instructions: {
     objective: "魚を調査しながら、より深い海を目指す。",
     action: "魚に近づくと自動調査し、電力を補充できる。",
@@ -92,7 +92,7 @@ export const MOCHI_BEAT: GameDefinition = {
 
 export const DOT_WAVE: GameDefinition = {
   id: "dot-wave", slug: "dot-wave", title: "DOT WAVE", localizedTitle: "ドットウェーブ",
-  shortTitle: "DW", description: "音符で攻めてリズムで守る、ソロプレイ・観戦対応のネオンバトル",
+  shortTitle: "DW", description: "リズムで攻撃・リズムで防御、対戦リズムゲーム",
   instructions: {
     objective: "リズムで攻めて守り、CPUの全3ステージ制覇を目指す。",
     action: "お手本のリズムで攻撃。相手のリズムをまねしてシールドで守る。",
