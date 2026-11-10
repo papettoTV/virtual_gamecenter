@@ -28,6 +28,7 @@ import { BUZZ_BARRIER } from "../../domain/game";
 import { recordWatchStarted } from "../../features/engagement/engagement-client";
 import { createCanvasRenderer } from "./rendering/canvas-renderer";
 import { createGameState } from "./state";
+import { resetBaseBulletSequences, getBaseBulletPattern } from "./base-bullet-sequence";
 import { createSimulation } from "./simulation";
 import { createInputController } from "./input";
 
@@ -351,6 +352,7 @@ export function mountGame(context) {
     pausedForLiveShare = false;
     resultSharing.clear(BUZZ_BARRIER.id);
     sharedRunId = createUuid();
+    resetBaseBulletSequences(players, Math.floor(Math.random() * 0x100000000));
     for (const player of players) {
       player.x = player.fieldX + FIELD_WIDTH / 2;
       player.y = FIELD_BOTTOM - 58;
@@ -408,6 +410,7 @@ export function mountGame(context) {
     pausedForLiveShare = false;
     resultSharing.clear(BUZZ_BARRIER.id);
     sharedRunId = createUuid();
+    resetBaseBulletSequences(players, Math.floor(Math.random() * 0x100000000));
     for (const player of players) {
       player.x = player.fieldX + FIELD_WIDTH / 2;
       player.y = FIELD_BOTTOM - 58;
@@ -2961,10 +2964,10 @@ export function mountGame(context) {
       (bulletDensity / 2)
       * BASE_BULLET_DENSITY_SCALE
       * (1 + defeatedBossCount * BASE_BULLET_CLEAR_BONUS);
-    player.enemyTimer = Math.max(0.08, (0.46 - intensity * 0.045 - Math.random() * 0.08) / densityScale);
+    player.enemyTimer = Math.max(0.08, (0.46 - intensity * 0.045 - player.baseBulletTimingRandom() * 0.08) / densityScale);
     const bulletBatch = Math.max(1, Math.floor(densityScale));
     const extraChance = densityScale - bulletBatch;
-    const spawnCount = bulletBatch + (Math.random() < extraChance ? 1 : 0);
+    const spawnCount = bulletBatch + (player.baseBulletTimingRandom() < extraChance ? 1 : 0);
 
     for (let index = 0; index < spawnCount; index += 1) {
       spawnBaseBulletPattern(player, intensity);
@@ -2981,26 +2984,6 @@ export function mountGame(context) {
     if (pattern === "fan") spawnFanBullets(player, intensity);
     if (pattern === "curtain") spawnCurtainBullets(player, intensity);
     if (pattern === "aimedStream") spawnAimedStreamBullets(player, intensity);
-  }
-
-  function getBaseBulletPattern(player) {
-    if (!player.basePattern || player.basePatternShotsLeft <= 0) {
-      player.basePattern = weightedRandom([
-        ["straight", 0.21],
-        ["aimed", 0.19],
-        ["diagonal", 0.16],
-        ["triple", 0.17],
-        ["fan", 0.15],
-        ["curtain", 0.07],
-        ["aimedStream", 0.05],
-      ]);
-      player.basePatternShotsLeft = Math.floor(randomRange(18, 31));
-    }
-    player.basePatternShotsLeft -= 1;
-    if (player.basePatternShotsLeft <= 0) {
-      player.basePatternBreakTimer = randomRange(1.8, 3.0);
-    }
-    return player.basePattern;
   }
 
   function spawnStraightBullet(player, intensity) {
@@ -3571,15 +3554,6 @@ export function mountGame(context) {
     return min + Math.random() * (max - min);
   }
 
-  function weightedRandom(entries) {
-    const total = entries.reduce((sum, [, weight]) => sum + weight, 0);
-    let roll = Math.random() * total;
-    for (const [value, weight] of entries) {
-      roll -= weight;
-      if (roll <= 0) return value;
-    }
-    return entries[entries.length - 1][0];
-  }
   return {
     async prepareSolo() {
       if (scope.disposed) return;
