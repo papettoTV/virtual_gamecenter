@@ -14,7 +14,11 @@ for (const width of [320, 390]) {
       '深海に潜む、謎の生物を分析・探索ソロゲーム',
     ]);
     for (const description of await descriptions.all()) {
-      await description.scrollIntoViewIfNeeded();
+      // Explicitly center each paragraph: scrollIntoViewIfNeeded can leave an
+      // already visible paragraph fractionally clipped at the viewport edge.
+      await description.evaluate(element => element.scrollIntoView({
+        block: 'center', inline: 'center', behavior: 'instant',
+      }));
       await expect(description).toBeInViewport({ ratio: 1 });
       const layout = await description.evaluate(element => {
         const range = document.createRange();
