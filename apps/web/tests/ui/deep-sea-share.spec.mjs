@@ -12,7 +12,11 @@ for (const width of [320, 390, 844, 1184, 1185, 1440]) {
       if (request.method() === 'POST' && request.url().includes('/api/platform/credit-reservations')) reservations.push(request.url());
     });
     await page.goto(`/cabinets/${randomUUID()}?game=deep-sea-salvage&start=1`);
-    const share = page.locator('#game-screen .game-share-button');
+    await expect.poll(() => page.evaluate(async () => {
+      const context = (await import('/src/features/sharing/share-service.ts')).liveSharing.getSnapshot();
+      return context && { role: context.role, phase: context.phase };
+    })).toEqual({ role: 'player', phase: 'ready' });
+    const share = page.locator('#game-screen .safe-live-share button');
     const profile = page.getByRole('button', { name: 'プロフィールを表示', exact: true });
     await expect(share).toBeVisible();
     await expect(profile).toBeVisible();

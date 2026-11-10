@@ -110,9 +110,11 @@ async function leaveToDirectory(page, gameId, selector = null) {
       && response.frame() === page.mainFrame(), { timeout: readBudgetTimeout });
     // Native clicks in one task exercise duplicate input on the same control.
     const beforeExit = await phase(page, gameId);
+    const player = await page.evaluate(async () =>
+      (await import('/src/features/sharing/share-service.ts')).liveSharing.getSnapshot()?.role === 'player');
     await leave.evaluate(button => { button.click(); button.click(); });
     const exit = page.getByRole('dialog', { name: '別のゲームを選びますか？', exact: true });
-    if (['playing', 'paused', 'countdown', 'impact'].includes(beforeExit)) {
+    if (player && ['playing', 'paused', 'countdown', 'impact'].includes(beforeExit)) {
       await expect(exit).toBeVisible();
       await expect(exit).toHaveCount(1);
       await test.info().attach('leave-confirmation-open', { body: await page.screenshot(), contentType: 'image/png' });
@@ -123,6 +125,8 @@ async function leaveToDirectory(page, gameId, selector = null) {
       await leave.click();
       await expect(exit).toBeVisible();
       await exit.getByRole('button', { name: '別のゲームをする', exact: true }).evaluate(button => { button.click(); button.click(); });
+    } else {
+      await expect(exit).toBeHidden();
     }
     const response = await loaded;
     expect(response.ok()).toBe(true);
@@ -232,7 +236,7 @@ for (const game of games) {
           const confirmBox = await confirm.boundingBox();
           expect(inviteBox.y + inviteBox.height).toBeLessThan(confirmBox.y);
           expect(confirmBox.x + confirmBox.width).toBeCloseTo(inviteBox.x + inviteBox.width, 0);
-          await invite.tap();
+          if (isMobile) await invite.tap(); else await invite.click();
           const sharing = page.getByRole('dialog', { name: '観戦リンクを共有' });
           for (const name of ['Xに投稿', 'Facebookに投稿', '投稿文とリンクをコピー']) {
             const action = sharing.getByRole('button', { name, exact: true });
@@ -247,9 +251,12 @@ for (const game of games) {
               configurable: true, value: { writeText: async text => { window.startShareCopied = text; } },
             });
           });
-          await sharing.getByRole('button', { name: 'Xに投稿' }).tap();
-          await sharing.getByRole('button', { name: 'Facebookに投稿' }).tap();
-          await sharing.getByRole('button', { name: '投稿文とリンクをコピー' }).tap();
+          const postX = sharing.getByRole('button', { name: 'Xに投稿' });
+          if (isMobile) await postX.tap(); else await postX.click();
+          const postFacebook = sharing.getByRole('button', { name: 'Facebookに投稿' });
+          if (isMobile) await postFacebook.tap(); else await postFacebook.click();
+          const copyPost = sharing.getByRole('button', { name: '投稿文とリンクをコピー' });
+          if (isMobile) await copyPost.tap(); else await copyPost.click();
           await expect(sharing.getByText('コピーしました。')).toBeVisible();
           const { links, copied } = await page.evaluate(() => ({ links: window.startShareLinks, copied: window.startShareCopied }));
           const [x, facebook] = links.map(url => new URL(url));
