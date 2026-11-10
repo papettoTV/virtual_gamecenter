@@ -98,6 +98,7 @@ async function leaveToDirectory(page, gameId, selector = null) {
     if (!selector && gameId !== 'dot-wave') await page.keyboard.press('Escape');
     const leave = selector ? page.locator(selector)
       : gameId === 'dot-wave' ? page.getByRole('link', { name: 'ゲーム一覧へ', exact: true })
+      : gameId === 'graze-duel' && await page.locator('.buzz-pause-leave').isVisible() ? page.locator('.buzz-pause-leave')
       : page.locator('#game-back-to-arcade');
     await expect(leave).toBeVisible();
     // DOT WAVE remounts PlatformExperience on return. Subscribe before exit:
@@ -108,10 +109,22 @@ async function leaveToDirectory(page, gameId, selector = null) {
       && response.request().method() === 'GET'
       && response.frame() === page.mainFrame(), { timeout: readBudgetTimeout });
     // Native clicks in one task exercise duplicate input on the same control.
-    const [response] = await Promise.all([
-      loaded,
-      leave.evaluate(button => { button.click(); button.click(); }),
-    ]);
+    const beforeExit = await phase(page, gameId);
+    await leave.evaluate(button => { button.click(); button.click(); });
+    const exit = page.getByRole('dialog', { name: '別のゲームを選びますか？', exact: true });
+    if (['playing', 'paused', 'countdown', 'impact'].includes(beforeExit)) {
+      await expect(exit).toBeVisible();
+      await expect(exit).toHaveCount(1);
+      await test.info().attach('leave-confirmation-open', { body: await page.screenshot(), contentType: 'image/png' });
+      await expect(exit).toContainText('今のプレイは終了し、使用したクレジットは戻りません。');
+      await exit.getByRole('button', { name: 'キャンセル', exact: true }).click();
+      await expect(exit).not.toBeVisible();
+      await expect(page).not.toHaveURL(`${origin}/`);
+      await leave.click();
+      await expect(exit).toBeVisible();
+      await exit.getByRole('button', { name: '別のゲームをする', exact: true }).evaluate(button => { button.click(); button.click(); });
+    }
+    const response = await loaded;
     expect(response.ok()).toBe(true);
     const account = await response.json();
     await expect(page.locator('.platform-credit-badge')).toHaveText(String(account.wallet.availableTotal));
@@ -212,7 +225,7 @@ for (const game of games) {
         await testInfo.attach('start-confirmation-open', {
           body: await page.screenshot({ fullPage: true }), contentType: 'image/png',
         });
-        if (game.id === 'graze-duel' && isMobile) {
+        {
           const invite = dialog.getByRole('button', { name: '観戦用画面を共有' });
           const confirm = dialog.getByRole('button', { name: '1クレジットで開始' });
           const inviteBox = await invite.boundingBox();
@@ -250,8 +263,9 @@ for (const game of games) {
           await expect(sharing).toBeHidden();
           await expect(invite).toBeFocused();
           await invite.blur();
+          if (game.id === 'dot-wave') await dialog.getByRole('button', { name: 'キャンセル', exact: true }).focus();
           expect(await wallet(page)).toBe(balance);
-          await start.evaluate(button => {
+          if (isMobile || game.id === 'dot-wave') await start.evaluate(button => {
             for (const pointerId of [1, 2]) button.dispatchEvent(new PointerEvent('pointerdown', { pointerId, bubbles: true }));
             button.click(); button.click();
           });
@@ -377,25 +391,36 @@ for (const game of games) {
           const cells = await status.locator('span').evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().toJSON()));
           for (let i = 1; i < cells.length; i++) expect(cells[i].x).toBeGreaterThanOrEqual(cells[i - 1].right);
           expect(cells.at(-1).right).toBeLessThanOrEqual(control.x);
-          const previousHeight = Math.min((viewport.width - 16) / .65, viewport.height - 68);
-          expect(frame.height).toBeGreaterThan(previousHeight);
+
+          expect(frame.height).toBeGreaterThanOrEqual(Math.min(viewport.width / .65, viewport.height - 132) - 2);
           expect(frame.y + frame.height).toBeLessThanOrEqual(viewport.height);
           expect(frame.width / frame.height).toBeCloseTo(416 / 640, 2);
-          if (viewport.width === 390) expect(frame.width).toBeGreaterThan(350);
+          const actions = await screen.locator('.buzz-pause-actions').boundingBox();
+          expect(actions.y).toBeGreaterThanOrEqual(frame.y + frame.height - 1);
+          expect(actions.y + actions.height).toBeLessThanOrEqual(viewport.height);
           await testInfo.attach(`buzz-paused-${viewport.width}`, { body: await page.screenshot(), contentType: 'image/png' });
         }
+        await screen.getByRole('button', { name: '観戦URLをシェア', exact: true }).click();
+        const pausedShare = page.getByRole('dialog', { name: '観戦リンクを共有', exact: true });
+        await expect(pausedShare).toBeVisible();
+        for (const name of ['Xに投稿', 'Facebookに投稿', '投稿文とリンクをコピー']) await expect(pausedShare.getByRole('button', { name, exact: true })).toBeVisible();
+        expect(await page.evaluate(async () => (await import('/src/features/sharing/share-service.ts')).sharePanel.getSnapshot().text)).toContain('バズバリアに挑戦中。ここから観戦！');
+        await testInfo.attach('paused-share-open', { body: await page.screenshot(), contentType: 'image/png' });
+        await pausedShare.getByRole('button', { name: '× 閉じる' }).click();
+        await expect.poll(() => phase(page, game.id)).toBe('paused');
+        expect(await wallet(page)).toBe(balance - 1);
         await expect(pause).toHaveAccessibleName('再開');
         await pause.focus();
         await page.keyboard.press('Enter');
         await expect.poll(() => phase(page, game.id)).toBe('playing');
         await expect(pause).toHaveText('一時停止');
-        await expect(screen.locator('#buzz-pause-overlay .buzz-pause-leave')).toHaveCount(0);
+        await expect(screen.locator('.buzz-pause-actions .buzz-pause-leave')).toHaveCount(0);
         expect(await wallet(page)).toBe(balance - 1);
         await pause.tap();
         await expect.poll(() => phase(page, game.id)).toBe('paused');
       }
       await test.step('直接退出・連打: 消費済み残高と表示復帰', async () => {
-        await leaveToDirectory(page, game.id, isMobile && game.id === 'graze-duel' ? '#buzz-pause-overlay .buzz-pause-leave' : null);
+        await leaveToDirectory(page, game.id, isMobile && game.id === 'graze-duel' ? '.buzz-pause-actions .buzz-pause-leave' : null);
         expect(await persistedWallet(page)).toBe(balance - 1);
         expect(writes.filter(url => url.endsWith('/credit-reservations'))).toHaveLength(1);
         expect(writes.filter(url => url.endsWith('/capture'))).toHaveLength(1);
