@@ -7,7 +7,7 @@ for (const width of [320, 390]) {
     const decline = page.getByRole('button', { name: '拒否する', exact: true });
     if (await decline.isVisible()) await decline.click();
 
-    const descriptions = page.locator('.showcase-description p');
+    const descriptions = page.locator('.showcase-description > p');
     await expect(descriptions).toHaveText([
       '弾幕かすり・無敵体当たり・対戦型シューティング',
       'リズムで攻撃・リズムで防御、対戦リズムゲーム',
