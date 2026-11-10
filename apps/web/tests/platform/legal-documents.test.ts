@@ -43,13 +43,17 @@ describe("free beta legal documents", () => {
       const markup = renderToStaticMarkup(createElement(PolicyDialog, { kind, onClose: () => {} }));
       expect(markup).toContain("無料ベータ版");
       expect(markup).toContain(`src="${path}"`);
+      expect(markup.includes("アクセス解析設定")).toBe(kind === "privacy");
     }
     const footer = renderToStaticMarkup(createElement(PlatformPolicies, { policy: null, setPolicy: () => {} }));
     expect(footer).toContain('href="https://x.com/pulbase"');
     expect(footer).toContain("お問い合わせ：X @pulbase");
     expect(footer).not.toContain("papettoTV");
     expect(footer).not.toContain("お問い合わせ（準備中）");
-    expect(footer).toContain("アクセス解析設定");
+    expect(footer).not.toContain("アクセス解析設定");
+    expect(footer).not.toContain("特定商取引法に基づく表記は有料化前に公開予定");
+    expect(footer).toContain("ご意見・感想を送る");
+    expect(footer).toContain('href="/third-party-notices.html"');
   });
 
   it("offers optional non-modal analytics choices without blocking games", () => {
