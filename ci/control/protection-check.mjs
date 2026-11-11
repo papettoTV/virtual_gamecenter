@@ -16,7 +16,7 @@ export function executionContext(env = process.env) {
 export function readApi(token, request = fetch) {
   if (!token) throw Error('GitHubの一時読取認証がありません。');
   return async path => {
-    if (!/^(?:environments\/staging(?:\/deployment-branch-policies\?per_page=100)?|rulesets(?:\/[1-9][0-9]*|\?per_page=100)|git\/ref\/heads\/(?:ci-control|main))$/.test(path)) {
+    if (!/^(?:environments\/staging(?:-worker)?(?:\/deployment-branch-policies\?per_page=100)?|rulesets(?:\/[1-9][0-9]*|\?per_page=100)|git\/ref\/heads\/(?:ci-control|main))$/.test(path)) {
       throw Error('対象外APIを拒否しました。');
     }
     try {
@@ -29,7 +29,7 @@ export function readApi(token, request = fetch) {
     } catch { throw Error('GitHubの保護設定を読み取れません。応答・認証値は表示していません。'); }
   };
 }
-export async function verifyProtection(api, execution, { requireSnapshot = true, ruleVersions } = {}) {
+export async function verifyProtection(api, execution, { requireSnapshot = true, ruleVersions, publication = 'pages' } = {}) {
   // This attestation lives only in the human-managed staging Environment.
   // No workflow input, source artifact or repository variable can select construction.
   let versions, protectionMode = 'unverified';
@@ -61,6 +61,19 @@ export async function verifyProtection(api, execution, { requireSnapshot = true,
   if (branches.total_count !== 1 || branches.branch_policies?.length !== 1
     || branches.branch_policies[0].name !== 'ci-control' || branches.branch_policies[0].type !== 'branch') {
     throw Error('stagingの許可対象がBranch型ci-controlだけではありません。');
+  }
+  if (publication === 'worker') {
+    const worker = await api('environments/staging-worker');
+    const allowed = await api('environments/staging-worker/deployment-branch-policies?per_page=100');
+    if (worker.can_admins_bypass !== false || worker.deployment_branch_policy?.custom_branch_policies !== true
+      || worker.deployment_branch_policy?.protected_branches !== false
+      || !Array.isArray(worker.protection_rules)
+      || worker.protection_rules.some(rule => rule.type !== 'branch_policy')
+      || allowed.total_count !== 1 || allowed.branch_policies?.length !== 1
+      || allowed.branch_policies[0].type !== 'branch' || allowed.branch_policies[0].name !== 'ci-control'
+      || (requireSnapshot && protectionMode !== 'strict')) {
+      throw Error('staging-workerの制御ブランチ限定とstrictを確認できません。');
+    }
   }
   const rules = await api('rulesets?per_page=100');
   // A full first page is ambiguous: never assume later rules do not exist.

@@ -44,7 +44,7 @@ export function assertReleaseObservation(scope,execution,observation,now=Date.no
  need(now>=scope.approvedAt&&now<scope.expiresAt,'承認期限切れ');
  need(JSON.stringify(observation)===JSON.stringify(scope.evidence),'承認後にdevelop・CI・成果物が変更');
 }
-export async function runPostmergeStaging({scope,execution,observe,publish,regress,now=Date.now}){
+export async function runPostmergeStaging({scope,execution,observe,publish,regress,publication='pages',now=Date.now}){
  context(execution);need(JSON.stringify(scope.execution)===JSON.stringify(execution),'別runへの承認流用を拒否');
  let phase='before-publication',publicationAttempted=false;
  async function current(){assertReleaseObservation(scope,execution,await observe(),now());}
@@ -52,7 +52,7 @@ export async function runPostmergeStaging({scope,execution,observe,publish,regre
   await current();phase='publication';publicationAttempted=true;await publish(scope.evidence);
   await current();phase='regression';const result=await regress(scope.evidence);
   need(result?.passed===true&&result.sha===scope.evidence.sha,'staging回帰テスト不合格');
-  await current();return {status:'passed',sha:scope.evidence.sha,approvalCount:1,publicationCount:1,regressionCount:1,
+  await current();return {status:'passed',sha:scope.evidence.sha,approvalCount:publication==='worker'?0:1,publicationCount:1,regressionCount:1,
    recovery:'fix-pull-request',mainUpdated:false,productionRequested:false};
  }catch{const e=Error('検証を停止しました。結果を確認し修正PRで対応してください。');e.phase=phase;e.sha=scope.evidence.sha;e.publicationAttempted=publicationAttempted;e.recovery='fix-pull-request';throw e;}
 }

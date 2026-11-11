@@ -23,6 +23,8 @@ REPO = '/repos/papettoTV/virtual_gamecenter'
 BASE = '828ac87708a57a208b9f06cf55f1b479a51ce492'
 MAIN = '73cb5d9267c56f06f9f1150327ec6b8b3caa2bb9'
 APP = 5405029
+WORKFLOW_CHANGED = False
+SYNC_WORKER_SNAPSHOT = False
 BUNDLE_DIGEST = 'PACKAGED_BUNDLE_DIGEST'
 APPLY_RULE_VERSION = None  # Pin only after the sole human-managed App bypass is verified.
 STRICT_RULE_VERSION = '2026-11-05T21:06:15.947Z'
@@ -30,6 +32,7 @@ MAIN_RULE_VERSION = '2026-10-21T20:32:35.191Z'
 MANIFEST = 'automatic-resume-installation.json'
 FILES = {'ci/control/review-trust.mjs', 'ci/control/review-trust.json', 'ci/production-candidate/policy.json',
          'ci/control/toolchain/browser/regression.spec.mjs'}
+INSTALL_PERMISSIONS = {'contents': 'write', **({'workflows': 'write'} if WORKFLOW_CHANGED else {})}
 SHA = re.compile(r'^[a-f0-9]{40}$')
 MESSAGE = 'ci: 信頼定義3件と検証回帰1件を更新（公開なし）'
 
@@ -60,7 +63,7 @@ def bundle(path):
     manifest = json.loads(data[MANIFEST])
     need(manifest.get('version') == 1 and manifest.get('mode') == 'automatic-resume-control-update-only'
          and manifest.get('parent') == BASE and set(manifest.get('files', {})) == FILES
-         and manifest.get('workflowChanged') is False and manifest.get('productionEnabled') is False,
+         and manifest.get('workflowChanged') is WORKFLOW_CHANGED and manifest.get('productionEnabled') is False,
          '配置manifestが不正です。')
     need(all(hashlib.sha256(data[p]).hexdigest() == h for p, h in manifest['files'].items()), '配置ファイルのハッシュが不一致です。')
     baseline = manifest.get('baselineFiles', {})
@@ -84,7 +87,7 @@ def permitted(method, path, body):
     if method != 'POST':
         return False
     if re.fullmatch(r'/app/installations/[1-9][0-9]*/access_tokens', path):
-        return body == {'repositories': ['virtual_gamecenter'], 'permissions': {'contents': 'write'}}
+        return body == {'repositories': ['virtual_gamecenter'], 'permissions': INSTALL_PERMISSIONS}
     if path == REPO + '/git/trees':
         entries = body.get('tree', [])
         return set(body) == {'base_tree', 'tree'} and bool(SHA.fullmatch(body.get('base_tree', ''))) and len(entries) == len(FILES) and all(
@@ -190,7 +193,7 @@ def apply(data, baseline, jwt, api=request, *, rule_version=None):
     token = None
     report = {'mode': 'automatic-resume-control-update-only', 'stage': 'preflight', 'commit': None, 'refUpdated': False,
               'tokenRevoked': None, 'mainRefWriteRequested': False, 'developRefWriteRequested': False,
-              'workflowStarted': False, 'workflowChanged': False, 'deploymentRequested': False}
+              'workflowStarted': False, 'workflowChanged': WORKFLOW_CHANGED, 'deploymentRequested': False}
     try:
         guards(api, baseline, True, apply_version=rule_version)
         app = ok(api, 'GET', '/app', jwt)
@@ -198,10 +201,11 @@ def apply(data, baseline, jwt, api=request, *, rule_version=None):
         installation = ok(api, 'GET', REPO + '/installation', jwt)
         need(installation.get('app_id') == APP and not installation.get('suspended_at') and isinstance(installation.get('id'), int), 'Appのインストールが不一致です。')
         created = ok(api, 'POST', '/app/installations/' + str(installation['id']) + '/access_tokens', jwt,
-                     {'repositories': ['virtual_gamecenter'], 'permissions': {'contents': 'write'}})
+                     {'repositories': ['virtual_gamecenter'], 'permissions': INSTALL_PERMISSIONS})
         token = created.get('token')
         need(isinstance(token, str) and token and created.get('permissions', {}).get('contents') == 'write'
-             and set(created['permissions']) <= {'contents', 'metadata'} and created['permissions'].get('metadata', 'read') == 'read', '一時トークンの権限が不一致です。')
+             and all(created['permissions'].get(name) == value for name, value in INSTALL_PERMISSIONS.items())
+             and set(created['permissions']) <= INSTALL_PERMISSIONS.keys() | {'metadata'} and created['permissions'].get('metadata', 'read') == 'read', '一時トークンの権限が不一致です。')
         accessible = ok(api, 'GET', '/installation/repositories', token)
         need(accessible.get('total_count') == 1 and len(accessible.get('repositories', [])) == 1
              and accessible['repositories'][0]['full_name'] == 'papettoTV/virtual_gamecenter', '一時トークンの対象が不一致です。')
@@ -252,19 +256,24 @@ def sign(pem):
 
 REPOSITORY_VARIABLE = REPO + '/actions/variables/PULBASE_CONTROL_EVIDENCE_SHA'
 STAGING_VARIABLE = REPO + '/environments/staging/variables/PULBASE_CONTROL_RULE_VERSIONS'
+WORKER_VARIABLES = REPO + '/environments/staging-worker/variables'
+WORKER_VARIABLE = WORKER_VARIABLES + '/PULBASE_CONTROL_RULE_VERSIONS'
+SNAPSHOT_VARIABLES = (STAGING_VARIABLE, WORKER_VARIABLE) if SYNC_WORKER_SNAPSHOT else (STAGING_VARIABLE,)
 ISO_VERSION = re.compile(r'^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$')
 
 
 def configuration_permitted(method, path, body):
-    # A separate human credential can only reach these two variable endpoints.
+    # The human credential can only write the fixed control variables.
     # Environment protection, secrets, deployment approvals and refs are never writable.
     if method == 'GET':
-        return path in (REPOSITORY_VARIABLE, STAGING_VARIABLE) or permitted(method, path, body)
+        return path in (REPOSITORY_VARIABLE, *SNAPSHOT_VARIABLES) or permitted(method, path, body)
+    if method == 'POST' and SYNC_WORKER_SNAPSHOT and path == WORKER_VARIABLES:
+        return configuration_permitted('PATCH', WORKER_VARIABLE, body)
     if method != 'PATCH' or not isinstance(body, dict) or set(body) != {'name', 'value'}:
         return False
     if path == REPOSITORY_VARIABLE:
         return body['name'] == 'PULBASE_CONTROL_EVIDENCE_SHA' and isinstance(body['value'], str) and bool(SHA.fullmatch(body['value']))
-    if path == STAGING_VARIABLE and body['name'] == 'PULBASE_CONTROL_RULE_VERSIONS':
+    if path in SNAPSHOT_VARIABLES and body['name'] == 'PULBASE_CONTROL_RULE_VERSIONS':
         try:
             value = json.loads(body['value'])
             return (set(value) == {'ciControl', 'main', 'protectionMode'}
@@ -296,8 +305,14 @@ def strict_configuration_guards(api, token, commit, data, baseline, *, installed
 
 
 def variable_value(api, token, path, name):
-    value = ok(api, 'GET', path, token)
-    need(isinstance(value, dict) and value.get('name') == name and isinstance(value.get('value'), str), '既存変数を確認できません。新規作成や代用はしません。')
+    if SYNC_WORKER_SNAPSHOT and path == WORKER_VARIABLE:
+        status, value = api('GET', path, token)
+        if status == 404:
+            return None
+        need(status == 200, 'Worker環境の保護設定版を確認できません。')
+    else:
+        value = ok(api, 'GET', path, token)
+    need(isinstance(value, dict) and value.get('name') == name and isinstance(value.get('value'), str), '既存変数を確認できません。')
     return value['value']
 
 
@@ -309,25 +324,27 @@ def configure(commit, data, baseline, token, api=configuration_request, *, insta
     try:
         versions = strict_configuration_guards(api, token, commit, data, baseline, installed=installed)
         paths = [(REPOSITORY_VARIABLE, 'PULBASE_CONTROL_EVIDENCE_SHA', commit),
-                 (STAGING_VARIABLE, 'PULBASE_CONTROL_RULE_VERSIONS', json.dumps(versions, separators=(',', ':')))]
-        # Read BOTH before either write. Never replace an unexpected third-party value.
+                 *((path, 'PULBASE_CONTROL_RULE_VERSIONS', json.dumps(versions, separators=(',', ':')))
+                   for path in SNAPSHOT_VARIABLES)]
+        # Read all values before writing. Preserve unexpected third-party values.
         current = [variable_value(api, token, path, name) for path, name, target in paths]
         need(current[0] in (BASE, commit), '制御SHA変数が想定外です。上書きしません。')
         old_versions = {'ciControl': STRICT_RULE_VERSION, 'main': MAIN_RULE_VERSION, 'protectionMode': 'strict'}
-        need(json.loads(current[1]) in (old_versions, versions), '保護設定版変数が想定外です。上書きしません。')
+        need(all(value is None or json.loads(value) in (old_versions, versions) for value in current[1:]), '保護設定版変数が想定外です。上書きしません。')
         for index, (path, name, target) in enumerate(paths):
             report['stage'] = 'update-' + name
             need(strict_configuration_guards(api, token, commit, data, baseline, installed=installed) == versions, '保護設定版が変わりました。')
             need(variable_value(api, token, path, name) == current[index], '確認後に変数が変更されました。上書きしません。')
-            matches = current[index] == target if index == 0 else json.loads(current[index]) == versions
+            matches = current[index] is not None and (current[index] == target if index == 0 else json.loads(current[index]) == versions)
             if not matches:
-                ok(api, 'PATCH', path, token, {'name': name, 'value': target})
-                report['updatedVariables'].append(name)
+                method, target_path = ('POST', WORKER_VARIABLES) if current[index] is None else ('PATCH', path)
+                ok(api, method, target_path, token, {'name': name, 'value': target})
+                report['updatedVariables'].append('staging-worker/' + name if path == WORKER_VARIABLE else name)
             saved = variable_value(api, token, path, name)
             need(saved == target if index == 0 else json.loads(saved) == versions, '変数の保存値が不一致です。再配置せず--finishで状態を確認してください。')
         need(strict_configuration_guards(api, token, commit, data, baseline, installed=installed) == versions, '更新後の保護設定が変わりました。')
         need(variable_value(api, token, REPOSITORY_VARIABLE, paths[0][1]) == commit
-             and json.loads(variable_value(api, token, STAGING_VARIABLE, paths[1][1])) == versions, '最終保存値が不一致です。')
+             and all(json.loads(variable_value(api, token, path, name)) == versions for path, name, _ in paths[1:]), '最終保存値が不一致です。')
         report.update(stage='complete', variablesVerified=True, ruleVersions=versions, success=True)
     except Exception as error:
         report['stopped'] = True
