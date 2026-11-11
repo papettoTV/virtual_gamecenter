@@ -5,7 +5,7 @@
   "controlSha": "2c883a1cdd961510a0557742f74294739752f445",
   "mainSha": "73cb5d9267c56f06f9f1150327ec6b8b3caa2bb9",
   "maxAgeMs": 86400000,
-  "reviewPolicyDigest": "88668258e058fc90c3fb4058ea82d546f01fd2cf800ca777fcd3f531d672a396",
+  "reviewPolicyDigest": "083639e4acb575eade5a9536ebda25c53cb29d9cb392a09c57a3cf3a653dc02a",
   "preparationFiles": {
     ".github/workflows/production-preparation.yml": "f2b765c9733f8a894b2752e1008f332da07f27c0",
     "ci/production-preparation.mjs": "ee6b726ab90a1aa6865c7220af1c720283385851",
@@ -26,7 +26,7 @@
     "ci/control/postmerge-staging.mjs": "2f0e6417879c89ff53b19514f44a5de2fc28c770",
     "ci/control/premerge-decision.mjs": "56eb8a4fa0d0ec211b2dd90cb6eaf8b1e2061042",
     "ci/control/protection-check.mjs": "1c11b2047601e26321fc946ad6da6f901c208995",
-    "ci/control/review-trust.json": "33ffb4affe601ce3f3dfeca3f144bf46f11f0979",
+    "ci/control/review-trust.json": "6c69227e1c9aedf481fafc1b717e2748740c01ef",
     "ci/control/review-trust.mjs": "304ce02e35532defd6df55735bcba5c286cc69f1",
     "ci/control/staging-gateway.mjs": "aab48944a51c69857bd32afff7eeffa066e48838",
     "ci/control/staging-publication.mjs": "ee43e79244ec5faffe2c14dda3adc16f300a4767",
