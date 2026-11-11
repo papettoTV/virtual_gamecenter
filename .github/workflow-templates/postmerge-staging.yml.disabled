@@ -6,6 +6,12 @@ on:
         description: developのWeb checks初回成功run ID
         required: true
         type: string
+      publication:
+        description: workerは検証Workerのみ、pagesは共有Pagesの検証プレビューも更新
+        required: true
+        type: choice
+        default: pages
+        options: [pages, worker]
 permissions:
   contents: read
   actions: read
@@ -19,6 +25,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       CI_RUN_ID: ${{ inputs.ci_run_id }}
+      STAGING_PUBLICATION: ${{ inputs.publication }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -47,12 +54,13 @@ jobs:
           retention-days: 7
   staging:
     needs: prepare
-    environment: staging
+    environment: ${{ inputs.publication == 'worker' && 'staging-worker' || 'staging' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       GH_TOKEN: ${{ github.token }}
       CI_RUN_ID: ${{ inputs.ci_run_id }}
+      STAGING_PUBLICATION: ${{ inputs.publication }}
       PULBASE_CONTROL_RULE_VERSIONS: ${{ vars.PULBASE_CONTROL_RULE_VERSIONS }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -88,7 +96,15 @@ jobs:
           const browser=await chromium.launch({channel:'chromium',chromiumSandbox:true});
           await browser.close();
           JS
-      - name: 検証公開1回・HTTPとブラウザ回帰1回
+      - name: 検証Workerの公開とHTTP・ブラウザ回帰
+        if: inputs.publication == 'worker'
+        env:
+          CLOUDFLARE_WORKER_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKER_API_TOKEN }}
+          PULBASE_CHECK_USERNAME: ${{ secrets.PULBASE_CHECK_USERNAME }}
+          PULBASE_CHECK_PASSWORD: ${{ secrets.PULBASE_CHECK_PASSWORD }}
+        run: node ci/control/postmerge-runner.mjs approved
+      - name: 共有Pagesを含む検証公開とHTTP・ブラウザ回帰
+        if: inputs.publication == 'pages'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           PULBASE_CHECK_USERNAME: ${{ secrets.PULBASE_CHECK_USERNAME }}

@@ -6,6 +6,12 @@ on:
         description: developのWeb checks初回成功run ID
         required: true
         type: string
+      publication:
+        description: workerは検証Workerのみ、pagesは共有Pagesの検証プレビューも更新
+        required: true
+        type: choice
+        default: pages
+        options: [pages, worker]
 permissions: {}
 jobs:
   registration-only:

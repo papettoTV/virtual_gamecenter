@@ -98,3 +98,61 @@ test('ブラウザ失敗診断を回帰処理から失敗成果物まで伝え�
  const r=failureReport({phase:'regression',sha,operationStatus:ops.report()});
  assert.equal(r.browserFailure.cases.at(-1).case,'game-navigation');assert.equal(r.browserFailure.cases.at(-1).project,'mobile');assert.equal(r.browserFailure.cases.at(-1).status,'timedOut');assert.doesNotMatch(JSON.stringify(r),/dummy-|httpCredentials/);
 });
+test('Worker専用公開はPages APIとPages CLIを呼ばず、異なるWorkerとゲートウェイSHAで回帰する',async t=>{
+ const f=await fixture(t),gatewaySha='c'.repeat(40),calls=[];
+ Object.assign(f,{mode:'live',publication:'worker',credentials:{cloudflareToken:'worker-token',username:'basic-user',password:'basic-password'}});
+ f.ports={
+  request:async(url,options)=>{
+   assert.equal(new URL(url).origin,'https://develop.virtual-gamecenter.pages.dev');
+   assert.match(options.headers.Authorization,/^Basic /);
+   const deployed=calls.includes('worker');
+   calls.push(deployed?'http-after':'http-before');
+   return new Response(null,{headers:{'x-pulbase-revision':deployed?sha:gatewaySha,'x-pulbase-gateway-revision':gatewaySha}});
+  },
+  process:async(tool,args,opts)=>{
+   if(tool==='wrangler'){
+    assert.equal(args[0],'deploy');
+    assert.equal(opts.env.CLOUDFLARE_API_TOKEN,'worker-token');
+    calls.push('worker');
+   }else{
+    assert.equal(tool,'playwright');
+    assert.equal(opts.env.CLOUDFLARE_API_TOKEN,undefined);
+    assert.equal(opts.env.PULBASE_EXPECTED_GATEWAY_SHA,gatewaySha);
+    assert.equal(opts.env.PULBASE_EXPECTED_SHA,sha);
+    calls.push('browser');
+   }
+   return {exitCode:0,stdout:JSON.stringify(browserReport())};
+  },
+ };
+ const ops=await connectedStagingOperations(f);
+ const result=await runPostmergeStaging({scope:f.scope,execution,observe:f.guard,publish:ops.publish,regress:ops.regress,publication:'worker'});
+ assert.deepEqual(calls,['http-before','worker','http-after','browser']);
+ assert.equal(result.approvalCount,0);
+ assert.equal(result.regressionCount,1);
+ assert.equal(ops.report().pagesOutcome,'not-attempted');
+ assert.equal(ops.report().gatewaySha,gatewaySha);
+});
+test('Worker専用公開はゲートウェイのSHAを取得できなければ書き込まない',async t=>{
+ const f=await fixture(t);let writes=0;
+ Object.assign(f,{mode:'live',publication:'worker',
+  credentials:{cloudflareToken:'worker-token',username:'basic-user',password:'basic-password'},
+  ports:{request:async()=>new Response(null,{headers:{'x-pulbase-gateway-revision':sha}}),process:async()=>{writes++;}}});
+ const ops=await connectedStagingOperations(f);
+ await assert.rejects(ops.publish(),e=>e.stopReason==='gateway-revision');
+ assert.equal(writes,0);
+});
+test('Worker公開の前後でPagesのSHAが変わればHTTP回帰で止まる',async t=>{
+ const f=await fixture(t);let uploaded=false;
+ Object.assign(f,{mode:'live',publication:'worker',
+  credentials:{cloudflareToken:'worker-token',username:'basic-user',password:'basic-password'},
+  ports:{
+   request:async()=>new Response(null,{headers:{'x-pulbase-revision':sha,
+    'x-pulbase-gateway-revision':(uploaded?'e':'c').repeat(40)}}),
+   process:async(tool)=>{assert.equal(tool,'wrangler');uploaded=true;return {exitCode:0};},
+  }});
+ const ops=await connectedStagingOperations(f);
+ await ops.publish();
+ await assert.rejects(ops.regress(),/HTTP回帰/);
+ assert.equal(ops.report().pagesOutcome,'not-attempted');
+ assert.equal(ops.report().browserAttempted,false);
+});
