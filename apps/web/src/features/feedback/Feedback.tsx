@@ -95,8 +95,8 @@ export function Feedback({ address }: { address: string }) {
   const title = context.gameId ? getGameDefinition(context.gameId)?.title ?? "サイト全体" : "サイト全体";
   return <dialog ref={dialog} className="feedback-dialog" aria-labelledby="feedback-title" onKeyDown={event => event.stopPropagation()} onKeyUp={event => event.stopPropagation()} onClick={event => { if (event.target === event.currentTarget) dialog.current?.close(); }}>
     <form onSubmit={event => void send(event)}>
-      <header><h2 id="feedback-title">感想・不具合を送る</h2><button type="button" aria-label="フィードバックを閉じる" onClick={() => dialog.current?.close()}>✕ 閉じる</button></header>
-      <p>気づいたことを教えてください。登録・メールアドレスは不要です。</p>
+      <header><h2 id="feedback-title">ご意見・感想を送る</h2><button type="button" aria-label="フィードバックを閉じる" onClick={() => dialog.current?.close()}>✕ 閉じる</button></header>
+      <p>あなたのご意見を改善に役立てます。</p>
       <fieldset disabled={pending}><legend>どのような内容ですか？</legend>
         {[["good", "よかった"], ["concern", "気になった"], ["bug", "不具合"]].map(([value, label]) => <label key={value}><input type="radio" name="feedback-category" value={value} required checked={category === value} onChange={() => setCategory(value!)} />{label}</label>)}
       </fieldset>

@@ -1,6 +1,13 @@
 import { test, expect } from '../../../../ci/ui-fixtures.mjs';
 
 const panelFor = page => page.getByRole('region', { name: 'アクセス解析の設定' });
+async function openSettings(page) {
+  await page.locator('.platform-footer').getByRole('button', { name: 'プライバシーポリシー', exact: true }).click();
+  const dialog = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: 'プライバシーポリシー（無料ベータ版）', exact: true }) });
+  await expect(dialog.getByTitle('プライバシーポリシー全文')).toBeVisible();
+  await dialog.getByRole('button', { name: 'アクセス解析設定', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+}
 
 // Keep only geometry/style metadata: no page text, URLs, storage or credentials.
 const observations = new WeakMap();
@@ -123,7 +130,7 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 664 
     }
     await panelFor(page).getByRole('button', { name: '閉じる', exact: true }).click();
     await expect(panelFor(page)).toHaveCount(0);
-    await page.getByRole('button', { name: 'アクセス解析設定', exact: true }).click();
+    await openSettings(page);
     await expectDocked(page, 'reopen undecided');
     await expect(panelFor(page)).toContainText('未選択');
 
@@ -131,9 +138,9 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 664 
       await panelFor(page).getByRole('button', { name: button, exact: true }).click();
       await expect(panelFor(page)).toHaveCount(0);
       await page.reload();
-      await expect(page.getByRole('button', { name: 'アクセス解析設定', exact: true })).toBeVisible();
+      await expect(page.locator('.platform-footer').getByRole('button', { name: 'プライバシーポリシー', exact: true })).toBeVisible();
       await expect(panelFor(page)).toHaveCount(0);
-      await page.getByRole('button', { name: 'アクセス解析設定', exact: true }).click();
+      await openSettings(page);
       await expectDocked(page, `reopen ${choice}`);
       await expect(panelFor(page)).toContainText(`現在：${choice}`);
       await expect(panelFor(page)).toContainText('開発・検証環境では同意しても解析は動作しません');

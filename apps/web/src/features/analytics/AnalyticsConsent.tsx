@@ -57,7 +57,7 @@ export function AnalyticsConsentView({ current, sectionRef, onChoose, onClose }:
     <div>
       <strong>Google Analyticsによるアクセス解析</strong>
       <p>利用状況の把握と改善のため、Googleに閲覧情報等を送信してよいですか？拒否してもプレイ・観戦できます。</p>
-      <small>選択はこのブラウザに180日間保存します。フッターの「アクセス解析設定」から変更できます。</small>
+      <small>選択はこのブラウザに180日間保存します。フッターの「プライバシーポリシー」内の「アクセス解析設定」から変更できます。</small>
       <small>現在：{current.choice === "accepted" ? "同意" : current.choice === "rejected" ? "拒否" : "未選択（解析停止中）"}
         {current.local && " · 開発・検証環境では同意しても解析は動作しません。"}</small>
       {!current.persisted && <small>保存できない場合、選択はこのページを開いている間だけ有効です。</small>}
