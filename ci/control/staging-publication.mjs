@@ -59,22 +59,31 @@ export function samePagesConfiguration(before,after){
  const normalized=p=>({source:p.source,production:p.deployment_configs?.production,build_config:{...p.build_config,...(typeof p.build_config?.destination_dir==='string'?{destination_dir:(posix.normalize(p.build_config.destination_dir).replace(/\/+$/,'')||'.')}:{})}});
  return JSON.stringify(canonical(normalized(before)))===JSON.stringify(canonical(normalized(after)));
 }
-export const PUBLICATION_STOP_REASONS=Object.freeze(['evidence','pages-target','pages-build-metadata','worker-command','pages-command','pages-postflight','pages-config-drift','unknown']);
+export const PUBLICATION_STOP_REASONS=Object.freeze(['evidence','gateway-revision','pages-target','pages-build-metadata','worker-command','pages-command','pages-postflight','pages-config-drift','unknown']);
 export class PublicationStopped extends Error{
  constructor(phase,workerOutcome,stopReason='unknown'){super('staging公開を停止しました。部分反映の可能性を確認してください。');this.phase=phase;this.workerOutcome=workerOutcome;this.stopReason=PUBLICATION_STOP_REASONS.includes(stopReason)?stopReason:'unknown';}
 }
-export async function executeStagingPublication(plan,{guard,transport}={}){
- need(typeof guard==='function'&&typeof transport?.project==='function'&&typeof transport.execute==='function','保護されたguardと明示transportが必要');
+export async function executeStagingPublication(plan,{guard,transport,publication='pages'}={}){
+ need(typeof guard==='function'&&typeof transport?.execute==='function'
+  &&(publication==='pages'&&typeof transport.project==='function'||publication==='worker'&&typeof transport.gateway==='function'),'保護されたguardと明示transportが必要');
  let phase='preflight',workerOutcome='not-attempted',stopReason='evidence';
  const commands=publicationCommands(plan);
  async function recheck(){stopReason='evidence';await checkBuild(plan.artifact,plan.receipt);await guard();}
  try{
-  await recheck();stopReason='pages-target';const before=await transport.project();assertStagingPages(before);
-  stopReason='pages-build-metadata';await preservePagesBuildMetadata(plan,before);
+  await recheck();
+  let before;
+  if(publication==='pages'){
+   stopReason='pages-target';before=await transport.project();assertStagingPages(before);
+   stopReason='pages-build-metadata';await preservePagesBuildMetadata(plan,before);
+  }else{
+   stopReason='gateway-revision';await transport.gateway();
+  }
   await recheck();phase='worker';workerOutcome='unknown';stopReason='worker-command';await transport.execute(commands.worker,{cwd:plan.prepared});workerOutcome='uploaded';
-  await recheck();stopReason='pages-target';assertStagingPages(await transport.project());phase='pages';stopReason='pages-command';await transport.execute(commands.pages,{cwd:plan.prepared});
-  stopReason='pages-postflight';const after=await transport.project();assertStagingPages(after);
-  stopReason='pages-config-drift';need(samePagesConfiguration(before,after),'Pages設定が変わりました。自動修復せず停止');
+  if(publication==='pages'){
+   await recheck();stopReason='pages-target';assertStagingPages(await transport.project());phase='pages';stopReason='pages-command';await transport.execute(commands.pages,{cwd:plan.prepared});
+   stopReason='pages-postflight';const after=await transport.project();assertStagingPages(after);
+   stopReason='pages-config-drift';need(samePagesConfiguration(before,after),'Pages設定が変わりました。自動修復せず停止');
+  }
   await recheck();return {passed:true,environment:'staging',sha:plan.sha,files:plan.files};
  }catch{throw new PublicationStopped(phase,workerOutcome,stopReason);}
 }

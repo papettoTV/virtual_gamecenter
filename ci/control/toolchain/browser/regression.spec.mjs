@@ -10,7 +10,7 @@ test('home renders active games and versioned Worker/Pages', async ({ page }) =>
   const response = await page.goto('/');
   expect(response.status()).toBe(200);
   expect(response.headers()['x-pulbase-revision']).toBe(sha);
-  expect(response.headers()['x-pulbase-gateway-revision']).toBe(sha);
+  expect(response.headers()['x-pulbase-gateway-revision']).toBe(process.env.PULBASE_EXPECTED_GATEWAY_SHA ?? sha);
   await expect(page.getByRole('img', { name: 'PULBASE', exact: true })).toBeVisible();
   await expect(page.getByRole('region', { name: 'ゲームを見て回る' })).toBeVisible();
   await expect(page.locator('.game-showcase h2').first()).toBeVisible();
