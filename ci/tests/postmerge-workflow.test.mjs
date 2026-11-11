@@ -4,7 +4,8 @@ import {readFile} from 'node:fs/promises';
 import {parse} from 'yaml';
 test('staging承認ジョブ1つ、公開/回帰の実行ステップ1つ、実公開鍵は承認後の1stepだけ、共通ロックは制御側だけ',async()=>{
  const w=parse(await readFile(new URL('../../.github/workflow-templates/postmerge-staging.yml.disabled',import.meta.url),'utf8'));assert.deepEqual(w.permissions,{contents:'read',actions:'read'});assert.equal(w.jobs.staging.environment,"${{ inputs.publication == 'worker' && 'staging-worker' || 'staging' }}");
- assert.deepEqual(w.on.workflow_dispatch.inputs.publication.options,['pages','worker']);assert.ok(!JSON.stringify(w.jobs.prepare).includes('secrets.'));
+ assert.deepEqual(w.on.workflow_dispatch.inputs.publication.options,['disabled','pages','worker']);
+ assert.equal(w.on.workflow_dispatch.inputs.publication.default,'disabled');assert.ok(!JSON.stringify(w.jobs.prepare).includes('secrets.'));
  const steps=w.jobs.staging.steps;const published=steps.filter(s=>s.run==='node ci/control/postmerge-runner.mjs approved');
  const [worker,approved]=published;
  assert.deepEqual(published.map(s=>s.if),["inputs.publication == 'worker'","inputs.publication == 'pages'"]);

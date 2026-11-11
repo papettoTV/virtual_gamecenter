@@ -10,8 +10,8 @@ on:
         description: workerは検証Workerのみ、pagesは共有Pagesの検証プレビューも更新
         required: true
         type: choice
-        default: pages
-        options: [pages, worker]
+        default: disabled
+        options: [disabled, pages, worker]
 permissions:
   contents: read
   actions: read

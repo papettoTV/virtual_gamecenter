@@ -32,7 +32,7 @@ async function json(p){const b=await readFile(p);need(b.length<65536,'承認対�
 async function outputs(e){await appendFile(process.env.GITHUB_OUTPUT,`build_run=${e.runId}\nartifact_id=${e.artifactId}\n`);}
 async function main(){
  const x=executionContext(),api=postmergeApi(process.env.GH_TOKEN),run=process.env.CI_RUN_ID,mode=process.argv[2];
- const publication=process.env.STAGING_PUBLICATION ?? 'pages';
+ const publication=process.env.STAGING_PUBLICATION;
  need(['worker','pages'].includes(publication),'公開モードが不正です。');
  if(mode==='prepare'){
   const protection=await verifyProtection(readApi(process.env.GH_TOKEN),x,{requireSnapshot:false,publication});
