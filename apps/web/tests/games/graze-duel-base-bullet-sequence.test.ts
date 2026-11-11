@@ -61,33 +61,34 @@ describe("通常弾の共通シード系列", () => {
       straight: .21, aimed: .19, diagonal: .16, triple: .17,
       fan: .15, curtain: .07, aimedStream: .05,
     };
-    const violations = {
-      invalidLength: 0,
-      intermediatePause: 0,
-      patternChange: 0,
-      unfinishedBurst: 0,
-      invalidPause: 0,
+    // Record only the first failing burst for each invariant; assert after sampling.
+    const violations: Record<string, number | null> = {
+      invalidLength: null,
+      intermediatePause: null,
+      patternChange: null,
+      unfinishedBurst: null,
+      invalidPause: null,
     };
     for (let burst = 0; burst < 10000; burst++) {
       const first = shot(player);
       const length = first.remaining + 1;
-      if (!(length >= 18 && length <= 30)) violations.invalidLength++;
+      if (!(length >= 18 && length <= 30)) violations.invalidLength ??= burst;
       counts[first.pattern] = (counts[first.pattern] ?? 0) + 1;
       for (let i = 1; i < length; i++) {
-        if (player.basePatternBreakTimer !== 0) violations.intermediatePause++;
-        if (shot(player).pattern !== first.pattern) violations.patternChange++;
+        if (player.basePatternBreakTimer !== 0) violations.intermediatePause ??= burst;
+        if (getBaseBulletPattern(player) !== first.pattern) violations.patternChange ??= burst;
       }
-      if (player.basePatternShotsLeft !== 0) violations.unfinishedBurst++;
+      if (player.basePatternShotsLeft !== 0) violations.unfinishedBurst ??= burst;
       if (!(player.basePatternBreakTimer >= 1.8 && player.basePatternBreakTimer < 3)) {
-        violations.invalidPause++;
+        violations.invalidPause ??= burst;
       }
     }
     expect(violations).toEqual({
-      invalidLength: 0,
-      intermediatePause: 0,
-      patternChange: 0,
-      unfinishedBurst: 0,
-      invalidPause: 0,
+      invalidLength: null,
+      intermediatePause: null,
+      patternChange: null,
+      unfinishedBurst: null,
+      invalidPause: null,
     });
     expect(Object.keys(counts).sort()).toEqual(Object.keys(weights).sort());
     for (const [pattern, weight] of Object.entries(weights)) {
