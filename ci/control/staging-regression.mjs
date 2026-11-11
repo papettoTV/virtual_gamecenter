@@ -7,16 +7,27 @@ export function regressionEnvironment(sha,credentials={}){
  return {PATH:process.env.PATH,PULBASE_BROWSER_ENVIRONMENT:'staging',PULBASE_EXPECTED_SHA:sha,
   ...(credentials.username?{PULBASE_CHECK_USERNAME:credentials.username,PULBASE_CHECK_PASSWORD:credentials.password}:{})};
 }
-export async function stagingRegression(sha,{request,browser,guard,credentials={},validationOnly=false}={}){
- const env=regressionEnvironment(sha,credentials);
- need(typeof request==='function'&&typeof browser==='function'&&typeof guard==='function','回帰の明示transportとguardが必要');
- await guard();
+export async function checkStagingHttp({request, credentials, gatewaySha, workerSha}) {
+ const isSha=value=>/^[a-f0-9]{40}$/.test(value??'');
+ need(workerSha===undefined||isSha(workerSha)&&isSha(gatewaySha),'回帰対象のSHA不正');
+ const revision=workerSha ?? 'gateway';
  let response;
- try{response=await request(`${origin}/?release-check=${sha}`,{method:'GET',redirect:'manual',cache:'no-store',signal:AbortSignal.timeout(15000),
+ try{response=await request(`${origin}/?release-check=${revision}`,{method:'GET',redirect:'manual',cache:'no-store',signal:AbortSignal.timeout(15000),
   headers:credentials.username?{Authorization:`Basic ${Buffer.from(`${credentials.username}:${credentials.password}`).toString('base64')}`}:{}});
   await response.body?.cancel();
-  need(response.status===200&&response.headers.get('x-pulbase-revision')===sha&&response.headers.get('x-pulbase-gateway-revision')===sha,'SHA不一致');
+  const observedWorker=response.headers.get('x-pulbase-revision');
+  const observedGateway=response.headers.get('x-pulbase-gateway-revision');
+  need(response.status===200&&isSha(observedWorker)&&isSha(observedGateway)
+    &&(workerSha===undefined||observedWorker===workerSha&&observedGateway===gatewaySha),'SHA不一致');
+  return {workerSha:observedWorker,gatewaySha:observedGateway};
  }catch{throw Error('検証環境HTTP回帰が不合格です。認証値・応答本文は表示しません');}
+}
+export async function stagingRegression(sha,{request,browser,guard,credentials={},validationOnly=false,gatewaySha=sha}={}){
+ const env=regressionEnvironment(sha,credentials);
+ if(gatewaySha!==sha)env.PULBASE_EXPECTED_GATEWAY_SHA=gatewaySha;
+ need(typeof request==='function'&&typeof browser==='function'&&typeof guard==='function','回帰の明示transportとguardが必要');
+ await guard();
+ await checkStagingHttp({request,credentials,gatewaySha,workerSha:sha});
  await guard();let result;
  try{result=await browser({environment:env,config:'ci/control/toolchain/staging-browser.config.mjs'});}catch{throw Error('検証環境ブラウザ回帰が不合格です');}
  if(validationOnly)need(result?.exitCode===0&&result.listOnly===true&&result.listedTests===8,'ブラウザ定義8件を確認できません');

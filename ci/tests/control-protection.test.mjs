@@ -113,3 +113,21 @@ test('承認後に例外・保護版が変われば次の照合で停止する',
   changed = true;
   await assert.rejects(verifyProtection(api, executionContext(env), construction));
 });
+test('Worker専用環境はci-control限定かつstrictで、共有Pagesの承認も維持する',async()=>{
+ const branchPath='environments/staging-worker/deployment-branch-policies?per_page=100';
+ const workerPath='environments/staging-worker';
+ const workerFixture=(mutate=()=>{})=>fixture(state=>{
+  state[workerPath]={...structuredClone(state['environments/staging']),protection_rules:[{type:'branch_policy'}]};
+  state[branchPath]=structuredClone(state['environments/staging/deployment-branch-policies?per_page=100']);
+  mutate(state);
+ });
+ const options={publication:'worker',ruleVersions:JSON.stringify({...versions,protectionMode:'strict'})};
+ assert.equal((await verifyProtection(workerFixture(),executionContext(env),options)).protectionVerified,true);
+ for(const mutate of [s=>s[workerPath].can_admins_bypass=true,
+  s=>s[workerPath].protection_rules=[{type:'wait_timer',wait_timer:5}],
+  s=>s[branchPath].branch_policies[0].name='develop',
+  s=>s['environments/staging'].protection_rules=[],
+  s=>s['rulesets/1'].bypass_actors=[releaseActor]]){
+  await assert.rejects(verifyProtection(workerFixture(mutate),executionContext(env),options));
+ }
+});

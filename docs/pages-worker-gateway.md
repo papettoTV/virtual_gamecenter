@@ -53,3 +53,10 @@ Wrangler Pagesは任意の設定ファイルパスを受け付けないため、
 2026-10-14の検証：全459テスト・型検査・検証ビルド成功。検証Worker `1cdcca0c-6289-49f6-9ebb-5d5c1636bb6d`で、専用ゲストのISO期限切れによるHTTP401・既存WS1008切断・匿名観戦接続の維持を実測。通常の消費/開始/観戦同期も再確認。詳しくは[セキュリティレビュー](security-review.md)。
 
 本番リソース、mainへの反映、本番Google設定・ドメイン、監視/通知・復元・乱用対策、実機検証は別作業。検証用Basic認証情報は、このMacで作成した `/tmp/pulbase-staging-access.json` にある。これは一時ファイルなので、安全な管理方法へ移したうえで不要なSecret一時ファイルを削除する。
+
+## 通常の検証公開と共有Pages更新
+
+- 通常は初回に成功したdevelopのCI成果物を、固定したci-controlから検証Workerだけへ自動公開する。検証URLは従来どおり。共有Pagesを含む更新は、同じworkflowをci-controlで手動起動し、`publication=pages` を選択して既存のstaging承認を1回行う。
+- 自動経路の `staging-worker` Environment はBranch型 `ci-control` だけを許可し、管理者bypassを無効にする。Cloudflareの `CLOUDFLARE_WORKER_API_TOKEN` は `pulbase-staging` だけのIndividual Workers Editor。検証Basic認証2件とstrictの保護設定版をこのEnvironmentに置く。共有Pagesの鍵は承認付きの `staging` Environmentに置く。
+- Worker公開直前に検証URLから既存ゲートウェイのSHAを取得する。公開後に同じゲートウェイSHAと新しいWorker SHAを照合し、HTTPとブラウザの回帰を1回行う。ゲートウェイSHAを手で登録する必要はない。
+- 起動変数 `PULBASE_STAGING_WORKER_AUTO` を `true` にすると、developの初回成功CIでWorker専用経路を自動起動する。未設定・falseの場合は自動公開を起動しない。保護設定版の変更時は両Environmentのstrict設定版を同期する。
