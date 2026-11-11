@@ -61,20 +61,34 @@ describe("通常弾の共通シード系列", () => {
       straight: .21, aimed: .19, diagonal: .16, triple: .17,
       fan: .15, curtain: .07, aimedStream: .05,
     };
+    const violations = {
+      invalidLength: 0,
+      intermediatePause: 0,
+      patternChange: 0,
+      unfinishedBurst: 0,
+      invalidPause: 0,
+    };
     for (let burst = 0; burst < 10000; burst++) {
       const first = shot(player);
       const length = first.remaining + 1;
-      expect(length).toBeGreaterThanOrEqual(18);
-      expect(length).toBeLessThanOrEqual(30);
+      if (!(length >= 18 && length <= 30)) violations.invalidLength++;
       counts[first.pattern] = (counts[first.pattern] ?? 0) + 1;
       for (let i = 1; i < length; i++) {
-        expect(player.basePatternBreakTimer).toBe(0);
-        expect(shot(player).pattern).toBe(first.pattern);
+        if (player.basePatternBreakTimer !== 0) violations.intermediatePause++;
+        if (shot(player).pattern !== first.pattern) violations.patternChange++;
       }
-      expect(player.basePatternShotsLeft).toBe(0);
-      expect(player.basePatternBreakTimer).toBeGreaterThanOrEqual(1.8);
-      expect(player.basePatternBreakTimer).toBeLessThan(3);
+      if (player.basePatternShotsLeft !== 0) violations.unfinishedBurst++;
+      if (!(player.basePatternBreakTimer >= 1.8 && player.basePatternBreakTimer < 3)) {
+        violations.invalidPause++;
+      }
     }
+    expect(violations).toEqual({
+      invalidLength: 0,
+      intermediatePause: 0,
+      patternChange: 0,
+      unfinishedBurst: 0,
+      invalidPause: 0,
+    });
     expect(Object.keys(counts).sort()).toEqual(Object.keys(weights).sort());
     for (const [pattern, weight] of Object.entries(weights)) {
       expect(Math.abs(counts[pattern]! / 10000 - weight)).toBeLessThan(.02);
