@@ -1,4 +1,4 @@
-.share-overlay { position: fixed; inset: 0; z-index: 2000; background: #030610d9; display: grid; place-items: center; padding: 16px; overflow-y: auto; }
+.share-overlay { position: fixed; inset: 0; z-index: 2300; background: #030610d9; display: grid; place-items: center; padding: 16px; overflow-y: auto; }
 .share-dialog { width: min(600px, 100%); max-height: calc(100dvh - 32px); overflow-y: auto; background: #111526; border: 1px solid #49647a; border-radius: 20px; padding: 24px; box-shadow: 0 20px 80px #0008; }
 .share-dialog button, .result-share-button, .shared-result-next button, .safe-live-share button { border: 1px solid #54617c; border-radius: 10px; background: #1b253a; color: #f3f5ff; padding: 10px 16px; font: inherit; cursor: pointer; }
 .share-dialog button:focus-visible, .result-share-button:focus-visible, .shared-result-next button:focus-visible, .safe-live-share button:focus-visible { outline: 2px solid #69f7ff; outline-offset: 3px; }

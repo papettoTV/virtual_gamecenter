@@ -110,8 +110,8 @@ for (const [game, filename] of artwork) {
         await import('/styles.css');
         const { default: React } = await import('/node_modules/.vite/deps/react.js');
         const { default: ReactDOMClient } = await import('/node_modules/.vite/deps/react-dom_client.js');
-        const { createResultImage, ResultShareButton, LiveShareButton, SharePanel } = await import('/src/features/sharing/ShareActions.tsx');
-        const { setLiveContext } = await import('/src/features/sharing/share-service.ts');
+        const { createResultImage, ResultShareButton, SharePanel } = await import('/src/features/sharing/ShareActions.tsx');
+        const { setLiveContext, shareLive } = await import('/src/features/sharing/share-service.ts');
         const host = document.getElementById('social-image-fixture');
         const result = { id: '12345678-1234-4234-8234-123456789012', gameId: game, gameVersion: 'test', playerName: 'Preview-test', score: 1200, elapsedTimeMs: 1000, cleared: false, metrics: game === 'dot-wave' ? { mode: 'cpu', turns: 10, remainingHp: 45 } : {}, createdAt: '2026-01-01T00:00:00Z' };
         if (kind === 'result') {
@@ -128,7 +128,7 @@ for (const [game, filename] of artwork) {
         setLiveContext({ gameId: game, cabinetId: result.id, role: 'player', phase: 'paused' });
         // One real panel and store; no App, guest session or game initialization.
         ReactDOMClient.createRoot(host).render(React.createElement(React.Fragment, null,
-          React.createElement(kind === 'result' ? ResultShareButton : LiveShareButton, kind === 'result' ? { draft: result, placement: 'result-page' } : {}),
+          kind === 'result' ? React.createElement(ResultShareButton, { draft: result, placement: 'result-page' }) : React.createElement('button', { onClick: () => shareLive({ gameId: game, cabinetId: result.id, role: 'spectator', phase: 'paused' }) }, '観戦に招待'),
           React.createElement(SharePanel)));
         window.__previewShareLinks = [];
         window.open = url => { window.__previewShareLinks.push(String(url)); return null; };
