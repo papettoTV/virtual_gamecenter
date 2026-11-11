@@ -6,22 +6,24 @@ import { respectReadBudget, finishReadBudget, readBudgetTimeout } from './api-re
 const panel = page => page.getByRole('region', { name: 'アクセス解析の設定' });
 const feedback = page => page.getByRole('dialog', { name: 'ご意見・感想を送る', exact: true });
 
-async function settings(page) {
+async function settings(page, info) {
   const footer = page.locator('.platform-footer');
   await expect(footer.getByRole('button', { name: 'アクセス解析設定', exact: true })).toHaveCount(0);
   await expect(footer.getByRole('link', { name: 'ライセンス', exact: true })).toHaveAttribute('href', '/third-party-notices.html');
   await footer.getByRole('button', { name: 'プライバシーポリシー', exact: true }).click();
   const dialog = page.getByRole('dialog').filter({ has: page.getByTitle('プライバシーポリシー全文') });
   await expect(dialog).toBeVisible();
+  if (info) await info.attach('プライバシーポリシー内の設定導線', { body: await page.screenshot(), contentType: 'image/png' });
   await dialog.getByRole('button', { name: 'アクセス解析設定', exact: true }).click();
   await expect(dialog).toHaveCount(0);
   await expect(panel(page)).toBeVisible();
 }
 
-async function checkFeedback(page, button) {
+async function checkFeedback(page, button, info, name) {
   await button.click();
   await expect(feedback(page)).toBeVisible();
   await expect(feedback(page)).toContainText('あなたのご意見を改善に役立てます。');
+  await info.attach(name, { body: await page.screenshot(), contentType: 'image/png' });
   await feedback(page).getByRole('button', { name: 'フィードバックを閉じる', exact: true }).click();
   await expect(feedback(page)).toBeHidden();
 }
@@ -42,13 +44,13 @@ for (const width of [1280, 390]) {
     const account = await response.json();
     await panel(page).getByRole('button', { name: '閉じる', exact: true }).click();
     for (const [button, choice] of [['同意する', '同意'], ['拒否する', '拒否']]) {
-      await settings(page);
+      await settings(page, info);
       await panel(page).getByRole('button', { name: button, exact: true }).click();
       await settings(page);
       await expect(panel(page)).toContainText(`現在：${choice}`);
       await panel(page).getByRole('button', { name: '閉じる', exact: true }).click();
     }
-    await checkFeedback(page, page.locator('.platform-footer').getByRole('button', { name: 'ご意見・感想を送る', exact: true }));
+    await checkFeedback(page, page.locator('.platform-footer').getByRole('button', { name: 'ご意見・感想を送る', exact: true }), info, '常設のフィードバック画面');
     if (!account.welcomeCreditGranted) await claimWelcomeAndRefresh(page);
     const cabinet = `/cabinets/${randomUUID()}?game=deep-sea-salvage&power=1&powerDrain=100`;
     await page.goto(cabinet);
@@ -64,7 +66,7 @@ for (const width of [1280, 390]) {
     else await page.keyboard.press('p');
     const result = page.locator('#ranking-submit-panel');
     await expect(result).toBeVisible({ timeout: 15000 });
-    await checkFeedback(page, result.getByRole('button', { name: 'ご意見・感想を送る', exact: true }));
+    await checkFeedback(page, result.getByRole('button', { name: 'ご意見・感想を送る', exact: true }), info, '結果から開いたフィードバック画面');
     await expect(result).toBeVisible();
     await info.attach('結果のフィードバック導線', { body: await page.screenshot(), contentType: 'image/png' });
     const reservations = [];

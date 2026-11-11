@@ -77,4 +77,18 @@ describe("free beta legal documents", () => {
     expect(privacy).toContain("すでに送信済み・送信中");
     expect(terms).toContain("独立した任意の選択");
   });
+
+  it("uses the privacy dialog route consistently in documents and consent guidance", () => {
+    const route = "フッターの「プライバシーポリシー」内の「アクセス解析設定」";
+    const consent = renderToStaticMarkup(createElement(AnalyticsConsentView, {
+      current: { choice: "rejected", persisted: true, local: true, active: false },
+      onChoose: () => {}, onClose: () => {},
+    }));
+    for (const document of [terms, privacy, consent]) {
+      expect(document).toContain(route);
+      expect(document).not.toContain("フッターの「アクセス解析設定」");
+    }
+    expect(consent).toContain("現在：拒否");
+    expect(consent).toContain("拒否してもプレイ・観戦できます");
+  });
 });
