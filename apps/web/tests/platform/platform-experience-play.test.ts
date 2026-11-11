@@ -1,3 +1,4 @@
+import { PlayCreditConfirmation } from "../../src/features/platform/PlayCreditConfirmation";
 import type { ReactElement, ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PlatformExperience } from "../../src/features/platform/PlatformExperience";
@@ -82,13 +83,19 @@ function elements(node: ReactNode): ReactElement<Record<string, unknown>>[] {
   if (Array.isArray(node)) return node.flatMap(elements);
   if (!node || typeof node !== "object" || !("props" in node)) return [];
   const element = node as ReactElement<Record<string, unknown>>;
-  return [element, ...elements(element.props.children as ReactNode)];
+  // Expand the shared presentation component so tests operate its rendered buttons.
+  // Keep other component boundaries intact for the account/purchase hook harness.
+  const children = element.type === PlayCreditConfirmation
+    ? PlayCreditConfirmation(element.props as unknown as Parameters<typeof PlayCreditConfirmation>[0])
+    : element.props.children as ReactNode;
+  return [element, ...elements(children)];
 }
 
 function confirm() {
   const button = elements(render()).find(element => element.props.className === "platform-primary-button play-credit-start-button");
   expect(button).toBeDefined();
-  (button?.props.onClick as () => void)();
+  expect(button!.type).toBe("button");
+  (button!.props.onClick as () => void)();
 }
 
 async function flush() {
