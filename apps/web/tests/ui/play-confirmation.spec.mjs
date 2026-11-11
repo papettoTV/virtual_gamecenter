@@ -414,9 +414,24 @@ for (const game of games) {
         const pausedShare = page.getByRole('dialog', { name: '観戦リンクを共有', exact: true });
         await expect(pausedShare).toBeVisible();
         for (const name of ['Xに投稿', 'Facebookに投稿', '投稿文とリンクをコピー']) await expect(pausedShare.getByRole('button', { name, exact: true })).toBeVisible();
+        const closeShare = pausedShare.getByRole('button', { name: '× 閉じる' });
+        // Visibility alone does not catch the fullscreen cabinet covering the
+        // share overlay. Check the actual pointer target as well.
+        expect(await closeShare.evaluate(button => {
+          const rect = button.getBoundingClientRect();
+          return button.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2));
+        })).toBe(true);
         expect(await page.evaluate(async () => (await import('/src/features/sharing/share-service.ts')).sharePanel.getSnapshot().text)).toContain('バズバリアに挑戦中。ここから観戦！');
         await testInfo.attach('paused-share-open', { body: await page.screenshot(), contentType: 'image/png' });
+        await page.keyboard.press('Escape');
+        await expect(pausedShare).toBeHidden();
+        await expect(screen).toHaveAttribute('data-mobile-play', 'true');
+        // Reopening and closing by pointer must restore the same paused view.
+        await screen.getByRole('button', { name: '観戦URLをシェア', exact: true }).click();
+        await expect(pausedShare).toBeVisible();
         await pausedShare.getByRole('button', { name: '× 閉じる' }).click();
+        await expect(pausedShare).toBeHidden();
+        await expect(screen).toHaveAttribute('data-mobile-play', 'true');
         await expect.poll(() => phase(page, game.id)).toBe('paused');
         expect(await wallet(page)).toBe(balance - 1);
         await expect(pause).toHaveAccessibleName('再開');
