@@ -62,8 +62,8 @@ for (const width of [1280, 390]) {
     await start.getByRole('button', { name: '1クレジットで開始', exact: true }).click();
     expect((await (await capture).json()).status).toBe('captured');
     await expect(start).toBeHidden();
-    if (await screen.locator('#touch-pause').isVisible()) await screen.locator('#touch-pause').click();
-    else await page.keyboard.press('p');
+    // The local development parameters above exhaust power naturally. Pausing
+    // here can freeze the simulation before the result is shown.
     const result = page.locator('#ranking-submit-panel');
     await expect(result).toBeVisible({ timeout: 15000 });
     await checkFeedback(page, result.getByRole('button', { name: 'ご意見・感想を送る', exact: true }), info, '結果から開いたフィードバック画面');
