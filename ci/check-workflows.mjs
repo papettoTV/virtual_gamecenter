@@ -10,7 +10,7 @@ export function checkWebWorkflow(web) {
   assert.deepEqual(web.permissions, {contents: 'read'});
   assert.deepEqual(web.jobs.verify.needs, ['unit', 'ui']);
   assert.equal(web.jobs.verify.if, 'always()');
-  assert.deepEqual(web.jobs.ui.strategy.matrix, {project: ['desktop', 'mobile']});
+  assert.deepEqual(web.jobs.ui.strategy.matrix, {project: ['desktop', 'mobile'], shard: [1, 2]});
   assert.equal(web.jobs.ui.strategy['fail-fast'], false);
   assert.equal(web.jobs.ui.needs, undefined);
   assert.equal(web.jobs.unit.needs, undefined);
@@ -25,8 +25,12 @@ export function checkWebWorkflow(web) {
   const unit = web.jobs.unit.steps;
   assert.ok(unit.some(s => s.run === 'npm test'));
   assert.ok(unit.some(s => s.run?.includes('for iteration in 1 2 3')));
-  const ui = web.jobs.ui.steps.find(s => s.run?.includes('test --config ci/ui-local.config.mjs'));
-  assert.equal(ui.run, 'node ci/node_modules/@playwright/test/cli.js test --config ci/ui-local.config.mjs --project=${{ matrix.project }} --reporter=list,blob');
+  const ui = web.jobs.ui.steps.find(s => s.run?.startsWith('node ci/ui-tests.mjs run'));
+  assert.equal(ui.run, 'node ci/ui-tests.mjs run "${{ matrix.project }}" "${{ matrix.shard }}"');
+  assert.equal(ui.if, "steps.ui.outputs.enabled == 'true'");
+  assert.ok(web.jobs.ui.steps.some(s =>
+    s.with?.name === 'ui-part-${{ github.sha }}-${{ github.run_attempt }}-${{ matrix.project }}-${{ matrix.shard }}'));
+  assert.ok(web.jobs.verify.steps.some(s => s.run?.startsWith('node ci/ui-tests.mjs collect\n')));
   const steps = web.jobs.verify.steps;
   const gate = steps.findIndex(s => s.env?.UNIT_RESULT);
   assert.ok(gate > 0);

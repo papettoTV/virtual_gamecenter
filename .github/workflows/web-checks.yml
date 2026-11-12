@@ -42,13 +42,14 @@ jobs:
           done
 
   ui:
-    name: UI (${{ matrix.project }})
+    name: UI (${{ matrix.project }}, ${{ matrix.shard }}/2)
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
         project: [desktop, mobile]
+        shard: [1, 2]
     defaults:
       run:
         working-directory: apps/web
@@ -70,7 +71,7 @@ jobs:
         working-directory: .
         run: |
           npm ci --ignore-scripts --prefix ci
-          node ci/ui-tests.mjs
+          node ci/ui-tests.mjs discover "${{ matrix.shard }}"
       - name: 必要な場合だけ固定ブラウザを準備
         if: steps.ui.outputs.enabled == 'true'
         working-directory: .
@@ -79,12 +80,12 @@ jobs:
         if: steps.ui.outputs.enabled == 'true'
         working-directory: .
         env:
-          PLAYWRIGHT_BLOB_OUTPUT_FILE: ${{ github.workspace }}/ci/ui-results/blob/${{ matrix.project }}.zip
-        run: node ci/node_modules/@playwright/test/cli.js test --config ci/ui-local.config.mjs --project=${{ matrix.project }} --reporter=list,blob
+          PLAYWRIGHT_BLOB_OUTPUT_FILE: ${{ github.workspace }}/ci/ui-results/blob/${{ matrix.project }}-${{ matrix.shard }}.zip
+        run: node ci/ui-tests.mjs run "${{ matrix.project }}" "${{ matrix.shard }}"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: ui-part-${{ github.sha }}-${{ github.run_attempt }}-${{ matrix.project }}
+          name: ui-part-${{ github.sha }}-${{ github.run_attempt }}-${{ matrix.project }}-${{ matrix.shard }}
           path: |
             ci/ui-results/discovery.json
             ci/ui-results/blob/*.zip
@@ -128,20 +129,8 @@ jobs:
           PLAYWRIGHT_JSON_OUTPUT_FILE: ${{ github.workspace }}/ci/ui-results/report.json
           PLAYWRIGHT_HTML_OUTPUT_DIR: ${{ github.workspace }}/ci/ui-results/html
         run: |
-          node --input-type=module <<'JS'
-          import {readFile,mkdir,copyFile,readdir} from 'node:fs/promises';
-          import assert from 'node:assert/strict';
-          const root='ci/ui-parts', prefix=`ui-part-${process.env.GITHUB_SHA}-${process.env.GITHUB_RUN_ATTEMPT}-`;
-          assert.deepEqual((await readdir(root)).sort(),['desktop','mobile'].map(p=>prefix+p));
-          const parts=await Promise.all(['desktop','mobile'].map(p=>readFile(`${root}/${prefix}${p}/discovery.json`,'utf8')));
-          assert.equal(parts[0],parts[1],'PCとスマホの検査定義が不一致です');
-          const discovery=JSON.parse(parts[0]);
-          assert.equal(discovery.required,discovery.files.length>0);
-          await mkdir('ci/ui-results/blob',{recursive:true});
-          await copyFile(`${root}/${prefix}desktop/discovery.json`,'ci/ui-results/discovery.json');
-          if(discovery.required)for(const p of ['desktop','mobile'])await copyFile(`${root}/${prefix}${p}/blob/${p}.zip`,`ci/ui-results/blob/${p}.zip`);
-          JS
-          if test -f ci/ui-results/blob/desktop.zip; then
+          node ci/ui-tests.mjs collect
+          if test -f ci/ui-results/blob/desktop-1.zip; then
             node ci/node_modules/@playwright/test/cli.js merge-reports --reporter=json,html ci/ui-results/blob
             test -s ci/ui-results/report.json
             test -s ci/ui-results/html/index.html
