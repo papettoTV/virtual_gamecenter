@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { test, expect } from '../../../../ci/ui-fixtures.mjs';
 import { respectReadBudget, finishReadBudget, readBudgetTimeout } from './api-read-budget.mjs';
 
@@ -84,3 +85,52 @@ for (const waiting of ['fetch', 'retry']) {
     await finishReadBudget(scope);
   });
 }
+
+// Keep one genuine limit/recovery check; only injected failures use the short
+// probe delay. A fresh guest owns its player budget, so other cases cannot
+// consume it while this case respects the Worker's actual Retry-After.
+test('real Worker backpressure keeps its Retry-After and recovers', async ({ page, context }, testInfo) => {
+  await context.setExtraHTTPHeaders({
+    'cf-connecting-ip': `fd00:${randomUUID().replaceAll('-', '').match(/.{4}/g).slice(0, 7).join(':')}`,
+  });
+  await loadGuest(page, context, testInfo);
+  let limited;
+  for (let attempt = 0; attempt < 61; attempt++) {
+    const response = await context.request.get(`${origin}/api/platform/bootstrap`);
+    if (response.status() === 429) {
+      limited = response;
+      break;
+    }
+    expect(response.status()).toBe(200);
+    await response.dispose();
+  }
+  expect(limited, 'real bootstrap budget must be exhausted').toBeDefined();
+  const retryAfter = Number(limited.headers()['retry-after']);
+  expect(Number.isInteger(retryAfter)).toBe(true);
+  expect(retryAfter).toBeGreaterThan(0);
+  expect(retryAfter).toBeLessThanOrEqual(60);
+  await limited.dispose();
+
+  let realLimits = 0;
+  const probe = delayedReadProbe('/api/platform/bootstrap');
+  // Deliberately omit the probe's IP override here: both fetches must hit the
+  // exhausted real budget. backpressure returns genuine 429s unchanged.
+  const scope = instrument(context, (fetch, request) => probe.intercept(async () => {
+    const response = await fetch();
+    if (response.status() === 429) realLimits++;
+    return response;
+  }, request));
+  await respectReadBudget(scope, testInfo);
+  try {
+    const result = await page.evaluate(async () => {
+      const response = await fetch('/api/platform/bootstrap');
+      return { status: response.status, wallet: (await response.json()).wallet };
+    });
+    expect(realLimits).toBe(1);
+    probe.verify();
+    expect(result.status).toBe(200);
+    await expect(page.locator('.platform-credit-badge')).toHaveText(String(result.wallet.availableTotal));
+  } finally {
+    await finishReadBudget(scope);
+  }
+});

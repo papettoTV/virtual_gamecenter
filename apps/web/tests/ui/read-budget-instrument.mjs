@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+import { localUiUrl } from '../../../../ci/ui-tests.mjs';
 import { expect } from '../../../../ci/ui-fixtures.mjs';
 
 // Instrument actual Playwright Routes, not a fake route lifecycle. Every fetch
@@ -13,7 +15,7 @@ export function instrument(context, intercept) {
       wrapped = async route => {
         owned++;
         const fetch = route.fetch.bind(route);
-        route.fetch = options => intercept(() => fetch(options), route.request());
+        route.fetch = options => intercept(overrides => fetch({ ...options, ...overrides }), route.request());
         try { await handler(route); } finally { owned--; }
       };
       await context.route(pattern, wrapped);
@@ -40,12 +42,12 @@ export function backpressure(response, seconds) {
 
 
 // Observe each browser GET separately, including its one permitted route retry.
-// A successful first fetch may spend the actor's last read in the Worker's
-// minute window (AbuseGuard.consume). An artificial 6s delay can then make the
-// sole retry hit a genuine 429 in that same window. Give injected backpressure
-// a full window, within readBudgetTimeout, so the retry gets a fresh budget.
-// backpressure still preserves a genuine 429 and its actual Retry-After.
-export function delayedReadProbe(pathname, seconds = 60) {
+// Isolate just this probe's two real GETs from the suite's shared loopback IP
+// budget. Keep cookies and player budgets unchanged, and use the same address
+// for both attempts. This header is test input to the disposable local Worker,
+// never a production bypass. Genuine 429s still own their full Retry-After.
+export function delayedReadProbe(pathname, seconds = 6) {
+  const address = `fd00:${randomUUID().replaceAll('-', '').match(/.{4}/g).slice(0, 7).join(':')}`;
   const reads = new Map();
   let selected;
   return {
@@ -54,7 +56,10 @@ export function delayedReadProbe(pathname, seconds = 60) {
       reads.set(request, attempts);
       const inject = !selected && new URL(request.url()).pathname === pathname;
       if (inject) selected = request;
-      const response = await fetch();
+      if (!localUiUrl(request.url())) throw new Error('Read probes require the disposable local Worker');
+      const response = await fetch(request === selected ? {
+        headers: { ...request.headers(), 'cf-connecting-ip': address },
+      } : undefined);
       const at = Date.now();
       const delivered = inject ? backpressure(response, seconds) : response;
       attempts.push({ status: response.status(), at,
