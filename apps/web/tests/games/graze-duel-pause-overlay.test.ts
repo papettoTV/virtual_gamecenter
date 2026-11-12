@@ -12,7 +12,10 @@ describe("BUZZ BARRIER pause overlay", () => {
     const html = render(context);
     expect(html).toContain('role="region" aria-label="一時停止"');
     expect(html).not.toContain("buzz-pause-resume");
-    expect(html).toContain('class="buzz-pause-leave" type="button">別のゲームをする</button>');
+    const actions = renderToStaticMarkup(createElement(BuzzPausePanel, { context, compact: true, actionsOnly: true }));
+    expect(actions).toContain('class="buzz-pause-leave" type="button">別のゲームをする</button>');
+    expect(actions.indexOf("別のゲームをする")).toBeLessThan(actions.indexOf("観戦URLをシェア"));
+    expect(html).not.toContain("<button");
     expect(html).not.toContain("中央");
     expect(html).toContain("右上の「▶」");
     expect(html).toContain("ゲーム画面をスライド");

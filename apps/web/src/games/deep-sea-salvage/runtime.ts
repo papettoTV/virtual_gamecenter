@@ -269,7 +269,7 @@ export function mountGame(context: GameContext): GameInstance {
   function updateLiveShareContext() {
     const context = cabinetId && liveShareScreen ? {
         gameId: DEEP_SEA_SALVAGE.id, cabinetId,
-        role: playing && !watching && cabinetRole === "player" ? "player" as const : "spectator" as const,
+        role: !watching && cabinetRole === "player" ? "player" as const : "spectator" as const,
         phase: state.phase === "result" ? "finished" as const : state.phase === "ready" ? "ready" as const
           : state.paused || state.collectionOpen ? "paused" as const : "playing" as const,
     } : null;

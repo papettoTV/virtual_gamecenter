@@ -174,7 +174,8 @@ for (const viewport of [{ width: 320, height: 568 }, { width: 844, height: 390 }
     // Let transient credit notifications expire naturally before collecting evidence.
     await expect(page.locator('.notification')).toHaveCount(0, { timeout: 15000 });
     await info.attach(`salvage-${viewport.width}`, { body: await page.screenshot(), contentType: 'image/png' });
-    await screen.getByRole('button', { name: '通常表示に戻る' }).click();
+    await expect(screen.getByRole('button', { name: '通常表示に戻る' })).toHaveCount(0);
+    await page.keyboard.press('Escape');
     await expect(screen).not.toHaveAttribute('data-mobile-play');
     await expect(screen).toHaveAttribute('data-salvage-collection', 'true');
     await expect(leave).toBeHidden();
@@ -210,7 +211,8 @@ test('salvage: restore, reenter fullscreen and exit directly with connection cle
   const { screen, localAccount, writes, sockets } = state;
   await start(page, state);
   await expect.poll(() => sockets.size).toBe(1);
-  await screen.getByRole('button', { name: '通常表示に戻る' }).click();
+  await expect(screen.getByRole('button', { name: '通常表示に戻る' })).toHaveCount(0);
+  await page.keyboard.press('Escape');
   await expect(screen).not.toHaveAttribute('data-mobile-play');
   const scrollState = () => page.evaluate(() => ({
     fixed: document.body.style.position === 'fixed',
@@ -228,6 +230,13 @@ test('salvage: restore, reenter fullscreen and exit directly with connection cle
   const dialogs = [];
   page.on('dialog', async dialog => { dialogs.push(dialog.message()); await dialog.dismiss(); });
   await screen.locator('.mobile-play-leave').click();
+  const confirmation = page.getByRole('dialog', { name: '別のゲームを選びますか？', exact: true });
+  await expect(confirmation).toBeVisible();
+  await confirmation.getByRole('button', { name: 'キャンセル', exact: true }).click();
+  await expect(screen).toHaveAttribute('data-mobile-play', 'true');
+  await expect.poll(() => sockets.size).toBe(1);
+  await screen.locator('.mobile-play-leave').click();
+  await confirmation.getByRole('button', { name: '別のゲームをする', exact: true }).click();
   await expect(page).toHaveURL(`${origin}/`);
   await expect(screen).toHaveCount(0);
   await expect.poll(() => phase(page)).toBeUndefined();
