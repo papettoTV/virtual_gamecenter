@@ -405,6 +405,30 @@ for (const game of games) {
           expect(frame.height).toBeGreaterThanOrEqual(Math.min(viewport.width / .65, viewport.height - 132) - 2);
           expect(frame.y + frame.height).toBeLessThanOrEqual(viewport.height);
           expect(frame.width / frame.height).toBeCloseTo(416 / 640, 2);
+          const panel = screen.getByRole('region', { name: '一時停止', exact: true });
+          await expect(panel).toBeVisible();
+          await expect(panel.getByRole('heading', { name: 'PAUSED', exact: true })).toBeVisible();
+          await expect(panel.locator('.buzz-pause-hint')).toHaveText('右上の「▶」をタップして再開');
+          await expect(panel.locator('li')).toHaveText(['移動: ゲーム画面をスライド', 'ボス攻撃: 無敵シールドを当てる']);
+          // Check the actual rendered text lines, not just their wrapping boxes.
+          // Grid min-content sizing used to push these beyond the narrow board.
+          const textBounds = await panel.locator('h2, .buzz-pause-hint, li').evaluateAll(nodes => nodes.map(node => {
+            const range = document.createRange();
+            range.selectNodeContents(node);
+            return {
+              box: node.getBoundingClientRect().toJSON(),
+              lines: [...range.getClientRects()].map(rect => rect.toJSON()),
+              overflows: node.scrollWidth > node.clientWidth,
+            };
+          }));
+          for (const { box, lines, overflows } of textBounds) {
+            expect(overflows).toBe(false);
+            expect(lines.length).toBeGreaterThan(0);
+            for (const rect of [box, ...lines]) {
+              expect(rect.left).toBeGreaterThanOrEqual(frame.x - 1);
+              expect(rect.right).toBeLessThanOrEqual(frame.x + frame.width + 1);
+            }
+          }
           const actions = await screen.locator('.buzz-pause-actions').boundingBox();
           expect(actions.y).toBeGreaterThanOrEqual(frame.y + frame.height - 1);
           expect(actions.y + actions.height).toBeLessThanOrEqual(viewport.height);
