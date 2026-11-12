@@ -66,16 +66,32 @@ test('cleanup propagates in-flight transport failures', async () => {
   await Promise.all([read, cleanup]);
 });
 
-test('a real 429 read waits Retry-After and retries only once', async () => {
+test('an isolated real 429 read preserves cookies, waits Retry-After and retries only once', async () => {
   const response = { status: () => 429, headers: () => ({ 'retry-after': '1' }), async dispose() {} };
   const h = harness(response);
-  await respectReadBudget(h.context, info());
+  const testInfo = info();
+  h.route.request = () => ({
+    url: () => 'http://127.0.0.1:5174/api/platform/credits', method: () => 'GET',
+    headers: () => ({ cookie: 'fake-local-session=guest', accept: 'application/json' }),
+  });
+  await respectReadBudget(h.context, testInfo, {
+    address: 'fd00:1:2:3:4:5:6:7', label: 'player', phase: () => 'start-and-wallet',
+  });
   const started = Date.now();
   await h.run();
   assert.ok(Date.now() - started >= 1000);
   const fetches = h.calls.filter(call => typeof call === 'object');
   assert.equal(fetches.length, 2);
   assert.ok(fetches.every(options => options.maxRetries === 0 && options.maxRedirects === 0));
+  assert.deepEqual(fetches[0].headers, {
+    cookie: 'fake-local-session=guest', accept: 'application/json',
+    'cf-connecting-ip': 'fd00:1:2:3:4:5:6:7',
+  });
+  assert.deepEqual(fetches[1], fetches[0]);
+  assert.deepEqual(testInfo.annotations, [
+    { type: 'local-api-backpressure', description: 'player/start-and-wallet /api/platform/credits: 1s' },
+    { type: 'local-api-backpressure-retry', description: 'player/start-and-wallet /api/platform/credits: 429' },
+  ]);
   assert.ok(h.calls.includes('fulfill'));
   await finishReadBudget(h.context);
 });
@@ -87,7 +103,7 @@ test('writes and external reads fall through without a fetch or retry', async ()
   ]) {
     const h = harness(null);
     h.route.request = () => ({ url: () => url, method: () => method });
-    await respectReadBudget(h.context, info());
+    await respectReadBudget(h.context, info(), { address: 'fd00:1:2:3:4:5:6:7' });
     await h.run();
     assert.deepEqual(h.calls, ['fallback']);
     await finishReadBudget(h.context);

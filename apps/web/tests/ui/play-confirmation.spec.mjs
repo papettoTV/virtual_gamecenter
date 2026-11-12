@@ -510,6 +510,20 @@ for (const game of games) {
     test(`${game.id}: spectator never requests a start (${occupied ? 'live player' : 'empty cabinet'}${delayedExit ? ', exit read backpressure' : ''})`, async ({ page, context, browser, isMobile }, testInfo) => {
       const cabinet = `${origin}/cabinets/${randomUUID()}?game=${game.id}`;
       const playerContext = occupied ? await browser.newContext() : null;
+      // Isolate the whole delayed-exit case, including setup and post-exit reads.
+      // Each role keeps one local IP across its reads; cookies/player limits and
+      // every accounting write still use the unmodified real Worker behavior.
+      let readPhase = 'setup';
+      const identity = label => ({
+        address: `fd00:${randomUUID().replaceAll('-', '').match(/.{4}/g).slice(0, 7).join(':')}`,
+        label, phase: () => readPhase,
+      });
+      const spectatorReads = delayedExit ? identity('spectator') : undefined;
+      const playerReads = delayedExit ? identity('player') : undefined;
+      if (delayedExit) {
+        await finishReadBudget(context);
+        await respectReadBudget(context, testInfo, spectatorReads);
+      }
       const playerEvents = [];
       const playerWrites = [];
       let player;
@@ -518,7 +532,7 @@ for (const game of games) {
           // Extra contexts need the same local-only network boundary as the fixture.
           await playerContext.route('**/*', route => localUiUrl(route.request().url()) ? route.continue() : route.abort());
           await playerContext.routeWebSocket('**/*', socket => localUiUrl(socket.url()) ? socket.connectToServer() : socket.close());
-          await respectReadBudget(playerContext, testInfo);
+          await respectReadBudget(playerContext, testInfo, playerReads);
           player = await playerContext.newPage();
           // Record local accounting and connection transitions for failed CI diagnosis.
           player.on('request', request => {
@@ -555,6 +569,7 @@ for (const game of games) {
             await expect(start).toBeVisible();
             await expect(start).toBeEnabled();
           }
+          readPhase = 'player-start-and-wallet';
           const playerBalance = await wallet(player);
           // Register both real accounting responses before any start operation.
           const reserved = player.waitForResponse(response => response.request().method() === 'POST' && response.url().endsWith('/credit-reservations'));
@@ -600,6 +615,7 @@ for (const game of games) {
           await expect(player.locator('.platform-credit-badge')).toHaveText(String(playerBalance - 1), { timeout: readBudgetTimeout });
           expect(await persistedWallet(player)).toBe(playerBalance - 1);
         }
+        readPhase = 'spectator-setup';
         const balance = (await prepareGuest(page)).availableTotal;
         const writes = [];
         page.on('request', request => { if (request.method() === 'POST' && request.url().includes('credit-reservations')) writes.push(request.url()); });
@@ -636,13 +652,15 @@ for (const game of games) {
         if (delayedExit) {
           await finishReadBudget(context);
           exitScope = instrument(context, exitProbe.intercept);
-          await respectReadBudget(exitScope, testInfo);
+          await respectReadBudget(exitScope, testInfo, spectatorReads);
         }
+        readPhase = 'spectator-exit';
         try {
           await leaveToDirectory(page, game.id, !occupied
             ? '.spectator-availability .showcase-actions button:last-child'
             : game.id === 'dot-wave' ? null : '#spectator-game-back');
           if (delayedExit) exitProbe.verify();
+          readPhase = 'spectator-post-exit-wallet';
           expect(await wallet(page)).toBe(balance);
           expect(await persistedWallet(page)).toBe(balance);
           expect(writes).toHaveLength(0);
