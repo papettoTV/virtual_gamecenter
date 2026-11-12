@@ -1,3 +1,4 @@
+import { PlayCreditConfirmation } from "./PlayCreditConfirmation";
 import { usePlatformAccount } from "./use-platform-account";
 import { useCreditPurchase } from "./use-credit-purchase";
 import { PlatformProfile } from "./PlatformProfile";
@@ -323,70 +324,19 @@ export function PlatformExperience({ standaloneCredits = false }: { standaloneCr
         handleWelcomeCredit={handleWelcomeCredit}
       />
 
-      {playDialog && (
-        <div className="platform-overlay" role="dialog" aria-modal="true" aria-labelledby="play-credit-title">
-          <div className="platform-dialog platform-dialog-small">
-            <div className="play-credit-header">
-              <p className="eyebrow">1 Credit</p>
-              {playDialog === "confirm" && (
-                <button
-                  className="cabinet-share-button platform-share-icon-button"
-                  type="button"
-                  aria-label="観戦用画面を共有"
-                  title="観戦用画面を共有"
-                  onClick={event => { event.currentTarget.focus(); void shareCabinetUrl(); }}
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <circle cx="18" cy="5" r="3" />
-                    <circle cx="6" cy="12" r="3" />
-                    <circle cx="18" cy="19" r="3" />
-                    <path d="m8.7 10.7 6.6-4.2M8.7 13.3l6.6 4.2" />
-                  </svg>
-                </button>
-              )}
-            </div>
-            <h2 id="play-credit-title">
-              {playDialog === "confirm" ? "ゲームを開始しますか？" : "クレジットが不足しています"}
-            </h2>
-            {playDialog === "confirm" ? (
-              <p>
-                開始時に1クレジットを使用します。現在の利用可能残高は
-                <strong> {wallet?.availableTotal ?? 0}枚</strong>です。
-              </p>
-            ) : (
-              <p>
-                {purchasesEnabled ? "ゲーム開始には1クレジット必要です。クレジットを購入しますか？" : "無料ベータ期間中は購入できません。毎日、残高が3枚未満なら3枚まで補充します（日本時間・1日1回）。本日の補充が利用済みなら、翌日またお越しください。"}
-              </p>
-            )}
-            <div className={`platform-dialog-actions play-credit-actions${playDialog === "confirm" ? " is-confirm" : ""}`}>
-              <button className="platform-cancel-button" type="button" disabled={busy} onClick={cancelPlay}>
-                {playDialog === "confirm" ? "キャンセル" : purchasesEnabled ? "いいえ" : "閉じる"}
-              </button>
-              {playDialog === "confirm" && (
-                <button className="platform-primary-button play-credit-start-button" type="button" disabled={busy} onClick={() => void handlePlayConfirm()}>
-                  {busy ? "準備中…" : "1クレジットで開始"}
-                </button>
-              )}
-              {playDialog === "insufficient" && purchasesEnabled && (
-                <button className="platform-primary-button" type="button" onClick={() => {
-                  setPlayDialog(null);
-                  setPurchaseDialog("select");
-                }}>
-                  はい
-                </button>
-              )}
-              {playDialog === "insufficient" && !purchasesEnabled && !platform?.accountRegistered && (
-                <button className="platform-primary-button" type="button" onClick={() => {
-                  setPlayDialog(null);
-                  requestUserRegistration();
-                }}>
-                  ユーザー登録で5枚を受け取る
-                </button>
-              )}
-            </div>
+      {playDialog === "confirm" && <PlayCreditConfirmation busy={busy} balance={wallet?.availableTotal ?? 0}
+        onCancel={cancelPlay} onConfirm={() => void handlePlayConfirm()} onShare={() => void shareCabinetUrl()} />}
+      {playDialog === "insufficient" && <div className="platform-overlay" role="dialog" aria-modal="true" aria-labelledby="play-credit-title">
+        <div className="platform-dialog platform-dialog-small">
+          <h2 id="play-credit-title">クレジットが不足しています</h2>
+          <p>{purchasesEnabled ? "ゲーム開始には1クレジット必要です。クレジットを購入しますか？" : "無料ベータ期間中は購入できません。毎日、残高が3枚未満なら3枚まで補充します（日本時間・1日1回）。本日の補充が利用済みなら、翌日またお越しください。"}</p>
+          <div className="platform-dialog-actions play-credit-actions">
+            <button className="platform-cancel-button" type="button" disabled={busy} onClick={cancelPlay}>{purchasesEnabled ? "いいえ" : "閉じる"}</button>
+            {purchasesEnabled && <button className="platform-primary-button" type="button" onClick={() => { setPlayDialog(null); setPurchaseDialog("select"); }}>はい</button>}
+            {!purchasesEnabled && !platform?.accountRegistered && <button className="platform-primary-button" type="button" onClick={() => { setPlayDialog(null); requestUserRegistration(); }}>ユーザー登録で5枚を受け取る</button>}
           </div>
         </div>
-      )}
+      </div>}
 
       <CreditPurchaseDialogs
         purchasesEnabled={purchasesEnabled}

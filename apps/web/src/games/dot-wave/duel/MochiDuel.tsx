@@ -1,3 +1,5 @@
+import { PlayCreditConfirmation } from "../../../features/platform/PlayCreditConfirmation";
+import { LeaveGameConfirmation } from "../../../features/game/LeaveGameConfirmation";
 import { notifications } from "../../../features/notifications/notifications";
 import { DotWaveResult } from "./DotWaveResult";
 import { navigate } from "../../../shared/navigation";
@@ -357,16 +359,10 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
   const heading = e.phase === "intro" ? ""  : e.phase === "paused" ? "PAUSED / 一時停止" : e.phase === "finished" && cleared ? next ? `${stageInfo.label} CLEAR!` : "ALL STAGES CLEAR!" : e.phase === "finished" ? e.match.winner === "draw" ? "DRAW / 引き分け" : `${name(e.match.winner!)}の勝ち！` : e.phase === "impact" ? e.outcome!.damage ? "CORE HIT! パルス直撃！" : "攻撃を防いだ！" : beat < 4 ? `${name(attacker)}、次の攻撃！ ${4 - Math.floor(beat)}` : beat < 8 ? `${name(attacker)}の攻撃！` : `${name((1 - attacker) as Side)}、リズムで守れ！`;
 
   return <main className="dot-wave" data-phase={e.phase}>
-    {creditConfirmation.current && <div className="platform-overlay" role="dialog" aria-modal="true" aria-label="ゲームを開始しますか？"
-      onKeyDown={event => { event.stopPropagation(); if (event.repeat && ["Space", "Enter"].includes(event.code)) event.preventDefault(); if (event.code === "Escape") { event.preventDefault(); creditConfirmation.current = false; render(); } }}>
-      <div className="platform-dialog platform-dialog-small">
-        <h2>ゲームを開始しますか？</h2><p>開始時に1クレジットを使用します。</p>
-        <div className="platform-dialog-actions">
-          <button autoFocus type="button" onClick={() => { creditConfirmation.current = false; render(); }}>キャンセル</button>
-          <button type="button" onClick={() => void begin(true)}>1クレジットで開始</button>
-        </div>
-      </div>
-    </div>}
+    <LeaveGameConfirmation active={!replica && !["intro", "finished"].includes(e.phase)} />
+    {creditConfirmation.current && <PlayCreditConfirmation autoFocus busy={busy.current}
+      onCancel={() => { if (!busy.current) { creditConfirmation.current = false; render(); } }}
+      onConfirm={() => void begin(true)} onShare={() => window.dispatchEvent(new Event("request-cabinet-share"))} />}
 
     <header><div><span className="duel-eyebrow">NEON RHYTHM BATTLE</span><h1><PixelWord /></h1></div><a href="/">ゲーム一覧へ</a></header>
     <div className="duel-mode-label">

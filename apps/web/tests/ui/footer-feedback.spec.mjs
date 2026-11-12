@@ -53,7 +53,18 @@ for (const width of [1280, 390]) {
     await checkFeedback(page, page.locator('.platform-footer').getByRole('button', { name: 'ご意見・感想を送る', exact: true }), info, '常設のフィードバック画面');
     if (!account.welcomeCreditGranted) await claimWelcomeAndRefresh(page);
     const cabinet = `/cabinets/${randomUUID()}?game=deep-sea-salvage&power=1&powerDrain=100`;
+    // Navigation renders READY before the new document's account is hydrated.
+    // Observe its real bootstrap and rendered balance before the single start click.
+    const cabinetLoaded = page.waitForResponse(r =>
+      r.url() === new URL('/api/platform/bootstrap', page.url()).href
+      && r.request().method() === 'GET'
+      && r.frame() === page.mainFrame(), { timeout: readBudgetTimeout });
     await page.goto(cabinet);
+    const cabinetResponse = await cabinetLoaded;
+    expect(cabinetResponse.ok()).toBe(true);
+    const cabinetAccount = await cabinetResponse.json();
+    await expect(page.locator('.platform-credit-badge')).toHaveText(
+      String(cabinetAccount.wallet.availableTotal), { timeout: readBudgetTimeout });
     const screen = page.locator('#game-screen');
     await screen.getByRole('button', { name: '潜航開始', exact: true }).click();
     const start = page.getByRole('dialog', { name: 'ゲームを開始しますか？', exact: true });

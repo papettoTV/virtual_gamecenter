@@ -38,6 +38,11 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 412, height: 915 }
     const invite = screen.getByRole('button', { name: '観戦に招待', exact: true });
     await expect(invite).toBeVisible();
     await expect(screen.locator('.mobile-ready-start')).toHaveCount(0);
+    const guide = screen.getByRole('region', { name: '操作と遊び方' });
+    await expect(guide.getByRole('heading', { name: '操作', exact: true })).toBeVisible();
+    await expect(guide.getByRole('heading', { name: '遊び方', exact: true })).toBeVisible();
+    await screen.locator('#game').click({ position: { x: 30, y: 30 } });
+    await expect(page.getByRole('dialog', { name: 'ゲームを開始しますか？', exact: true })).toHaveCount(0);
     await expect(screen.getByRole('button', { name: 'ゲーム開始', exact: true })).toBeVisible();
     await expect(screen.locator('#touch-pause')).toBeHidden();
     await expect(screen.locator('.game-share-button')).toHaveCount(0);
@@ -273,8 +278,8 @@ for (const gameId of ['graze-duel', 'deep-sea-salvage']) {
         body: await page.screenshot(), contentType: 'image/png',
       });
     }
-    if (gameId === 'graze-duel') await page.keyboard.press('Escape');
-    else await screen.getByRole('button', { name: '通常表示に戻る' }).click();
+    await expect(screen.getByRole('button', { name: '通常表示に戻る' })).toHaveCount(0);
+    await page.keyboard.press('Escape');
     await expect(screen).not.toHaveAttribute('data-mobile-play');
     if (gameId === 'graze-duel') {
       await page.evaluate(() => window.disposeInputFixture());

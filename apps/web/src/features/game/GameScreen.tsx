@@ -1,3 +1,4 @@
+import { LeaveGameConfirmation } from "./LeaveGameConfirmation";
 import { gameHost } from "../../game-sdk/game-host";
 import { useRef } from "react";
 import { useMobilePlay } from "./use-mobile-play";
@@ -65,6 +66,11 @@ export function GameScreen({ game }: GameScreenProps) {
           </svg>
         </button>}
         <canvas id="game" width="960" height="640" aria-label={`${game.title} game canvas`} />
+        {tapReady && <section className="buzz-ready-guide" aria-label="操作と遊び方">
+          <h2>READY</h2><h3>操作</h3><p>ゲーム画面をスライドして移動</p>
+          <h3>遊び方</h3><p>弾をかすめてゲージをため、<br />無敵シールドをボスに当てよう。</p>
+          <p>右上の「▶」をタップして開始</p>
+        </section>}
         {tapReady && <button className="touch-button buzz-ready-trigger" type="button" aria-label="ゲーム開始"
           onKeyDown={event => event.stopPropagation()}
           onKeyUp={event => event.stopPropagation()}
@@ -130,9 +136,11 @@ export function GameScreen({ game }: GameScreenProps) {
         </div>
       </div>
 
+      {game.id === "graze-duel" && <BuzzPauseOverlay compact={play.mobile || play.active} actionsOnly />}
+      <LeaveGameConfirmation />
       <LiveShareButton />
-      {(play.active || play.available) && !(game.id === "graze-duel" && play.active) && <button className="mobile-play-toggle touch-button" type="button" onKeyDown={event => event.stopPropagation()} onKeyUp={event => event.stopPropagation()} onPointerDown={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); play.toggle(); }}>
-        {play.active ? "通常表示に戻る" : "全画面でプレイ"}
+      {play.available && !play.active && <button className="mobile-play-toggle touch-button" type="button" onKeyDown={event => event.stopPropagation()} onKeyUp={event => event.stopPropagation()} onPointerDown={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); play.toggle(); }}>
+        全画面でプレイ
       </button>}
 
       <AfterFrame game={game} />
