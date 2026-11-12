@@ -24,9 +24,9 @@ it.each(GAME_CATALOG)("places secondary actions after $id result and retry actio
   const html = renderToStaticMarkup(createElement(GameScreen, { game }));
   const panel = html.slice(html.indexOf('id="ranking-submit-panel"'), html.indexOf('class="spectator-game-actions"'));
   expect(panel).toContain('class="result-feedback"');
-  expect(panel.indexOf("感想・不具合を送る")).toBeGreaterThan(panel.indexOf('id="ranking-submit"'));
+  expect(panel.indexOf("ご意見・感想を送る")).toBeGreaterThan(panel.indexOf('id="ranking-submit"'));
   expect(panel.indexOf('id="ranking-retry"')).toBeLessThan(panel.indexOf('id="ranking-another-game"'));
-  expect(panel.indexOf("感想・不具合を送る")).toBeGreaterThan(panel.indexOf('id="ranking-another-game"'));
+  expect(panel.indexOf("ご意見・感想を送る")).toBeGreaterThan(panel.indexOf('id="ranking-another-game"'));
   expect(panel.indexOf("結果を共有")).toBeGreaterThan(panel.indexOf('id="ranking-another-game"'));
 });
 
@@ -56,7 +56,7 @@ it("groups DOT WAVE final result before retry and secondary feedback", () => {
   expect(html).toContain("54,820");
   expect(html.indexOf("54,820")).toBeLessThan(html.indexOf("リトライ"));
   expect(html.indexOf("リトライ")).toBeLessThan(html.indexOf("結果を共有"));
-  expect(html.indexOf("結果を共有")).toBeLessThan(html.indexOf("感想・不具合を送る"));
+  expect(html.indexOf("結果を共有")).toBeLessThan(html.indexOf("ご意見・感想を送る"));
 });
 
 it("keeps DOT WAVE held player results actionable without exposing gameplay controls", () => {
@@ -67,5 +67,5 @@ it("keeps DOT WAVE held player results actionable without exposing gameplay cont
   expect(html).toContain("別のゲームを探す");
   expect(html).toContain('class="duel-controls" hidden=""');
   expect(html).not.toContain('class="dot-scene-wrap"');
-  expect(html.indexOf('class="dot-result-actions"')).toBeLessThan(html.indexOf("感想・不具合を送る"));
+  expect(html.indexOf('class="dot-result-actions"')).toBeLessThan(html.indexOf("ご意見・感想を送る"));
 });

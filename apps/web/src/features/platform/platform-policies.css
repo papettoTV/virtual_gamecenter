@@ -1,0 +1,9 @@
+footer.platform-footer {
+  margin-block: 20px;
+  row-gap: 12px;
+}
+
+.policy-dialog > button:not(.platform-dialog-close) {
+  display: block;
+  margin-bottom: 12px;
+}
