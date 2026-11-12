@@ -3,7 +3,7 @@ import {readFile,writeFile,appendFile,lstat,readdir} from 'node:fs/promises';
 import {pathToFileURL} from 'node:url';
 import {resolve} from 'node:path';
 export const CONTROL_SHA='3d0bc599e40017ad75af5affd94a4cc5efb7907c';
-export const RULE_VERSIONS={ciControl:'2026-11-11T03:40:11.177Z',main:'2026-10-21T20:32:35.191Z',protectionMode:'strict'};
+export const RULE_VERSIONS={ciControl:'2026-11-11T21:22:14.651Z',main:'2026-10-21T20:32:35.191Z',protectionMode:'strict'};
 const repository='papettoTV/virtual_gamecenter',sha=v=>/^[a-f0-9]{40}$/.test(v??''),id=v=>/^[1-9][0-9]*$/.test(String(v??''));
 function need(v,m){if(!v)throw Error(m);}
 export function context(env=process.env){

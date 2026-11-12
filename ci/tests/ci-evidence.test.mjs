@@ -55,7 +55,8 @@ test('待機はAPI所要時間を含む期限で停止し、未完了やAPI失�
 test('CI・照合jobの上限は順序に合い、安全な固定コードで失敗理由を出す',async()=>{
  const web=await readFile(new URL('../../.github/workflows/web-checks.yml',import.meta.url),'utf8');
  const review=await readFile(new URL('../../.github/workflows/codex-pr.yml',import.meta.url),'utf8');
- const ui=Number(web.match(/  ui:[\s\S]*?timeout-minutes: (\d+)/)[1]);
+ const [,mobile,desktop]=web.match(/  ui:[\s\S]*?timeout-minutes: \$\{\{ matrix\.project == 'mobile' && (\d+) \|\| (\d+) \}\}/);
+ const ui=Math.max(Number(mobile),Number(desktop));
  const verify=Number(web.match(/  verify:[\s\S]*?timeout-minutes: (\d+)/)[1]);
  const candidate=Number(review.match(/name: Candidate tests[\s\S]*?timeout-minutes: (\d+)/)[1]);
  assert.ok(ciEvidenceTimeoutMs>=(ui+verify+5)*60000);assert.ok(candidate*60000>=ciEvidenceTimeoutMs+5*60000);
