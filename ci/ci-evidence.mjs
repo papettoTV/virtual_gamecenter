@@ -25,10 +25,9 @@ export async function ciEvidence({ api, repository, checkSha, buildSha, event, r
   if (matching.length !== 1 || !Number.isSafeInteger(matching[0].size_in_bytes) || matching[0].size_in_bytes < 1 || matching[0].size_in_bytes > 250 * 1024 * 1024) throw Error('Exact CI artifact is missing or ambiguous');
   return { runId: String(run.id), attempt: String(run.run_attempt), artifactId: String(matching[0].id) };
 }
-// Web checks allow UI=15m followed by verify=5m. Leave 5m for queue/API lag;
-// Candidate tests has a separate 30m job limit, including its own setup.
-export const ciEvidenceTimeoutMs = 25 * 60 * 1000;
-export async function waitForCi(options, { timeoutMs = ciEvidenceTimeoutMs, attempts = 151, now = Date.now, wait = ms => new Promise(resolve => setTimeout(resolve, ms)) } = {}) {
+const ciEvidencePollMs = 10000;
+export const ciEvidenceTimeoutMs = 35 * 60 * 1000;
+export async function waitForCi(options, { timeoutMs = ciEvidenceTimeoutMs, attempts = Math.ceil(timeoutMs / ciEvidencePollMs) + 1, now = Date.now, wait = ms => new Promise(resolve => setTimeout(resolve, ms)) } = {}) {
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || !Number.isSafeInteger(attempts) || attempts < 1) throw Error('Invalid CI wait budget');
   const deadline = now() + timeoutMs;
   for (let i = 0; i < attempts; i++) {
@@ -36,7 +35,7 @@ export async function waitForCi(options, { timeoutMs = ciEvidenceTimeoutMs, atte
     if (result) return result;
     const remaining = deadline - now();
     if (remaining <= 0 || i === attempts - 1) break;
-    await wait(Math.min(10000, remaining));
+    await wait(Math.min(ciEvidencePollMs, remaining));
   }
   throw Error('CI evidence timed out');
 }
