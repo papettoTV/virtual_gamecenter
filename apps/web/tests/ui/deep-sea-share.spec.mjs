@@ -12,7 +12,11 @@ for (const width of [320, 390, 844, 1184, 1185, 1440]) {
       if (request.method() === 'POST' && request.url().includes('/api/platform/credit-reservations')) reservations.push(request.url());
     });
     await page.goto(`/cabinets/${randomUUID()}?game=deep-sea-salvage&start=1`);
-    const share = page.locator('#game-screen .game-share-button');
+    await expect.poll(() => page.evaluate(async () => {
+      const context = (await import('/src/features/sharing/share-service.ts')).liveSharing.getSnapshot();
+      return context && { role: context.role, phase: context.phase };
+    })).toEqual({ role: 'player', phase: 'ready' });
+    const share = page.locator('#game-screen .safe-live-share button');
     const profile = page.getByRole('button', { name: 'プロフィールを表示', exact: true });
     await expect(share).toBeVisible();
     await expect(profile).toBeVisible();
@@ -33,10 +37,11 @@ for (const width of [320, 390, 844, 1184, 1185, 1440]) {
     expect(geometry.profileHit).toBe(true);
     const activate = button => isMobile ? button.tap() : button.click();
     await activate(share);
-    const dialog = page.getByRole('dialog', { name: '観戦に招待', exact: true });
+    const dialog = page.getByRole('dialog', { name: '観戦リンクを共有', exact: true });
     await expect(dialog).toBeVisible();
     await expect(profile).toHaveAttribute('aria-expanded', 'false');
-    await expect(dialog.locator('.social-link-card img')).toHaveAttribute('src', /deep-sea-salvage-ogp-v2\.jpg$/);
+    await expect(dialog.locator('.social-link-card, textarea')).toHaveCount(0);
+    for (const name of ['Xに投稿', 'Facebookに投稿', '投稿文とリンクをコピー']) await expect(dialog.getByRole('button', { name, exact: true })).toBeVisible();
     await dialog.getByRole('button', { name: '× 閉じる', exact: true }).click();
     await activate(profile);
     await expect(page.getByRole('region', { name: 'プレイヤー情報', exact: true })).toBeVisible();

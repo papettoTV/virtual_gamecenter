@@ -1,0 +1,3 @@
+.leave-game-dialog:not([open]) { display: none; }
+.leave-game-dialog[open] { position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; border: 0; box-sizing: border-box; }
+.leave-game-dialog::backdrop { background: rgba(3, 7, 19, .8); }
