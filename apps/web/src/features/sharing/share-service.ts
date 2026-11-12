@@ -57,7 +57,7 @@ export function liveShareText(context: LiveShareContext): string {
   if (context.phase === "finished") return `${title}のプレイは終了しました。この筐体の状況はこちら。\n${tags}`;
   if (context.role === "spectator") return `${title}のライブを観戦中。一緒に見ませんか？\n${tags}`;
   if (context.phase === "ready") return `これから${title}に挑戦！ここから観戦できます。\n${tags}`;
-  if (context.phase === "paused") return `${title}に挑戦中。ただいま休憩中です。続きの観戦はこちら。\n${tags}`;
+  if (context.phase === "paused") return `${title}に挑戦中。ここから観戦！\n${tags}`;
   return `${title}に挑戦中！ライブ観戦はこちら。\n${tags}`;
 }
 
@@ -75,7 +75,7 @@ export async function getShareOrigin(): Promise<string> {
 
 export async function shareLive(context: LiveShareContext) {
   const shareId = createUuid();
-  const compactLive = context.gameId === "graze-duel" && context.role === "player" && context.phase === "ready";
+  const compactLive = context.role === "player";
   const state: SharePanelState = { kind: "live", gameId: context.gameId, targetId: context.cabinetId, shareId, title: compactLive ? "観戦リンクを共有" : "観戦に招待", text: liveShareText(context), url: "", status: "loading", compactLive };
   updatePanel(state);
   recordSharingEvent("share_opened", state);

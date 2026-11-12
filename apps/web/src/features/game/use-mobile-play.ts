@@ -51,11 +51,13 @@ export function useMobilePlay(screen: RefObject<HTMLElement | null>) {
     }
     const preventMenu = (event: Event) => event.preventDefault();
     const escape = (event: KeyboardEvent) => {
+      // The foreground dialog owns Escape; closing it must retain mobile play.
+      if (document.querySelector(".leave-game-dialog[open], .share-overlay, .platform-overlay")) return;
       if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); dismissed.current = true; setActive(false); }
     };
     root.addEventListener("contextmenu", preventMenu);
     document.addEventListener("keydown", escape, true);
-    root.querySelector<HTMLButtonElement>(root.dataset.gameId === "graze-duel" ? "#touch-pause" : ".mobile-play-toggle")?.focus({ preventScroll: true });
+    root.querySelector<HTMLButtonElement>("#touch-pause")?.focus({ preventScroll: true });
     return () => {
       root.removeEventListener("contextmenu", preventMenu);
       document.removeEventListener("keydown", escape, true);

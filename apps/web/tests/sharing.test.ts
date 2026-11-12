@@ -75,7 +75,7 @@ describe("live invitation copy", () => {
   });
   it("distinguishes player, pause, and spectator messages", () => {
     expect(liveShareText({ ...context, phase: "playing" })).toContain("挑戦中");
-    expect(liveShareText({ ...context, phase: "paused" })).toContain("休憩中");
+    expect(liveShareText({ ...context, phase: "paused" })).toContain("バズバリアに挑戦中。ここから観戦！");
     expect(liveShareText({ ...context, role: "spectator", phase: "playing" })).toContain("一緒に見ませんか");
   });
 });

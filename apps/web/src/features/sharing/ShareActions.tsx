@@ -27,6 +27,7 @@ export function ResultShareButton({ draft, placement }: { draft?: SharedResultDr
 export function LiveShareButton() {
   const context = useSyncExternalStore(liveSharing.subscribe, liveSharing.getSnapshot);
   if (!context || context.role !== "player" || !["ready", "paused"].includes(context.phase)) return null;
+  if (context.gameId === "graze-duel" && context.phase === "paused") return null;
   return <div className="safe-live-share"><button type="button" onClick={event => { event.currentTarget.focus(); void shareLive(context); }}>観戦に招待</button></div>;
 }
 
