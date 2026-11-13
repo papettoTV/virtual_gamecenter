@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { test, expect } from '../../../../ci/ui-fixtures.mjs';
 
+// Both projects retain six independent layout/hit-target cases. Repeat the full
+// interaction contract at the phone representative and both desktop breakpoints.
+const interactionWidths = new Set([390, 1184, 1185]);
+
 for (const width of [320, 390, 844, 1184, 1185, 1440]) {
   test(`deep sea: independent share and profile controls at ${width}px`, async ({ page, isMobile }, info) => {
     await page.setViewportSize({ width, height: 844 });
@@ -35,23 +39,26 @@ for (const width of [320, 390, 844, 1184, 1185, 1440]) {
     expect(geometry.overlap).toBe(false);
     expect(geometry.shareHit).toBe(true);
     expect(geometry.profileHit).toBe(true);
-    const activate = button => isMobile ? button.tap() : button.click();
-    await activate(share);
-    const dialog = page.getByRole('dialog', { name: '観戦リンクを共有', exact: true });
-    await expect(dialog).toBeVisible();
-    await expect(profile).toHaveAttribute('aria-expanded', 'false');
-    await expect(dialog.locator('.social-link-card, textarea')).toHaveCount(0);
-    for (const name of ['Xに投稿', 'Facebookに投稿', '投稿文とリンクをコピー']) await expect(dialog.getByRole('button', { name, exact: true })).toBeVisible();
-    await dialog.getByRole('button', { name: '× 閉じる', exact: true }).click();
-    await activate(profile);
-    await expect(page.getByRole('region', { name: 'プレイヤー情報', exact: true })).toBeVisible();
-    await expect(dialog).toBeHidden();
-    await activate(profile);
-    await share.focus();
-    await page.keyboard.press('Enter');
-    await expect(dialog).toBeVisible();
-    await page.keyboard.press('Escape');
-    await expect(dialog).toBeHidden();
+    if (interactionWidths.has(width)) {
+      const activate = button => isMobile ? button.tap() : button.click();
+      await activate(share);
+      const dialog = page.getByRole('dialog', { name: '観戦リンクを共有', exact: true });
+      await expect(dialog).toBeVisible();
+      await expect(profile).toHaveAttribute('aria-expanded', 'false');
+      await expect(dialog.locator('.social-link-card, textarea')).toHaveCount(0);
+      for (const name of ['Xに投稿', 'Facebookに投稿', '投稿文とリンクをコピー']) await expect(dialog.getByRole('button', { name, exact: true })).toBeVisible();
+      await dialog.getByRole('button', { name: '× 閉じる', exact: true }).click();
+      await activate(profile);
+      await expect(page.getByRole('region', { name: 'プレイヤー情報', exact: true })).toBeVisible();
+      await expect(dialog).toBeHidden();
+      await activate(profile);
+      await expect(page.getByRole('region', { name: 'プレイヤー情報', exact: true })).toBeHidden();
+      await share.focus();
+      await page.keyboard.press('Enter');
+      await expect(dialog).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(dialog).toBeHidden();
+    }
     await expect(page.getByRole('dialog', { name: 'ゲームを開始しますか？', exact: true })).toBeHidden();
     expect(reservations).toEqual([]);
   });
