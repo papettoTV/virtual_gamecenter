@@ -92,7 +92,7 @@ export const MOCHI_BEAT: GameDefinition = {
 
 export const DOT_WAVE: GameDefinition = {
   id: "dot-wave", slug: "dot-wave", title: "DOT WAVE", localizedTitle: "ドットウェーブ",
-  shortTitle: "DW", description: "リズムで攻撃・リズムで防御、対戦リズムゲーム",
+  shortTitle: "DW", description: "リズムで攻めて、リズムで守る、対戦プレイ対応のリズムバトル",
   instructions: {
     objective: "リズムで攻めて守り、CPUの全3ステージ制覇を目指す。",
     action: "お手本のリズムで攻撃。相手のリズムをまねしてシールドで守る。",
