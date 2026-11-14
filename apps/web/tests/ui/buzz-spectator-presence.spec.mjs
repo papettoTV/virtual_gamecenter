@@ -45,10 +45,15 @@ test('BUZZ player sees edge only during play, current viewers on pause and a fro
     await page.getByRole('button', { name: '1クレジットで開始', exact: true }).click();
     await expect(edge).toHaveAttribute('data-presence', 'watching');
     await expect(edge).toHaveCSS('pointer-events', 'none');
+    await expect(edge).toHaveCSS('border-top-width', '0px');
+    const glowStyle = property => edge.evaluate((element, name) => getComputedStyle(element, '::before').getPropertyValue(name), property);
+    expect(await glowStyle('background-image')).toContain('radial-gradient');
+    expect(await glowStyle('animation-name')).toBe('none');
     await expect(caption).toBeHidden();
     pushCount(3);
     await expect(edge).toHaveAttribute('data-pulse', '');
-    await expect(edge).toHaveCSS('animation-name', isMobile ? 'none' : 'buzz-spectator-pulse');
+    expect(await glowStyle('animation-name')).toBe(isMobile ? 'none' : 'buzz-spectator-pulse');
+    expect(await glowStyle('border-top-width')).toBe('0px');
     await expect(edge).not.toHaveAttribute('data-pulse', '');
     const togglePause = async () => {
       if (isMobile) await page.locator('#touch-pause').tap();
