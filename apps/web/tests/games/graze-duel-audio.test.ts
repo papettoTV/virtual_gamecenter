@@ -8,7 +8,7 @@ function setup() {
     return { buffer: null, connect: vi.fn(), disconnect: vi.fn(), start: vi.fn(), stop: vi.fn(), onended: null as (() => void) | null };
   }
   function gainNode() {
-    return { gain: { setValueAtTime: vi.fn() }, connect: vi.fn(), disconnect: vi.fn() };
+    return { gain: { value: 1, setValueAtTime: vi.fn() }, connect: vi.fn(), disconnect: vi.fn() };
   }
   const buffer = { duration: 0.4 };
   const context = {
@@ -37,10 +37,26 @@ describe("selected U3 graze sound", () => {
     expect(context.createBiquadFilter).not.toHaveBeenCalled();
     expect(sources[0]!.buffer).toBe(buffer);
     expect(sources[0]!.start).toHaveBeenCalledWith(0);
-    expect(gains[0]!.gain.setValueAtTime).toHaveBeenCalledWith(0.4, 0);
+    const [output, voice] = gains;
+    expect(sources[0]!.connect).toHaveBeenCalledWith(voice);
+    expect(voice!.connect).toHaveBeenCalledWith(output);
+    expect(output!.connect).toHaveBeenCalledWith(context.destination);
+    expect(voice!.gain.setValueAtTime).toHaveBeenCalledWith(0.4, 0);
     sources[0]!.onended?.();
     expect(sources[0]!.disconnect).toHaveBeenCalledOnce();
-    expect(gains[0]!.disconnect).toHaveBeenCalledOnce();
+    expect(voice!.disconnect).toHaveBeenCalledOnce();
+    audio.dispose();
+  });
+
+  it("mutes the shared output without changing individual sound levels", async () => {
+    const { audio, gains } = setup();
+    audio.setMuted(true);
+    await audio.playGrazeSound(1);
+    expect(gains[0]!.gain.value).toBe(0);
+    expect(gains[1]!.gain.setValueAtTime).toHaveBeenCalledWith(0.4, 0);
+    expect(audio.cheer(0)).toBeUndefined();
+    audio.setMuted(false);
+    expect(gains[0]!.gain.value).toBe(1);
     audio.dispose();
   });
 
