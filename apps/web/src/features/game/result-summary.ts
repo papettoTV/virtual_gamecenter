@@ -1,3 +1,5 @@
+import { hasSpectatorPeak } from "./spectator-presence";
+
 export interface ResultSummary {
   title: string;
   score: number;
@@ -35,7 +37,7 @@ export function renderResultSummary({ title, score, details, note, peakSpectator
     message.textContent = note;
     target.appendChild(message);
   }
-  if (peakSpectators !== undefined) {
+  if (hasSpectatorPeak(peakSpectators)) {
     const audience = document.createElement("p");
     audience.className = "spectator-result-caption";
     audience.textContent = `最大同時観戦 ${peakSpectators}人`;
