@@ -103,7 +103,7 @@ async function expectDocked(page, phase = 'initial', scrollTarget) {
 }
 
 for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 664 }, { width: 320, height: 568 }]) {
-  test(`画面下部への固定と再表示 ${viewport.width}px`, async ({ page }, testInfo) => {
+  test(`画面下部への固定と代表幅での再表示 ${viewport.width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize(viewport);
     await page.goto('/');
     await expectDocked(page);
@@ -126,24 +126,36 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 664 
       }
     }
     for (const name of ['拒否する', '同意する', '閉じる']) {
-      await expect(panelFor(page).getByRole('button', { name, exact: true })).toBeInViewport();
+      const button = panelFor(page).getByRole('button', { name, exact: true });
+      await expect(button).toBeInViewport();
+      await button.click({ trial: true });
     }
-    await panelFor(page).getByRole('button', { name: '閉じる', exact: true }).click();
-    await expect(panelFor(page)).toHaveCount(0);
-    await openSettings(page);
-    await expectDocked(page, 'reopen undecided');
-    await expect(panelFor(page)).toContainText('未選択');
+    // Layout changes at 720px; exercise the full persistence flow once per
+    // project at its representative layout. Every width keeps the geometry,
+    // scroll and actionability checks above, including 320px wrapping.
+    const representativeWidth = testInfo.project.name === 'desktop' ? 1280 : 390;
+    if (viewport.width === representativeWidth) {
+      await test.step('代表幅: 閉じる・フッターから未選択で再表示', async () => {
+        await panelFor(page).getByRole('button', { name: '閉じる', exact: true }).click();
+        await expect(panelFor(page)).toHaveCount(0);
+        await openSettings(page);
+        await expectDocked(page, 'reopen undecided');
+        await expect(panelFor(page)).toContainText('未選択');
+      });
 
-    for (const [button, choice] of [['拒否する', '拒否'], ['同意する', '同意']]) {
-      await panelFor(page).getByRole('button', { name: button, exact: true }).click();
-      await expect(panelFor(page)).toHaveCount(0);
-      await page.reload();
-      await expect(page.locator('.platform-footer').getByRole('button', { name: 'プライバシーポリシー', exact: true })).toBeVisible();
-      await expect(panelFor(page)).toHaveCount(0);
-      await openSettings(page);
-      await expectDocked(page, `reopen ${choice}`);
-      await expect(panelFor(page)).toContainText(`現在：${choice}`);
-      await expect(panelFor(page)).toContainText('開発・検証環境では同意しても解析は動作しません');
+      for (const [button, choice] of [['拒否する', '拒否'], ['同意する', '同意']]) {
+        await test.step(`代表幅: ${choice}の保存・再読込・フッターから再表示`, async () => {
+          await panelFor(page).getByRole('button', { name: button, exact: true }).click();
+          await expect(panelFor(page)).toHaveCount(0);
+          await page.reload();
+          await expect(page.locator('.platform-footer').getByRole('button', { name: 'プライバシーポリシー', exact: true })).toBeVisible();
+          await expect(panelFor(page)).toHaveCount(0);
+          await openSettings(page);
+          await expectDocked(page, `reopen ${choice}`);
+          await expect(panelFor(page)).toContainText(`現在：${choice}`);
+          await expect(panelFor(page)).toContainText('開発・検証環境では同意しても解析は動作しません');
+        });
+      }
     }
   });
 }
