@@ -9,7 +9,7 @@ import { SPECIES } from "../../src/games/deep-sea-salvage/species";
 const mocks = vi.hoisted(() => ({
   sessions: [] as Array<{ role: string; join: ReturnType<typeof vi.fn>; leave: ReturnType<typeof vi.fn>; send: ReturnType<typeof vi.fn>; startSolo: ReturnType<typeof vi.fn>; waitForPlayer: ReturnType<typeof vi.fn> }>,
   rendererDispose: vi.fn(), draw: vi.fn(), reset: vi.fn(), startDive: vi.fn(), continueRun: vi.fn(),
-  editorCleanup: vi.fn(), renderers: [] as Array<{ dispose: ReturnType<typeof vi.fn>; setThreeLayer: ReturnType<typeof vi.fn> }>,
+  editorCleanup: vi.fn(), initEditor: vi.fn(), renderers: [] as Array<{ dispose: ReturnType<typeof vi.fn>; setThreeLayer: ReturnType<typeof vi.fn> }>,
   createThreeLayer: vi.fn(), fetchRanking: vi.fn(async () => []),
   inputs: [] as Array<{ keys: Set<string>; pointer: { active: boolean; x: number; y: number } }>,
   bounds: [] as Array<() => [number, number]>,
@@ -49,7 +49,7 @@ vi.mock("../../src/games/deep-sea-salvage/simulation", () => ({
     return { reset: mocks.reset, update: vi.fn(), ensureChunks: vi.fn(), startDive: mocks.startDive, continueRun: mocks.continueRun, setMessage: vi.fn() };
   },
 }));
-vi.mock("../../src/games/deep-sea-salvage/terrain-editor", () => ({ initTerrainEditor: () => mocks.editorCleanup }));
+vi.mock("../../src/games/deep-sea-salvage/terrain-editor", () => ({ initTerrainEditor: () => { mocks.initEditor(); return mocks.editorCleanup; } }));
 vi.mock("../../src/games/deep-sea-salvage/three-game-layer", () => ({ DeepSeaThreeLayer: { create: mocks.createThreeLayer } }));
 vi.mock("../../src/features/notifications/notifications", () => ({ notifications: { show: vi.fn(), clearScope: vi.fn() } }));
 vi.mock("../../src/features/notifications/share", () => ({ copySharedText: vi.fn() }));
@@ -91,7 +91,7 @@ beforeEach(() => {
   vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => { const id = nextFrame++; frames.set(id, callback); return id; });
   vi.stubGlobal("cancelAnimationFrame", (id: number) => frames.delete(id));
 });
-afterEach(() => { lifetime.dispose(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { lifetime.dispose(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
 describe("深海サルベージのmount契約", () => {
   it("変化していないステータスのDOMを毎フレーム書き換えず、値の変化は表示する", () => {
@@ -264,5 +264,13 @@ describe("深海サルベージのmount契約", () => {
     mountGame({ game: DEEP_SEA_SALVAGE, lifetime });
     expect(mocks.fetchRanking).not.toHaveBeenCalled();
     expect((selectors.get("#ranking-list") as { innerHTML: string }).innerHTML).toBe("");
+  });
+
+  it("配布ビルドではURLで指定されても岩壁エディタを初期化しない", () => {
+    vi.stubEnv("DEV", false);
+    Object.assign(windowTarget, { location: { pathname: "/cabinets/current", search: "?terrainEditor=1", href: "https://example.test/cabinets/current?terrainEditor=1" } });
+    const instance = mountGame({ game: DEEP_SEA_SALVAGE, lifetime });
+    expect(mocks.initEditor).not.toHaveBeenCalled();
+    instance.dispose();
   });
 });
