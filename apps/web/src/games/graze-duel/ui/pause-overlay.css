@@ -20,6 +20,44 @@
 .buzz-pause-actions { display: grid; gap: 10px; }
 .buzz-pause-leave { min-height: 44px; justify-self: center; padding: 8px 16px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: #abb8ce; font-size: 14px; font-weight: 400; }
 .buzz-pause-leave:focus-visible { outline: 2px solid #69f7ff; outline-offset: 3px; }
+.buzz-spectator-caption { margin: 0; color: #a4c2d9; font-size: 13px; line-height: 1.5; }
+.buzz-spectator-edge {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  border-radius: inherit;
+  pointer-events: none;
+  mask-image: linear-gradient(to bottom, transparent, #000 10px, #000 calc(100% - 12px), transparent);
+}
+.buzz-spectator-edge::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: inherit;
+  filter: blur(5px);
+}
+.buzz-spectator-edge[data-presence="watching"]::before {
+  --buzz-corner: radial-gradient(ellipse at top left, #25e3efb8, #08a8e84d 33%, transparent 72%);
+  background: var(--buzz-corner) top left / 82px 76px no-repeat,
+    radial-gradient(ellipse at top right, #25e3efb8, #08a8e84d 33%, transparent 72%) top right / 82px 76px no-repeat,
+    radial-gradient(ellipse at bottom left, #25e3efb8, #08a8e84d 33%, transparent 72%) bottom left / 82px 76px no-repeat,
+    radial-gradient(ellipse at bottom right, #25e3efb8, #08a8e84d 33%, transparent 72%) bottom right / 82px 76px no-repeat;
+}
+.buzz-spectator-edge[data-presence="crowd"]::before {
+  background:
+    linear-gradient(to bottom, #18cdeec7, transparent) top / 100% 26px no-repeat,
+    linear-gradient(to right, #13cfeab8, transparent) left / 25px 100% no-repeat,
+    linear-gradient(to left, #9368f7c9, transparent) right / 25px 100% no-repeat,
+    linear-gradient(to top, #7752f6b8, transparent) bottom / 100% 28px no-repeat;
+  opacity: .67;
+}
+.buzz-spectator-edge[data-presence="crowd"][data-pulse]::before { animation: buzz-spectator-pulse 1450ms ease-in-out; }
+@keyframes buzz-spectator-pulse {
+  40% { opacity: 1; filter: blur(10px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .buzz-spectator-edge[data-presence="crowd"][data-pulse]::before { animation: none; }
+}
 @media (max-height: 480px) {
   .buzz-pause-overlay { padding: 16px; place-items: start center; }
   .buzz-pause-content h2 { margin-bottom: 10px; }

@@ -32,6 +32,7 @@ import { createGameState } from "./state";
 import { resetBaseBulletSequences, getBaseBulletPattern } from "./base-bullet-sequence";
 import { createSimulation } from "./simulation";
 import { createInputController } from "./input";
+import { createSpectatorPresence } from "./spectator-presence";
 
 /**
  * @param {import("../../game-sdk/contracts").GameContext} context
@@ -99,6 +100,9 @@ export function mountGame(context) {
   const spectatorSwitchPlayer = document.querySelector("#spectator-switch-player");
   const spectatorCount = document.querySelector("#spectator-count");
   const playerCrowdPulse = document.querySelector("#player-crowd-pulse");
+  const spectatorPresence = createSpectatorPresence();
+  const pausedSpectators = document.querySelector("#buzz-paused-spectators");
+  const versusPeak = document.querySelector("#buzz-versus-peak");
   const versusStatus = document.querySelector("#versus-status");
   const versusOverlay = document.querySelector("#versus-overlay");
   const versusEyebrow = document.querySelector("#versus-eyebrow");
@@ -359,6 +363,7 @@ export function mountGame(context) {
 
   function resetGame() {
     victory.clear();
+    spectatorPresence.reset();
     pausedForLiveShare = false;
     resultSharing.clear(BUZZ_BARRIER.id);
     sharedRunId = createUuid();
@@ -417,6 +422,7 @@ export function mountGame(context) {
   }
 
   function resetGameForRetry() {
+    spectatorPresence.reset();
     pausedForLiveShare = false;
     resultSharing.clear(BUZZ_BARRIER.id);
     sharedRunId = createUuid();
@@ -884,6 +890,7 @@ export function mountGame(context) {
   }
 
   function showVersusOverlay(title, message, mode) {
+    if (versusPeak) versusPeak.hidden = true;
     versusUiMode = mode;
     versusOverlay?.classList.remove("is-hidden");
     if (versusEyebrow) versusEyebrow.textContent = mode === "resultLoser" || mode === "resultWinner" ? "Result" : "Versus";
@@ -1373,6 +1380,10 @@ export function mountGame(context) {
       showVersusOverlay(title, `${description} 10秒以内に再挑戦できます。`, "resultLoser");
       startRematchTimer();
     }
+    if (versusPeak && isVersusParticipant()) {
+      versusPeak.textContent = `最大同時観戦 ${spectatorPresence.peak}人`;
+      versusPeak.hidden = false;
+    }
   }
 
   function formatVersusResultScores(message) {
@@ -1440,9 +1451,31 @@ export function mountGame(context) {
   function updateCrowdUi() {
     const count = Math.max(0, Number(cabinetState?.spectatorCount ?? 0));
     if (spectatorCount) spectatorCount.textContent = `観戦者 ${Math.max(1, count)}人`;
-    const intensity = Math.min(1, Math.log2(count + 1) / 4);
-    playerCrowdPulse?.style.setProperty("--crowd-intensity", String(intensity));
-    playerCrowdPulse?.classList.toggle("is-hidden", cabinetRole !== "player" || count === 0);
+    updateSpectatorPresence(performance.now());
+  }
+
+  function updateSpectatorPresence(now) {
+    const participant = isVersusParticipant();
+    const phase = currentScreen !== "game" || !gameSessionActive || (cabinetRole !== "player" && !participant)
+      || waitingForStart || (participant && !["playing", "clearWaiting", "result"].includes(versusPhase)) ? "idle"
+      : versusPhase === "result" ? "finished"
+      : participant && (gameOver || versusPhase === "clearWaiting") ? "waiting"
+      : gameOver || clearGame ? "finished" : paused ? "paused" : "playing";
+    const count = cabinetConnected && cabinetState ? cabinetState.spectatorCount : null;
+    const presence = spectatorPresence.update(phase, count, now);
+    if (playerCrowdPulse && playerCrowdPulse.getAttribute("data-presence") !== presence.tier) {
+      playerCrowdPulse.setAttribute("data-presence", presence.tier);
+    }
+    if (playerCrowdPulse && playerCrowdPulse.hasAttribute("data-pulse") !== presence.pulse) {
+      playerCrowdPulse.toggleAttribute("data-pulse", presence.pulse);
+    }
+    if (pausedSpectators) {
+      if (pausedSpectators.hidden !== (presence.pausedCount === null)) pausedSpectators.hidden = presence.pausedCount === null;
+      if (presence.pausedCount !== null) {
+        const caption = `現在 ${presence.pausedCount}人が観戦中`;
+        if (pausedSpectators.textContent !== caption) pausedSpectators.textContent = caption;
+      }
+    }
   }
 
   function updateCabinetUi() {
@@ -2015,6 +2048,7 @@ export function mountGame(context) {
     lastTime = now;
     update(delta);
     updateLiveShareContext();
+    updateSpectatorPresence(now);
     draw();
     recordRenderStats(performance.now() - workStartedAt);
     scope.frame(loop);
@@ -2667,6 +2701,7 @@ export function mountGame(context) {
       score: totalScore,
       maxLevel: players[0].level,
       defeatedBossCount,
+      peakSpectators: spectatorPresence.peak,
     };
     if (!debugMessage && gameSessionActive && cabinetRole === "player" && !isVersusParticipant()
       && (cleared ? clearGame : gameOver && players[0].lives <= 0)) {
@@ -2693,6 +2728,7 @@ export function mountGame(context) {
         ["ボス撃破", String(result.defeatedBossCount)],
         ["LEVEL", String(result.maxLevel)],
         ["TIME", formatRankingTime(result.elapsedTimeMs)],
+        ...(Number.isInteger(result.peakSpectators) ? [["最大同時観戦", `${result.peakSpectators}人`]] : []),
         ...(result.cleared ? [["プレイスコア", formatScore(result.playScore)], ["タイムボーナス", formatScore(result.timeBonus)]] : []),
       ],
       note,

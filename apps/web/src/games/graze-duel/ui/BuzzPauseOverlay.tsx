@@ -14,13 +14,16 @@ export function BuzzPausePanel({ context, compact, actionsOnly = false }: { cont
         {!spectator && <button type="button" onClick={() => void shareLive(context!)}>観戦URLをシェア</button>}
       </div> : null;
   return <div id="buzz-pause-overlay" className="buzz-pause-overlay" hidden={!visible} role="region" aria-label="一時停止">
-    {visible && <div className="buzz-pause-content">
+    <div className="buzz-pause-content">
+      {visible && <>
       <h2>PAUSED</h2>
       <p className="buzz-pause-hint">{presentation.action}</p>
       {presentation.instructions.length > 0 && <ul className="buzz-pause-instructions">
         {presentation.instructions.map(instruction => <li key={instruction}>{instruction}</li>)}
       </ul>}
-    </div>}
+      </>}
+      <p id="buzz-paused-spectators" className="buzz-spectator-caption" hidden />
+    </div>
   </div>;
 }
 

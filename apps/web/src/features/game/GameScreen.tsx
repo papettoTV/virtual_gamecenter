@@ -51,7 +51,7 @@ export function GameScreen({ game }: GameScreenProps) {
       <DebugPanel hidden={ui.debugPanelHidden} />
 
       <div className="game-frame">
-        <div className="player-crowd-pulse is-hidden" id="player-crowd-pulse" aria-hidden="true" />
+        <div className={game.id === "buzz-barrier" ? "buzz-spectator-edge" : "player-crowd-pulse is-hidden"} id="player-crowd-pulse" aria-hidden="true" />
         {!play.inviteOnly && <button
           className="cabinet-share-button game-share-button"
           type="button"
@@ -88,6 +88,7 @@ export function GameScreen({ game }: GameScreenProps) {
           <p className="eyebrow" id="versus-eyebrow">Versus</p>
           <h2 id="versus-title">対戦</h2>
           <p id="versus-message" />
+          {game.id === "buzz-barrier" && <p id="buzz-versus-peak" className="buzz-spectator-caption" hidden />}
           <strong className="versus-countdown is-hidden" id="versus-countdown" />
           <div className="versus-actions">
             <button id="versus-secondary" type="button">いいえ</button>
