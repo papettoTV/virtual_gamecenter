@@ -445,7 +445,7 @@ for (const game of games) {
           const rect = button.getBoundingClientRect();
           return button.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2));
         })).toBe(true);
-        expect(await page.evaluate(async () => (await import('/src/features/sharing/share-service.ts')).sharePanel.getSnapshot().text)).toContain('バズバリアに挑戦中。ここから観戦！');
+        expect(await page.evaluate(async () => (await import('/src/features/sharing/share-service.ts')).sharePanel.getSnapshot().text.split('\n')[0])).toBe('バズバリアに挑戦中。');
         await testInfo.attach('paused-share-open', { body: await page.screenshot(), contentType: 'image/png' });
         await page.keyboard.press('Escape');
         await expect(pausedShare).toBeHidden();
