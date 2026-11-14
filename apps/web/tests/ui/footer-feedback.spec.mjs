@@ -35,6 +35,29 @@ test.beforeEach(async ({ context }, info) => {
 test.afterEach(async ({ context }) => { await finishReadBudget(context); });
 
 for (const width of [1280, 390]) {
+  test(`無料ベータの案内と観戦ページのバッジ ${width}px`, async ({ page }, info) => {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto('/');
+    await panel(page).getByRole('button', { name: '拒否する', exact: true }).click();
+    await expect(page.locator('.brand-heading .brand-beta-badge')).toHaveText('無料ベータ');
+    await info.attach('トップのバッジ', { body: await page.screenshot({ scale: 'css' }), contentType: 'image/png' });
+    const footer = page.locator('.platform-footer');
+    const note = footer.locator('.platform-beta-note');
+    await expect(note).toContainText('PULBASEは無料ベータ版です。');
+    await info.attach('トップのフッター', { body: await footer.screenshot({ scale: 'css' }), contentType: 'image/png' });
+    await checkFeedback(page, note.getByRole('button', { name: 'ご意見・感想を送る' }), info, 'ベータ案内のフィードバックフォーム');
+
+    const cabinet = `/cabinets/${randomUUID()}?game=deep-sea-salvage`;
+    await page.goto(cabinet + '&watch=1');
+    await expect(page.getByRole('region', { name: 'プレイの開始待ち・終了' })).toBeVisible();
+    await expect(footer.locator('.brand-beta-badge')).toHaveText('無料ベータ');
+    await expect(note).toHaveCount(0);
+    await info.attach('観戦ページのフッター', { body: await page.screenshot({ scale: 'css', fullPage: true }), contentType: 'image/png' });
+    await page.goto(cabinet);
+    await expect(footer).toBeVisible();
+    await expect(footer.locator('.brand-beta-badge')).toHaveCount(0);
+  });
+
   test(`フッター設定変更後もプレイ・結果の案内・観戦を利用できる ${width}px`, async ({ page }, info) => {
     await page.setViewportSize({ width, height: 844 });
     const loaded = page.waitForResponse(r => new URL(r.url()).pathname === '/api/platform/bootstrap' && r.request().method() === 'GET', { timeout: readBudgetTimeout });
