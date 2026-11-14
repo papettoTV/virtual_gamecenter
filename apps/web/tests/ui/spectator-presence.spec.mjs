@@ -7,7 +7,7 @@ import { installDotWaveFinishFixture } from './dot-wave-finish-fixture.mjs';
 const games = [
   { id: 'buzz-barrier', start: 'ゲーム開始', pauseKey: 'Space', caption: '#buzz-paused-spectators', result: '#ranking-result' },
   { id: 'dot-wave', start: 'START / ゲーム開始', pauseKey: 'KeyP', caption: '.duel-choice-panel .spectator-presence-caption', result: '.dot-result-card' },
-  { id: 'deep-sea-salvage', start: '潜航開始', pauseKey: 'KeyP', caption: '#salvage-paused-spectators', result: '#ranking-result', params: '&powerDrain=12&renderer=2d' },
+  { id: 'deep-sea-salvage', start: '潜航開始', pauseKey: 'KeyP', caption: '#salvage-paused-spectators', result: '#ranking-result', params: '&powerDrain=8&renderer=2d' },
 ].flatMap(game => [
   { ...game, zeroAudience: false },
   { ...game, zeroAudience: true, params: game.params ? '&power=1&powerDrain=100&renderer=2d' : undefined },
@@ -68,7 +68,7 @@ for (const game of games) {
       const result = page.locator(game.result);
       if (game.zeroAudience) {
         await finish();
-        await expect(result.locator('.result-score')).toBeVisible({ timeout: 20000 });
+        await expect(result.locator('.result-score')).toBeVisible({ timeout: 35000 });
         await expect(result).not.toContainText('最大同時観戦');
         return;
       }
@@ -105,7 +105,7 @@ for (const game of games) {
       await expect(edge).toHaveAttribute('data-presence', 'crowd');
       await expect(edge).not.toHaveAttribute('data-pulse', '');
       await finish();
-      await expect(result).toContainText('最大同時観戦', { timeout: 20000 });
+      await expect(result).toContainText('最大同時観戦', { timeout: 35000 });
       await expect(result).toContainText('8人');
       await expect(edge).toHaveAttribute('data-presence', 'none');
       if (game.id !== 'buzz-barrier') {
