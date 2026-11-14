@@ -2,23 +2,34 @@ import { test, expect } from '../../../../ci/ui-fixtures.mjs';
 
 // Exercise the real UI and sharing store without replacing authentication,
 // credits, or game-start APIs. Real-device acceptance remains separate.
-async function mount(page, gameId, role = 'player') {
+async function mount(page, gameId, role = 'player', initialPhase = 'ready') {
   await page.goto('http://127.0.0.1:5174/');
-  await page.evaluate(async ({ gameId, role }) => {
-    // Direct browser imports receive Vite's CommonJS default export; they do
-    // not get the named-import interop that Vite applies to source modules.
-    const { default: React } = await import('/node_modules/.vite/deps/react.js');
-    const { default: ReactDOMClient } = await import('/node_modules/.vite/deps/react-dom_client.js');
-    const { GameScreen } = await import('/src/features/game/GameScreen.tsx');
-    const { getGameDefinition } = await import('/src/domain/game.ts');
-    const { setLiveContext } = await import('/src/features/sharing/share-service.ts');
-    const host = document.createElement('main');
-    host.id = 'presentation-fixture'; document.body.append(host);
-    ReactDOMClient.createRoot(host).render(React.createElement(GameScreen, { game: getGameDefinition(gameId) }));
-    setLiveContext({ gameId, cabinetId: 'presentation-only', role, phase: 'ready' });
-  }, { gameId, role });
   const screen = page.locator('#presentation-fixture #game-screen');
-  await expect(screen).toBeAttached();
+  // Vite can reload the document while this fixture first imports game modules.
+  // Establish the fixture and its initial phase together in the live document.
+  await expect.poll(async () => {
+    try {
+      if (await screen.count()) return true;
+      await page.evaluate(async ({ gameId, role, initialPhase }) => {
+        // Direct browser imports receive Vite's CommonJS default export; they do
+        // not get the named-import interop that Vite applies to source modules.
+        const { default: React } = await import('/node_modules/.vite/deps/react.js');
+        const { default: ReactDOMClient } = await import('/node_modules/.vite/deps/react-dom_client.js');
+        const { GameScreen } = await import('/src/features/game/GameScreen.tsx');
+        const { getGameDefinition } = await import('/src/domain/game.ts');
+        const { setLiveContext } = await import('/src/features/sharing/share-service.ts');
+        if (document.getElementById('presentation-fixture')) return;
+        const host = document.createElement('main');
+        host.id = 'presentation-fixture'; document.body.append(host);
+        ReactDOMClient.createRoot(host).render(React.createElement(GameScreen, { game: getGameDefinition(gameId) }));
+        setLiveContext({ gameId, cabinetId: 'presentation-only', role, phase: initialPhase });
+      }, { gameId, role, initialPhase });
+      return Boolean(await screen.count());
+    } catch (error) {
+      if (!String(error).includes('Execution context was destroyed')) throw error;
+      return false;
+    }
+  }).toBe(true);
   await screen.evaluate(el => el.classList.remove('is-hidden'));
   return screen;
 }
@@ -94,11 +105,10 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }
   test(`unselected analytics panel cannot block play exit ${viewport.width}`, async ({ page }) => {
     // Enter in portrait, then rotate while playing, including on fine pointers.
     await page.setViewportSize({ width: 390, height: 844 });
-    const screen = await mount(page, 'buzz-barrier');
+    const screen = await mount(page, 'buzz-barrier', 'player', 'playing');
     const panel = page.locator('.analytics-consent');
     await expect(panel).toBeVisible();
     await expect(panel).toContainText('未選択（解析停止中）');
-    await phase(page, 'buzz-barrier', 'playing');
     await page.setViewportSize(viewport);
     await expect(screen).toHaveAttribute('data-mobile-play', 'true');
     await expect(panel).toContainText('未選択（解析停止中）');
