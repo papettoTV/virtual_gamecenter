@@ -215,7 +215,7 @@ export function mountGame(context: GameContext): GameInstance {
     document.body.classList.toggle("is-spectator", watching && screen === "game");
     spectatorBanner?.classList.toggle("is-hidden", !watching || screen !== "game");
     document.querySelector("#challenge-request")?.classList.add("is-hidden");
-    document.querySelector("#open-terrain-editor")?.classList.toggle("is-hidden", watching);
+    if (import.meta.env.DEV) document.querySelector("#open-terrain-editor")?.classList.toggle("is-hidden", watching);
     updateLiveShareContext();
   }
 
@@ -400,7 +400,7 @@ export function mountGame(context: GameContext): GameInstance {
     scope.frame(loop);
   }
   scope.listen(document, "visibilitychange", () => { lastTime = performance.now(); });
-  scope.own(initTerrainEditor());
+  if (import.meta.env.DEV) scope.own(initTerrainEditor());
   resetRun();
   if (debugParams.get("terrainEditor") === "1") {
     showScreen("game"); updateButtons();
