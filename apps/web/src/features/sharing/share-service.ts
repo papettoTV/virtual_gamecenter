@@ -54,11 +54,11 @@ function updatePanel(state: SharePanelState) {
 export function liveShareText(context: LiveShareContext): string {
   const title = getGameDefinition(context.gameId)?.localizedTitle ?? context.gameId;
   const tags = shareTags(context.gameId);
-  if (context.phase === "finished") return `${title}のプレイは終了しました。この筐体の状況はこちら。\n${tags}`;
-  if (context.role === "spectator") return `${title}のライブを観戦中。一緒に見ませんか？\n${tags}`;
-  if (context.phase === "ready") return `これから${title}に挑戦！ここから観戦できます。\n${tags}`;
-  if (context.phase === "paused") return `${title}に挑戦中。ここから観戦！\n${tags}`;
-  return `${title}に挑戦中！ライブ観戦はこちら。\n${tags}`;
+  if (context.phase === "finished") return `${title}のプレイは終了しました。\n${tags}`;
+  if (context.role === "spectator") return `${title}のライブを観戦中。\n${tags}`;
+  if (context.phase === "ready") return `これから${title}に挑戦！\n${tags}`;
+  if (context.phase === "paused") return `${title}に挑戦中。\n${tags}`;
+  return `${title}に挑戦中！\n${tags}`;
 }
 
 export async function getShareOrigin(): Promise<string> {
