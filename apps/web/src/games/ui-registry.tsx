@@ -55,9 +55,9 @@ const gameUIRegistry: Readonly<Record<GameId, Partial<GameUIConfig>>> = {
     FrameIntro: SalvageIntro,
     debugPanelHidden: true,
     ResultSummaryAction: SalvageResultCollection,
-    AfterFrame: SalvageTerrainEditor,
+    AfterFrame: import.meta.env.DEV ? SalvageTerrainEditor : EmptySlot,
     TouchActions: SalvageTouchCollection,
-    FooterAction: SalvageEditorAction,
+    FooterAction: import.meta.env.DEV ? SalvageEditorAction : EmptySlot,
   },
   "mochi-beat": {
     screenClassName: "mochi-screen",
