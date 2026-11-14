@@ -90,7 +90,7 @@ export function GameScreen({ game }: GameScreenProps) {
           <p className="eyebrow" id="versus-eyebrow">Versus</p>
           <h2 id="versus-title">対戦</h2>
           <p id="versus-message" />
-          {game.id === "graze-duel" && <p id="buzz-versus-peak" className="spectator-presence-caption" hidden />}
+          {game.id === "buzz-barrier" && <p id="buzz-versus-peak" className="spectator-presence-caption" hidden />}
           <strong className="versus-countdown is-hidden" id="versus-countdown" />
           <div className="versus-actions">
             <button id="versus-secondary" type="button">いいえ</button>
