@@ -376,7 +376,7 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
       onCancel={() => { if (!busy.current) { creditConfirmation.current = false; render(); } }}
       onConfirm={() => void begin(true)} onShare={() => window.dispatchEvent(new Event("request-cabinet-share"))} />}
 
-    <header><div><span className="duel-eyebrow">NEON RHYTHM BATTLE</span><h1><PixelWord /></h1></div><a href="/">ゲーム一覧へ</a></header>
+    <header><div><span className="duel-eyebrow">NEON RHYTHM BATTLE</span><h1><PixelWord /></h1></div><a href="/" data-return-to-arcade="">ゲーム一覧へ</a></header>
     <div className="duel-mode-label">
       <span className="duel-mode-info">{e.mode === "cpu" ? `CPU対戦 · ${stageInfo.label} / 3` : e.mode === "online" ? "通信対戦" : "同じ端末で2人対戦"} · {e.phase === "intro" ? "攻守交代のリズムバトル" : `攻防 ${e.match.turn + (e.phase === "impact" || e.phase === "finished" ? 0 : 1)} / ${exchangeLimit(e.match)}`}</span>
       {e.mode === "cpu" && <span className="duel-inline-score" aria-label="通算スコア">SCORE {(e.score?.total ?? 0).toLocaleString()}</span>}
@@ -391,7 +391,7 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
       {!replica && !network?.matchId && <div className="duel-intro-panel">
         <div className="duel-start-actions">
         <p className="duel-input-hint">{e.mode === "cpu" ? "スペース / F / タップでパルス" : "CYAN：F　PINK：J / それぞれのタップボタン"}</p>
-        <button className="duel-primary" onClick={() => void begin()} disabled={Boolean(network && !network.connected)}>START / {e.mode === "cpu" && stage > 1 ? `${stageInfo.label} 開始` : network ? network.startCost ? "ゲーム開始" : "続ける" : "対戦開始"}</button>
+        <button className="duel-primary" data-ready-start="" onClick={() => void begin()} disabled={Boolean(network && !network.connected)}>START / {e.mode === "cpu" && stage > 1 ? `${stageInfo.label} 開始` : network ? network.startCost ? "ゲーム開始" : "続ける" : "対戦開始"}</button>
         </div>
         {e.mode === "cpu" && <div className="dot-stage-intro"><strong>{stageInfo.label} · {stageInfo.name}</strong><span>{stageInfo.title}</span></div>}
         <div className="dot-cue-guide"><span><BattleIcon kind="tap"/><span>チカチカ → もうすぐ</span></span><span><BattleIcon kind="note"/><span>音符でこうげき</span></span><span><BattleIcon kind="shield"/><span>シールドでまもる</span></span></div>

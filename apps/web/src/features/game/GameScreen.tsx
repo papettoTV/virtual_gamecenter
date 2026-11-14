@@ -19,10 +19,11 @@ export function GameScreen({ game }: GameScreenProps) {
   const screen = useRef<HTMLElement>(null);
   const play = useMobilePlay(screen);
   const tapReady = game.id === "graze-duel" && play.mobile && play.ready;
+  const keyboardStart = game.id === "graze-duel" && !play.mobile && play.ready ? "Space" : undefined;
   const ui = getGameUI(game.id);
   const { FrameIntro, SetIntro, ResultPresentation, ResultSummaryAction, AfterFrame, TouchActions, Settings, FooterAction, RetryAction } = ui;
   return (
-    <section ref={screen} data-tap-ready={tapReady || undefined} data-invite-only={play.inviteOnly || undefined} data-game-id={game.id} data-mobile-play={play.active || undefined} className={`game-screen is-hidden${ui.screenClassName ? ` ${ui.screenClassName}` : ""}`} id="game-screen">
+    <section ref={screen} data-ready-start-key={keyboardStart} data-tap-ready={tapReady || undefined} data-invite-only={play.inviteOnly || undefined} data-game-id={game.id} data-mobile-play={play.active || undefined} className={`game-screen is-hidden${ui.screenClassName ? ` ${ui.screenClassName}` : ""}`} id="game-screen">
       <div className="spectator-banner is-hidden" id="spectator-banner">
         <div>
           <strong id="spectator-view-label">観戦中</strong>
@@ -72,7 +73,7 @@ export function GameScreen({ game }: GameScreenProps) {
           <p>右上の「▶」をタップして開始</p>
         </section>}
         {game.id === "graze-duel" && <button id="versus-sound-toggle" className="victory-sound-toggle" type="button" aria-pressed="false" hidden>ミュート</button>}
-        {tapReady && <button className="touch-button buzz-ready-trigger" type="button" aria-label="ゲーム開始"
+        {tapReady && <button className="touch-button buzz-ready-trigger" type="button" aria-label="ゲーム開始" data-ready-start=""
           onKeyDown={event => event.stopPropagation()}
           onKeyUp={event => event.stopPropagation()}
           onClick={() => {
@@ -177,7 +178,7 @@ export function GameScreen({ game }: GameScreenProps) {
 
       <div className="game-footer-actions">
         <FooterAction game={game} />
-        <button id="game-back-to-arcade" className="secondary-button" type="button" onClickCapture={event => { event.stopPropagation(); navigate("/"); }}>別のゲームをする</button>
+        <button id="game-back-to-arcade" className="secondary-button" type="button" data-return-to-arcade="" onClickCapture={event => { event.stopPropagation(); navigate("/"); }}>別のゲームをする</button>
       </div>
     </section>
   );

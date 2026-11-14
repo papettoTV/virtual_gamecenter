@@ -76,7 +76,7 @@ describe("深海サルベージの観戦案内", () => {
     expect(html).toContain('class="salvage-touch-help">タップして潜航開始');
     expect(html).toContain('class="salvage-key-help">WASD / 矢印: 移動　P: 一時停止');
     expect(html).toContain('class="salvage-key-help">潜航開始（P）');
-    expect(html).toContain('<button type="button" aria-label="潜航開始">');
+    expect(html).toMatch(/<button\b(?=[^>]*\baria-label="潜航開始")(?=[^>]*\btype="button")(?=[^>]*\bdata-ready-start="")[^>]*>/);
     expect(html).toContain("確認画面で承認すると1クレジットを使用します");
   });
 

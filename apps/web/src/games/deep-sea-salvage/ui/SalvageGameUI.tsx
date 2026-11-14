@@ -8,7 +8,7 @@ export function SalvageIntro() {
       <p>魚に近づくと自動で調査</p>
       <p className="salvage-touch-help">画面を押したまま、進みたい方向へ指を動かす</p>
       <p className="salvage-key-help">WASD / 矢印: 移動　P: 一時停止</p>
-      <button type="button" aria-label="潜航開始" onClick={event => { event.stopPropagation(); gameHost.requestPlay("start"); }}>
+      <button type="button" aria-label="潜航開始" data-ready-start="" onClick={event => { event.stopPropagation(); gameHost.requestPlay("start"); }}>
         <span className="salvage-touch-help">タップして潜航開始</span>
         <span className="salvage-key-help">潜航開始（P）</span>
       </button>

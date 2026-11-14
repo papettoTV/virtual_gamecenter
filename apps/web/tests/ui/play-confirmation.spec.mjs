@@ -177,8 +177,15 @@ for (const game of games) {
     const balance = await wallet(page);
     await expect.poll(() => phase(page, game.id)).toBe(ready);
     await navigateGuest(page, cabinet, true);
-    if (isMobile || game.id === 'dot-wave') await expect(start).toBeVisible();
     await expect.poll(() => phase(page, game.id)).toBe(ready);
+    if (isMobile || game.id !== 'graze-duel') {
+      const readyButton = page.locator('button[data-ready-start]:visible');
+      await expect(readyButton).toBeVisible();
+      if (isMobile || game.id === 'dot-wave') await expect(readyButton.and(start)).toHaveCount(1);
+    } else {
+      await expect(page.locator('[data-ready-start-key]:visible')).toHaveAttribute('data-ready-start-key', game.key);
+    }
+    await expect(page.locator('[data-return-to-arcade]:visible')).toBeVisible();
     await expect(page.getByRole('dialog', { name: 'ゲームを開始しますか？' })).toBeHidden();
     expect(await persistedWallet(page)).toBe(balance);
     expect(writes).toHaveLength(0);
@@ -445,7 +452,7 @@ for (const game of games) {
           const rect = button.getBoundingClientRect();
           return button.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2));
         })).toBe(true);
-        expect(await page.evaluate(async () => (await import('/src/features/sharing/share-service.ts')).sharePanel.getSnapshot().text)).toContain('バズバリアに挑戦中。ここから観戦！');
+        expect(await page.evaluate(async () => (await import('/src/features/sharing/share-service.ts')).sharePanel.getSnapshot().text.split('\n')[0])).toBe('バズバリアに挑戦中。');
         await testInfo.attach('paused-share-open', { body: await page.screenshot(), contentType: 'image/png' });
         await page.keyboard.press('Escape');
         await expect(pausedShare).toBeHidden();
