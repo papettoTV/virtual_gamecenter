@@ -177,8 +177,15 @@ for (const game of games) {
     const balance = await wallet(page);
     await expect.poll(() => phase(page, game.id)).toBe(ready);
     await navigateGuest(page, cabinet, true);
-    if (isMobile || game.id === 'dot-wave') await expect(start).toBeVisible();
     await expect.poll(() => phase(page, game.id)).toBe(ready);
+    if (isMobile || game.id !== 'buzz-barrier') {
+      const readyButton = page.locator('button[data-ready-start]:visible');
+      await expect(readyButton).toBeVisible();
+      if (isMobile || game.id === 'dot-wave') await expect(readyButton.and(start)).toHaveCount(1);
+    } else {
+      await expect(page.locator('[data-ready-start-key]:visible')).toHaveAttribute('data-ready-start-key', game.key);
+    }
+    await expect(page.locator('[data-return-to-arcade]:visible')).toBeVisible();
     await expect(page.getByRole('dialog', { name: 'ゲームを開始しますか？' })).toBeHidden();
     expect(await persistedWallet(page)).toBe(balance);
     expect(writes).toHaveLength(0);
