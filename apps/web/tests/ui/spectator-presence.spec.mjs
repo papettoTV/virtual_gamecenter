@@ -5,7 +5,7 @@ import { claimWelcomeAndRefresh } from './welcome-wallet.mjs';
 import { installDotWaveFinishFixture } from './dot-wave-finish-fixture.mjs';
 
 const games = [
-  { id: 'graze-duel', start: 'ゲーム開始', pauseKey: 'Space', caption: '#buzz-paused-spectators', result: '#ranking-result' },
+  { id: 'buzz-barrier', start: 'ゲーム開始', pauseKey: 'Space', caption: '#buzz-paused-spectators', result: '#ranking-result' },
   { id: 'dot-wave', start: 'START / ゲーム開始', pauseKey: 'KeyP', caption: '.duel-choice-panel .spectator-presence-caption', result: '.dot-result-card' },
   { id: 'deep-sea-salvage', start: '潜航開始', pauseKey: 'KeyP', caption: '#salvage-paused-spectators', result: '#ranking-result', params: '&powerDrain=7' },
 ];
@@ -48,8 +48,8 @@ for (const game of games) {
       pushCount(1);
       await expect(edge).toHaveAttribute('data-presence', 'none');
       const debug = page.locator('#debug-ranking-preview-toggle');
-      if (game.id === 'graze-duel') await page.locator('summary').filter({ hasText: 'デバッグ設定' }).click();
-      if (game.id === 'graze-duel' && !isMobile) await page.keyboard.press('Space');
+      if (game.id === 'buzz-barrier') await page.locator('summary').filter({ hasText: 'デバッグ設定' }).click();
+      if (game.id === 'buzz-barrier' && !isMobile) await page.keyboard.press('Space');
       else await page.getByRole('button', { name: game.start, exact: true }).click();
       await page.getByRole('button', { name: '1クレジットで開始', exact: true }).click();
       await expect(edge).toHaveAttribute('data-presence', 'watching', { timeout: 12000 });
@@ -85,7 +85,7 @@ for (const game of games) {
       await expect(edge).toHaveAttribute('data-presence', 'crowd');
       await expect(edge).not.toHaveAttribute('data-pulse', '');
       if (game.id === 'dot-wave') await page.evaluate(() => window.dispatchEvent(new Event('dot-wave-layout-finish')));
-      if (game.id === 'graze-duel') await debug.evaluate(checkbox => {
+      if (game.id === 'buzz-barrier') await debug.evaluate(checkbox => {
         checkbox.checked = true;
         checkbox.dispatchEvent(new Event('change', { bubbles: true }));
       });
