@@ -21,7 +21,7 @@ async function requestStart() {
   const cookie = bootstrap.headers.get("set-cookie")!.split(";", 1)[0]!;
   const { playerId } = await bootstrap.json<{ playerId: string }>();
   await call("welcome-credit", cookie, {});
-  const reserved = (await call("credit-reservations", cookie, { cabinetId: crypto.randomUUID(), gameId: "graze-duel", purpose: "solo" }))!;
+  const reserved = (await call("credit-reservations", cookie, { cabinetId: crypto.randomUUID(), gameId: "buzz-barrier", purpose: "solo" }))!;
   const { reservationId } = await reserved.json<{ reservationId: string }>();
   const capture = () => call("credit-reservations/" + reservationId + "/capture", cookie);
   expect((await capture())!.status).toBe(200);

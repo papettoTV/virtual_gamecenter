@@ -59,7 +59,7 @@ it.each(["solo_start", "versus_start", "google_login", "welcome_credit", "regist
 
 it("keeps cancellations and expected denials out of the technical-failure denominator", () => {
   const writeDataPoint = vi.fn();
-  recordOperation({ writeDataPoint }, "solo_start", "rejected", "graze-duel");
+  recordOperation({ writeDataPoint }, "solo_start", "rejected", "buzz-barrier");
   recordOperation({ writeDataPoint }, "google_login", "cancelled");
   recordOperation({ writeDataPoint }, "daily_credit", "noop");
   expect(writeDataPoint.mock.calls.map(call => call[0].doubles)).toEqual([[0, 0, 0, 1, 0], [0, 0, 0, 0, 1]]);

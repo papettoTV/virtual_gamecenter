@@ -86,7 +86,7 @@ for (const size of sizes) {
     test.setTimeout(60000);
     await page.setViewportSize({ width: size.width, height: size.height });
     // Use the real local server, guest bootstrap and cabinet connection.
-    await enter(page, 'graze-duel');
+    await enter(page, 'buzz-barrier');
     await expect(page.locator('#game-screen')).toBeVisible();
     if (await page.evaluate(() => matchMedia('(max-width: 820px), (pointer: coarse)').matches)) {
       await page.getByRole('button', { name: 'ゲーム開始', exact: true }).click();

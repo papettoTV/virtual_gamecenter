@@ -15,7 +15,7 @@ async function player(registered = true) {
   const account = await env.DB.prepare("SELECT account_id FROM players WHERE id = ?").bind(playerId).first<{ account_id: string }>();
   return { playerId, cookie, accountId: account?.account_id ?? "" };
 }
-const row = { operation: "solo_start", game: "graze-duel", eligible: 10, failed: 3, succeeded: 7, rejected: 2, cancelled: 1 };
+const row = { operation: "solo_start", game: "buzz-barrier", eligible: 10, failed: 3, succeeded: 7, rejected: 2, cancelled: 1 };
 const request = (cookie = "", path = "/operator/operations", method = "GET") => new Request("https://staging.example" + path, { method, headers: { Cookie: cookie } });
 const config = { APP_ENV: "staging", DB: env.DB, CLOUDFLARE_METRICS_TOKEN: "private-test-token" };
 

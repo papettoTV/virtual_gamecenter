@@ -4,7 +4,7 @@ import { rewriteLivePage } from "../src/worker/live-metadata";
 import { rewriteResultPage } from "../src/worker/shared-results";
 
 it.each([
-  ["graze-duel", "buzz-barrier"], ["dot-wave", "dot-wave"], ["deep-sea-salvage", "deep-sea-salvage"],
+  ["buzz-barrier", "buzz-barrier"], ["dot-wave", "dot-wave"], ["deep-sea-salvage", "deep-sea-salvage"],
 ])("renders fixed live and result server metadata for %s", async (gameId, filename) => {
   for (const origin of ["https://develop.virtual-gamecenter.pages.dev", "https://example.test:8443"]) {
     const image = socialImage(gameId, origin);

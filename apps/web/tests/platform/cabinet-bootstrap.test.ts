@@ -25,10 +25,10 @@ async function setup() {
   const { GameLifetime } = await import("../../src/game-sdk/lifetime");
   const lifetime = new GameLifetime();
   const onError = vi.fn();
-  const session = createCabinetSession({ gameId: "graze-duel", lifetime, onError });
+  const session = createCabinetSession({ gameId: "buzz-barrier", lifetime, onError });
   return { session, lifetime, fetch, onError, finish: (ok = true) => finish(new Response(JSON.stringify(ok ? {} : { error: "unavailable" }), { status: ok ? 200 : 503 })) };
 }
-it.each(["graze-duel", "deep-sea-salvage", "dot-wave"])("shares guest creation and waits before admission timeout: %s", async game => {
+it.each(["buzz-barrier", "deep-sea-salvage", "dot-wave"])("shares guest creation and waits before admission timeout: %s", async game => {
   const { session, fetch, finish } = await setup();
   const { fetchPlatformBootstrap } = await import("../../src/features/platform/platform-client");
   const initial = fetchPlatformBootstrap();
@@ -47,7 +47,7 @@ it.each(["graze-duel", "deep-sea-salvage", "dot-wave"])("shares guest creation a
   expect(fetch).toHaveBeenCalledTimes(1); expect(sockets).toHaveLength(2);
   session.leave();
 });
-it.each(["graze-duel", "deep-sea-salvage", "dot-wave"].flatMap(game =>
+it.each(["buzz-barrier", "deep-sea-salvage", "dot-wave"].flatMap(game =>
   ["leave", "dispose", "move"].map(action => [game, action])
 ))("invalidates pending %s guest connection on %s", async (game, action) => {
   const { session, lifetime, finish } = await setup();
@@ -69,16 +69,16 @@ it.each(["graze-duel", "deep-sea-salvage", "dot-wave"].flatMap(game =>
 });
 it("fails closed without retrying or charging when bootstrap fails, and permits an explicit retry", async () => {
   const { session, fetch, finish, onError } = await setup();
-  session.join("first", "graze-duel"); const waiting = session.waitForPlayer();
+  session.join("first", "buzz-barrier"); const waiting = session.waitForPlayer();
   finish(false); await expect(waiting).resolves.toBe(false);
   await vi.advanceTimersByTimeAsync(30_000);
   expect(sockets).toHaveLength(0); expect(onError).toHaveBeenCalledOnce(); expect(fetch).toHaveBeenCalledTimes(1);
-  session.join("first", "graze-duel"); finish(); await vi.advanceTimersByTimeAsync(0);
+  session.join("first", "buzz-barrier"); finish(); await vi.advanceTimersByTimeAsync(0);
   expect(sockets).toHaveLength(1); expect(fetch).toHaveBeenCalledTimes(2);
   expect(fetch.mock.calls.every(call => String(call[0]).endsWith("/api/platform/bootstrap"))).toBe(true);
   session.leave();
 });
-it.each(["graze-duel", "deep-sea-salvage", "dot-wave"])("starts the %s admission budget only after bootstrap, and still times out absent authorization", async game => {
+it.each(["buzz-barrier", "deep-sea-salvage", "dot-wave"])("starts the %s admission budget only after bootstrap, and still times out absent authorization", async game => {
   const { session, finish } = await setup();
   session.join("first", game);
   const settled = vi.fn(); const waiting = session.waitForPlayer().then(settled);

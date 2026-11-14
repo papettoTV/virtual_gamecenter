@@ -59,7 +59,7 @@ async function main() {
       return { socket, message, send };
     } catch (error) { socket.terminate(); throw error; }
   }
-  for (const game of ["graze-duel", "dot-wave", "deep-sea-salvage"]) {
+  for (const game of ["buzz-barrier", "dot-wave", "deep-sea-salvage"]) {
     const cabinet = crypto.randomUUID();
     const clients = [];
     let reservationId;

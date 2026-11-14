@@ -1,6 +1,6 @@
 /** Fixed approved artwork, shared by live and result previews. Versioned for SNS caches. */
 const images: Readonly<Record<string, { path: string; alt: string }>> = {
-  "graze-duel": { path: "/social/buzz-barrier-ogp-v2.jpg", alt: "BUZZ BARRIERのボスとシールドが見えるプレイ画面" },
+  "buzz-barrier": { path: "/social/buzz-barrier-ogp-v2.jpg", alt: "BUZZ BARRIERのボスとシールドが見えるプレイ画面" },
   "dot-wave": { path: "/social/dot-wave-ogp-v2.jpg", alt: "DOT WAVEのプレイ画面" },
   "deep-sea-salvage": { path: "/social/deep-sea-salvage-ogp-v2.jpg", alt: "深海サルベージのプレイ画面" },
 };

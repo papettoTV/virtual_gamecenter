@@ -14,7 +14,7 @@ describe("direct game entry", () => {
     expect(url.searchParams.has("watch")).toBe(false);
   });
   it("always allocates a fresh cabinet instead of taking a watched seat", () => {
-    expect(gamePlayUrl("graze-duel")).not.toBe(gamePlayUrl("graze-duel"));
+    expect(gamePlayUrl("buzz-barrier")).not.toBe(gamePlayUrl("buzz-barrier"));
   });
   it("navigates directly to confirmation, not to game selection", () => {
     startNewGame("dot-wave");

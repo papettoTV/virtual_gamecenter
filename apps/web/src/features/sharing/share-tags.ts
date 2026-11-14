@@ -1,5 +1,5 @@
 const gameTags: Readonly<Record<string, string>> = {
-  "graze-duel": "#バズバリア #BUZZBRRIER",
+  "buzz-barrier": "#バズバリア #BUZZBRRIER",
   "dot-wave": "#ドットウェーブ #DOTWAVE",
   "deep-sea-salvage": "#深海サルベージ #DEEPSEASALVAGE",
 };

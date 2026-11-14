@@ -106,6 +106,7 @@ export class CabinetRoom extends DurableObject<Env & { LOCAL_MULTIPLAYER_ENABLED
       if (stored) {
         this.cabinetId = stored.cabinetId;
         this.state = stored.state;
+        if (this.state.gameId === "graze-duel") this.state.gameId = "buzz-barrier";
         this.state.challengeQueueCount = stored.challengeQueue?.length ?? 0;
         this.pendingChallenge = stored.pendingChallenge ?? null;
         this.challengeQueue = stored.challengeQueue ?? [];

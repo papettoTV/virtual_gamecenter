@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 
 const games = [
-  { id: 'graze-duel', title: 'BUZZ BARRIER', index: 0, module: 'graze-duel/runtime.ts' },
+  { id: 'buzz-barrier', title: 'BUZZ BARRIER', index: 0, module: 'graze-duel/runtime.ts' },
   { id: 'dot-wave', title: 'DOT WAVE', index: 1, module: 'dot-wave/entry.tsx' },
   { id: 'deep-sea-salvage', title: 'DEEP SEA SALVAGE', index: 2, module: 'deep-sea-salvage/runtime.ts' },
 ];

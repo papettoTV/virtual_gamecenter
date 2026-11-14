@@ -5,7 +5,7 @@ vi.mock("../../src/features/platform/platform-client", () => ({ ensurePlatformSe
 
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 describe("cabinet reconnect budgets", () => {
-  it.each(["graze-duel", "dot-wave", "deep-sea-salvage"])("acknowledges only decoded start permissions on the current connection: %s", async game => {
+  it.each(["buzz-barrier", "dot-wave", "deep-sea-salvage"])("acknowledges only decoded start permissions on the current connection: %s", async game => {
     const sockets: FakeSocket[] = [];
     class FakeSocket extends EventTarget {
       static OPEN = 1;
@@ -58,7 +58,7 @@ describe("cabinet reconnect budgets", () => {
     vi.stubGlobal("WebSocket", FakeSocket);
     vi.stubGlobal("window", { location: { protocol: "https:", host: "example.test" }, setTimeout, clearTimeout });
     const client = createCabinetClient();
-    client.join("test", "graze-duel");
+    client.join("test", "buzz-barrier");
     await Promise.resolve();
     sockets[0]!.close();
     await vi.advanceTimersByTimeAsync(1000); expect(sockets).toHaveLength(2);

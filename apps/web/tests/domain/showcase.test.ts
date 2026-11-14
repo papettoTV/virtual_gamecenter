@@ -14,7 +14,7 @@ vi.mock("react", async importOriginal => ({
   useEffect() {},
 }));
 
-const entry = (cabinetId: string, status: string, spectatorCount = 0) => ({ cabinetId, status, spectatorCount, gameId: "graze-duel" });
+const entry = (cabinetId: string, status: string, spectatorCount = 0) => ({ cabinetId, status, spectatorCount, gameId: "buzz-barrier" });
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -33,7 +33,7 @@ describe("arcade showcases", () => {
   it("joins previews as observers, never as players", () => {
     const url = new URL(livePreviewUrl(entry("room", "soloPlaying")), "https://example.com");
     expect(url.pathname).toBe("/cabinets/room");
-    expect(url.searchParams.get("game")).toBe("graze-duel");
+    expect(url.searchParams.get("game")).toBe("buzz-barrier");
     expect(url.searchParams.get("watch")).toBe("1");
     expect(url.searchParams.get("preview")).toBe("1");
     expect(url.searchParams.has("start")).toBe(false);
@@ -42,7 +42,7 @@ describe("arcade showcases", () => {
     expect(livePreviewUrl({ ...entry("a/b", "soloPlaying"), gameId: "game & other" })).toContain("a%2Fb?game=game%20%26%20other");
   });
   it("orders games as Buzz Barrier, Dot Wave, then Deep Sea Salvage", () => {
-    expect(getActiveGames().map(game => game.id)).toEqual(["graze-duel", "dot-wave", "deep-sea-salvage"]);
+    expect(getActiveGames().map(game => game.id)).toEqual(["buzz-barrier", "dot-wave", "deep-sea-salvage"]);
   });
   it("retains the tagline while providing the brand pronunciation separately", () => {
     expect(BRAND.reading).toBe("パルベース");
@@ -56,7 +56,7 @@ describe("arcade showcases", () => {
     vi.stubGlobal("document", { visibilityState: "visible" });
     const html = renderToStaticMarkup(createElement(ArcadeScreen, { onSelectGame() {} }));
     expect(html.match(/<article\b/g)).toHaveLength(4);
-    expect(html.indexOf("showcase-graze-duel")).toBeLessThan(html.indexOf("showcase-dot-wave"));
+    expect(html.indexOf("showcase-buzz-barrier")).toBeLessThan(html.indexOf("showcase-dot-wave"));
     expect(html.indexOf("showcase-dot-wave")).toBeLessThan(html.indexOf("showcase-deep-sea-salvage"));
     expect(html.indexOf("showcase-deep-sea-salvage")).toBeLessThan(html.indexOf("COMING SOON"));
     expect(html.match(/class="showcase-watch" disabled=""/g)).toHaveLength(3);

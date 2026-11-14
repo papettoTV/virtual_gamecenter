@@ -59,19 +59,19 @@ export class CabinetRoom extends PreviousCabinetRoom {
     if (typeof failing !== "boolean" || !/^[a-f0-9-]{36}$/.test(cabinet)) throw Error("operation_drill_input");
     const player = await fixture(this.originalDatabase);
     if ((await player.api("welcome-credit"))?.status !== 200) throw Error("operation_drill_fixture");
-    const reservation = await player.api("credit-reservations", { cabinetId: cabinet, gameId: "graze-duel", purpose: "solo" });
+    const reservation = await player.api("credit-reservations", { cabinetId: cabinet, gameId: "buzz-barrier", purpose: "solo" });
     if (reservation?.status !== 200) throw Error("operation_drill_reservation");
     const { reservationId } = await reservation.json<{ reservationId: string }>();
     if ((await player.api(`credit-reservations/${reservationId}/capture`))?.status !== 200) throw Error("operation_drill_capture");
     let client: WebSocket | null = null;
     try {
-      const response = await this.fetch(new Request(`http://localhost/api/cabinets/${cabinet}/ws?gameId=graze-duel`, { headers: { Upgrade: "websocket", Cookie: player.cookie } }));
+      const response = await this.fetch(new Request(`http://localhost/api/cabinets/${cabinet}/ws?gameId=buzz-barrier`, { headers: { Upgrade: "websocket", Cookie: player.cookie } }));
       client = response.webSocket;
       if (!client) throw Error("operation_drill_socket");
       client.accept();
       const server = this.ctx.getWebSockets()[0];
       if (!server) throw Error("operation_drill_socket");
-      await this.webSocketMessage(server, JSON.stringify({ type: "joinCabinet", gameId: "graze-duel" }));
+      await this.webSocketMessage(server, JSON.stringify({ type: "joinCabinet", gameId: "buzz-barrier" }));
       this.fault.until = failing ? Date.now() + 60_000 : 0;
       let failed = false;
       try { await this.webSocketMessage(server, JSON.stringify({ type: "startSolo", reservationId })); }
@@ -100,7 +100,7 @@ export class OperationOperator extends WorkerEntrypoint<DrillEnv> {
     for (let attempt = 0; attempt < count; attempt += 1) {
       if (family === "start") {
         const cabinet = crypto.randomUUID();
-        await this.env.DB.prepare("INSERT INTO revocation_drill_cabinets (cabinet_id, game_id) VALUES (?, 'graze-duel')").bind(cabinet).run();
+        await this.env.DB.prepare("INSERT INTO revocation_drill_cabinets (cabinet_id, game_id) VALUES (?, 'buzz-barrier')").bind(cabinet).run();
         await this.env.CABINET_ROOMS.getByName(cabinet).operationStart(mode === "fail", cabinet);
       } else {
         const player = await fixture(this.env.DB);

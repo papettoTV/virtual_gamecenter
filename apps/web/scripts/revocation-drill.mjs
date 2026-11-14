@@ -89,7 +89,7 @@ async function main() {
       console.log(JSON.stringify({ environment: "isolated-staging-drill", quiescentCabinets: result.cabinetIds.length, admissions: 0 }));
       return;
     }
-    for (const game of ["graze-duel", "dot-wave", "deep-sea-salvage"]) {
+    for (const game of ["buzz-barrier", "dot-wave", "deep-sea-salvage"]) {
       stage = `${game}:prepare`;
       const fixture = await rpcResult(operator.prepare(game)); cabinets.push(fixture.cabinet);
       stage = `${game}:connect`;

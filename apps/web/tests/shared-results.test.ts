@@ -28,7 +28,7 @@ beforeAll(async () => {
 });
 
 function draft(overrides: Partial<SharedResultDraft> = {}): SharedResultDraft {
-  return { id: crypto.randomUUID(), gameId: "graze-duel", gameVersion: "test-1",
+  return { id: crypto.randomUUID(), gameId: "buzz-barrier", gameVersion: "test-1",
     elapsedTimeMs: 1234, cleared: false, score: 50, metrics: { maxLevel: 2, defeatedBossCount: 0 }, ...overrides };
 }
 
@@ -42,7 +42,7 @@ async function post(value: unknown, authenticated = true, extraHeaders: Record<s
 describe("shared result validation", () => {
   it("accepts only whitelisted game metrics and canonicalizes UUIDs and slugs", () => {
     const value = draft({ gameId: "buzz-barrier" });
-    expect(validateSharedResultDraft({ ...value, id: value.id.toUpperCase() }))?.toMatchObject({ id: value.id, gameId: "graze-duel" });
+    expect(validateSharedResultDraft({ ...value, id: value.id.toUpperCase() }))?.toMatchObject({ id: value.id, gameId: "buzz-barrier" });
     expect(validateSharedResultDraft(draft({ gameId: "deep-sea-salvage", metrics: { maxDepth: 10.5, discoveredCount: 2, speciesIds: "fish-1,fish_2", totalSpeciesCount: 8 } }))).not.toBeNull();
     expect(validateSharedResultDraft(draft({ gameId: "dot-wave", metrics: { mode: "versus", outcome: "draw", turns: 5, remainingHp: 0 } }))).not.toBeNull();
     expect(validateSharedResultDraft(draft({ gameId: "mochi-beat", metrics: { completedSets: 3, accuracy: 1 } }))).toBeNull();

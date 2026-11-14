@@ -71,7 +71,7 @@ async function exercise(env, action, functions) {
         database.prepare("INSERT INTO credit_wallets (player_id) VALUES (?)").bind(playerId),
         database.prepare("INSERT INTO player_sessions (token_hash, player_id, expires_at) VALUES (?, ?, '2099-01-01')").bind(await hashIdentifier(playerId), playerId),
         database.prepare("INSERT INTO rankings (owner_id, player_name, clear_time_ms, score, max_level, client_version) VALUES (?, 'Synthetic Drill Player', 1000, 10, 1, 'recovery-drill')").bind(playerId),
-        database.prepare("INSERT INTO shared_results (id, owner_id, player_name, game_id, game_version, elapsed_time_ms, cleared, score, metrics_json) VALUES (?, ?, 'Synthetic Drill Player', 'graze-duel', 'recovery-drill', 1000, 1, 10, '{}')").bind(`${playerId}-result`, playerId),
+        database.prepare("INSERT INTO shared_results (id, owner_id, player_name, game_id, game_version, elapsed_time_ms, cleared, score, metrics_json) VALUES (?, ?, 'Synthetic Drill Player', 'buzz-barrier', 'recovery-drill', 1000, 1, 10, '{}')").bind(`${playerId}-result`, playerId),
         database.prepare("INSERT INTO credit_ledger_entries (id, player_id, balance_type, entry_type, amount) VALUES (?, ?, 'free', 'free_granted', 5)").bind(`${playerId}-free`, playerId),
       ]);
     }

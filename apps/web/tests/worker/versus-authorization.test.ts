@@ -71,7 +71,7 @@ async function connect(cookie: string, cabinetId: string, gameId: string, watch:
 const status = async (cabinet: string) => (await env.DB.prepare("SELECT status FROM cabinet_directory WHERE cabinet_id = ?").bind(cabinet).first<{ status: string }>())?.status;
 const reservationStatus = async (id: string) => (await env.DB.prepare("SELECT status FROM credit_reservations WHERE id = ?").bind(id).first<{ status: string }>())?.status;
 
-it.each(["graze-duel", "dot-wave", "deep-sea-salvage"])("keeps a current match and rematch isolated from authenticated nonparticipants: %s", async gameId => {
+it.each(["buzz-barrier", "dot-wave", "deep-sea-salvage"])("keeps a current match and rematch isolated from authenticated nonparticipants: %s", async gameId => {
   const cabinet = crypto.randomUUID();
   const owner = await player(true), challenger = await player(), outsider = await player(true);
   const host = await connect(owner.cookie, cabinet, gameId, false);

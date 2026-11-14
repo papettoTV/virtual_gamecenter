@@ -17,6 +17,6 @@ describe("shared cabinet presence", () => {
   });
   it("does not require a browser event API in non-browser consumers", () => {
     vi.stubGlobal("window", {});
-    expect(() => publishCabinetPresence({ cabinetId: "room", gameId: "graze-duel", playerCount: 0 })).not.toThrow();
+    expect(() => publishCabinetPresence({ cabinetId: "room", gameId: "buzz-barrier", playerCount: 0 })).not.toThrow();
   });
 });

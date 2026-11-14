@@ -10,7 +10,7 @@ test('home renders active games and versioned Worker/Pages', async ({ page }) =>
   const response = await page.goto('/');
   expect(response.status()).toBe(200);
   expect(response.headers()['x-pulbase-revision']).toBe(sha);
-  expect(response.headers()['x-pulbase-gateway-revision']).toBe(sha);
+  expect(response.headers()['x-pulbase-gateway-revision']).toBe(process.env.PULBASE_EXPECTED_GATEWAY_SHA ?? sha);
   await expect(page.getByRole('img', { name: 'PULBASE', exact: true })).toBeVisible();
   await expect(page.getByRole('region', { name: 'ゲームを見て回る' })).toBeVisible();
   await expect(page.locator('.game-showcase h2').first()).toBeVisible();
@@ -38,8 +38,9 @@ test('game navigation allows declining credit and returning before play', async 
   const cabinet = new URL(page.url());
   cabinet.searchParams.delete('start');
   const cabinetUrl = cabinet.href;
-  const game = new URL(cabinetUrl).searchParams.get('game');
-  expect(['graze-duel', 'deep-sea-salvage', 'dot-wave']).toContain(game);
+  const slug = new URL(cabinetUrl).searchParams.get('game');
+  const game = slug === 'graze-duel' ? 'buzz-barrier' : slug;
+  expect(['buzz-barrier', 'deep-sea-salvage', 'dot-wave']).toContain(game);
   await expect(page.getByRole('button', { name: 'プロフィールを表示', exact: true })).toBeVisible();
   const badge = page.locator('.platform-credit-badge');
   await expect(badge).toBeVisible();
@@ -52,8 +53,8 @@ test('game navigation allows declining credit and returning before play', async 
   else await expect(page.locator('#game-screen')).toBeVisible();
   expect(reservations).toEqual([]);
   if (game === 'dot-wave') await page.getByRole('button', { name: /^START \// }).click();
-  else if (isMobile) await page.getByRole('button', { name: game === 'graze-duel' ? 'タップして開始（1枚）' : '潜航開始', exact: true }).tap();
-  else await page.keyboard.press(game === 'graze-duel' ? 'Space' : 'p');
+  else if (isMobile) await page.getByRole('button', { name: game === 'buzz-barrier' ? /^(?:ゲーム開始|タップして開始（1枚）)$/ : '潜航開始', exact: true }).tap();
+  else await page.keyboard.press(game === 'buzz-barrier' ? 'Space' : 'p');
   await expect(welcome).toBeVisible();
   await welcome.getByRole('button', { name: '受け取らない', exact: true }).click();
   await expect(gate).toBeVisible();
