@@ -5,17 +5,22 @@ import { openAnalyticsSettings } from "../analytics/AnalyticsConsent";
 import { openFeedback } from "../feedback/Feedback";
 import "./platform-policies.css";
 
-export interface PlatformPoliciesProps {
+interface BetaFooterProps {
+  showBetaMessage?: boolean;
+  showBetaBadge?: boolean;
+}
+
+export interface PlatformPoliciesProps extends BetaFooterProps {
   policy: PolicyKind | null;
   setPolicy: Dispatch<SetStateAction<PolicyKind | null>>;
 }
 
-export function SiteFooter() {
+export function SiteFooter({ showBetaMessage, showBetaBadge }: BetaFooterProps) {
   const [policy, setPolicy] = useState<PolicyKind | null>(null);
-  return <PlatformPolicies policy={policy} setPolicy={setPolicy} />;
+  return <PlatformPolicies policy={policy} setPolicy={setPolicy} showBetaMessage={showBetaMessage} showBetaBadge={showBetaBadge} />;
 }
 
-export function PlatformPolicies({ policy, setPolicy }: PlatformPoliciesProps) {
+export function PlatformPolicies({ policy, setPolicy, showBetaMessage, showBetaBadge }: PlatformPoliciesProps) {
   return (
     <>
       {policy && (
@@ -23,10 +28,14 @@ export function PlatformPolicies({ policy, setPolicy }: PlatformPoliciesProps) {
       )}
 
       <footer className="platform-footer">
-        <strong>{BRAND.name} · {BRAND.category}</strong>
+        {showBetaMessage && <div className="platform-beta-note">
+          <p>PULBASEは無料ベータ版です。遊んでみた感想や、気になったことをぜひお聞かせください。</p>
+          <button type="button" onClick={openFeedback}>ご意見・感想を送る</button>
+        </div>}
+        <strong className="platform-footer-brand">{BRAND.name} · {BRAND.category}{showBetaBadge && <span className="brand-beta-badge">{BRAND.betaLabel}</span>}</strong>
         <button type="button" onClick={() => setPolicy("terms")}>利用規約</button>
         <button type="button" onClick={() => setPolicy("privacy")}>プライバシーポリシー</button>
-        <button type="button" onClick={openFeedback}>ご意見・感想を送る</button>
+        {!showBetaMessage && <button type="button" onClick={openFeedback}>ご意見・感想を送る</button>}
         <a href="/third-party-notices.html" target="_blank" rel="noopener noreferrer">ライセンス</a>
         <a href="https://x.com/pulbase" target="_blank" rel="noopener noreferrer">お問い合わせ：X @pulbase</a>
       </footer>
