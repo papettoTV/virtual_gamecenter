@@ -1,0 +1,63 @@
+.victory-celebration {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.victory-sound-toggle {
+  position: absolute;
+  z-index: 9;
+  inset: auto auto 8px 8px;
+  min-height: 44px;
+}
+
+.victory-sound-toggle[aria-pressed="true"] { color: #66ebff; }
+
+.victory-celebration-label {
+  position: absolute;
+  inset: 8% 0 auto;
+  color: var(--victory-accent);
+  text-align: center;
+  font-size: clamp(1.3rem, 5vmin, 3.2rem);
+  letter-spacing: .14em;
+  text-shadow: 0 2px 8px #020511, 0 0 18px currentColor;
+  animation: victory-label var(--victory-duration) both;
+}
+
+.victory-celebration span {
+  position: absolute;
+  left: var(--piece-left);
+  top: 0;
+  width: 7px;
+  height: 12px;
+  background: var(--piece-color);
+  animation: victory-confetti var(--victory-duration) var(--piece-delay) ease-out both;
+}
+
+@keyframes victory-label {
+  0% { opacity: 0; transform: scale(.82); }
+  15%, 70% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; }
+}
+
+@keyframes victory-confetti {
+  0% { opacity: 0; top: 38%; transform: scale(.4); }
+  18% { opacity: 1; top: 4%; }
+  75% { opacity: 1; }
+  100% { opacity: 0; top: 100%; transform: translateX(var(--piece-shift)) rotate(var(--piece-spin)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .victory-celebration-label { animation: none; }
+  .victory-celebration span { display: none; }
+  .victory-celebration span:nth-child(-n + 9) {
+    display: block;
+    top: 5%;
+    opacity: .65;
+    animation: none;
+    transform: rotate(24deg);
+  }
+}

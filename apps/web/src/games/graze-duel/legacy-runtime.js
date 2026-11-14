@@ -22,6 +22,7 @@ import {
   LEVEL_UP_INVINCIBLE_TIME,
 } from "./core";
 import { createGrazeAudio } from "./audio";
+import { createVictoryCelebration, winningMatch } from "../../features/game/victory-celebration";
 import { emitGrazeSparks } from "./graze-sparks";
 import { createLevelUpLabel, tickLevelUpLabel } from "./level-up-label";
 import { BUZZ_BARRIER } from "../../domain/game";
@@ -48,8 +49,16 @@ export function mountGame(context) {
     notifications.clearScope(BUZZ_BARRIER.id);
   });
   const audio = createGrazeAudio();
+  const victory = createVictoryCelebration("buzz");
+  const soundToggle = document.querySelector("#versus-sound-toggle");
   const { playBossAttackSound, playBossHitSound, playExplosionSound, playGrazeSound } = audio;
   scope.own(() => audio.dispose());
+  scope.own(victory.clear);
+  if (soundToggle) scope.listen(soundToggle, "click", () => {
+    audio.setMuted(!audio.muted);
+    soundToggle.setAttribute("aria-pressed", String(audio.muted));
+    if (!audio.muted) audio.unlock();
+  });
   const canvas = document.querySelector("#game");
   const arcadeScreen = document.querySelector("#arcade-screen");
   const cabinetScreen = document.querySelector("#cabinet-screen");
@@ -349,6 +358,7 @@ export function mountGame(context) {
 
 
   function resetGame() {
+    victory.clear();
     pausedForLiveShare = false;
     resultSharing.clear(BUZZ_BARRIER.id);
     sharedRunId = createUuid();
@@ -823,6 +833,7 @@ export function mountGame(context) {
       return;
     }
     if (versusUiMode === "ready" && action === "primary" && versusMatchId) {
+      audio.unlock();
       const matchId = versusMatchId;
       void versusCreditReady.then(ready => {
         if (ready && !scope.disposed && versusMatchId === matchId) cabinetClient.send({ type: "versusReady", matchId });
@@ -1037,6 +1048,8 @@ export function mountGame(context) {
   }
 
   function leaveCabinet(updateUrl = true) {
+    victory.clear();
+    if (soundToggle) soundToggle.hidden = true;
     cabinetClient.leave();
     currentCabinetId = null;
     cabinetRole = "visitor";
@@ -1143,6 +1156,7 @@ export function mountGame(context) {
     }
 
     if (message.type === "challengeAccepted") {
+      if (soundToggle) soundToggle.hidden = false;
       versusMatchId = message.matchId;
       versusSeat = message.seat;
       versusPhase = "accepted";
@@ -1353,6 +1367,7 @@ export function mountGame(context) {
       }
     } else if (won) {
       showVersusOverlay(title, description, "resultWinner");
+      victory.play(winningMatch(versusMatchId, message, versusSeat), versusOverlay?.parentElement ?? null, audio.cheer);
     } else {
       rematchDeadline = Date.now() + 10000;
       showVersusOverlay(title, `${description} 10秒以内に再挑戦できます。`, "resultLoser");
@@ -1388,6 +1403,8 @@ export function mountGame(context) {
   }
 
   function finishVersusLocally(nextRole, reason) {
+    victory.clear();
+    if (soundToggle) soundToggle.hidden = true;
     if (rematchTimer) window.clearInterval(rematchTimer);
     rematchTimer = null;
     versusPhase = "none";
