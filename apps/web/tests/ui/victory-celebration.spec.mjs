@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { test, expect } from '../../../../ci/ui-fixtures.mjs';
 import { respectReadBudget, finishReadBudget, readBudgetTimeout } from './api-read-budget.mjs';
 
-for (const game of ['graze-duel', 'dot-wave']) {
+for (const game of ['buzz-barrier', 'dot-wave']) {
   test(`${game}: only confirmed winners celebrate, respecting sound and motion preferences`, async ({ page, context }, info) => {
     info.setTimeout(info.timeout + readBudgetTimeout);
     await respectReadBudget(context, info);
@@ -28,7 +28,7 @@ for (const game of ['graze-duel', 'dot-wave']) {
       await expect.poll(() => Boolean(socket), { timeout: readBudgetTimeout }).toBe(true);
       const send = message => socket.send(JSON.stringify(message));
       const effect = page.locator('.victory-celebration');
-      const buzz = game === 'graze-duel';
+      const buzz = game === 'buzz-barrier';
       const match = async (matchId, seat, winner, muted) => {
         send({ type: 'challengeAccepted', matchId, seat });
         if (buzz) {
