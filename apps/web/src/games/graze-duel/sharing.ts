@@ -10,7 +10,7 @@ export function presentBuzzBarrierResult(result: SharedResultDraft): ResultPrese
   return {
     title: "BUZZ BARRIER", headline, accent: "#69f7ff",
     details: [`SCORE ${score}`, `TIME ${resultTime(result.elapsedTimeMs)}`, `ボス撃破 ${resultMetric(result, "defeatedBossCount")} / LV ${resultMetric(result, "maxLevel")}`],
-    text: `BUZZ BARRIER${versus ? outcome === "win" ? "の対戦に勝利！" : outcome === "draw" ? "の対戦は引き分け！" : "の対戦に挑戦！" : result.cleared ? "をクリア！" : "に挑戦！"} ${score}点${result.cleared ? ` / ${resultTime(result.elapsedTimeMs)}` : ""}\n${shareTags("graze-duel")}`,
+    text: `BUZZ BARRIER${versus ? outcome === "win" ? "の対戦に勝利！" : outcome === "draw" ? "の対戦は引き分け！" : "の対戦に挑戦！" : result.cleared ? "をクリア！" : "に挑戦！"} ${score}点${result.cleared ? ` / ${resultTime(result.elapsedTimeMs)}` : ""}\n${shareTags("buzz-barrier")}`,
     imageLines: [versus ? outcome === "win" ? "VICTORY" : outcome === "draw" ? "DRAW" : "VERSUS RESULT" : result.cleared ? "ALL CLEAR" : "CHALLENGE RESULT", `SCORE ${score}`, `TIME ${resultTime(result.elapsedTimeMs)}`],
   };
 }

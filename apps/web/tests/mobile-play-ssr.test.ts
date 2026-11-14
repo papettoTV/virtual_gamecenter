@@ -19,7 +19,7 @@ it.each([null, "playing", "paused"] as const)(
   "renders the regular presentation on the server with live phase %s",
   phase => {
     setLiveContext(phase === null ? null : {
-      gameId: "graze-duel", cabinetId: "ssr-test", role: "player", phase,
+      gameId: "buzz-barrier", cabinetId: "ssr-test", role: "player", phase,
     });
     expect(renderToString(createElement(Presentation))).toBe(
       '<section data-active="false" data-available="false"></section>',

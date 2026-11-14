@@ -26,7 +26,7 @@ interface ResultRow {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_BODY_BYTES = 16_384;
 const METRIC_RULES: Record<string, Record<string, "number" | "species" | readonly string[]>> = {
-  "graze-duel": { maxLevel: "number", defeatedBossCount: "number", mode: ["solo", "versus"], outcome: ["win", "lose", "draw"] },
+  "buzz-barrier": { maxLevel: "number", defeatedBossCount: "number", mode: ["solo", "versus"], outcome: ["win", "lose", "draw"] },
   "deep-sea-salvage": { maxDepth: "number", discoveredCount: "number", speciesIds: "species", totalSpeciesCount: "number" },
   "dot-wave": { mode: ["solo", "versus"], outcome: ["win", "lose", "draw"], turns: "number", remainingHp: "number" },
   "mochi-beat": { completedSets: "number", accuracy: "number" },

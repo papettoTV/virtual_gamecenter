@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { BuzzPausePanel } from "../../src/games/graze-duel/ui/BuzzPauseOverlay";
 import type { LiveShareContext } from "../../src/features/sharing/share-service";
 
-const context: LiveShareContext = { gameId: "graze-duel", cabinetId: "test", role: "player", phase: "paused" };
+const context: LiveShareContext = { gameId: "buzz-barrier", cabinetId: "test", role: "player", phase: "paused" };
 const render = (state: LiveShareContext | null, compact = true) => renderToStaticMarkup(createElement(BuzzPausePanel, { context: state, compact }));
 
 describe("BUZZ BARRIER pause overlay", () => {

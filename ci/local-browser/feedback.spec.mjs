@@ -9,7 +9,7 @@ async function open(page) {
 }
 async function candidate(page, history = {}) {
   await page.addInitScript(({ history }) => {
-    sessionStorage.setItem('pulbase.feedback-return.v1', JSON.stringify({ gameId: 'graze-duel', activity: 'player', at: Date.now() }));
+    sessionStorage.setItem('pulbase.feedback-return.v1', JSON.stringify({ gameId: 'buzz-barrier', activity: 'player', at: Date.now() }));
     localStorage.setItem('pulbase.feedback.v1', JSON.stringify(history));
   }, { history });
 }

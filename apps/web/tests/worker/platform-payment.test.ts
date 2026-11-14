@@ -29,7 +29,7 @@ describe("credit purchases", () => {
   it("keeps the Stripe Checkout session placeholder unescaped", () => {
     const urls = buildStripeCheckoutReturnUrls(
       "http://localhost:5174",
-      "/cabinets/test?game=graze-duel",
+      "/cabinets/test?game=buzz-barrier",
     );
     expect(urls.successUrl).toContain("session_id={CHECKOUT_SESSION_ID}");
     expect(urls.cancelUrl).toContain("purchase=cancelled");

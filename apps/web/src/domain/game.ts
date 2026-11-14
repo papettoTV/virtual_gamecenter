@@ -30,7 +30,7 @@ export interface PlaySession {
 }
 
 export const BUZZ_BARRIER: GameDefinition = {
-  id: "graze-duel",
+  id: "buzz-barrier",
   slug: "buzz-barrier",
   title: "BUZZ BARRIER",
   localizedTitle: "バズバリア",

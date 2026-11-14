@@ -6,7 +6,7 @@ import type { SharedResult } from "../src/domain/shared-result";
 afterEach(() => vi.unstubAllGlobals());
 
 it("lets games replace image rendering while retaining a common default", async () => {
-  expect(await getResultImageRenderer("graze-duel")).toBeNull();
+  expect(await getResultImageRenderer("buzz-barrier")).toBeNull();
   expect(await getResultImageRenderer("deep-sea-salvage")).toBe(drawSalvageResultImage);
 });
 

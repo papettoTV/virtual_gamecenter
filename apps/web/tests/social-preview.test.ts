@@ -9,9 +9,9 @@ beforeEach(() => vi.stubGlobal("location", { origin: "http://localhost:5174" }))
 afterEach(() => vi.unstubAllGlobals());
 
 const panel: SharePanelState = {
-  kind: "result", gameId: "graze-duel", targetId: "saved-result", shareId: "share", title: "結果を共有", text: "text",
+  kind: "result", gameId: "buzz-barrier", targetId: "saved-result", shareId: "share", title: "結果を共有", text: "text",
   url: "http://localhost:5174/results/saved-result", status: "ready",
-  result: { id: "saved-result", gameId: "graze-duel", gameVersion: "test-1", elapsedTimeMs: 15000, cleared: false, score: 1200, metrics: { maxLevel: 3, defeatedBossCount: 0 }, playerName: "Player-test", createdAt: "2026-10-12T00:00:00Z" },
+  result: { id: "saved-result", gameId: "buzz-barrier", gameVersion: "test-1", elapsedTimeMs: 15000, cleared: false, score: 1200, metrics: { maxLevel: 3, defeatedBossCount: 0 }, playerName: "Player-test", createdAt: "2026-10-12T00:00:00Z" },
 };
 
 function elements(node: ReactNode): ReactElement<Record<string, unknown>>[] {
@@ -44,7 +44,7 @@ it("previews a live invitation with its own image rather than a result card", ()
   expect(copy(tree)).toContain("DOT WAVEの観戦");
 });
 
-it.each(["graze-duel", "dot-wave", "deep-sea-salvage", "unknown", "__proto__", "constructor"])("shares Worker artwork and metadata for live/result %s on the share origin", gameId => {
+it.each(["buzz-barrier", "dot-wave", "deep-sea-salvage", "unknown", "__proto__", "constructor"])("shares Worker artwork and metadata for live/result %s on the share origin", gameId => {
   expect(workerSocialImage).toBe(socialImage);
   for (const origin of ["https://develop.virtual-gamecenter.pages.dev", "https://example.test:8443"]) {
     for (const kind of ["live", "result"] as const) {

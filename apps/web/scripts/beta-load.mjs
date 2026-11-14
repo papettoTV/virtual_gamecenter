@@ -9,7 +9,7 @@ const duration = Number(process.env.LOAD_DURATION_SECONDS ?? 120);
 if (!process.argv.includes("--confirm-staging") || !Number.isInteger(duration) || duration < 30 || duration > 300) throw Error("検証環境専用です。--confirm-staging と30〜300秒の実行時間が必要です。");
 const access = JSON.parse(await readFile(process.env.PULBASE_LOAD_AUTH_FILE ?? "/tmp/pulbase-staging-access.json", "utf8"));
 const authorization = "Basic " + Buffer.from(access.username + ":" + access.password).toString("base64");
-const gameIds = ["graze-duel", "deep-sea-salvage", "dot-wave"];
+const gameIds = ["buzz-barrier", "deep-sea-salvage", "dot-wave"];
 const sockets = [];
 const results = { environment: "staging", startedAt: new Date().toISOString(), probe, duration, profiles: [] };
 const sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));

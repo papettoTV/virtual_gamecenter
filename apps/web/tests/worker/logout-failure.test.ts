@@ -69,7 +69,7 @@ it("rejects the old socket after an RPC failure while anonymous spectators conti
   await registerGoogleAccount(env.DB, { playerId, token: cookie.split("=")[1]!, secureCookie: false }, { sub: crypto.randomUUID(), name: "Fallback test" });
   const cabinet = crypto.randomUUID();
   async function connect(sessionCookie: string) {
-    const response = await exports.default.fetch(`http://localhost/api/cabinets/${cabinet}/ws?gameId=graze-duel`, { headers: { Upgrade: "websocket", Cookie: sessionCookie } });
+    const response = await exports.default.fetch(`http://localhost/api/cabinets/${cabinet}/ws?gameId=buzz-barrier`, { headers: { Upgrade: "websocket", Cookie: sessionCookie } });
     const socket = response.webSocket!; socket.accept(); sockets.push(socket);
     const messages: Array<{ type: string; sentAt?: number }> = [];
     socket.addEventListener("message", event => { messages.push(JSON.parse(String(event.data))); });

@@ -28,7 +28,7 @@ it("drains real room sockets, persists suspension and removes stale playback bef
   await api("platform/welcome-credit", cookie, {});
   const cabinetId = crypto.randomUUID();
   const connect = async () => {
-    const upgrade = await exports.default.fetch(`http://localhost/api/cabinets/${cabinetId}/ws?gameId=graze-duel`, { headers: { Cookie: cookie, Upgrade: "websocket", "CF-Connecting-IP": "192.0.2.80" } });
+    const upgrade = await exports.default.fetch(`http://localhost/api/cabinets/${cabinetId}/ws?gameId=buzz-barrier`, { headers: { Cookie: cookie, Upgrade: "websocket", "CF-Connecting-IP": "192.0.2.80" } });
     expect(upgrade.status).toBe(101);
     const socket = upgrade.webSocket!; socket.accept();
     const messages: Array<{ type: string }> = [];
@@ -37,14 +37,14 @@ it("drains real room sockets, persists suspension and removes stale playback bef
   };
   const host = await connect(); const viewer = await connect();
   try {
-    host.socket.send(JSON.stringify({ type: "joinCabinet", gameId: "graze-duel" }));
-    viewer.socket.send(JSON.stringify({ type: "joinCabinet", gameId: "graze-duel", watch: true }));
+    host.socket.send(JSON.stringify({ type: "joinCabinet", gameId: "buzz-barrier" }));
+    viewer.socket.send(JSON.stringify({ type: "joinCabinet", gameId: "buzz-barrier", watch: true }));
     await expect.poll(() => host.messages.some(message => message.type === "joinedCabinet")).toBe(true);
-    const reservation = await (await api("platform/credit-reservations", cookie, { cabinetId, gameId: "graze-duel", purpose: "solo" })).json<{ reservationId: string }>();
+    const reservation = await (await api("platform/credit-reservations", cookie, { cabinetId, gameId: "buzz-barrier", purpose: "solo" })).json<{ reservationId: string }>();
     await api(`platform/credit-reservations/${reservation.reservationId}/capture`, cookie, {});
     host.socket.send(JSON.stringify({ type: "startSolo", reservationId: reservation.reservationId }));
     await expect.poll(() => host.messages.some(message => message.type === "soloStarted")).toBe(true);
-    host.socket.send(JSON.stringify({ type: "gameKeyframe", seq: 1, snapshot: { gameId: "graze-duel" } }));
+    host.socket.send(JSON.stringify({ type: "gameKeyframe", seq: 1, snapshot: { gameId: "buzz-barrier" } }));
     await expect.poll(() => viewer.messages.some(message => message.type === "viewerKeyframe")).toBe(true);
     const room = env.CABINET_ROOMS.getByName(cabinetId);
     const closed: number[] = [];
@@ -67,7 +67,7 @@ it("drains real room sockets, persists suspension and removes stale playback bef
     await control.resume();
     expect((await api("platform/credits", cookie)).status).toBe(401);
     const reconnect = await connect();
-    reconnect.socket.send(JSON.stringify({ type: "joinCabinet", gameId: "graze-duel", watch: true }));
+    reconnect.socket.send(JSON.stringify({ type: "joinCabinet", gameId: "buzz-barrier", watch: true }));
     await expect.poll(() => reconnect.messages.some(message => message.type === "joinedCabinet")).toBe(true);
     expect(reconnect.messages.some(message => message.type === "viewerKeyframe")).toBe(false);
     reconnect.socket.close();

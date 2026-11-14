@@ -85,7 +85,7 @@ async function main() {
   }
   try {
     const owner = await player();
-    for (const game of ["graze-duel", "dot-wave", "deep-sea-salvage"]) {
+    for (const game of ["buzz-barrier", "dot-wave", "deep-sea-salvage"]) {
       const cabinet = crypto.randomUUID(), host = await connect(cabinet, game, owner), viewer = await connect(cabinet, game);
       const id = await reserve(owner, cabinet, game); await capture(owner, id); await capture(owner, id);
       host.send({ type: "startSolo", reservationId: id });
@@ -97,12 +97,12 @@ async function main() {
       attempts.push({ game, scenario: "solo_receipt_and_spectating", outcome: "success" });
     }
     for (const scenario of ["request_without_start_message", "permission_without_receipt"]) {
-      const cabinet = crypto.randomUUID(), host = await connect(cabinet, "graze-duel", owner, false);
-      const id = await reserve(owner, cabinet, "graze-duel"); await capture(owner, id);
+      const cabinet = crypto.randomUUID(), host = await connect(cabinet, "buzz-barrier", owner, false);
+      const id = await reserve(owner, cabinet, "buzz-barrier"); await capture(owner, id);
       let permission;
       if (scenario === "permission_without_receipt") {
         host.send({ type: "startSolo", reservationId: id }); permission = await host.next("soloStarted");
-        const viewer = await connect(cabinet, "graze-duel");
+        const viewer = await connect(cabinet, "buzz-barrier");
         viewer.send({ type: "startReceipt", ...permission.startReceipt }); viewer.send({ type: "clockPing", sentAt: 1 }); await viewer.next("clockPong"); viewer.socket.close();
       }
       const row = await audit(id);
@@ -111,7 +111,7 @@ async function main() {
       if (permission) { host.send({ type: "startReceipt", ...permission.startReceipt }); host.send({ type: "clockPing", sentAt: 2 }); await host.next("clockPong"); }
       const after = await audit(id);
       assert.equal(after.receipt_one, 0); assert.ok(after.deadline_ms < Date.now());
-      attempts.push({ game: "graze-duel", scenario, expired: true, received: false });
+      attempts.push({ game: "buzz-barrier", scenario, expired: true, received: false });
       host.send({ type: "leaveCabinet" }); host.socket.close();
       await owner.api("credit-reservations/" + id + "/release", {});
     }

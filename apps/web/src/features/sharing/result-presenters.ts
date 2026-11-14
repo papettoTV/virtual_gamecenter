@@ -7,7 +7,7 @@ import { presentDotWaveResult } from "../../games/dot-wave/sharing";
 export type ResultPresenter = (result: SharedResultDraft) => ResultPresentation;
 
 const resultPresenters: Readonly<Record<string, ResultPresenter>> = {
-  "graze-duel": presentBuzzBarrierResult,
+  "buzz-barrier": presentBuzzBarrierResult,
   "deep-sea-salvage": presentSalvageResult,
   "dot-wave": presentDotWaveResult,
 };

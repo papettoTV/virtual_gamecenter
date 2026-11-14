@@ -3,7 +3,7 @@ import { ArcadeScreen } from "../features/arcade/ArcadeScreen";
 import { CabinetScreen } from "../features/cabinet/CabinetScreen";
 import { GameScreen } from "../features/game/GameScreen";
 import { PlatformExperience } from "../features/platform/PlatformExperience";
-import { DEFAULT_GAME_ID, DOT_WAVE, resolveGameDefinition, type GameDefinition } from "../domain/game";
+import { DEFAULT_GAME_ID, DOT_WAVE, getGameDefinition, type GameDefinition } from "../domain/game";
 import { getGameRegistration } from "../games/registry";
 import { BRAND } from "../domain/brand";
 import { gamePlayUrl, startNewGame } from "../features/cabinet/play-navigation";
@@ -35,7 +35,7 @@ export function App() {
   }, []);
   const url = new URL(address, location.origin);
   const requested = url.searchParams.get("game");
-  const game = resolveGameDefinition(requested === "mochi-beat" || ["/labs/dot-wave", "/labs/mochi-duel"].includes(url.pathname) ? DOT_WAVE.id : requested ?? DEFAULT_GAME_ID);
+  const game = getGameDefinition(requested === "mochi-beat" || ["/labs/dot-wave", "/labs/mochi-duel"].includes(url.pathname) ? DOT_WAVE.id : requested ?? DEFAULT_GAME_ID);
   const isCabinet = /^\/cabinets\/[^/]+$/.test(url.pathname);
   const preview = isCabinet && url.searchParams.get("watch") === "1"
     && url.searchParams.get("preview") === "1" && window.self !== window.top;
@@ -47,12 +47,13 @@ export function App() {
   const resultMatch = /^\/results\/([^/]+)$/.exec(url.pathname);
   useEffect(() => {
     sharePanel.close();
-    if (!resultMatch) document.title = selection || isCabinet ? `${game.title}${url.searchParams.get("watch") === "1" ? "の観戦" : ""} | PULBASE` : `${BRAND.name} | ${BRAND.category}`;
+    if (!resultMatch) document.title = game && (selection || isCabinet) ? `${game.title}${url.searchParams.get("watch") === "1" ? "の観戦" : ""} | PULBASE` : `${BRAND.name} | ${BRAND.category}`;
   }, [address]);
   return <>{!preview && <><NotificationCenter /><SharePanel /><AnalyticsConsent /><Feedback address={address} /></>}{
     resultMatch ? <SharedResultPage key={resultMatch[1]} resultId={resultMatch[1]!} /> :
     url.pathname === "/labs/buzz-barrier-three" ?
       <Suspense fallback={<Loading />}><ThreeBulletLab /></Suspense> :
+    !game ? <main className="shell"><p>ゲームが見つかりません。</p><a href="/">ゲーム一覧へ</a></main> :
     isCabinet ? <SpectatorGate key={`${url.pathname}:${url.searchParams.get("watch")}:${preview}`} game={game} url={url} preview={preview}>
       <GameRoute game={game} preview={preview} />
     </SpectatorGate> :

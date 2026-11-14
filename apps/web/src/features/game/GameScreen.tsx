@@ -18,8 +18,8 @@ export interface GameScreenProps {
 export function GameScreen({ game }: GameScreenProps) {
   const screen = useRef<HTMLElement>(null);
   const play = useMobilePlay(screen);
-  const tapReady = game.id === "graze-duel" && play.mobile && play.ready;
-  const keyboardStart = game.id === "graze-duel" && !play.mobile && play.ready ? "Space" : undefined;
+  const tapReady = game.id === "buzz-barrier" && play.mobile && play.ready;
+  const keyboardStart = game.id === "buzz-barrier" && !play.mobile && play.ready ? "Space" : undefined;
   const ui = getGameUI(game.id);
   const { FrameIntro, SetIntro, ResultPresentation, ResultSummaryAction, AfterFrame, TouchActions, Settings, FooterAction, RetryAction } = ui;
   return (
@@ -81,7 +81,7 @@ export function GameScreen({ game }: GameScreenProps) {
           }}>
           <span aria-hidden="true">▶</span>
         </button>}
-        {game.id === "graze-duel" && <BuzzPauseOverlay compact={play.mobile || play.active} />}
+        {game.id === "buzz-barrier" && <BuzzPauseOverlay compact={play.mobile || play.active} />}
         <FrameIntro game={game} />
         <SetIntro game={game} />
         <div className="versus-overlay is-hidden" id="versus-overlay" role="dialog" aria-modal="true">
@@ -138,7 +138,7 @@ export function GameScreen({ game }: GameScreenProps) {
         </div>
       </div>
 
-      {game.id === "graze-duel" && <BuzzPauseOverlay compact={play.mobile || play.active} actionsOnly />}
+      {game.id === "buzz-barrier" && <BuzzPauseOverlay compact={play.mobile || play.active} actionsOnly />}
       <LeaveGameConfirmation />
       <LiveShareButton />
       {play.available && !play.active && <button className="mobile-play-toggle touch-button" type="button" onKeyDown={event => event.stopPropagation()} onKeyUp={event => event.stopPropagation()} onPointerDown={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); play.toggle(); }}>
@@ -153,7 +153,7 @@ export function GameScreen({ game }: GameScreenProps) {
 
       <div className="touch-controls" aria-label="スマホ操作">
         <div className="touch-actions">
-          {game.id === "graze-duel" && <div className="buzz-mobile-status" aria-label="ゲームステータス">
+          {game.id === "buzz-barrier" && <div className="buzz-mobile-status" aria-label="ゲームステータス">
             <span data-buzz-status="score" /><span data-buzz-status="time" />
             <span data-buzz-status="level" /><span data-buzz-status="lives" />
             <meter data-buzz-status="gauge" aria-label="攻撃ゲージ" min="0" max="1" />

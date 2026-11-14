@@ -22,7 +22,7 @@ describe("Cloudflare Worker", () => {
     const event = {
       eventId,
       eventType: "watch_started",
-      gameId: "graze-duel",
+      gameId: "buzz-barrier",
       cabinetId: "live-cabinet",
       shareId: "shared-link",
     };
