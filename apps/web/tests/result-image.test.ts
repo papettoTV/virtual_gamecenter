@@ -78,7 +78,7 @@ describe("result PNG", () => {
   });
 
   it.each([
-    ["graze-duel", { score: 98765 }],
+    ["buzz-barrier", { score: 98765 }],
     ["deep-sea-salvage", { metrics: { maxDepth: 9876, discoveredCount: 19 } }],
     ["dot-wave", { metrics: { mode: "solo", outcome: "draw", turns: 99, remainingHp: 1 } }],
   ] satisfies [string, Partial<SharedResult>][])("changes rendered pixels when %s metrics change", async (gameId, changes) => {

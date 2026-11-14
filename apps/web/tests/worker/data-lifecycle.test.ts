@@ -34,7 +34,7 @@ async function record(playerId: string, name = "same-name") {
   const id = crypto.randomUUID();
   await env.DB.batch([
     env.DB.prepare("INSERT INTO rankings (owner_id, player_name, clear_time_ms, score, max_level, client_version) VALUES (?, ?, 1000, 10, 1, 'test')").bind(playerId, name),
-    env.DB.prepare("INSERT INTO shared_results (id, owner_id, player_name, game_id, game_version, elapsed_time_ms, cleared, score, metrics_json) VALUES (?, ?, ?, 'graze-duel', 'test', 1000, 1, 10, '{}')").bind(id, playerId, name),
+    env.DB.prepare("INSERT INTO shared_results (id, owner_id, player_name, game_id, game_version, elapsed_time_ms, cleared, score, metrics_json) VALUES (?, ?, ?, 'buzz-barrier', 'test', 1000, 1, 10, '{}')").bind(id, playerId, name),
   ]);
   return id;
 }
@@ -197,7 +197,7 @@ describe("retention", () => {
   it("expires detail records but retains current-day refill, balances and independent eligibility", async () => {
     const target = await guest();
     await env.DB.prepare("UPDATE credit_ledger_entries SET created_at = '2000-01-01' WHERE player_id = ?").bind(target.playerId).run();
-    await env.DB.prepare("INSERT INTO sharing_events (id, event_type, kind, game_id, target_id, created_at) VALUES ('old', 'result_viewed', 'result', 'graze-duel', 'old', '2000-01-01')").run();
+    await env.DB.prepare("INSERT INTO sharing_events (id, event_type, kind, game_id, target_id, created_at) VALUES ('old', 'result_viewed', 'result', 'buzz-barrier', 'old', '2000-01-01')").run();
     await runRetention(env.DB, rooms, env.DELETION_AUDIT);
     expect(await env.DB.prepare("SELECT * FROM sharing_events WHERE id = 'old'").first()).toBeNull();
     expect((await env.DB.prepare("SELECT free_balance FROM credit_wallets WHERE player_id = ?").bind(target.playerId).first<{ free_balance: number }>())!.free_balance).toBe(5);

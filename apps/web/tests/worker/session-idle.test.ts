@@ -28,7 +28,7 @@ async function fixture(gameId: string) {
   return { room, playerId, hash, old: await connect(cookie), valid: await connect(`vgc_session=${other}`), anonymous: await connect("") };
 }
 
-it.each(["graze-duel", "dot-wave", "deep-sea-salvage"].flatMap(gameId => ["deleted", "expired", "account-deletion"].map(reason => ({ gameId, reason }))))(
+it.each(["buzz-barrier", "dot-wave", "deep-sea-salvage"].flatMap(gameId => ["deleted", "expired", "account-deletion"].map(reason => ({ gameId, reason }))))(
   "alarm closes idle $gameId on $reason without any client message", async ({ gameId, reason }) => {
     const current = await fixture(gameId);
     if (reason === "deleted") await env.DB.prepare("DELETE FROM player_sessions WHERE token_hash = ?").bind(current.hash).run();
@@ -46,7 +46,7 @@ it.each(["graze-duel", "dot-wave", "deep-sea-salvage"].flatMap(gameId => ["delet
 );
 
 it("fails closed on a D1 check failure, preserves anonymous viewing, and schedules future work", async () => {
-  const current = await fixture("graze-duel");
+  const current = await fixture("buzz-barrier");
   vi.spyOn(console, "warn").mockImplementation(() => {});
   await runInDurableObject(current.room, instance => {
     const original = Reflect.get(instance, "env") as Env;
@@ -74,7 +74,7 @@ it("does not postpone an existing security alarm when state is persisted repeate
 });
 
 it.each(["marked-revoked", "missing-hash"])("closes an abandoned idle attachment: %s", async reason => {
-  const current = await fixture("graze-duel");
+  const current = await fixture("buzz-barrier");
   await runInDurableObject(current.room, async (instance, state) => {
     const socket = state.getWebSockets().find(candidate => candidate.deserializeAttachment()?.sessionHash === current.hash)!;
     const attachment = socket.deserializeAttachment();

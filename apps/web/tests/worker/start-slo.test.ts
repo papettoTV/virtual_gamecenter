@@ -20,7 +20,7 @@ async function fixture(mode = "solo") {
   const cookie = bootstrap.headers.get("set-cookie")!.split(";", 1)[0]!;
   const identity = await bootstrap.json<{ playerId: string }>();
   await call("welcome-credit", cookie, {});
-  const reserved = (await call("credit-reservations", cookie, { cabinetId: crypto.randomUUID(), gameId: "graze-duel", purpose: mode === "solo" ? "solo" : "challenge" }))!;
+  const reserved = (await call("credit-reservations", cookie, { cabinetId: crypto.randomUUID(), gameId: "buzz-barrier", purpose: mode === "solo" ? "solo" : "challenge" }))!;
   expect(reserved.status).toBe(200);
   const { reservationId } = await reserved.json<{ reservationId: string }>();
   return { reservationId, cookie, playerId: identity.playerId, capture: async () => {

@@ -3381,7 +3381,7 @@ export function mountGame(context) {
     if (currentScreen !== "game") return;
     updateRenderStressBullets();
     renderThreeBulletLayer();
-    const mobileHud = Boolean(canvas.closest('[data-mobile-play="true"][data-game-id="graze-duel"]'));
+    const mobileHud = Boolean(canvas.closest('[data-mobile-play="true"][data-game-id="buzz-barrier"]'));
     if (mobileHud) {
       const player = players[0];
       const values = { score: `S ${Math.round(player.score)}`, time: `${Math.floor(elapsedRound)}s`,

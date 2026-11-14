@@ -37,7 +37,7 @@ const origin = "http://127.0.0.1:8797";
 const sockets = [];
 async function connect(cabinetId, cookie = "", blocked = false) {
   return new Promise((resolveConnection, reject) => {
-    const socket = new WebSocket(`${origin.replace("http:", "ws:")}/api/cabinets/${cabinetId}/ws?gameId=graze-duel`, { headers: { Cookie: cookie, Origin: origin } });
+    const socket = new WebSocket(`${origin.replace("http:", "ws:")}/api/cabinets/${cabinetId}/ws?gameId=buzz-barrier`, { headers: { Cookie: cookie, Origin: origin } });
     sockets.push(socket);
     const queue = [];
     const timer = setTimeout(() => { socket.terminate(); reject(Error("drill_socket_timeout")); }, 10000);
@@ -77,13 +77,13 @@ async function exerciseStop(operator, configPath) {
     const cookie = `vgc_session=${player}`;
     const host = await connect(cabinetId, cookie); const viewer = await connect(cabinetId);
     for (const [client, watch] of [[host, false], [viewer, true]]) {
-      client.socket.send(JSON.stringify({ type: "joinCabinet", gameId: "graze-duel", watch })); await message(client, "joinedCabinet");
+      client.socket.send(JSON.stringify({ type: "joinCabinet", gameId: "buzz-barrier", watch })); await message(client, "joinedCabinet");
     }
-    const reservation = await api("platform/credit-reservations", cookie, { cabinetId, gameId: "graze-duel", purpose: "solo" });
+    const reservation = await api("platform/credit-reservations", cookie, { cabinetId, gameId: "buzz-barrier", purpose: "solo" });
     assert.equal(reservation.response.status, 200);
     assert.equal((await api(`platform/credit-reservations/${reservation.data.reservationId}/capture`, cookie, {})).response.status, 200);
     host.socket.send(JSON.stringify({ type: "startSolo", reservationId: reservation.data.reservationId })); await message(host, "soloStarted");
-    host.socket.send(JSON.stringify({ type: "gameKeyframe", seq: 1, snapshot: { gameId: "graze-duel", state: { elapsedTime: 1 } } })); await message(viewer, "viewerKeyframe");
+    host.socket.send(JSON.stringify({ type: "gameKeyframe", seq: 1, snapshot: { gameId: "buzz-barrier", state: { elapsedTime: 1 } } })); await message(viewer, "viewerKeyframe");
     clients.push(host, viewer);
   }
   const bookmark = wrangler(configPath, ["d1", "time-travel", "info", "DB"]).bookmark;
@@ -109,7 +109,7 @@ async function verifyResumed(operator, database) {
   assert.equal((await api("platform/credits", "vgc_session=recovery-drill-deleted")).response.status, 401);
   assert.equal((await api("platform/credits", "vgc_session=recovery-drill-survivor")).response.status, 401);
   const viewer = await connect(state.rooms[0].id);
-  viewer.socket.send(JSON.stringify({ type: "joinCabinet", gameId: "graze-duel", watch: true })); await message(viewer, "joinedCabinet");
+  viewer.socket.send(JSON.stringify({ type: "joinCabinet", gameId: "buzz-barrier", watch: true })); await message(viewer, "joinedCabinet");
   assert.ok(!viewer.queue.some(value => value.type === "viewerKeyframe"));
   viewer.socket.close(); await viewer.closed;
   const token = randomUUID();
@@ -117,8 +117,8 @@ async function verifyResumed(operator, database) {
   await database.prepare("INSERT INTO player_sessions (token_hash, player_id, expires_at) VALUES (?, 'recovery-drill-survivor', datetime('now', '+1 day'))").bind(hash).run();
   const cookie = `vgc_session=${token}`;
   const client = await connect(state.rooms[1].id, cookie);
-  client.socket.send(JSON.stringify({ type: "joinCabinet", gameId: "graze-duel" })); await message(client, "joinedCabinet");
-  const reservation = await api("platform/credit-reservations", cookie, { cabinetId: state.rooms[1].id, gameId: "graze-duel", purpose: "solo" });
+  client.socket.send(JSON.stringify({ type: "joinCabinet", gameId: "buzz-barrier" })); await message(client, "joinedCabinet");
+  const reservation = await api("platform/credit-reservations", cookie, { cabinetId: state.rooms[1].id, gameId: "buzz-barrier", purpose: "solo" });
   assert.equal(reservation.response.status, 200);
   assert.equal((await api(`platform/credit-reservations/${reservation.data.reservationId}/capture`, cookie, {})).response.status, 200);
   client.socket.send(JSON.stringify({ type: "startSolo", reservationId: reservation.data.reservationId })); await message(client, "soloStarted");

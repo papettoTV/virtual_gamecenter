@@ -12,7 +12,7 @@
   touch-action: pan-y;
 }
 .buzz-pause-overlay[hidden] { display: none; }
-#game-screen[data-mobile-play][data-game-id="graze-duel"] .buzz-pause-overlay { top: 44px; border-top-left-radius: 0; border-top-right-radius: 0; }
+#game-screen[data-mobile-play][data-game-id="buzz-barrier"] .buzz-pause-overlay { top: 44px; border-top-left-radius: 0; border-top-right-radius: 0; }
 .buzz-pause-content { width: min(100%, 340px); min-width: 0; container-type: inline-size; overflow-wrap: anywhere; text-align: center; }
 .buzz-pause-content h2 { margin: 0 0 16px; font: 800 clamp(20px, 18cqi, 48px) / 1.1 system-ui; }
 .buzz-pause-hint { margin: 0 0 20px; color: #b5eaf0; font-size: 14px; line-height: 1.7; }

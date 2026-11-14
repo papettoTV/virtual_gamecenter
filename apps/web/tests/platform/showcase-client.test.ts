@@ -28,11 +28,11 @@ describe("showcase spectator connection", () => {
         location: { protocol: "https:", host: "example.com", search: framed ? "?watch=1&preview=1" : "?watch=1" },
       });
       const client = createCabinetClient();
-      client.join("room", "graze-duel", explicitWatch);
+      client.join("room", "buzz-barrier", explicitWatch);
       await Promise.resolve();
       socket!.readyState = 1;
       handlers.get("open")?.();
-      expect(sent.map(message => JSON.parse(message))).toContainEqual({ type: "joinCabinet", gameId: "graze-duel", watch: true });
+      expect(sent.map(message => JSON.parse(message))).toContainEqual({ type: "joinCabinet", gameId: "buzz-barrier", watch: true });
       client.leave();
     });
   }

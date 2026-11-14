@@ -8,7 +8,7 @@ import { instrument, delayedReadProbe } from './read-budget-instrument.mjs';
 
 const origin = 'http://127.0.0.1:5174';
 const games = [
-  { id: 'graze-duel', button: 'ゲーム開始', key: 'Space' },
+  { id: 'buzz-barrier', button: 'ゲーム開始', key: 'Space' },
   { id: 'deep-sea-salvage', button: '潜航開始', key: 'p' },
   { id: 'dot-wave', button: 'START / ゲーム開始', key: 'Space' },
 ];
@@ -98,7 +98,7 @@ async function leaveToDirectory(page, gameId, selector = null) {
     if (!selector && gameId !== 'dot-wave') await page.keyboard.press('Escape');
     const leave = selector ? page.locator(selector)
       : gameId === 'dot-wave' ? page.getByRole('link', { name: 'ゲーム一覧へ', exact: true })
-      : gameId === 'graze-duel' && await page.locator('.buzz-pause-leave').isVisible() ? page.locator('.buzz-pause-leave')
+      : gameId === 'buzz-barrier' && await page.locator('.buzz-pause-leave').isVisible() ? page.locator('.buzz-pause-leave')
       : page.locator('#game-back-to-arcade');
     await expect(leave).toBeVisible();
     // DOT WAVE remounts PlatformExperience on return. Subscribe before exit:
@@ -178,7 +178,7 @@ for (const game of games) {
     await expect.poll(() => phase(page, game.id)).toBe(ready);
     await navigateGuest(page, cabinet, true);
     await expect.poll(() => phase(page, game.id)).toBe(ready);
-    if (isMobile || game.id !== 'graze-duel') {
+    if (isMobile || game.id !== 'buzz-barrier') {
       const readyButton = page.locator('button[data-ready-start]:visible');
       await expect(readyButton).toBeVisible();
       if (isMobile || game.id === 'dot-wave') await expect(readyButton.and(start)).toHaveCount(1);
@@ -217,7 +217,7 @@ for (const game of games) {
         expect(writes).toHaveLength(0);
       });
       const balance = await wallet(page);
-      if (game.id === 'graze-duel' && isMobile) {
+      if (game.id === 'buzz-barrier' && isMobile) {
         await expect(page.locator('#touch-pause')).toBeHidden();
         await expect(page.locator('.game-share-button')).toHaveCount(0);
         await page.getByRole('button', { name: '観戦に招待', exact: true }).tap();
@@ -376,7 +376,7 @@ for (const game of games) {
           expect(writes.filter(url => url.endsWith('/release'))).toHaveLength(0);
         });
       });
-      if (game.id === 'graze-duel' && isMobile) {
+      if (game.id === 'buzz-barrier' && isMobile) {
         const screen = page.locator('#game-screen');
         const pause = screen.locator('#touch-pause');
         await expect(screen).toHaveAttribute('data-mobile-play', 'true');
@@ -476,7 +476,7 @@ for (const game of games) {
         await expect.poll(() => phase(page, game.id)).toBe('paused');
       }
       await test.step('直接退出・連打: 消費済み残高と表示復帰', async () => {
-        await leaveToDirectory(page, game.id, isMobile && game.id === 'graze-duel' ? '.buzz-pause-actions .buzz-pause-leave' : null);
+        await leaveToDirectory(page, game.id, isMobile && game.id === 'buzz-barrier' ? '.buzz-pause-actions .buzz-pause-leave' : null);
         expect(await persistedWallet(page)).toBe(balance - 1);
         expect(writes.filter(url => url.endsWith('/credit-reservations'))).toHaveLength(1);
         expect(writes.filter(url => url.endsWith('/capture'))).toHaveLength(1);
@@ -695,7 +695,7 @@ for (const game of games) {
 // DOT WAVE uses standaloneCredits and its own confirmation, not this welcome flow.
 // Keep the three-game start/accounting/spectator coverage above unchanged; the
 // real account/consent hook regression is in registration-play-recovery.test.ts.
-for (const game of games.filter(game => game.id === 'graze-duel')) {
+for (const game of games.filter(game => game.id === 'buzz-barrier')) {
   for (const closeAt of ['consent', 'registration']) {
     test(`${game.id}: insufficient credit registration cancellation at ${closeAt} recovers without reload`, async ({ page, isMobile }) => {
       // Keep the welcome grant unclaimed so it can fund the final authorized play.
@@ -722,7 +722,7 @@ for (const game of games.filter(game => game.id === 'graze-duel')) {
       page.on('request', request => {
         if (request.method() === 'POST' && request.url().includes('/api/platform/credit-reservations')) writes.push(request.url());
       });
-      if (game.id === 'graze-duel' && isMobile) {
+      if (game.id === 'buzz-barrier' && isMobile) {
         await expect(page.locator('#touch-pause')).toBeHidden();
         await expect(page.locator('.game-share-button')).toHaveCount(0);
         await page.getByRole('button', { name: '観戦に招待', exact: true }).tap();

@@ -5,14 +5,14 @@ import { liveShareText, resultShareText } from "../src/features/sharing/share-se
 import type { SharedResult, SharedResultDraft } from "../src/domain/shared-result";
 
 vi.mock("../src/features/platform/platform-client", () => ({ fetchPlatformBootstrap: vi.fn(async () => ({})) }));
-const draft = (): SharedResultDraft => ({ id: crypto.randomUUID(), gameId: "graze-duel", gameVersion: "test-1", elapsedTimeMs: 18000, cleared: true, score: 12345, metrics: { maxLevel: 30, defeatedBossCount: 3 } });
+const draft = (): SharedResultDraft => ({ id: crypto.randomUUID(), gameId: "buzz-barrier", gameVersion: "test-1", elapsedTimeMs: 18000, cleared: true, score: 12345, metrics: { maxLevel: 30, defeatedBossCount: 3 } });
 const saved = (value: SharedResultDraft): SharedResult => ({ ...value, playerName: "Player-test", createdAt: "2026-10-12T00:00:00Z" });
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe("game hashtags in share defaults", () => {
   it.each([
-    ["graze-duel", "#バズバリア #BUZZBRRIER"],
+    ["buzz-barrier", "#バズバリア #BUZZBRRIER"],
     ["dot-wave", "#ドットウェーブ #DOTWAVE"],
     ["deep-sea-salvage", "#深海サルベージ #DEEPSEASALVAGE"],
   ])("includes %s tags in invitations and player/viewer results", (gameId, tags) => {
@@ -68,7 +68,7 @@ describe("game-specific result presenters", () => {
 });
 
 describe("live invitation copy", () => {
-  const context = { gameId: "graze-duel", cabinetId: "cabinet", role: "player" as const, phase: "ready" as const };
+  const context = { gameId: "buzz-barrier", cabinetId: "cabinet", role: "player" as const, phase: "ready" as const };
   it("uses one sentence to describe the current sharing state", () => {
     const message = (overrides: Partial<Parameters<typeof liveShareText>[0]> = {}) =>
       liveShareText({ ...context, ...overrides }).split("\n")[0];

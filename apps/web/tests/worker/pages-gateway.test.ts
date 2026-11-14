@@ -64,7 +64,7 @@ describe("Pages to Worker gateway", () => {
       const mutation = await forwarded("/api/platform/auth/logout", { method: "POST", headers });
       expect(mutation.status).toBe(403);
       expect(await mutation.json()).toEqual({ error: "invalid_origin" });
-      const socket = await forwarded(`/api/cabinets/${crypto.randomUUID()}/ws?gameId=graze-duel`, { headers: { ...headers, Upgrade: "websocket" } });
+      const socket = await forwarded(`/api/cabinets/${crypto.randomUUID()}/ws?gameId=buzz-barrier`, { headers: { ...headers, Upgrade: "websocket" } });
       expect(socket.status).toBe(403);
       expect(await socket.json()).toEqual({ error: "invalid_origin" });
     },

@@ -8,7 +8,13 @@ test.use({ screenshot: 'only-on-failure' });
 test.afterEach(async ({ context }) => { await finishReadBudget(context); });
 test.beforeEach(async ({ context }, testInfo) => respectReadBudget(context, testInfo));
 
-for (const game of ['graze-duel', 'deep-sea-salvage', 'dot-wave']) {
+test('旧BUZZ BARRIERのURLではゲームを開かない', async ({ page }) => {
+  await page.goto(`/cabinets/${randomUUID()}?game=graze-duel&watch=1`);
+  await expect(page.getByText('ゲームが見つかりません。')).toBeVisible();
+  await expect(page.locator('#game-screen')).toHaveCount(0);
+});
+
+for (const game of ['buzz-barrier', 'deep-sea-salvage', 'dot-wave']) {
   for (const delay of [0, 1200]) {
     test(`${game}: new guest waits for real bootstrap (${delay}ms) and retains cabinet`, async ({ page }, testInfo) => {
       let initialized = false;

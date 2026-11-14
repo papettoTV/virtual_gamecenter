@@ -4,8 +4,8 @@ import type { LiveShareContext } from "../src/features/sharing/share-service";
 import { GAME_CATALOG } from "../src/domain/game";
 
 const now = Date.parse("2026-10-25T12:00:00Z");
-const context = (role: LiveShareContext["role"], phase: LiveShareContext["phase"]): LiveShareContext => ({ gameId: "graze-duel", cabinetId: "cabinet", role, phase });
-const cabinet = "/cabinets/cabinet?game=graze-duel";
+const context = (role: LiveShareContext["role"], phase: LiveShareContext["phase"]): LiveShareContext => ({ gameId: "buzz-barrier", cabinetId: "cabinet", role, phase });
+const cabinet = "/cabinets/cabinet?game=buzz-barrier";
 
 describe("feedback frequency", () => {
   it("uses Japan days and suppresses same-day prompts", () => {
@@ -56,7 +56,7 @@ describe("feedback visit", () => {
     expect(visit.leaving(now)).toBeNull();
     visit.live(context("player", "finished"), now + 1000, true);
     const candidate = visit.leaving(now + 2000);
-    expect(candidate).toEqual({ gameId: "graze-duel", activity: "player" });
+    expect(candidate).toEqual({ gameId: "buzz-barrier", activity: "player" });
     let raw: string | null = JSON.stringify({ ...candidate, at: now });
     const storage = { getItem: () => raw, removeItem: () => { raw = null; } };
     expect(takeReturn(storage, now + 1000)).toEqual(candidate);
@@ -70,7 +70,7 @@ describe("feedback visit", () => {
     visit.live(context("player", "playing"), now, true);
     visit.live(context("player", "finished"), now + 1000, true);
     visit.live(null, now + 1500, true);
-    expect(visit.route("/", now + 2000)).toEqual({ gameId: "graze-duel", activity: "player" });
+    expect(visit.route("/", now + 2000)).toEqual({ gameId: "buzz-barrier", activity: "player" });
     expect(visit.route("/", now + 3000)).toBeNull();
   });
   it("does not invite unfinished players or navigation to another screen", () => {
@@ -87,7 +87,7 @@ describe("feedback visit", () => {
     const visit = new FeedbackVisit();
     visit.live(context("spectator", "playing"), now, true);
     visit.route(cabinet, now);
-    expect(visit.route("/", now + duration)).toEqual(duration >= 60000 ? { gameId: "graze-duel", activity: "spectator" } : null);
+    expect(visit.route("/", now + duration)).toEqual(duration >= 60000 ? { gameId: "buzz-barrier", activity: "spectator" } : null);
   });
   it("excludes background, ready, paused and finished time", () => {
     const visit = new FeedbackVisit();

@@ -49,7 +49,7 @@ async function main() {
   try {
     const { getPlatformProxy } = await import("wrangler");
     proxy = await getPlatformProxy({ configPath, envFiles: [], persist: false, remoteBindings: true });
-    for (const game of ["graze-duel", "dot-wave", "deep-sea-salvage"]) {
+    for (const game of ["buzz-barrier", "dot-wave", "deep-sea-salvage"]) {
       const oldGuest = await guest(), validGuest = await guest(), cabinet = crypto.randomUUID();
       const old = await connect(cabinet, game, oldGuest.cookie, authorization);
       const valid = await connect(cabinet, game, validGuest.cookie, authorization);

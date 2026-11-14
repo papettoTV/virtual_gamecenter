@@ -9,7 +9,7 @@ import { migrateTestDatabase } from "../migrate-test-database";
 beforeAll(migrateTestDatabase);
 beforeEach(async () => { await env.DB.batch([env.DB.prepare("DELETE FROM feedback"), env.DB.prepare("DELETE FROM feedback_rate_buckets")]); });
 const options = { APP_ENV: "staging", DB: env.DB };
-const payload = () => ({ id: crypto.randomUUID(), category: "good", message: "見ていて楽しかった", gameId: "graze-duel", activity: "spectator" });
+const payload = () => ({ id: crypto.randomUUID(), category: "good", message: "見ていて楽しかった", gameId: "buzz-barrier", activity: "spectator" });
 function request(body: unknown = payload(), changes: RequestInit = {}) {
   return new Request("https://staging.example/api/feedback", { method: "POST", body: JSON.stringify(body), headers: { Origin: "https://staging.example", "Content-Type": "application/json", "CF-Connecting-IP": "192.0.2.1" }, ...changes });
 }

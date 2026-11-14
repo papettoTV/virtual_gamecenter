@@ -28,7 +28,7 @@ export async function verifyMissingStarts(args) {
       let socket, permission, joined;
       if (normal) {
         const { default: WebSocket } = await import("ws");
-        socket = new WebSocket(origin.replace("https:", "wss:") + `/api/cabinets/${cabinetId}/ws?gameId=graze-duel`, {
+        socket = new WebSocket(origin.replace("https:", "wss:") + `/api/cabinets/${cabinetId}/ws?gameId=buzz-barrier`, {
           origin, followRedirects: false, handshakeTimeout: 10000, headers: { Authorization: authorization, Cookie: [...cookies].map(([key, value]) => `${key}=${value}`).join("; ") } });
         sockets.push(socket); socket.on("error", () => {});
         socket.on("message", bytes => {
@@ -37,12 +37,12 @@ export async function verifyMissingStarts(args) {
           if (message.type === "joinedCabinet") joined = message;
         });
         await new Promise((resolve, reject) => { socket.once("open", resolve); socket.once("error", reject); socket.once("unexpected-response", (_request, response) => { response.resume(); reject(Error("handshake_rejected")); }); });
-        socket.send(JSON.stringify({ type: "joinCabinet", gameId: "graze-duel", watch: false }));
+        socket.send(JSON.stringify({ type: "joinCabinet", gameId: "buzz-barrier", watch: false }));
         const until = Date.now() + 4000;
         while (!joined && Date.now() < until) await new Promise(resolve => setTimeout(resolve, 20));
         assert.ok(joined);
       }
-      const { reservationId } = await api("credit-reservations", { cabinetId, gameId: "graze-duel", purpose: "solo" });
+      const { reservationId } = await api("credit-reservations", { cabinetId, gameId: "buzz-barrier", purpose: "solo" });
       assert.match(reservationId, /^[a-f0-9-]{36}$/);
       cleanups.push(() => api(`credit-reservations/${reservationId}/release`, {}));
       await api(`credit-reservations/${reservationId}/capture`, {});

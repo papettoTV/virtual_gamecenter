@@ -11,7 +11,7 @@ describe("showcase watch attribution", () => {
     vi.stubGlobal("location", { href: "https://example.com/cabinets/room?watch=1&preview=1" });
     vi.stubGlobal("sessionStorage", storage);
     vi.stubGlobal("fetch", fetch);
-    recordWatchStarted("graze-duel", "room");
+    recordWatchStarted("buzz-barrier", "room");
     expect(storage.setItem).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
   });
@@ -24,7 +24,7 @@ describe("showcase watch attribution", () => {
     vi.stubGlobal("location", { href: "https://example.com/cabinets/room?watch=1&preview=1" });
     vi.stubGlobal("sessionStorage", storage);
     vi.stubGlobal("fetch", fetch);
-    recordWatchStarted("graze-duel", "room");
+    recordWatchStarted("buzz-barrier", "room");
     expect(storage.setItem).toHaveBeenCalledWith("vgc_watch_recorded:room", "1");
     expect(fetch).toHaveBeenCalledWith("/api/platform/engagement/events", expect.objectContaining({ method: "POST" }));
   });

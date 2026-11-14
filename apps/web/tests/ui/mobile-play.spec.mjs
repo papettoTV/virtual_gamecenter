@@ -31,10 +31,10 @@ async function phase(page, gameId, phase, role = 'player') {
 for (const viewport of [{ width: 390, height: 844 }, { width: 412, height: 915 }]) {
   test(`mobile viewport, invitation, rotation and restoration ${viewport.width}`, async ({ page }) => {
     await page.setViewportSize(viewport);
-    const screen = await mount(page, 'graze-duel');
+    const screen = await mount(page, 'buzz-barrier');
     // Resolve the real consent panel before exercising the invitation below it.
     await page.getByRole('button', { name: '拒否する', exact: true }).click();
-    await phase(page, 'graze-duel', 'ready');
+    await phase(page, 'buzz-barrier', 'ready');
     const invite = screen.getByRole('button', { name: '観戦に招待', exact: true });
     await expect(invite).toBeVisible();
     await expect(screen.locator('.mobile-ready-start')).toHaveCount(0);
@@ -52,7 +52,7 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 412, height: 915 }
     await invite.click();
     await expect(page.getByRole('dialog', { name: '観戦リンクを共有', exact: true })).toBeVisible();
     await page.getByRole('button', { name: '× 閉じる' }).click();
-    await phase(page, 'graze-duel', 'playing');
+    await phase(page, 'buzz-barrier', 'playing');
     await expect(screen).toHaveAttribute('data-mobile-play', 'true');
     await expect(screen.locator('.ranking-panel')).toBeHidden();
     const rect = await screen.boundingBox();
@@ -77,13 +77,13 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 412, height: 915 }
     // Return to portrait to offer mobile entry again on fine-pointer projects.
     // The rotated presentation and its exit were verified above.
     await page.setViewportSize(viewport);
-    await phase(page, 'graze-duel', 'paused'); await phase(page, 'graze-duel', 'playing');
+    await phase(page, 'buzz-barrier', 'paused'); await phase(page, 'buzz-barrier', 'playing');
     await expect(screen).not.toHaveAttribute('data-mobile-play');
     await screen.getByRole('button', { name: '全画面でプレイ' }).click();
     await page.keyboard.press('Escape');
     await expect(screen).not.toHaveAttribute('data-mobile-play');
     await screen.getByRole('button', { name: '全画面でプレイ' }).click();
-    await phase(page, 'graze-duel', 'finished');
+    await phase(page, 'buzz-barrier', 'finished');
     await expect(screen).not.toHaveAttribute('data-mobile-play');
     await expect(screen.locator('.ranking-panel')).toBeVisible();
     expect(await page.evaluate(() => document.querySelector('#root')?.inert ?? false)).toBe(false);
@@ -94,11 +94,11 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }
   test(`unselected analytics panel cannot block play exit ${viewport.width}`, async ({ page }) => {
     // Enter in portrait, then rotate while playing, including on fine pointers.
     await page.setViewportSize({ width: 390, height: 844 });
-    const screen = await mount(page, 'graze-duel');
+    const screen = await mount(page, 'buzz-barrier');
     const panel = page.locator('.analytics-consent');
     await expect(panel).toBeVisible();
     await expect(panel).toContainText('未選択（解析停止中）');
-    await phase(page, 'graze-duel', 'playing');
+    await phase(page, 'buzz-barrier', 'playing');
     await page.setViewportSize(viewport);
     await expect(screen).toHaveAttribute('data-mobile-play', 'true');
     await expect(panel).toContainText('未選択（解析停止中）');
@@ -124,10 +124,10 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }
 test('desktop and spectator keep the regular page', async ({ page, isMobile }) => {
   test.skip(isMobile, 'PCのポインター条件で確認する');
   await page.setViewportSize({ width: 1280, height: 900 });
-  const screen = await mount(page, 'graze-duel');
-  await phase(page, 'graze-duel', 'playing');
+  const screen = await mount(page, 'buzz-barrier');
+  await phase(page, 'buzz-barrier', 'playing');
   await expect(screen).not.toHaveAttribute('data-mobile-play');
-  await phase(page, 'graze-duel', 'playing', 'spectator');
+  await phase(page, 'buzz-barrier', 'playing', 'spectator');
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(screen).not.toHaveAttribute('data-mobile-play');
 });
@@ -145,7 +145,7 @@ for (const gameId of ['deep-sea-salvage']) {
 
 // Local rendering/input fixtures use production renderers, simulation and input
 // conversion. They do not pretend to cover authenticated start or cabinet APIs.
-for (const gameId of ['graze-duel', 'deep-sea-salvage']) {
+for (const gameId of ['buzz-barrier', 'deep-sea-salvage']) {
   test(`real rendering and canvas input in portrait and landscape: ${gameId}`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 390, height: 844 });
     const screen = await mount(page, gameId);
@@ -153,7 +153,7 @@ for (const gameId of ['graze-duel', 'deep-sea-salvage']) {
     await expect(screen).toHaveAttribute('data-mobile-play', 'true');
     await page.evaluate(async gameId => {
       const canvas = document.querySelector('#presentation-fixture #game');
-      if (gameId === 'graze-duel') {
+      if (gameId === 'buzz-barrier') {
         const { createThreeGameRenderer } = await import('/src/games/graze-duel/rendering/three-game-renderer.ts');
         const renderer = createThreeGameRenderer(960, 640);
         renderer.mount(canvas.parentElement, canvas);
@@ -227,7 +227,7 @@ for (const gameId of ['graze-duel', 'deep-sea-salvage']) {
     for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }]) {
       await page.setViewportSize(viewport);
       await expect(screen).toHaveAttribute('data-mobile-play', 'true');
-      if (gameId === 'graze-duel') {
+      if (gameId === 'buzz-barrier') {
         const rect = await screen.locator('#game').boundingBox();
         await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
         await page.mouse.down();
@@ -281,7 +281,7 @@ for (const gameId of ['graze-duel', 'deep-sea-salvage']) {
     await expect(screen.getByRole('button', { name: '通常表示に戻る' })).toHaveCount(0);
     await page.keyboard.press('Escape');
     await expect(screen).not.toHaveAttribute('data-mobile-play');
-    if (gameId === 'graze-duel') {
+    if (gameId === 'buzz-barrier') {
       await page.evaluate(() => window.disposeInputFixture());
       const released = await page.evaluate(() => window.renderFixture());
       expect(released.touch.active).toBe(false);

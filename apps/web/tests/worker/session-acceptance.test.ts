@@ -9,7 +9,7 @@ beforeAll(migrateTestDatabase);
 const sockets: WebSocket[] = [];
 afterEach(() => { for (const socket of sockets.splice(0)) socket.close(); });
 
-it.each(["graze-duel", "dot-wave", "deep-sea-salvage"].flatMap(gameId =>
+it.each(["buzz-barrier", "dot-wave", "deep-sea-salvage"].flatMap(gameId =>
   ["before-accept", "during-check", "check-failure"].map(scenario => ({ gameId, scenario })),
 ))("closes $gameId handshake on $scenario without sending state", async ({ gameId, scenario }) => {
   const bootstrap = await exports.default.fetch("http://localhost/api/platform/bootstrap");

@@ -3,18 +3,9 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { reconcileBetaCredits, type CreditPolicy } from "../../src/worker/beta-credits";
 import { handlePlatformRequest, type StripePaymentEnv } from "../../src/worker/platform";
 import { registerGoogleAccount } from "../../src/worker/google-auth";
+import { migrateTestDatabase } from "../migrate-test-database";
 
-const migrations = import.meta.glob<string>("../../migrations/*.sql", {
-  eager: true, query: "?raw", import: "default",
-});
-
-beforeAll(async () => {
-  for (const path of Object.keys(migrations).sort()) {
-    const sql = migrations[path]!.replace(/^--.*$/gm, "");
-    await env.DB.batch(sql.split(/;\s*(?=(?:CREATE|ALTER|UPDATE|INSERT)\b)/)
-      .filter((statement) => statement.trim()).map((statement) => env.DB.prepare(statement)));
-  }
-});
+beforeAll(migrateTestDatabase);
 
 afterEach(() => {
   vi.useRealTimers();
@@ -60,7 +51,7 @@ describe("free beta daily credits", () => {
   it("preserves completed refunds after a partial failure and recovers only the remainder on retry", async () => {
     const player = await eligible(5);
     for (let index = 0; index < 2; index++) {
-      const response = await api("credit-reservations", player.cookie, "POST", { cabinetId: crypto.randomUUID(), gameId: "graze-duel" });
+      const response = await api("credit-reservations", player.cookie, "POST", { cabinetId: crypto.randomUUID(), gameId: "buzz-barrier" });
       const { reservationId } = await response.json<{ reservationId: string }>();
       await api(`credit-reservations/${reservationId}/capture`, player.cookie, "POST");
     }
@@ -106,7 +97,7 @@ describe("free beta daily credits", () => {
   it("recovers unused captures before a parallel daily refill decision", async () => {
     const player = await eligible(5);
     for (let index = 0; index < 3; index++) {
-      const response = await api("credit-reservations", player.cookie, "POST", { cabinetId: crypto.randomUUID(), gameId: "graze-duel" });
+      const response = await api("credit-reservations", player.cookie, "POST", { cabinetId: crypto.randomUUID(), gameId: "buzz-barrier" });
       const { reservationId } = await response.json<{ reservationId: string }>();
       expect((await api(`credit-reservations/${reservationId}/capture`, player.cookie, "POST")).status).toBe(200);
     }
@@ -181,7 +172,7 @@ describe("free beta daily credits", () => {
     await balance(player.playerId, 0);
     expect((await (await api("credits", player.cookie)).json<State>()).creditPolicy.refilledAmount).toBe(0);
     vi.setSystemTime(new Date("2032-01-01T15:00:00Z"));
-    const reservation = await api("credit-reservations", player.cookie, "POST", { cabinetId: "midnight", gameId: "graze-duel" });
+    const reservation = await api("credit-reservations", player.cookie, "POST", { cabinetId: "midnight", gameId: "buzz-barrier" });
     expect(reservation.status).toBe(200);
     expect((await reservation.json<State>()).wallet.freeBalance).toBe(3);
     const credits = await (await api("credits", player.cookie)).json<State>();
@@ -254,7 +245,7 @@ describe("free beta daily credits", () => {
   it("does not treat reservations as spending, refill on capture, or require bootstrap before next play", async () => {
     const player = await eligible(3);
     const sessionCookie = /vgc_session=[^;]+/.exec(player.cookie)![0];
-    const reserve = await api("credit-reservations", sessionCookie, "POST", { cabinetId: "beta", gameId: "graze-duel" });
+    const reserve = await api("credit-reservations", sessionCookie, "POST", { cabinetId: "beta", gameId: "buzz-barrier" });
     expect(reserve.status).toBe(200);
     expect(cookies(reserve)).toContain("vgc_device=");
     const reservation = await reserve.json<{ reservationId: string }>();
@@ -265,7 +256,7 @@ describe("free beta daily credits", () => {
     const capture = await api(`credit-reservations/${reservation.reservationId}/capture`, sessionCookie, "POST");
     expect(cookies(capture)).toContain("vgc_device=");
     expect((await capture.json<State>()).wallet.freeBalance).toBe(2);
-    const next = await api("credit-reservations", sessionCookie, "POST", { cabinetId: "beta", gameId: "graze-duel" });
+    const next = await api("credit-reservations", sessionCookie, "POST", { cabinetId: "beta", gameId: "buzz-barrier" });
     expect((await next.json<State>()).wallet.freeBalance).toBe(3);
     const direct = await api("credits", sessionCookie);
     expect(cookies(direct)).toContain("vgc_device=");

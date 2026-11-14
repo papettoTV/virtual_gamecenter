@@ -31,11 +31,11 @@ async function fixture(gameId: string) {
   return { room: env.CABINET_ROOMS.getByName(cabinet), playerId, sessionHash, reservationId, socket, messages, send };
 }
 
-const cases = ["graze-duel", "dot-wave", "deep-sea-salvage"].flatMap(gameId =>
+const cases = ["buzz-barrier", "dot-wave", "deep-sea-salvage"].flatMap(gameId =>
   ["startSolo", "gameKeyframe", "joinCabinet"].map(operation => ({ gameId, operation })),
 );
 
-for (const gameId of ["graze-duel", "dot-wave", "deep-sea-salvage"]) {
+for (const gameId of ["buzz-barrier", "dot-wave", "deep-sea-salvage"]) {
   for (const outcome of ["success", "rejected", "failure"] as const) {
     it(`measures ${gameId} start ${outcome} at the actual DO start boundary`, async () => {
       const test = await fixture(gameId);

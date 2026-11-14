@@ -13,14 +13,14 @@ function post(body: unknown, origin = "http://localhost") {
 
 describe("sharing interaction events", () => {
   it.each(["facebook", "x"])("records %s separately from actual SNS publication and deduplicates retries", async channel => {
-    const event = { eventId: crypto.randomUUID(), eventType: "share_target_opened", kind: "result", gameId: "graze-duel", targetId: crypto.randomUUID(), channel, shareId: crypto.randomUUID() };
+    const event = { eventId: crypto.randomUUID(), eventType: "share_target_opened", kind: "result", gameId: "buzz-barrier", targetId: crypto.randomUUID(), channel, shareId: crypto.randomUUID() };
     expect((await post(event)).status).toBe(200); expect((await post(event)).status).toBe(200);
     const rows = await env.DB.prepare("SELECT * FROM sharing_events").all();
     expect(rows.results).toHaveLength(1);
     expect(rows.results[0]).not.toHaveProperty("player_id");
   });
   it("rejects arbitrary channels, types, names, and cross-origin requests", async () => {
-    const event = { eventId: "test", eventType: "result_viewed", kind: "result", gameId: "graze-duel", targetId: "test" };
+    const event = { eventId: "test", eventType: "result_viewed", kind: "result", gameId: "buzz-barrier", targetId: "test" };
     expect((await post(event, "https://evil.test")).status).toBe(403);
     expect((await post({ ...event, eventType: "posted_successfully" })).status).toBe(400);
     expect((await post({ ...event, gameId: "not-a-game" })).status).toBe(400);

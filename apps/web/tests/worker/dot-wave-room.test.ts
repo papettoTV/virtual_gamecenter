@@ -139,7 +139,7 @@ it("allows anonymous watching but not taking a player seat", async () => {
   expect((await viewer.next("clockPong")).sentAt).toBe(14);
 });
 
-it.each(["graze-duel", "dot-wave", "deep-sea-salvage"])("prevents anonymous spectators from controlling the host or its credit: %s", async gameId => {
+it.each(["buzz-barrier", "dot-wave", "deep-sea-salvage"])("prevents anonymous spectators from controlling the host or its credit: %s", async gameId => {
   const cabinet = crypto.randomUUID();
   const cookie = await player();
   const host = await connect(cookie, cabinet, false, gameId);
