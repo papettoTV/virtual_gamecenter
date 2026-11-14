@@ -69,14 +69,14 @@ describe("game-specific result presenters", () => {
 
 describe("live invitation copy", () => {
   const context = { gameId: "graze-duel", cabinetId: "cabinet", role: "player" as const, phase: "ready" as const };
-  it("does not claim a live is running before start or after end", () => {
-    expect(liveShareText(context)).toContain("これから");
-    expect(liveShareText({ ...context, phase: "finished" })).toContain("終了しました");
-  });
-  it("distinguishes player, pause, and spectator messages", () => {
-    expect(liveShareText({ ...context, phase: "playing" })).toContain("挑戦中");
-    expect(liveShareText({ ...context, phase: "paused" })).toContain("バズバリアに挑戦中。ここから観戦！");
-    expect(liveShareText({ ...context, role: "spectator", phase: "playing" })).toContain("一緒に見ませんか");
+  it("uses one sentence to describe the current sharing state", () => {
+    const message = (overrides: Partial<Parameters<typeof liveShareText>[0]> = {}) =>
+      liveShareText({ ...context, ...overrides }).split("\n")[0];
+    expect(message()).toBe("これからバズバリアに挑戦！");
+    expect(message({ phase: "playing" })).toBe("バズバリアに挑戦中！");
+    expect(message({ phase: "paused" })).toBe("バズバリアに挑戦中。");
+    expect(message({ role: "spectator", phase: "playing" })).toBe("バズバリアのライブを観戦中。");
+    expect(message({ phase: "finished" })).toBe("バズバリアのプレイは終了しました。");
   });
 });
 
