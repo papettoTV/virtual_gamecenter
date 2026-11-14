@@ -1,7 +1,7 @@
 import { test, expect } from '../../../../ci/ui-fixtures.mjs';
 
-for (const width of [320, 390]) {
-  test(`トップページのゲーム説明がスマホ幅${width}pxで全文表示される`, async ({ page }, info) => {
+for (const width of [320, 390, 1280]) {
+  test(`トップページのゲーム説明が画面幅${width}pxで全文表示される`, async ({ page }, info) => {
     await page.setViewportSize({ width, height: 844 });
     await page.goto('/');
     const decline = page.getByRole('button', { name: '拒否する', exact: true });
@@ -10,7 +10,7 @@ for (const width of [320, 390]) {
     const descriptions = page.locator('.showcase-description > p');
     await expect(descriptions).toHaveText([
       '弾幕かすり・無敵体当たり・対戦型シューティング',
-      'リズムで攻撃・リズムで防御、対戦リズムゲーム',
+      'リズムで攻めて、リズムで守る、対戦プレイ対応のリズムバトル',
       '深海に潜む、謎の生物を分析・探索ソロゲーム',
     ]);
     for (const description of await descriptions.all()) {
