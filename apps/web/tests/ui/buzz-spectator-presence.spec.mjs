@@ -32,7 +32,7 @@ test('BUZZ player sees edge only during play, current viewers on pause and a fro
     const decline = page.getByRole('button', { name: '拒否する', exact: true });
     if (await decline.isVisible()) await decline.click();
     if (!account.welcomeCreditGranted) await claimWelcomeAndRefresh(page);
-    await page.goto(`/cabinets/${randomUUID()}?game=graze-duel`);
+    await page.goto(`/cabinets/${randomUUID()}?game=buzz-barrier`);
     await expect.poll(() => Boolean(latestState), { timeout: readBudgetTimeout }).toBe(true);
     const edge = page.locator('.buzz-spectator-edge');
     const caption = page.locator('#buzz-paused-spectators');
