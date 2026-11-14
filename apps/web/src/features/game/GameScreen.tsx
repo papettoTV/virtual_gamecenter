@@ -72,7 +72,7 @@ export function GameScreen({ game }: GameScreenProps) {
           <h3>遊び方</h3><p>弾をかすめてゲージをため、<br />無敵シールドをボスに当てよう。</p>
           <p>右上の「▶」をタップして開始</p>
         </section>}
-        {game.id === "graze-duel" && <button id="versus-sound-toggle" className="victory-sound-toggle" type="button" aria-pressed="false" hidden>ミュート</button>}
+        {game.id === "buzz-barrier" && <button id="versus-sound-toggle" className="victory-sound-toggle" type="button" aria-pressed="false" hidden>ミュート</button>}
         {tapReady && <button className="touch-button buzz-ready-trigger" type="button" aria-label="ゲーム開始" data-ready-start=""
           onKeyDown={event => event.stopPropagation()}
           onKeyUp={event => event.stopPropagation()}
