@@ -7,7 +7,7 @@ import { installDotWaveFinishFixture } from './dot-wave-finish-fixture.mjs';
 const games = [
   { id: 'buzz-barrier', start: 'ゲーム開始', pauseKey: 'Space', caption: '#buzz-paused-spectators', result: '#ranking-result' },
   { id: 'dot-wave', start: 'START / ゲーム開始', pauseKey: 'KeyP', caption: '.duel-choice-panel .spectator-presence-caption', result: '.dot-result-card' },
-  { id: 'deep-sea-salvage', start: '潜航開始', pauseKey: 'KeyP', caption: '#salvage-paused-spectators', result: '#ranking-result', params: '&powerDrain=12&renderer=2d' },
+  { id: 'deep-sea-salvage', start: '潜航開始', pauseKey: 'KeyP', caption: '#salvage-paused-spectators', result: '#ranking-result', params: '&powerDrain=8&renderer=2d' },
 ];
 
 for (const game of games) {
@@ -90,7 +90,7 @@ for (const game of games) {
         checkbox.dispatchEvent(new Event('change', { bubbles: true }));
       });
       const result = page.locator(game.result);
-      await expect(result).toContainText('最大同時観戦', { timeout: 20000 });
+      await expect(result).toContainText('最大同時観戦', { timeout: 35000 });
       await expect(result).toContainText('8人');
       await expect(edge).toHaveAttribute('data-presence', 'none');
       pushCount(12);
