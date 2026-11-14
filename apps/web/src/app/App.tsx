@@ -45,6 +45,8 @@ export function App() {
   }, [preview]);
   const selection = requested !== null || url.pathname.startsWith("/labs/");
   const resultMatch = /^\/results\/([^/]+)$/.exec(url.pathname);
+  const isHome = url.pathname === "/" && !selection;
+  const isWatch = isCabinet && url.searchParams.get("watch") === "1";
   useEffect(() => {
     sharePanel.close();
     if (!resultMatch) document.title = game && (selection || isCabinet) ? `${game.title}${url.searchParams.get("watch") === "1" ? "の観戦" : ""} | PULBASE` : `${BRAND.name} | ${BRAND.category}`;
@@ -60,13 +62,16 @@ export function App() {
       <main className={`shell${!selection ? " showroom-shell" : ""}`}>
         {!selection && <section className="intro">
           <p className="eyebrow brand-category">{BRAND.category}</p>
-          <h1 className="brand-heading"><img className="brand-wordmark" src="/brand/pulbase-wordmark.svg" alt={BRAND.name} /><span className="brand-reading">{BRAND.reading}</span></h1>
+          <h1 className="brand-heading">
+            <span className="brand-logo-row"><img className="brand-wordmark" src="/brand/pulbase-wordmark.svg" alt={BRAND.name} /><span className="brand-beta-badge">{BRAND.betaLabel}</span></span>
+            <span className="brand-reading">{BRAND.reading}</span>
+          </h1>
           <p className="brand-tagline">{BRAND.tagline}</p>
         </section>}
         {selection ? <StartGameRedirect game={game} /> : <ArcadeScreen onSelectGame={startNewGame} />}
         <PlatformExperience standaloneCredits />
       </main>
-  }{!preview && !(import.meta.env.DEV && url.searchParams.get("promoCapture") === "1") && <SiteFooter key={address} />}</>;
+  }{!preview && !(import.meta.env.DEV && url.searchParams.get("promoCapture") === "1") && <SiteFooter key={address} showBetaMessage={isHome} showBetaBadge={isWatch} />}</>;
 }
 
 function StartGameRedirect({ game }: { game: GameDefinition }) {
