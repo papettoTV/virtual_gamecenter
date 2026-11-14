@@ -247,8 +247,7 @@ export function mountGame(context: GameContext): GameInstance {
       ["最大深度", `${Math.floor(state.maxDepth).toLocaleString()}m`],
       ["TIME", `${state.elapsed.toFixed(2)}s`],
       ["適用前スコア", state.finalSubtotal.toLocaleString()], ["倍率", `${(multiplier * 100).toFixed(0)}%`],
-      ...(playing && !watching && cabinetRole === "player" ? [["最大同時観戦", `${presence.peak}人`] as [string, string]] : []),
-    ] });
+    ], peakSpectators: playing && !watching && cabinetRole === "player" ? presence.peak : undefined });
     rankingPanel?.classList.add("is-visible"); rankingPanel?.classList.remove("is-submitted");
     if (rankingRetry) rankingRetry.textContent = state.cleared ? "1クレジットでもう一度" : "1クレジットでリトライ";
   }

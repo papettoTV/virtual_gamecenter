@@ -93,6 +93,15 @@ for (const game of games) {
       await expect(result).toContainText('最大同時観戦', { timeout: 35000 });
       await expect(result).toContainText('8人');
       await expect(edge).toHaveAttribute('data-presence', 'none');
+      if (game.id !== 'buzz-barrier') {
+        const peak = result.locator('.spectator-result-caption');
+        await expect(result.locator('.result-metrics')).not.toContainText('最大同時観戦');
+        await expect(peak).toHaveText('最大同時観戦 8人');
+        await expect(peak).toHaveCSS('font-size', '12px');
+        await expect(peak).toHaveCSS('text-align', 'center');
+        const metrics = await result.locator('.result-metrics').boundingBox();
+        expect((await peak.boundingBox()).y).toBeGreaterThanOrEqual(metrics.y + metrics.height);
+      }
       pushCount(12);
       await expect(result).toContainText('8人');
       await expect(result).not.toContainText('12人');

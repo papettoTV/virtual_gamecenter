@@ -1,3 +1,5 @@
+.salvage-screen #ranking-result:has(.spectator-result-caption) { padding-bottom: 12px; }
+
 .salvage-paused-spectators {
   position: absolute;
   z-index: 5;

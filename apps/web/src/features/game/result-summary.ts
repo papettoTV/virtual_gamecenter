@@ -3,9 +3,10 @@ export interface ResultSummary {
   score: number;
   details: [string, string][];
   note?: string;
+  peakSpectators?: number;
 }
 
-export function renderResultSummary({ title, score, details, note }: ResultSummary) {
+export function renderResultSummary({ title, score, details, note, peakSpectators }: ResultSummary) {
   const heading = document.querySelector("#ranking-submit-heading");
   const target = document.querySelector("#ranking-result");
   if (heading) heading.textContent = title;
@@ -33,5 +34,11 @@ export function renderResultSummary({ title, score, details, note }: ResultSumma
     const message = document.createElement("small");
     message.textContent = note;
     target.appendChild(message);
+  }
+  if (peakSpectators !== undefined) {
+    const audience = document.createElement("p");
+    audience.className = "spectator-result-caption";
+    audience.textContent = `最大同時観戦 ${peakSpectators}人`;
+    target.appendChild(audience);
   }
 }
