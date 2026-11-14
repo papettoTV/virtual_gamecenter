@@ -20,7 +20,7 @@ import { CPU_STAGES, advanceCampaign, freshDuel as fresh, nextCpuStage, randomCp
 import { freshScore, scoreChart, awardBossBonus, readBest, saveBest } from "./score";
 import "./style.css";
 import "../../../features/game/spectator-presence.css";
-import { createSpectatorPresence, renderSpectatorGlow } from "../../../features/game/spectator-presence";
+import { createSpectatorPresence, hasSpectatorPeak, renderSpectatorGlow } from "../../../features/game/spectator-presence";
 
 import type { Engine, Phase } from "./engine";
 export type { Engine } from "./engine";
@@ -446,7 +446,7 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
           ] : [[name(0), String(e.match.hp[0])], [name(1), String(e.match.hp[1])]],
           note: spectator ? "プレイヤーが続けるか終了するかを選んでいます。" : undefined,
         }} ranking={<>
-          {localParticipant && <p className="spectator-result-caption">最大同時観戦 {presence.peak}人</p>}
+          {localParticipant && hasSpectatorPeak(presence.peak) && <p className="spectator-result-caption">最大同時観戦 {presence.peak}人</p>}
           {cleared && !replica && !holdResult && e.score && <DotWaveRanking score={e.score} elapsedTimeMs={e.elapsedPlayMs ?? 1} playerName={name(0)} />}
           {resultPanel}
         </>} share={resultShare} actions={<>

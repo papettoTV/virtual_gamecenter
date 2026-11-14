@@ -1,6 +1,10 @@
 type Tier = "none" | "watching" | "crowd";
 export type PresencePhase = "idle" | "playing" | "paused" | "waiting" | "finished";
 
+export function hasSpectatorPeak(count: number | undefined): count is number {
+  return count !== undefined && Number.isInteger(count) && count > 0;
+}
+
 export function renderSpectatorGlow(element: Element | null, presence: { tier: Tier; pulse: boolean }) {
   if (!element) return;
   if (element.getAttribute("data-presence") !== presence.tier) element.setAttribute("data-presence", presence.tier);

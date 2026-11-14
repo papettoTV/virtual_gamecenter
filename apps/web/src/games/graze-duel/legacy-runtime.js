@@ -32,7 +32,7 @@ import { createGameState } from "./state";
 import { resetBaseBulletSequences, getBaseBulletPattern } from "./base-bullet-sequence";
 import { createSimulation } from "./simulation";
 import { createInputController } from "./input";
-import { createSpectatorPresence, renderSpectatorGlow } from "../../features/game/spectator-presence";
+import { createSpectatorPresence, hasSpectatorPeak, renderSpectatorGlow } from "../../features/game/spectator-presence";
 
 /**
  * @param {import("../../game-sdk/contracts").GameContext} context
@@ -1380,7 +1380,7 @@ export function mountGame(context) {
       showVersusOverlay(title, `${description} 10秒以内に再挑戦できます。`, "resultLoser");
       startRematchTimer();
     }
-    if (versusPeak && isVersusParticipant()) {
+    if (versusPeak && isVersusParticipant() && hasSpectatorPeak(spectatorPresence.peak)) {
       versusPeak.textContent = `最大同時観戦 ${spectatorPresence.peak}人`;
       versusPeak.hidden = false;
     }
@@ -2723,7 +2723,7 @@ export function mountGame(context) {
         ["ボス撃破", String(result.defeatedBossCount)],
         ["LEVEL", String(result.maxLevel)],
         ["TIME", formatRankingTime(result.elapsedTimeMs)],
-        ...(Number.isInteger(result.peakSpectators) ? [["最大同時観戦", `${result.peakSpectators}人`]] : []),
+        ...(hasSpectatorPeak(result.peakSpectators) ? [["最大同時観戦", `${result.peakSpectators}人`]] : []),
         ...(result.cleared ? [["プレイスコア", formatScore(result.playScore)], ["タイムボーナス", formatScore(result.timeBonus)]] : []),
       ],
       note,

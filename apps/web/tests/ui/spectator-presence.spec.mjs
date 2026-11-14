@@ -8,10 +8,13 @@ const games = [
   { id: 'buzz-barrier', start: 'ゲーム開始', pauseKey: 'Space', caption: '#buzz-paused-spectators', result: '#ranking-result' },
   { id: 'dot-wave', start: 'START / ゲーム開始', pauseKey: 'KeyP', caption: '.duel-choice-panel .spectator-presence-caption', result: '.dot-result-card' },
   { id: 'deep-sea-salvage', start: '潜航開始', pauseKey: 'KeyP', caption: '#salvage-paused-spectators', result: '#ranking-result', params: '&powerDrain=8&renderer=2d' },
-];
+].flatMap(game => [
+  { ...game, zeroAudience: false },
+  { ...game, zeroAudience: true, params: game.params ? '&power=1&powerDrain=100&renderer=2d' : undefined },
+]);
 
 for (const game of games) {
-  test(`${game.id}: glow, pause count and frozen result peak`, async ({ page, context, isMobile }, info) => {
+  test(`${game.id}: ${game.zeroAudience ? 'no audience caption at zero' : 'glow, pause count and frozen result peak'}`, async ({ page, context, isMobile }, info) => {
     info.setTimeout(info.timeout + readBudgetTimeout);
     await respectReadBudget(context, info);
     try {
@@ -45,13 +48,30 @@ for (const game of games) {
       await expect.poll(() => Boolean(latestState), { timeout: readBudgetTimeout }).toBe(true);
       const edge = page.locator('.spectator-presence-edge');
       const caption = page.locator(game.caption);
-      pushCount(1);
+      if (!game.zeroAudience) pushCount(1);
       await expect(edge).toHaveAttribute('data-presence', 'none');
       const debug = page.locator('#debug-ranking-preview-toggle');
       if (game.id === 'buzz-barrier') await page.locator('summary').filter({ hasText: 'デバッグ設定' }).click();
       if (game.id === 'buzz-barrier' && !isMobile) await page.keyboard.press('Space');
       else await page.getByRole('button', { name: game.start, exact: true }).click();
       await page.getByRole('button', { name: '1クレジットで開始', exact: true }).click();
+      const finish = async () => {
+        if (game.id === 'dot-wave') {
+          await expect(page.locator('main.dot-wave')).toHaveAttribute('data-phase', 'playing', { timeout: 12000 });
+          await page.evaluate(() => window.dispatchEvent(new Event('dot-wave-layout-finish')));
+        }
+        if (game.id === 'buzz-barrier') await debug.evaluate(checkbox => {
+          checkbox.checked = true;
+          checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+      };
+      const result = page.locator(game.result);
+      if (game.zeroAudience) {
+        await finish();
+        await expect(result.locator('.result-score')).toBeVisible({ timeout: 35000 });
+        await expect(result).not.toContainText('最大同時観戦');
+        return;
+      }
       await expect(edge).toHaveAttribute('data-presence', 'watching', { timeout: 12000 });
       await expect(edge).toHaveCSS('pointer-events', 'none');
       await expect(edge).toHaveCSS('border-top-width', '0px');
@@ -84,12 +104,7 @@ for (const game of games) {
       pushCount(4);
       await expect(edge).toHaveAttribute('data-presence', 'crowd');
       await expect(edge).not.toHaveAttribute('data-pulse', '');
-      if (game.id === 'dot-wave') await page.evaluate(() => window.dispatchEvent(new Event('dot-wave-layout-finish')));
-      if (game.id === 'buzz-barrier') await debug.evaluate(checkbox => {
-        checkbox.checked = true;
-        checkbox.dispatchEvent(new Event('change', { bubbles: true }));
-      });
-      const result = page.locator(game.result);
+      await finish();
       await expect(result).toContainText('最大同時観戦', { timeout: 35000 });
       await expect(result).toContainText('8人');
       await expect(edge).toHaveAttribute('data-presence', 'none');
