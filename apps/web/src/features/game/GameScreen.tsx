@@ -3,6 +3,7 @@ import { gameHost } from "../../game-sdk/game-host";
 import { useRef } from "react";
 import { useMobilePlay } from "./use-mobile-play";
 import "./mobile-play.css";
+import "./spectator-presence.css";
 import type { GameDefinition } from "../../domain/game";
 import { isGameModeAvailable } from "../../domain/play-mode-policy";
 import { DebugPanel, getGameUI } from "../../games/ui-registry";
@@ -51,7 +52,8 @@ export function GameScreen({ game }: GameScreenProps) {
       <DebugPanel hidden={ui.debugPanelHidden} />
 
       <div className="game-frame">
-        <div className={game.id === "buzz-barrier" ? "buzz-spectator-edge" : "player-crowd-pulse is-hidden"} id="player-crowd-pulse" aria-hidden="true" />
+        <div className="spectator-presence-edge" id="player-crowd-pulse" aria-hidden="true" />
+        {game.id === "deep-sea-salvage" && <p id="salvage-paused-spectators" className="spectator-presence-caption salvage-paused-spectators" hidden />}
         {!play.inviteOnly && <button
           className="cabinet-share-button game-share-button"
           type="button"
@@ -88,7 +90,7 @@ export function GameScreen({ game }: GameScreenProps) {
           <p className="eyebrow" id="versus-eyebrow">Versus</p>
           <h2 id="versus-title">対戦</h2>
           <p id="versus-message" />
-          {game.id === "buzz-barrier" && <p id="buzz-versus-peak" className="buzz-spectator-caption" hidden />}
+          {game.id === "buzz-barrier" && <p id="buzz-versus-peak" className="spectator-presence-caption" hidden />}
           <strong className="versus-countdown is-hidden" id="versus-countdown" />
           <div className="versus-actions">
             <button id="versus-secondary" type="button">いいえ</button>

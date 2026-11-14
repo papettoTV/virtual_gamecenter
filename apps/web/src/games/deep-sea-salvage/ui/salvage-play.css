@@ -1,3 +1,15 @@
+.salvage-paused-spectators {
+  position: absolute;
+  z-index: 5;
+  inset: auto 0 12px;
+  width: fit-content;
+  margin-inline: auto;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: #081220e8;
+  pointer-events: none;
+}
+
 .salvage-screen .salvage-intro {
   position: absolute;
   inset: 16% 8% auto;

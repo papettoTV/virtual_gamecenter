@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { createSpectatorPresence } from "../../src/games/graze-duel/spectator-presence";
+import { createSpectatorPresence } from "../../src/features/game/spectator-presence";
 
 it("smooths changes and pulses just once per play, including across pauses", () => {
   const presence = createSpectatorPresence();

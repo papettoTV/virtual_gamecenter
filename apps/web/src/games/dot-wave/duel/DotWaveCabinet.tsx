@@ -19,7 +19,7 @@ export default function DotWaveCabinet() {
   const canChallenge = multiplayerAvailable && net.connected && net.role === "spectator" && !net.matchId && d.room && (["soloPlaying", "challengePending", "versusReady", "versusPlaying", "result"].includes(d.room.status) || (d.room.status === "occupied" && net.latest?.engine.phase === "finished"));
   return <>
     <div className="dot-cabinet-bar dot-wave">
-      <span>{!net.connected ? "接続中…" : net.matchId ? net.side === 1 ? "あなたはピンク側" : "あなたはシアン側" : net.role === "player" ? "あなたの筐体" : "観戦中"} · {d.room?.spectatorCount ?? 0}人</span>
+      <span>{!net.connected ? "接続中…" : net.side === null ? `観戦中 · ${d.room?.spectatorCount ?? 0}人` : net.matchId ? net.side === 1 ? "あなたはピンク側" : "あなたはシアン側" : "あなたの筐体"}</span>
       <div className="dot-cabinet-actions"><button disabled={!controller.canShareLive()} onClick={() => void share()}>ライブを共有</button>
       <div className="dot-cabinet-seat-action">{canChallenge && !d.applied && <button disabled={d.busy} onClick={() => void requestChallenge()}>1クレジットで対戦</button>}
       {multiplayerAvailable && d.applied && <button onClick={() => controller.cancelChallenge()}>{d.queue ? `${d.queue}人待ち` : "承認待ち"} · キャンセル</button>}
@@ -30,6 +30,7 @@ export default function DotWaveCabinet() {
     </div>
     <MochiDuel key={d.revision} players={players} network={net} sharedAudio={audio}
       victoryMatch={winningMatch(d.result?.matchId ?? null, d.result, d.seat)}
+      audienceCount={net.connected ? d.room?.spectatorCount ?? null : null}
       challengePending={multiplayerAvailable && d.pending && net.role === "player"}
       challengeNotice={<>{multiplayerAvailable && d.pending && net.role === "player" && <div className="dot-challenge-prompt" role="dialog" aria-label="対戦の申し込み"><strong>対戦の申し込みが来ました</strong><button onClick={() => void respond(true)}>対戦する</button><button onClick={() => void respond(false)}>今回は断る</button></div>}</>}
       boardNotice={<>{net.matchId && !net.startsAt && !d.result && <p role="status">対戦の準備中…</p>}</>}

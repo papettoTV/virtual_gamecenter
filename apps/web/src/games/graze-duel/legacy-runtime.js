@@ -32,7 +32,7 @@ import { createGameState } from "./state";
 import { resetBaseBulletSequences, getBaseBulletPattern } from "./base-bullet-sequence";
 import { createSimulation } from "./simulation";
 import { createInputController } from "./input";
-import { createSpectatorPresence } from "./spectator-presence";
+import { createSpectatorPresence, renderSpectatorGlow } from "../../features/game/spectator-presence";
 
 /**
  * @param {import("../../game-sdk/contracts").GameContext} context
@@ -1463,12 +1463,7 @@ export function mountGame(context) {
       : gameOver || clearGame ? "finished" : paused ? "paused" : "playing";
     const count = cabinetConnected && cabinetState ? cabinetState.spectatorCount : null;
     const presence = spectatorPresence.update(phase, count, now);
-    if (playerCrowdPulse && playerCrowdPulse.getAttribute("data-presence") !== presence.tier) {
-      playerCrowdPulse.setAttribute("data-presence", presence.tier);
-    }
-    if (playerCrowdPulse && playerCrowdPulse.hasAttribute("data-pulse") !== presence.pulse) {
-      playerCrowdPulse.toggleAttribute("data-pulse", presence.pulse);
-    }
+    renderSpectatorGlow(playerCrowdPulse, presence);
     if (pausedSpectators) {
       if (pausedSpectators.hidden !== (presence.pausedCount === null)) pausedSpectators.hidden = presence.pausedCount === null;
       if (presence.pausedCount !== null) {

@@ -6,7 +6,7 @@ import { DotWaveResult } from "./DotWaveResult";
 import { navigate } from "../../../shared/navigation";
 import type { DotWaveRoster } from "../../../domain/cabinet";
 import { isGameModeAvailable } from "../../../domain/play-mode-policy";
-import { useEffect, useReducer, useRef, useState, type RefObject, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useReducer, useRef, useState, type RefObject, type ReactNode } from "react";
 import { turnCue, cueName, inputHint, countdownCue } from "./turnCue";
 import { DotScene, PixelWord } from "./DotScene";
 import { BattleIcon } from "./BattleIcon";
@@ -19,12 +19,14 @@ import { INPUT_GRACE, validRemoteTap, type DuelLink, type DuelFrame } from "./ne
 import { CPU_STAGES, advanceCampaign, freshDuel as fresh, nextCpuStage, randomCpuMove } from "./campaign";
 import { freshScore, scoreChart, awardBossBonus, readBest, saveBest } from "./score";
 import "./style.css";
+import "../../../features/game/spectator-presence.css";
+import { createSpectatorPresence, renderSpectatorGlow } from "../../../features/game/spectator-presence";
 
 import type { Engine, Phase } from "./engine";
 export type { Engine } from "./engine";
 
 
-export default function MochiDuel({ players, network, sharedAudio, boardNotice, resultPanel, resultShare, onResultRetry, challengeNotice, challengePending = false, holdResult = false, victoryMatch = null }: { players?: DotWaveRoster; network?: DuelLink; sharedAudio?: RefObject<DuelAudio | null>; boardNotice?: ReactNode; resultPanel?: ReactNode; resultShare?: ReactNode; onResultRetry?: () => void; challengeNotice?: ReactNode; holdResult?: boolean; victoryMatch?: string | null; challengePending?: boolean } = {}) {
+export default function MochiDuel({ players, network, sharedAudio, boardNotice, resultPanel, resultShare, onResultRetry, challengeNotice, challengePending = false, holdResult = false, victoryMatch = null, audienceCount = null }: { players?: DotWaveRoster; network?: DuelLink; sharedAudio?: RefObject<DuelAudio | null>; boardNotice?: ReactNode; resultPanel?: ReactNode; resultShare?: ReactNode; onResultRetry?: () => void; challengeNotice?: ReactNode; holdResult?: boolean; victoryMatch?: string | null; audienceCount?: number | null; challengePending?: boolean } = {}) {
   const engine = useRef(fresh(network?.matchId ? "online" : "cpu"));
   const ownSound = useRef<DuelAudio | null>(null);
   const sound = sharedAudio ?? ownSound;
@@ -56,6 +58,20 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
   const alive = useRef(true);
   const [, render] = useReducer((value: number) => value + 1, 0);
   const e = engine.current;
+  const [presence] = useState(createSpectatorPresence);
+  const glow = useRef<HTMLDivElement>(null);
+  const audience = useRef(audienceCount);
+  audience.current = audienceCount;
+  const localParticipant = network != null && viewSide !== null;
+  function updatePresence(current: Engine, now: number) {
+    if (current.phase === "intro" && (current.cpuStage ?? 1) === 1) presence.reset();
+    const phase = !network || network.side === null ? "idle" : current.phase === "playing" ? "playing"
+      : current.phase === "paused" ? "paused"
+      : current.phase === "countdown" || (current.phase === "impact" && current.match.winner === null) ? "waiting"
+      : current.phase === "finished" || current.phase === "impact" ? "finished" : "idle";
+    renderSpectatorGlow(glow.current, presence.update(phase, network?.connected ? audience.current : null, now));
+  }
+  useLayoutEffect(() => { updatePresence(engine.current, performance.now()); }, [audienceCount, e.phase, network?.connected, viewSide]);
   const [best, setBest] = useState(() => readBest(e.match.ending));
   useEffect(() => {
     if (e.mode !== "cpu" || replica || holdResult) return;
@@ -215,6 +231,7 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
           }
         }
         const remote = engine.current;
+        updatePresence(remote, now);
         if (["countdown", "playing"].includes(remote.phase) && remote.exchange) {
           remote.seconds = Math.min(END_BEAT * remote.exchange.beatSeconds, (network.now() - remoteTurnOrigin.current) / 1000);
           sound.current?.schedule(remote.match.ending === "knockout" || remote.match.turn < exchangeLimit(remote.match) - 1);
@@ -312,6 +329,7 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
         render();
       }
       if (network) network.publish(current, network.now() - (sound.current && ["countdown", "playing"].includes(current.phase) ? sound.current.seconds : current.seconds) * 1000);
+      updatePresence(current, now);
     };
     const key = (event: KeyboardEvent) => {
       if (creditConfirmation.current || document.querySelector(".platform-overlay, .share-overlay")) return;
@@ -381,11 +399,14 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
       <span className="duel-mode-info">{e.mode === "cpu" ? `CPU対戦 · ${stageInfo.label} / 3` : e.mode === "online" ? "通信対戦" : "同じ端末で2人対戦"} · {e.phase === "intro" ? "攻守交代のリズムバトル" : `攻防 ${e.match.turn + (e.phase === "impact" || e.phase === "finished" ? 0 : 1)} / ${exchangeLimit(e.match)}`}</span>
       {e.mode === "cpu" && <span className="duel-inline-score" aria-label="通算スコア">SCORE {(e.score?.total ?? 0).toLocaleString()}</span>}
     </div>
+    {!replica && !network?.matchId && (e.phase === "playing" || e.phase === "paused") &&
+      <button className="duel-pause-toggle" onClick={() => void pause()}>{e.phase === "paused" ? "再開" : "一時停止"}</button>}
 
     <section ref={board} className={`duel-board${e.phase === "finished" && !next ? " has-final-result" : ""}`} onClick={event => { if (e.phase === "paused" && !replica && !(event.target instanceof Element && event.target.closest("button, a, input, select, [role=dialog]"))) void pause(); }}>
       {e.phase !== "intro" && <h2 className={busy.current || e.phase === "countdown" || e.phase === "playing" || e.phase === "impact" || (e.phase === "finished" && !next) ? "dot-sr-only" : undefined} aria-live="polite">{heading}</h2>}
       {!(e.phase === "finished" && !next) && <DotScene engine={e} viewSide={viewSide} players={players} musicOverride={musicOverride.current} />}
       <div className="duel-board-notice">{boardNotice}</div>
+      <div ref={glow} className="spectator-presence-edge" aria-hidden="true" />
       {e.phase === "countdown" && <div className="duel-start-countdown" role="status" aria-label={`開始まで${Math.max(1, Math.ceil(-e.seconds))}秒`}><strong key={Math.ceil(-e.seconds)}>{Math.max(1, Math.min(3, Math.ceil(-e.seconds)))}</strong></div>}
       {e.phase === "intro" && !busy.current && <div className="duel-state-overlay duel-start-panel">
       {!replica && !network?.matchId && <div className="duel-intro-panel">
@@ -412,7 +433,7 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
         </div>
         <NeonRail exchange={e.exchange ?? createExchange(0, e.selected)} seconds={e.seconds} viewSide={viewSide} /></div>
 
-      {e.phase === "paused" && <div className="duel-choice-panel duel-state-overlay"><div className="duel-paused-challenge">{challengeNotice}</div><p>音と判定を同じ位置で止めています。</p>{!replica && <p>画面をタップ / Pキーで再開</p>}</div>}
+      {e.phase === "paused" && <div className="duel-choice-panel duel-state-overlay"><div className="duel-paused-challenge">{challengeNotice}</div><p>音と判定を同じ位置で止めています。</p>{!replica && <p>画面をタップ / Pキーで再開</p>}{localParticipant && network.connected && audienceCount !== null && <p className="spectator-presence-caption">現在 {audienceCount}人が観戦中</p>}</div>}
       {e.phase === "finished" && <div className={`duel-choice-panel duel-state-overlay${next ? " is-stage-clear" : " is-final-result"}`}>
         <div className="duel-result-challenge">{challengeNotice}</div>
         {!next && <DotWaveResult spectator={spectator} summary={{
@@ -425,6 +446,7 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
           ] : [[name(0), String(e.match.hp[0])], [name(1), String(e.match.hp[1])]],
           note: spectator ? "プレイヤーが続けるか終了するかを選んでいます。" : undefined,
         }} ranking={<>
+          {localParticipant && <p className="spectator-presence-caption">最大同時観戦 {presence.peak}人</p>}
           {cleared && !replica && !holdResult && e.score && <DotWaveRanking score={e.score} elapsedTimeMs={e.elapsedPlayMs ?? 1} playerName={name(0)} />}
           {resultPanel}
         </>} share={resultShare} actions={<>

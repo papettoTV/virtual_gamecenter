@@ -1,5 +1,11 @@
 type Tier = "none" | "watching" | "crowd";
-type Phase = "idle" | "playing" | "paused" | "waiting" | "finished";
+export type PresencePhase = "idle" | "playing" | "paused" | "waiting" | "finished";
+
+export function renderSpectatorGlow(element: Element | null, presence: { tier: Tier; pulse: boolean }) {
+  if (!element) return;
+  if (element.getAttribute("data-presence") !== presence.tier) element.setAttribute("data-presence", presence.tier);
+  if (element.hasAttribute("data-pulse") !== presence.pulse) element.toggleAttribute("data-pulse", presence.pulse);
+}
 
 export function createSpectatorPresence() {
   let tier: Tier = "none";
@@ -17,7 +23,7 @@ export function createSpectatorPresence() {
       pulsed = false;
     },
     get peak() { return peak; },
-    update(phase: Phase, count: number | null, now: number) {
+    update(phase: PresencePhase, count: number | null, now: number) {
       if ((phase === "playing" || phase === "paused" || phase === "waiting") && count !== null) {
         peak = Math.max(peak, count);
       }

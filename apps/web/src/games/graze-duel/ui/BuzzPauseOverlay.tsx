@@ -22,7 +22,7 @@ export function BuzzPausePanel({ context, compact, actionsOnly = false }: { cont
         {presentation.instructions.map(instruction => <li key={instruction}>{instruction}</li>)}
       </ul>}
       </>}
-      <p id="buzz-paused-spectators" className="buzz-spectator-caption" hidden />
+      <p id="buzz-paused-spectators" className="spectator-presence-caption" hidden />
     </div>
   </div>;
 }
