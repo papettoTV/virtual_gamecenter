@@ -93,7 +93,7 @@ for (const game of games) {
       await expect(result).toContainText('最大同時観戦', { timeout: 20000 });
       await expect(result).toContainText('8人');
       await expect(edge).toHaveAttribute('data-presence', 'none');
-      if (game.id !== 'graze-duel') {
+      if (game.id !== 'buzz-barrier') {
         const peak = result.locator('.spectator-result-caption');
         await expect(result.locator('.result-metrics')).not.toContainText('最大同時観戦');
         await expect(peak).toHaveText('最大同時観戦 8人');
