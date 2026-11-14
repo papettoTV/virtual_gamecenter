@@ -1,5 +1,6 @@
 import { notifications } from "../../features/notifications/notifications";
 import { renderResultSummary } from "../../features/game/result-summary";
+import { createSpectatorPresence, renderSpectatorGlow } from "../../features/game/spectator-presence";
 import { resultSharing } from "../../features/sharing/result-sharing";
 import { setLiveContext } from "../../features/sharing/share-service";
 import { createCabinetSession } from "../../game-sdk/cabinet-session";
@@ -104,11 +105,16 @@ export function mountGame(context: GameContext): GameInstance {
   const spectatorBanner = document.querySelector<HTMLElement>("#spectator-banner");
   const spectatorStatus = document.querySelector<HTMLElement>("#spectator-status-text");
   const spectatorCount = document.querySelector<HTMLElement>("#spectator-count");
+  const presence = createSpectatorPresence();
+  const glow = document.querySelector("#player-crowd-pulse");
+  const pausedAudience = document.querySelector<HTMLElement>("#salvage-paused-spectators");
+  let audienceCount: number | null = null;
   const cabinetClient = createCabinetSession({
     gameId: DEEP_SEA_SALVAGE.id, lifetime: scope,
     onMessage: handleCabinetMessage,
     onConnectionChange(connected) {
       if (scope.disposed) return;
+      if (!connected) audienceCount = null;
       if (watching && spectatorStatus) spectatorStatus.textContent = connected ? "ライブ映像を受信しています。" : "再接続しています…";
     },
     onError(message) { if (scope.disposed) return; notifications.show({ id: "salvage-connection", scope: DEEP_SEA_SALVAGE.id, type: "error", message }); },
@@ -158,10 +164,20 @@ export function mountGame(context: GameContext): GameInstance {
   }
 
   function updateAudience(state: CabinetState) {
+    audienceCount = state.spectatorCount;
     if (spectatorCount) spectatorCount.textContent = `観戦者 ${state.spectatorCount}人`;
-    const pulse = document.querySelector<HTMLElement>("#player-crowd-pulse");
-    pulse?.classList.toggle("is-hidden", state.spectatorCount === 0 || !playing);
-    pulse?.style.setProperty("--crowd-intensity", String(Math.min(1, Math.log2(state.spectatorCount + 1) / 4)));
+    updatePresence(performance.now());
+  }
+
+  function updatePresence(now: number) {
+    const phase = !playing || watching || cabinetRole !== "player" || state.phase === "ready" ? "idle"
+      : state.phase !== "dive" ? "finished" : state.paused || state.collectionOpen ? "paused" : "playing";
+    const snapshot = presence.update(phase, audienceCount, now);
+    renderSpectatorGlow(glow, snapshot);
+    if (!pausedAudience) return;
+    const caption = snapshot.pausedCount === null ? "" : `現在 ${snapshot.pausedCount}人が観戦中`;
+    if (pausedAudience.textContent !== caption) pausedAudience.textContent = caption;
+    if (pausedAudience.hidden !== !caption) pausedAudience.hidden = !caption;
   }
 
   function publishLiveState(now: number) {
@@ -231,6 +247,7 @@ export function mountGame(context: GameContext): GameInstance {
       ["最大深度", `${Math.floor(state.maxDepth).toLocaleString()}m`],
       ["TIME", `${state.elapsed.toFixed(2)}s`],
       ["適用前スコア", state.finalSubtotal.toLocaleString()], ["倍率", `${(multiplier * 100).toFixed(0)}%`],
+      ...(playing && !watching && cabinetRole === "player" ? [["最大同時観戦", `${presence.peak}人`] as [string, string]] : []),
     ] });
     rankingPanel?.classList.add("is-visible"); rankingPanel?.classList.remove("is-submitted");
     if (rankingRetry) rankingRetry.textContent = state.cleared ? "1クレジットでもう一度" : "1クレジットでリトライ";
@@ -368,6 +385,7 @@ export function mountGame(context: GameContext): GameInstance {
   }
   function loop(now: number) {
     if (scope.disposed) return;
+    updatePresence(now);
     const dt = Math.min(.05, (now - lastTime) / 1_000); lastTime = now;
     if (!document.hidden) {
       if (watching) {
@@ -440,6 +458,7 @@ export function mountGame(context: GameContext): GameInstance {
       if (!await cabinetClient.waitForPlayer() || scope.disposed || generation !== actionGeneration) return false;
       if (!reservationId || !await cabinetClient.startSolo(reservationId) || scope.disposed || generation !== actionGeneration) return false;
       watching = false; playing = true;
+      presence.reset();
       if (action === "retry") retryFromResult(); else { resetRun(); startDive(); }
       showScreen("game"); lastTime = performance.now();
       return true;
@@ -447,6 +466,8 @@ export function mountGame(context: GameContext): GameInstance {
   }
 
   scope.own(() => {
+    renderSpectatorGlow(glow, { tier: "none", pulse: false });
+    if (pausedAudience) pausedAudience.hidden = true;
     resultSharing.clear(DEEP_SEA_SALVAGE.id);
     setLiveContext(null);
     actionGeneration += 1; playing = watching = false;
