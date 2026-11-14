@@ -1,4 +1,5 @@
 import grazeSoundUrl from "./assets/graze-u3.wav?url";
+import { playVictoryCheer } from "../../features/game/victory-celebration";
 
 type AudioWindow = Window & typeof globalThis & {
   webkitAudioContext?: typeof AudioContext;
@@ -6,6 +7,8 @@ type AudioWindow = Window & typeof globalThis & {
 
 export function createGrazeAudio() {
   let audioContext: AudioContext | null = null;
+  let output: GainNode;
+  let muted = false;
   let disposed = false;
   let grazeBuffer: Promise<AudioBuffer> | null = null;
   let lastGrazeTime = -Infinity;
@@ -20,6 +23,9 @@ export function createGrazeAudio() {
         throw new Error("Web Audio API is not supported.");
       }
       audioContext = new AudioContextConstructor();
+      output = audioContext.createGain();
+      output.gain.value = muted ? 0 : 1;
+      output.connect(audioContext.destination);
     }
     if (audioContext.state === "suspended") void audioContext.resume().catch(() => {});
     return audioContext;
@@ -48,7 +54,7 @@ export function createGrazeAudio() {
       source.buffer = buffer;
       gain.gain.setValueAtTime(0.4, audio.currentTime);
       source.connect(gain);
-      gain.connect(audio.destination);
+      gain.connect(output);
       grazeVoices.set(source, gain);
       source.onended = () => {
         if (!grazeVoices.delete(source)) return;
@@ -97,7 +103,7 @@ export function createGrazeAudio() {
     gainNode.gain.exponentialRampToValueAtTime(volume, now + 0.012);
     gainNode.gain.exponentialRampToValueAtTime(0.0001, now + duration - 0.02);
     oscillator.connect(gainNode);
-    gainNode.connect(audio.destination);
+    gainNode.connect(output);
     oscillator.start(now);
     oscillator.stop(now + duration);
   }
@@ -124,11 +130,22 @@ export function createGrazeAudio() {
     gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.38);
     noise.connect(filter);
     filter.connect(gainNode);
-    gainNode.connect(audio.destination);
+    gainNode.connect(output);
     noise.start(now);
     noise.stop(now + 0.4);
   }
   return {
+    get muted() { return muted; },
+    setMuted(value: boolean) {
+      muted = value;
+      if (audioContext) output.gain.value = muted ? 0 : 1;
+    },
+    unlock() {
+      if (!disposed && (window.AudioContext ?? (window as AudioWindow).webkitAudioContext)) getAudioContext();
+    },
+    cheer(delay: number) {
+      if (!muted && audioContext) return playVictoryCheer(audioContext, output, delay);
+    },
     playGrazeSound,
     playAttackSound,
     playBossAttackSound,

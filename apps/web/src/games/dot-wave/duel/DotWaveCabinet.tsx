@@ -4,6 +4,7 @@ import type { DotWaveRoster } from "../../../domain/cabinet";
 import { isGameModeAvailable } from "../../../domain/play-mode-policy";
 import MochiDuel from "./MochiDuel";
 import { useDotWaveCabinet } from "./useDotWaveCabinet";
+import { winningMatch } from "../../../features/game/victory-celebration";
 
 export default function DotWaveCabinet() {
   const controller = useDotWaveCabinet();
@@ -28,6 +29,7 @@ export default function DotWaveCabinet() {
 
     </div>
     <MochiDuel key={d.revision} players={players} network={net} sharedAudio={audio}
+      victoryMatch={winningMatch(d.result?.matchId ?? null, d.result, d.seat)}
       challengePending={multiplayerAvailable && d.pending && net.role === "player"}
       challengeNotice={<>{multiplayerAvailable && d.pending && net.role === "player" && <div className="dot-challenge-prompt" role="dialog" aria-label="対戦の申し込み"><strong>対戦の申し込みが来ました</strong><button onClick={() => void respond(true)}>対戦する</button><button onClick={() => void respond(false)}>今回は断る</button></div>}</>}
       boardNotice={<>{net.matchId && !net.startsAt && !d.result && <p role="status">対戦の準備中…</p>}</>}

@@ -1,6 +1,7 @@
 import { BEAT, END_BEAT, MOVES, releaseWindow, type Exchange, type Grade } from "./core";
 
 import type { MusicStage } from "./musicMood";
+import { playVictoryCheer } from "../../../features/game/victory-celebration";
 
 export class DuelAudio {
   private disposed = false;
@@ -19,6 +20,9 @@ export class DuelAudio {
   constructor() { this.gain.gain.value = .35; this.gain.connect(this.context.destination); }
   get seconds() { return this.context.currentTime - this.origin; }
   get audible() { return this.context.state === "running" && !this.muted; }
+  cheer(delay: number) {
+    if (!this.disposed && this.audible && this.outputVolume > 0) return playVictoryCheer(this.context, this.gain, delay);
+  }
   setMuted(muted: boolean) { this.muted = muted; this.gain.gain.value = muted ? 0 : this.outputVolume; }
   volume(value: number) { this.outputVolume = value * .5; this.gain.gain.value = this.muted ? 0 : this.outputVolume; }
   async start(move: number, beatSeconds = BEAT, delay = .2, elapsed = 0) {

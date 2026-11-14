@@ -1,5 +1,6 @@
 import { PlayCreditConfirmation } from "../../../features/platform/PlayCreditConfirmation";
 import { LeaveGameConfirmation } from "../../../features/game/LeaveGameConfirmation";
+import { createVictoryCelebration } from "../../../features/game/victory-celebration";
 import { notifications } from "../../../features/notifications/notifications";
 import { DotWaveResult } from "./DotWaveResult";
 import { navigate } from "../../../shared/navigation";
@@ -23,10 +24,20 @@ import type { Engine, Phase } from "./engine";
 export type { Engine } from "./engine";
 
 
-export default function MochiDuel({ players, network, sharedAudio, boardNotice, resultPanel, resultShare, onResultRetry, challengeNotice, challengePending = false, holdResult = false }: { players?: DotWaveRoster; network?: DuelLink; sharedAudio?: RefObject<DuelAudio | null>; boardNotice?: ReactNode; resultPanel?: ReactNode; resultShare?: ReactNode; onResultRetry?: () => void; challengeNotice?: ReactNode; holdResult?: boolean; challengePending?: boolean } = {}) {
+export default function MochiDuel({ players, network, sharedAudio, boardNotice, resultPanel, resultShare, onResultRetry, challengeNotice, challengePending = false, holdResult = false, victoryMatch = null }: { players?: DotWaveRoster; network?: DuelLink; sharedAudio?: RefObject<DuelAudio | null>; boardNotice?: ReactNode; resultPanel?: ReactNode; resultShare?: ReactNode; onResultRetry?: () => void; challengeNotice?: ReactNode; holdResult?: boolean; victoryMatch?: string | null; challengePending?: boolean } = {}) {
   const engine = useRef(fresh(network?.matchId ? "online" : "cpu"));
   const ownSound = useRef<DuelAudio | null>(null);
   const sound = sharedAudio ?? ownSound;
+  const board = useRef<HTMLElement>(null);
+  const victory = useRef<ReturnType<typeof createVictoryCelebration> | null>(null);
+  useEffect(() => {
+    const celebration = createVictoryCelebration("dot");
+    victory.current = celebration;
+    return () => { celebration.clear(); victory.current = null; };
+  }, []);
+  useEffect(() => {
+    victory.current?.play(victoryMatch, board.current, delay => sound.current?.cheer(delay));
+  }, [victoryMatch, sound]);
   const lastFrame = useRef<DuelFrame | null>(null);
   const lastSoundFlash = useRef("");
   const remoteSeq = useRef(-1);
@@ -64,8 +75,9 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
   useEffect(() => { if (holdResult) { engine.current.phase = "finished"; engine.current.match.winner ??= network?.side ?? 0; render(); } }, [holdResult]);
 
   async function toggleSound() {
+    const wasAudible = sound.current?.audible;
     sound.current ??= new DuelAudio();
-    if (sound.current.audible) sound.current.setMuted(true);
+    if (wasAudible) sound.current.setMuted(true);
     else {
       sound.current.setMuted(false);
       if (engine.current.phase !== "paused") await sound.current.resume(); notifications.dismiss("game-audio");
@@ -370,7 +382,7 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
       {e.mode === "cpu" && <span className="duel-inline-score" aria-label="通算スコア">SCORE {(e.score?.total ?? 0).toLocaleString()}</span>}
     </div>
 
-    <section className={`duel-board${e.phase === "finished" && !next ? " has-final-result" : ""}`} onClick={event => { if (e.phase === "paused" && !replica && !(event.target instanceof Element && event.target.closest("button, a, input, select, [role=dialog]"))) void pause(); }}>
+    <section ref={board} className={`duel-board${e.phase === "finished" && !next ? " has-final-result" : ""}`} onClick={event => { if (e.phase === "paused" && !replica && !(event.target instanceof Element && event.target.closest("button, a, input, select, [role=dialog]"))) void pause(); }}>
       {e.phase !== "intro" && <h2 className={busy.current || e.phase === "countdown" || e.phase === "playing" || e.phase === "impact" || (e.phase === "finished" && !next) ? "dot-sr-only" : undefined} aria-live="polite">{heading}</h2>}
       {!(e.phase === "finished" && !next) && <DotScene engine={e} viewSide={viewSide} players={players} musicOverride={musicOverride.current} />}
       <div className="duel-board-notice">{boardNotice}</div>
