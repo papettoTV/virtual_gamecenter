@@ -143,6 +143,45 @@ describe("Pages to Worker gateway", () => {
     expect(stagingImage.status).toBe(200);
   });
 
+  it("opens the beta only on pulbase.com and keeps operator endpoints protected", async () => {
+    const production = {
+      APP_ENV: "production",
+      BACKEND: {
+        fetch(request: Request) {
+          return worker.fetch(request as Parameters<typeof worker.fetch>[0], {
+            ...env, APP_ENV: "production", PUBLIC_BETA_ENABLED: "true",
+            BASIC_AUTH_USERNAME: "test", BASIC_AUTH_PASSWORD: "test",
+            CREDIT_PURCHASES_ENABLED: "false",
+            ASSETS: { fetch: async () => new Response("<html>game</html>", { headers: { "Content-Type": "text/html" } }) },
+          } as unknown as Env);
+        },
+      },
+    };
+    const send = (host: string, path: string, init?: RequestInit) => gateway.fetch(new Request(host + path, {
+      ...init, headers: { "CF-Connecting-IP": "192.0.2.92", ...Object.fromEntries(new Headers(init?.headers)) },
+    }), production);
+    const site = "https://pulbase.com";
+    expect((await send(site, "/")).status).toBe(200);
+    expect((await send(site, "/share/live/dot-wave/image.png")).headers.get("content-type")).toBe("image/png");
+    expect((await send("https://virtual-gamecenter.pages.dev", "/")).status).toBe(401);
+    for (const path of ["/operator/feedback", "/api/operator/operations", "/api/platform/dev/retention"]) {
+      expect((await send(site, path)).status).toBe(401);
+    }
+    for (const path of ["/api/operator/operations", "/api/operator/feedback"]) {
+      expect((await send(site, path, { headers: { Authorization: authorization } })).status).toBe(404);
+    }
+    const purchase = await send(site, "/api/platform/credit-purchases/checkout", {
+      method: "POST", headers: { Origin: site }, body: "{}",
+    });
+    expect(purchase.status).toBe(403);
+    expect(await purchase.json()).toEqual({ error: "purchases_disabled" });
+    const crossOrigin = await send(site, "/api/platform/credit-purchases/checkout", {
+      method: "POST", headers: { Origin: "https://example.com" }, body: "{}",
+    });
+    expect(crossOrigin.status).toBe(403);
+    expect(await crossOrigin.json()).toEqual({ error: "invalid_origin" });
+  });
+
   it("keeps Google login callback and return URL on the Pages host", async () => {
     const bootstrap = await forwarded("/api/platform/bootstrap");
     const initial = await bootstrap.json() as { playerId: string; consent: { termsVersion: string; privacyVersion: string } };
