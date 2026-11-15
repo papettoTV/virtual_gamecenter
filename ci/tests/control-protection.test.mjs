@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { executionContext, verifyProtection as verify, readApi } from '../control/protection-check.mjs';
-const controlSha = 'a'.repeat(40), mainSha = '73cb5d9267c56f06f9f1150327ec6b8b3caa2bb9';
+const controlSha = 'a'.repeat(40), mainSha = '717af9cc139d88fc9d0ccca61395e2e540a5c252';
 const versions = { ciControl: '2026-10-23T00:00:00.000Z', main: '2026-10-21T20:32:35.191Z' };
 const verifyProtection = (api, execution, options = { ruleVersions: JSON.stringify(versions) }) => verify(api, execution, options);
 const env = { GITHUB_REPOSITORY: 'papettoTV/virtual_gamecenter', GITHUB_REF: 'refs/heads/ci-control',
@@ -133,7 +133,7 @@ test('Worker専用環境はci-control限定かつstrictで、共有Pagesの承�
 });
 
 test('初回リリース候補へmainを昇格した後もstrictの検証公開を許可する', async () => {
-  const releasedMain = '717af9cc139d88fc9d0ccca61395e2e540a5c252';
+  const releasedMain = '83e7825a82cf995893dc9555a6ccd943eda6e653';
   const api = fixture(state => { state['git/ref/heads/main'].object.sha = releasedMain; });
   const evidence = await verifyProtection(api, executionContext(env));
   assert.equal(evidence.mainSha, releasedMain);
@@ -142,7 +142,7 @@ test('初回リリース候補へmainを昇格した後もstrictの検証公開�
 });
 
 test('初回リリース候補でもmainの例外や設定版の差し替えを拒否する', async () => {
-  const releasedMain = '717af9cc139d88fc9d0ccca61395e2e540a5c252';
+  const releasedMain = '83e7825a82cf995893dc9555a6ccd943eda6e653';
   for (const changeMainRule of [
     rule => { rule.bypass_actors = [releaseActor]; },
     rule => { rule.updated_at = '2026-11-14T23:00:00.000Z'; },
