@@ -117,3 +117,23 @@ jobs:
           path: postmerge-result.json
           if-no-files-found: error
           retention-days: 7
+  request-release-rehearsal:
+    needs: staging
+    if: >-
+      github.ref == 'refs/heads/ci-control' && github.run_attempt == 1 &&
+      github.sha == vars.PULBASE_CONTROL_EVIDENCE_SHA &&
+      vars.PULBASE_PRODUCTION_ENABLED == 'false' &&
+      vars.PULBASE_PRODUCTION_CD_REHEARSAL == 'true' &&
+      (inputs.publication == 'worker' || inputs.publication == 'pages')
+    permissions:
+      actions: write
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: 検証成功runを予行試験の候補探索へ渡す
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run production-approved-dispatch.yml --repo papettoTV/virtual_gamecenter \
+            --ref develop -f "staging_run_id=$GITHUB_RUN_ID"
