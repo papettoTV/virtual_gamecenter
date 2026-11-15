@@ -82,6 +82,7 @@
       "workers_dev": false,
       "vars": {
         "APP_ENV": "production",
+        "PRODUCTION_REQUIRE_BASIC_FOR_ALL": "true",
         "USAGE_MONITOR_ENABLED": "false",
         "METRICS_ACCOUNT_ID": "60e5472a284dc71bbafbbfac8aa2a940",
         "DEVELOPER_AUTH_ENABLED": "false",

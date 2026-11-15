@@ -145,7 +145,7 @@ test("認証を迂回する静的配信・別環境DO・定期削除/監視不�
 test("生成された別環境の成果物をデプロイしない", () => {
   const config = ready();
   assert.deepEqual(checkBuildConfig(config.env.production, config.env.production, "production"), []);
-  assert.equal(checkBuildConfig(config.env.staging, config.env.production, "production").length, 6);
+  assert.equal(checkBuildConfig(config.env.staging, config.env.production, "production").length, 7);
 });
 
 test("環境が欠落しても例外ではなく拒否理由を返す", () => {
@@ -154,4 +154,12 @@ test("環境が欠落しても例外ではなく拒否理由を返す", () => {
   delete config.env.production.d1_databases;
   delete config.env.production.r2_buckets;
   assert.ok(checkReleaseConfig(config, "production").length);
+});
+
+test("初回公開のBasic認証が成果物で外れていれば拒否する", () => {
+  const selected = ready().env.production;
+  assert.equal(selected.vars.PRODUCTION_REQUIRE_BASIC_FOR_ALL, "true");
+  const built = structuredClone(selected);
+  delete built.vars.PRODUCTION_REQUIRE_BASIC_FOR_ALL;
+  assert.ok(checkBuildConfig(built, selected, "production").some(error => error.includes("Basic認証")));
 });

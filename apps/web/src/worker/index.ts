@@ -73,6 +73,11 @@ const handler = {
     }
     const distributed = await distributedBudget(request, env);
     if (distributed) return distributed;
+    const requireBasicForAll = env.APP_ENV === "production" && env.PRODUCTION_REQUIRE_BASIC_FOR_ALL === "true";
+    if (requireBasicForAll) {
+      const error = await authorizeRequest(request, env);
+      if (error) return error;
+    }
     const liveImage = /^\/share\/live\/([^/]+)\/image\.png$/.exec(url.pathname);
     if (liveImage && request.method === "GET") {
       return getGameDefinition(liveImage[1]) ? renderLiveImage(liveImage[1]!) : Response.json({ error: "unknown_game" }, { status: 404 });
@@ -91,8 +96,10 @@ const handler = {
       return platformResponse ?? Response.json({ error: "not_found" }, { status: 404 });
     }
 
-    const authorizationError = await authorizeRequest(request, env);
-    if (authorizationError) return authorizationError;
+    if (!requireBasicForAll) {
+      const error = await authorizeRequest(request, env);
+      if (error) return error;
+    }
     const feedbackResponse = await handleFeedback(request, env);
     if (feedbackResponse) return feedbackResponse;
     const operatorResponse = await handleOperatorRequest(request, env);
