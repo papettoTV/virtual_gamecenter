@@ -6,6 +6,7 @@ import {resolve,join} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {checkReleaseConfig,checkBuildConfig} from '../apps/web/scripts/release-config.mjs';
 import {checkPagesTargets} from '../apps/web/scripts/pages-targets.mjs';
+import {packProductionBundle} from './production-candidate/build-bundle.mjs';
 const root=fileURLToPath(new URL('../',import.meta.url));
 const prod={worker:'pulbase-production',database:'af463342-06e5-4904-97fc-6569d59ceec3',bucket:'pulbase-production-deletion-audit'};
 function need(v,m){if(!v)throw Error(m);}
@@ -45,7 +46,8 @@ async function main(){
  if(process.argv[2]==='build'){
   const scratch=await mkdtemp(join(tmpdir(),'pulbase-production-prepare-'));
   try{
-   const sourceSha=execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim();
+   const gitRevision=ref=>execFileSync('git',['rev-parse',ref],{cwd:root,encoding:'utf8'}).trim();
+   const sourceSha=gitRevision('HEAD');
    const env=isolatedEnvironment(scratch,sourceSha);
    for(const directory of ['home','config','temp','source'])await mkdir(join(scratch,directory));
    const archive=execFileSync('git',['archive','HEAD','apps/web'],{cwd:root,env,maxBuffer:128*1024*1024});
@@ -68,6 +70,17 @@ async function main(){
    stage='browser-definition';const browserEnv={...env,PULBASE_BROWSER_ENVIRONMENT:'production',PULBASE_EXPECTED_SHA:sourceSha,PULBASE_CONFIRM_PRODUCTION:'true'};
    execFileSync(process.execPath,['ci/node_modules/@playwright/test/cli.js','test','--list','--config','ci/playwright.config.mjs'],{cwd:root,env:browserEnv,stdio:'inherit',timeout:60000});
    report.browserDefinitionsListed=true;report.sourceSha=sourceSha;
+   const firstCheck=process.env.GITHUB_ACTIONS==='true'&&process.env.GITHUB_RUN_ATTEMPT==='1';
+   const developPush=process.env.GITHUB_EVENT_NAME==='push'&&process.env.GITHUB_REF==='refs/heads/develop';
+   if(firstCheck&&(developPush||process.env.GITHUB_EVENT_NAME==='pull_request')){
+    stage='bundle';
+    need(process.env.GITHUB_SHA===sourceSha,'本番成果物のcheckoutがpush SHAと一致しません');
+    const bundle=await packProductionBundle({
+     webRoot:web,directory:resolve(root,'ci/results/production-bundle'),revision:sourceSha,
+     tree:gitRevision('HEAD^{tree}'),run:process.env.GITHUB_RUN_ID,attempt:process.env.GITHUB_RUN_ATTEMPT,
+    });
+    report.bundle=bundle;
+   }
   }finally{await rm(scratch,{recursive:true,force:true});}
  }
  await mkdir(resolve(root,'ci/results'),{recursive:true});

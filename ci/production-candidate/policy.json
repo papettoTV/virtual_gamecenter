@@ -7,12 +7,13 @@
   "maxAgeMs": 86400000,
   "reviewPolicyDigest": "e86ffb55d9a3604b883242193d732212b3f1d706294bbb6223579f41c66999b7",
   "preparationFiles": {
-    ".github/workflows/production-preparation.yml": "f2b765c9733f8a894b2752e1008f332da07f27c0",
-    "ci/production-preparation.mjs": "ee6b726ab90a1aa6865c7220af1c720283385851",
+    ".github/workflows/production-preparation.yml": "30bd722c07bd5d0c475a336415e7b44a0dc9d279",
+    "ci/production-preparation.mjs": "bca4aeba3510e2b3fd0fbb08302ba12576fb2f37",
     "tools/check-production-migrations.py": "eb0b255033cf17c8fb2724af6b6e830704f0c8b0",
     "ci/playwright.config.mjs": "b06cd710c98d8743e4dbf9e764f2f71801ffaabe",
     "ci/browser/regression.spec.mjs": "5ac9c8d1be5591be11ec90ca1a98fac88e9fcd16",
-    "ci/check-revision.mjs": "8eb33d29e266c2ba8bbcd247763b02f6928985d2"
+    "ci/check-revision.mjs": "8eb33d29e266c2ba8bbcd247763b02f6928985d2",
+    "ci/production-candidate/build-bundle.mjs": "6491e41db205855bdf7614c5a6d678830248f3c1"
   },
   "controlFiles": {
     ".github/workflows/postmerge-staging.yml": "9d8b36e153987d1beb239f98085ee4f7e4209f60",
