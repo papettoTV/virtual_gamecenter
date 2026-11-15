@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { parse } from 'yaml';
-import { candidateDiscoveryReader, checkRehearsalCandidate, discoverRelease } from '../production-candidate/discover.mjs';
+import { candidateDiscoveryReader, checkRehearsalCandidate, discoverFromStaging, discoverRelease } from '../production-candidate/discover.mjs';
 import { digest } from '../production-candidate/evidence.mjs';
 
 const repo = 'papettoTV/virtual_gamecenter';
@@ -91,12 +91,50 @@ test('候補探索はGET限定、起動は制御ブランチだけで登録版�
   const read = async file => parse(await readFile(new URL('../../.github/workflows/'+file,import.meta.url),'utf8'));
   const kickoff = await read('production-approved-dispatch.yml');
   const registration = await read('production-approved-release.yml');
-  assert.equal(kickoff.on.workflow_dispatch,undefined);
+  assert.equal(kickoff.on.workflow_dispatch.inputs.staging_run_id.required,true);
+  assert.match(kickoff.jobs.discover.if,/github\.actor == 'github-actions\[bot\]'/);
   assert.equal(kickoff.jobs.discover.permissions.actions,'read');
   assert.equal(kickoff.jobs.dispatch.permissions.actions,'write');
   assert.match(kickoff.jobs.dispatch.steps[0].run,/ref: 'ci-control'/);
   assert.deepEqual(registration.permissions,{});
   assert.equal(registration.jobs['registration-only'].environment,undefined);
+});
+
+test('検証結果の通知は公開鍵から分離し、検証成功時だけ固定ワークフローへ渡す', async () => {
+  const workflow = parse(await readFile(new URL('../../.github/workflow-templates/postmerge-staging.yml.disabled',import.meta.url),'utf8'));
+  const job = workflow.jobs['request-release-rehearsal'];
+  assert.equal(job.needs,'staging');
+  assert.equal(job.environment,undefined);
+  assert.deepEqual(job.permissions,{actions:'write'});
+  assert.match(job.if,/refs\/heads\/ci-control/);
+  assert.match(job.if,/PULBASE_PRODUCTION_ENABLED == 'false'/);
+  assert.doesNotMatch(JSON.stringify(job),/secrets\./);
+  assert.match(job.steps[0].run,/production-approved-dispatch\.yml/);
+  assert.match(job.steps[0].run,/--ref develop -f "staging_run_id=\$GITHUB_RUN_ID"/);
+});
+
+test('検証runの終了を待って指定された成功runからだけ候補を選択する', async () => {
+  const f = fixture();
+  const read = f.options.api;
+  let count = 0;
+  f.options.api = async path => path === 'actions/runs/30'
+    ? { ...f.stage, status: count++ === 0 ? 'in_progress' : 'completed' }
+    : read(path);
+  const candidate = await discoverFromStaging({ ...f.options, requestedRun: '30', pause: async () => {} });
+  assert.equal(candidate.stagingRunId,30);
+  assert.equal(count,2);
+});
+
+test('別制御・再実行・失敗・別の成功run・終了期限超過からは起動しない', async () => {
+  const f = fixture();
+  const options = { ...f.options, requestedRun: '30', pause: async () => {} };
+  const withRun = run => ({ ...options, api: async path => path.startsWith('actions/runs/') && !path.includes('artifacts')
+    ? run : f.options.api(path) });
+  await assert.rejects(discoverFromStaging(withRun({ ...f.stage, head_sha: main })));
+  await assert.rejects(discoverFromStaging(withRun({ ...f.stage, run_attempt: 2 })));
+  assert.equal(await discoverFromStaging(withRun({ ...f.stage, conclusion: 'failure' })),null);
+  assert.equal(await discoverFromStaging({ ...withRun({ ...f.stage, id: 31 }), requestedRun: '31' }),null);
+  await assert.rejects(discoverFromStaging(withRun({ ...f.stage, status: 'in_progress' })),/完了/);
 });
 
 test('鍵なし予行試験では自分のrunだけを除外し、承認対象の変更と再実行を拒否する', async () => {

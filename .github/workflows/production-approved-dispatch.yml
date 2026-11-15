@@ -1,5 +1,11 @@
 name: 本番リリースの承認待ちを自動作成
 on:
+  workflow_dispatch:
+    inputs:
+      staging_run_id:
+        description: 保護された検証公開・回帰の初回run ID
+        required: true
+        type: string
   workflow_run:
     workflows: [developマージ後の検証公開と回帰, 本番準備の検査（公開なし）]
     types: [completed]
@@ -16,8 +22,10 @@ jobs:
       vars.PULBASE_PRODUCTION_ENABLED == 'false' &&
       vars.PULBASE_PRODUCTION_CD_REHEARSAL == 'true' &&
       github.run_attempt == 1 &&
+      github.ref == 'refs/heads/develop' &&
       (github.event_name == 'schedule' ||
-       (github.event.workflow_run.conclusion == 'success' &&
+       (github.event_name == 'workflow_dispatch' && github.actor == 'github-actions[bot]') ||
+       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
         github.event.workflow_run.run_attempt == 1 &&
         github.event.workflow_run.head_repository.full_name == github.repository))
     permissions:
@@ -40,6 +48,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PULBASE_EXPECTED_CONTROL_SHA: ${{ vars.PULBASE_CONTROL_EVIDENCE_SHA }}
+          REQUESTED_STAGING_RUN_ID: ${{ inputs.staging_run_id }}
         run: node ci/production-candidate/discover.mjs
   dispatch:
     needs: discover

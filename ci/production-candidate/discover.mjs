@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import { appendFile } from 'node:fs/promises';
+import { setTimeout as delay } from 'node:timers/promises';
 import { readJsonArchive } from './check.mjs';
 import { receipt } from './evidence.mjs';
 
@@ -18,7 +19,7 @@ const workflow = {
   prep: 'production-preparation.yml',
   staging: 'postmerge-staging.yml',
 };
-const allowed = /^(?:git\/ref\/heads\/(?:develop|main|ci-control)|actions\/workflows\/(?:web-checks|production-preparation)\.yml\/runs\?branch=develop&head_sha=[a-f0-9]{40}&per_page=10|actions\/workflows\/(?:postmerge-staging|production-approved-release)\.yml\/runs\?branch=ci-control&per_page=30|actions\/runs\/[1-9][0-9]*\/(?:artifacts\?per_page=100|jobs\?per_page=100))$/;
+const allowed = /^(?:git\/ref\/heads\/(?:develop|main|ci-control)|actions\/workflows\/(?:web-checks|production-preparation)\.yml\/runs\?branch=develop&head_sha=[a-f0-9]{40}&per_page=10|actions\/workflows\/(?:postmerge-staging|production-approved-release)\.yml\/runs\?branch=ci-control&per_page=30|actions\/runs\/[1-9][0-9]*(?:\/(?:artifacts\?per_page=100|jobs\?per_page=100))?)$/;
 
 function currentRun(run, file, branch, revision, events, now) {
   const created = Date.parse(run.created_at), ended = Date.parse(run.updated_at);
@@ -122,13 +123,38 @@ export async function checkRehearsalCandidate(reader, env) {
   return { ...input, fingerprint, mainUpdated: false, deploymentRequested: false };
 }
 
+export async function discoverFromStaging({ requestedRun, pause = delay, ...options }) {
+  const runId = Number(requestedRun);
+  if (!/^[1-9][0-9]*$/.test(requestedRun) || !id(runId) || !sha.test(options.controlSha ?? '')) {
+    throw Error('検証公開の起動元が不正です。');
+  }
+  for (let checked = 0; checked < 15; checked += 1) {
+    const run = await options.api('actions/runs/' + runId);
+    if (run.id !== runId || run.path !== '.github/workflows/' + workflow.staging
+        || run.head_repository?.full_name !== repository || run.head_branch !== 'ci-control'
+        || run.head_sha !== options.controlSha || run.event !== 'workflow_dispatch' || run.run_attempt !== 1) {
+      throw Error('固定した検証公開の初回実行ではありません。');
+    }
+    if (run.status === 'completed') {
+      if (run.conclusion !== 'success') return null;
+      const candidate = await discoverRelease(options);
+      return candidate?.stagingRunId === runId ? candidate : null;
+    }
+    if (checked < 14) await pause(2000);
+  }
+  throw Error('検証公開runの完了を確認できません。');
+}
+
 async function main() {
   const mode = process.argv[2];
   if (process.argv.length > 3 || (mode !== undefined && mode !== '--rehearse')) throw Error('対象外モードです。');
   const reader = candidateDiscoveryReader();
-  const result = mode === '--rehearse'
-    ? await checkRehearsalCandidate(reader, process.env)
-    : await discoverRelease({ ...reader, controlSha: process.env.PULBASE_EXPECTED_CONTROL_SHA });
+  const options = { ...reader, controlSha: process.env.PULBASE_EXPECTED_CONTROL_SHA };
+  let result;
+  if (mode === '--rehearse') result = await checkRehearsalCandidate(reader, process.env);
+  else if (process.env.GITHUB_EVENT_NAME === 'workflow_dispatch') {
+    result = await discoverFromStaging({ ...options, requestedRun: process.env.REQUESTED_STAGING_RUN_ID });
+  } else result = await discoverRelease(options);
   if (result && process.env.GITHUB_OUTPUT) {
     await appendFile(process.env.GITHUB_OUTPUT, 'candidate=' + JSON.stringify(result) + '\n'
       + (mode === '--rehearse' ? 'fingerprint=' + result.fingerprint + '\n' : ''));
