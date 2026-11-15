@@ -1,0 +1,79 @@
+name: 本番リリース承認
+run-name: 本番候補 ${{ inputs.sha }}
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: 本番候補のdevelop SHA
+        required: true
+        type: string
+      main_sha:
+        description: 昇格前のmain SHA
+        required: true
+        type: string
+      ci_run_id:
+        description: 初回Web checksの実行ID
+        required: true
+        type: string
+      staging_run_id:
+        description: 検証公開と回帰の実行ID
+        required: true
+        type: string
+      preparation_run_id:
+        description: 本番準備CIの実行ID
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: production-approved-release
+  cancel-in-progress: false
+env:
+  INPUT_SHA: ${{ inputs.sha }}
+  INPUT_MAIN_SHA: ${{ inputs.main_sha }}
+  INPUT_CI_RUN_ID: ${{ inputs.ci_run_id }}
+  INPUT_STAGING_RUN_ID: ${{ inputs.staging_run_id }}
+  INPUT_PREPARATION_RUN_ID: ${{ inputs.preparation_run_id }}
+  PULBASE_EXPECTED_CONTROL_SHA: ${{ vars.PULBASE_CONTROL_EVIDENCE_SHA }}
+jobs:
+  prepare:
+    if: >-
+      github.ref == 'refs/heads/ci-control' && github.run_attempt == 1 &&
+      vars.PULBASE_PRODUCTION_ENABLED == 'false' && vars.PULBASE_PRODUCTION_CD_REHEARSAL == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    outputs:
+      fingerprint: ${{ steps.candidate.outputs.fingerprint }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: 承認対象のSHAと証跡を固定（鍵なし）
+        id: candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node ci/production-candidate/discover.mjs --rehearse
+  rehearse:
+    needs: prepare
+    if: needs.prepare.outputs.fingerprint != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    environment: production-rehearsal
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: 承認後に同じ候補を照合（公開なし）
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_PLAN_FINGERPRINT: ${{ needs.prepare.outputs.fingerprint }}
+        run: node ci/production-candidate/discover.mjs --rehearse
