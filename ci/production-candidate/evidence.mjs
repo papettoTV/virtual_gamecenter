@@ -20,7 +20,7 @@ async function jobs(api,runId,names){
  const values=list(await api(`actions/runs/${runId}/jobs?filter=latest&per_page=100`),'jobs');
  need(names.every(name=>values.filter(x=>x.name===name&&x.status==='completed'&&x.conclusion==='success').length===1),'必須ジョブが未合格です');
 }
-async function receipt(api,load,run,name,file){
+export async function receipt(api,load,run,name,file){
  const artifacts=list(await api(`actions/runs/${run.id}/artifacts?per_page=100`),'artifacts');
  const matching=artifacts.filter(x=>x.name===`${name}-${run.id}-1`),a=matching[0];
  need(matching.length===1&&id(a.id)&&a.expired===false&&Number.isSafeInteger(a.size_in_bytes)
