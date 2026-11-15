@@ -124,6 +124,8 @@ test('予行試験の承認は1ジョブで、固定SHAの再照合に書込やS
   assert.match(workflow.jobs.prepare.if,/PULBASE_PRODUCTION_ENABLED == 'false'/);
   assert.equal(Object.values(workflow.jobs).filter(job => job.environment).length,1);
   assert.equal(workflow.jobs.rehearse.environment,'production-rehearsal');
-  assert.match(workflow.jobs.rehearse.steps.at(-1).run,/--rehearse/);
+  assert.match(workflow.jobs.prepare.steps.at(-1).run,/handoff\.mjs --prepare$/);
+  assert.match(workflow.jobs.rehearse.steps.at(-1).run,/handoff\.mjs --after-approval$/);
+  assert.match(workflow.jobs.rehearse.steps.at(-1).env.RELEASE_BUNDLE_FINGERPRINT,/needs\.prepare\.outputs\.fingerprint/);
   assert.doesNotMatch(JSON.stringify(workflow),/secrets\./);
 });
