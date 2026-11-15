@@ -2,6 +2,10 @@ import { appendFile, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 export const SOURCE = 'papettoTV/virtual_gamecenter';
 const sha = /^[a-f0-9]{40}$/;
+const firstReleaseMainRevisions = new Set([
+  '73cb5d9267c56f06f9f1150327ec6b8b3caa2bb9',
+  '717af9cc139d88fc9d0ccca61395e2e540a5c252',
+]);
 export function executionContext(env = process.env) {
   const value = { repository: env.GITHUB_REPOSITORY, ref: env.GITHUB_REF,
     event: env.GITHUB_EVENT_NAME, runId: env.GITHUB_RUN_ID, attempt: env.GITHUB_RUN_ATTEMPT,
@@ -110,7 +114,9 @@ export async function verifyProtection(api, execution, { requireSnapshot = true,
   }
   if ((await api('git/ref/heads/ci-control')).object?.sha !== execution.controlSha) throw Error('制御ブランチが実行中のSHAから変わりました。');
   const mainSha = (await api('git/ref/heads/main')).object?.sha;
-  if (mainSha !== '73cb5d9267c56f06f9f1150327ec6b8b3caa2bb9') throw Error('mainが今回の準備開始時のSHAから変わりました。公開せず停止します。');
+  if (!firstReleaseMainRevisions.has(mainSha)) {
+    throw Error('mainが初回リリース前のSHAまたは照合済み候補と一致しません。公開せず停止します。');
+  }
   return { version: 1, mode: 'rehearsal-only', checkedAt: new Date().toISOString(), execution,
     protectionMode, preflightReady: true, protectionVerified: bypassSnapshotVerified, bypassSnapshotVerified,
     publicRuleVersions: { ciControl: rule.updated_at, main: mainRule.updated_at },

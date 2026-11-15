@@ -131,3 +131,26 @@ test('Worker専用環境はci-control限定かつstrictで、共有Pagesの承�
   await assert.rejects(verifyProtection(workerFixture(mutate),executionContext(env),options));
  }
 });
+
+test('初回リリース候補へmainを昇格した後もstrictの検証公開を許可する', async () => {
+  const releasedMain = '717af9cc139d88fc9d0ccca61395e2e540a5c252';
+  const api = fixture(state => { state['git/ref/heads/main'].object.sha = releasedMain; });
+  const evidence = await verifyProtection(api, executionContext(env));
+  assert.equal(evidence.mainSha, releasedMain);
+  assert.equal(evidence.protectionMode, 'strict');
+  assert.equal(evidence.bypassSnapshotVerified, true);
+});
+
+test('初回リリース候補でもmainの例外や設定版の差し替えを拒否する', async () => {
+  const releasedMain = '717af9cc139d88fc9d0ccca61395e2e540a5c252';
+  for (const changeMainRule of [
+    rule => { rule.bypass_actors = [releaseActor]; },
+    rule => { rule.updated_at = '2026-11-14T23:00:00.000Z'; },
+  ]) {
+    const api = fixture(state => {
+      state['git/ref/heads/main'].object.sha = releasedMain;
+      changeMainRule(state['rulesets/2']);
+    });
+    await assert.rejects(verifyProtection(api, executionContext(env)));
+  }
+});
