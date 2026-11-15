@@ -27,6 +27,7 @@ import { settleStartAttempts, recordStartSloCoverage } from "./start-slo";
 export { CabinetRoom, AbuseGuard };
 
 interface WorkerEnv extends Env, BasicAuthEnv {
+  PUBLIC_BETA_ENABLED?: string;
   LOCAL_MULTIPLAYER_ENABLED?: string;
   OPERATOR_ACCOUNT_IDS?: string;
   SECURITY_EVENTS?: AnalyticsEngineDataset;
@@ -74,7 +75,10 @@ const handler = {
     const distributed = await distributedBudget(request, env);
     if (distributed) return distributed;
     const requireBasicForAll = env.APP_ENV === "production";
-    if (requireBasicForAll) {
+    const publicBeta = requireBasicForAll && env.PUBLIC_BETA_ENABLED === "true"
+      && gatewayEnvironment === "production" && url.origin === "https://pulbase.com"
+      && !/^\/(?:operator|api\/operator|api\/platform\/dev)(?:\/|$)/.test(url.pathname);
+    if (requireBasicForAll && !publicBeta) {
       const error = await authorizeRequest(request, env);
       if (error) return error;
     }
