@@ -80,3 +80,43 @@ test('Secretファイル、シンボリックリンク、SHA刻印なしを拒�
     f=>writeFile(join(f.webRoot,'dist/client/_worker.js'),'other version'),
   ]) { const f=await bundleFixture(t);await adversary(f);await assert.rejects(packProductionBundle(f)); }
 });
+
+test('本番公開計画は固定Worker・Pages mainを使い、公開前に保護と成果物を再照合する',async t=>{
+  const { prepareProductionPublication, productionCommands, executeProductionPublication } = await import('../production-candidate/publication.mjs');
+  const { readFile } = await import('node:fs/promises');
+  const f = await bundleFixture(t);
+  const gateway = await readFile(new URL('../control/staging-gateway.mjs',import.meta.url),'utf8');
+  await writeFile(join(f.webRoot,'dist/client/_worker.js'),gateway.replace('__PULBASE_GATEWAY_REVISION__',scope.revision));
+  const bundle = await packProductionBundle(f);
+  const plan = await prepareProductionPublication(f.directory,{...scope,expectedDigest:bundle.manifestDigest},dirname(f.directory));
+  const commands = productionCommands(plan);
+  assert.ok(commands.worker.includes('--no-bundle'));
+  assert.equal(commands.pages[commands.pages.indexOf('--branch')+1],'main');
+  const worker = JSON.parse(await readFile(plan.workerConfig,'utf8'));
+  assert.equal(worker.name,'pulbase-production');
+  assert.equal(worker.vars.PUBLIC_BETA_ENABLED,'true');
+  assert.equal(worker.vars.CREDIT_PURCHASES_ENABLED,'false');
+  assert.equal(worker.preview_urls,false);
+  assert.equal(worker.build,undefined);
+  let pages = false;
+  const calls = [];
+  const project = {
+    name:'virtual-gamecenter', production_branch:'main', domains:['pulbase.com'],
+    source:{config:{production_deployments_enabled:false,preview_deployment_setting:'none'}},
+    build_config:{destination_dir:'apps/web/dist/client'},
+  };
+  const transport = {
+    project:async()=>({...project,canonical_deployment:pages ? {environment:'production',
+      latest_stage:{status:'success'},deployment_trigger:{metadata:{commit_hash:scope.revision}}} : {}}),
+    execute:async kind=>{calls.push(kind);if(kind==='pages') pages=true;},
+  };
+  await assert.rejects(executeProductionPublication(plan,{guard:async()=>{throw Error('approval missing');},transport}));
+  assert.deepEqual(calls,[]);
+  const result = await executeProductionPublication(plan,{guard:async()=>{},transport});
+  assert.deepEqual(calls,['worker','pages']);
+  assert.deepEqual(result,{sha:scope.revision,workerUploaded:true,pagesUploaded:true});
+  calls.length=0;
+  transport.project=async()=>({...project,source:{config:{production_deployments_enabled:true}}});
+  await assert.rejects(executeProductionPublication(plan,{guard:async()=>{},transport}),error=>error.phase==='preflight');
+  assert.deepEqual(calls,[]);
+});
