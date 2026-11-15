@@ -115,6 +115,34 @@ describe("Pages to Worker gateway", () => {
     expect(await (await forwarded("/")).text()).toContain("<html>game</html>");
   });
 
+  it("requires Basic authentication on shared URLs routed to production", async () => {
+    const production = {
+      APP_ENV: "production",
+      BACKEND: {
+        fetch(request: Request) {
+          return worker.fetch(request as Parameters<typeof worker.fetch>[0], {
+            ...env, APP_ENV: "production", BASIC_AUTH_USERNAME: "test", BASIC_AUTH_PASSWORD: "test",
+          } as unknown as Env);
+        },
+      },
+    };
+    const sharedImage = "/share/live/dot-wave/image.png";
+    for (const path of [sharedImage, "/results/unknown/image.png", "/api/results/unknown"]) {
+      const denied = await gateway.fetch(new Request("https://pulbase.com" + path, {
+        headers: { "CF-Connecting-IP": "192.0.2.91" },
+      }), production);
+      expect(denied.status).toBe(401);
+      expect(denied.headers.get("www-authenticate")).toContain("Basic");
+    }
+    const image = await gateway.fetch(new Request("https://pulbase.com" + sharedImage, {
+      headers: { Authorization: authorization, "CF-Connecting-IP": "192.0.2.91" },
+    }), production);
+    expect(image.status).toBe(200);
+    expect(image.headers.get("content-type")).toBe("image/png");
+    const stagingImage = await gateway.fetch(new Request(origin + sharedImage), { APP_ENV: "staging", BACKEND: backend });
+    expect(stagingImage.status).toBe(200);
+  });
+
   it("keeps Google login callback and return URL on the Pages host", async () => {
     const bootstrap = await forwarded("/api/platform/bootstrap");
     const initial = await bootstrap.json() as { playerId: string; consent: { termsVersion: string; privacyVersion: string } };
