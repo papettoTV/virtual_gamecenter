@@ -1,0 +1,35 @@
+name: 本番リリース承認
+run-name: 本番候補 ${{ inputs.sha }}
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: 本番候補のdevelop SHA
+        required: true
+        type: string
+      main_sha:
+        description: 昇格前のmain SHA
+        required: true
+        type: string
+      ci_run_id:
+        description: 初回Web checksの実行ID
+        required: true
+        type: string
+      staging_run_id:
+        description: 検証公開と回帰の実行ID
+        required: true
+        type: string
+      preparation_run_id:
+        description: 本番準備CIの実行ID
+        required: true
+        type: string
+permissions: {}
+jobs:
+  registration-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    steps:
+      - name: 登録用のため公開せず停止
+        run: |
+          echo '本番リリースは保護されたci-controlの定義が必要です。'
+          exit 1
