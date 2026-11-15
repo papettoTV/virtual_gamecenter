@@ -73,7 +73,7 @@ const handler = {
     }
     const distributed = await distributedBudget(request, env);
     if (distributed) return distributed;
-    const requireBasicForAll = env.APP_ENV === "production" && env.PRODUCTION_REQUIRE_BASIC_FOR_ALL === "true";
+    const requireBasicForAll = env.APP_ENV === "production";
     if (requireBasicForAll) {
       const error = await authorizeRequest(request, env);
       if (error) return error;

@@ -68,7 +68,6 @@ export function checkBuildConfig(config, selected, environment) {
   if (config.vars?.USAGE_MONITOR_ENABLED !== selected.vars?.USAGE_MONITOR_ENABLED || config.vars?.METRICS_ACCOUNT_ID !== selected.vars?.METRICS_ACCOUNT_ID || JSON.stringify(config.analytics_engine_datasets) !== JSON.stringify(selected.analytics_engine_datasets)) errors.push("成果物の利用量監視が選択した環境と一致しません。");
   if (JSON.stringify(config.ratelimits) !== JSON.stringify(selected.ratelimits)) errors.push("成果物の乱用対策が選択した環境と一致しません。");
   if (config.name !== selected.name) errors.push("成果物のWorker名が選択した環境と一致しません。");
-  if (config.vars?.PRODUCTION_REQUIRE_BASIC_FOR_ALL !== selected.vars?.PRODUCTION_REQUIRE_BASIC_FOR_ALL) errors.push("成果物の本番限定公開のBasic認証設定が選択した環境と一致しません。");
   if (config.vars?.APP_ENV !== environment || config.vars?.DEVELOPER_AUTH_ENABLED !== "false" || config.vars?.CREDIT_PURCHASES_ENABLED !== "false") errors.push("成果物の環境・認証・購入設定が不正です。");
   if (binding(config, "DB", "d1_databases")?.database_id !== binding(selected, "DB", "d1_databases")?.database_id) errors.push("成果物のD1が選択した環境と一致しません。");
   if (binding(config, "DELETION_AUDIT", "r2_buckets")?.bucket_name !== binding(selected, "DELETION_AUDIT", "r2_buckets")?.bucket_name) errors.push("成果物のR2が選択した環境と一致しません。");
