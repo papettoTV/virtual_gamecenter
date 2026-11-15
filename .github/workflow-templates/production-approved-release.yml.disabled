@@ -53,11 +53,11 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
-      - name: 承認対象のSHAと証跡を固定（鍵なし）
+      - name: 承認対象のSHAと成果物を固定（鍵なし）
         id: candidate
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node ci/production-candidate/discover.mjs --rehearse
+        run: node ci/production-candidate/handoff.mjs --prepare
   rehearse:
     needs: prepare
     if: needs.prepare.outputs.fingerprint != ''
@@ -72,8 +72,8 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
-      - name: 承認後に同じ候補を照合（公開なし）
+      - name: 承認後に同じ候補と成果物を再照合（公開なし）
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_PLAN_FINGERPRINT: ${{ needs.prepare.outputs.fingerprint }}
-        run: node ci/production-candidate/discover.mjs --rehearse
+          RELEASE_BUNDLE_FINGERPRINT: ${{ needs.prepare.outputs.fingerprint }}
+        run: node ci/production-candidate/handoff.mjs --after-approval
