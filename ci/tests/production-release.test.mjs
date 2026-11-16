@@ -12,6 +12,7 @@ import { checkPublicProductionBrowser, checkPublicProductionHttp } from '../prod
 import { wranglerPublicationIdentifier } from '../production-candidate/public-wrangler.mjs';
 import { verifyUnchangedProductionMigrations } from '../production-candidate/production-operations.mjs';
 import { productionGitHub } from '../production-candidate/github-release.mjs';
+import { verifyProtection } from '../control/protection-check.mjs';
 
 const repo = 'papettoTV/virtual_gamecenter';
 const mainSha = 'a'.repeat(40);
@@ -202,6 +203,31 @@ test('本番Appだけをmain更新ルールに限定し、fast-forward後に一�
   assert.equal(mutations.filter(([method]) => method === 'DELETE').length, 2);
   update.bypass_actors = [];
   await assert.rejects(api.guard(candidate), /bypass/);
+});
+
+test('本番昇格後もstagingはstrictとmainの必須保護を確認する', async () => {
+  const timestamp = '2026-11-15T23:14:03.974Z';
+  const env = { can_admins_bypass: false, deployment_branch_policy: { protected_branches: false, custom_branch_policies: true },
+    protection_rules: [{ type: 'required_reviewers', reviewers: [{ type: 'User', reviewer: { login: 'papettoTV' } }] }] };
+  const branches = { total_count: 1, branch_policies: [{ type: 'branch', name: 'ci-control' }] };
+  const rule = (branch, rules, bypass_actors = []) => ({ target: 'branch', enforcement: 'active', updated_at: timestamp, bypass_actors, rules,
+    conditions: { ref_name: { include: ['refs/heads/' + branch], exclude: [] } } });
+  const integrity = rule('main', [{ type: 'deletion' }, { type: 'non_fast_forward' }, { type: 'required_status_checks',
+    parameters: { strict_required_status_checks_policy: true, do_not_enforce_on_create: false,
+      required_status_checks: ['verify', 'Automation control checks'].map(context => ({ context, integration_id: 15368 })) } }]);
+  const responses = { 'environments/staging': env, 'environments/staging/deployment-branch-policies?per_page=100': branches,
+    'rulesets?per_page=100': [{ id: 25676153, name: 'ci-control-human-managed' }, { id: 25520943, name: 'main-release-app-only' }],
+    'rulesets/25676153': rule('ci-control', ['creation', 'deletion', 'non_fast_forward', 'update'].map(type => ({ type }))),
+    'rulesets/25520943': rule('main', [{ type: 'update' }], [{ actor_id: 5405029, actor_type: 'Integration', bypass_mode: 'always' }]),
+    'rulesets/25520941': integrity, 'git/ref/heads/ci-control': { object: { sha: controlSha } },
+    'git/ref/heads/main': { object: { sha: revision } }, 'git/ref/heads/develop': { object: { sha: revision } } };
+  const api = async path => responses[path] ?? { status: 'ahead', merge_base_commit: { sha: path.slice(8, 48) } };
+  const options = { ruleVersions: JSON.stringify({ ciControl: timestamp, main: timestamp, mainIntegrity: timestamp, protectionMode: 'strict' }) };
+  const result = await verifyProtection(api, { controlSha }, options);
+  assert.equal(result.mainSha, revision);
+  assert.equal(result.protectionMode, 'strict');
+  integrity.bypass_actors = responses['rulesets/25520943'].bypass_actors;
+  await assert.rejects(verifyProtection(api, { controlSha }, options), /必須CI/);
 });
 
 test('Cloudflare切り戻しは既知のPages IDとWorkerバージョンだけに別々のトークンを使う', async () => {
