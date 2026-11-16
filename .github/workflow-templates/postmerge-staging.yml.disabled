@@ -122,8 +122,8 @@ jobs:
     if: >-
       github.ref == 'refs/heads/ci-control' && github.run_attempt == 1 &&
       github.sha == vars.PULBASE_CONTROL_EVIDENCE_SHA &&
-      vars.PULBASE_PRODUCTION_ENABLED == 'false' &&
-      vars.PULBASE_PRODUCTION_CD_REHEARSAL == 'true' &&
+      ((vars.PULBASE_PRODUCTION_ENABLED == 'false' && vars.PULBASE_PRODUCTION_CD_REHEARSAL == 'true') ||
+       (vars.PULBASE_PRODUCTION_ENABLED == 'true' && vars.PULBASE_PRODUCTION_CD_REHEARSAL == 'false')) &&
       (inputs.publication == 'worker' || inputs.publication == 'pages')
     permissions:
       actions: write

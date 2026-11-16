@@ -19,8 +19,8 @@ concurrency:
 jobs:
   discover:
     if: >-
-      vars.PULBASE_PRODUCTION_ENABLED == 'false' &&
-      vars.PULBASE_PRODUCTION_CD_REHEARSAL == 'true' &&
+      ((vars.PULBASE_PRODUCTION_ENABLED == 'false' && vars.PULBASE_PRODUCTION_CD_REHEARSAL == 'true') ||
+       (vars.PULBASE_PRODUCTION_ENABLED == 'true' && vars.PULBASE_PRODUCTION_CD_REHEARSAL == 'false')) &&
       github.run_attempt == 1 &&
       github.ref == 'refs/heads/develop' &&
       (github.event_name == 'schedule' ||
