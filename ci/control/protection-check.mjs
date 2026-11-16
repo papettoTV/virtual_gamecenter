@@ -4,6 +4,7 @@ export const SOURCE = 'papettoTV/virtual_gamecenter';
 const sha = /^[a-f0-9]{40}$/;
 const firstPublicMain = '83e7825a82cf995893dc9555a6ccd943eda6e653';
 const firstReleaseMainRevisions = new Set([
+  '73cb5d9267c56f06f9f1150327ec6b8b3caa2bb9',
   '717af9cc139d88fc9d0ccca61395e2e540a5c252',
   firstPublicMain,
 ]);
