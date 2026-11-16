@@ -111,14 +111,29 @@ body:has(#game-screen[data-mobile-play][data-game-id="buzz-barrier"]) .notificat
 #game-screen[data-tap-ready] > .touch-controls { display: none; }
 #game-screen .buzz-ready-trigger {
   position: absolute;
+  inset: 0;
+  z-index: 6;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  touch-action: pan-y;
+}
+#game-screen .buzz-ready-trigger:focus-visible { outline-offset: -4px; }
+.buzz-ready-icon {
+  position: absolute;
   top: 60px;
   right: 8px;
-  z-index: 6;
+  display: grid;
+  place-items: center;
   width: 44px;
-  min-width: 44px;
-  min-height: 44px;
-  padding: 0;
+  height: 44px;
+  border: 1px solid #62d8e573;
+  border-radius: 10px;
+  background: #101827;
   font-size: 22px;
+  pointer-events: none;
 }
 #game-screen[data-tap-ready] #game {
   height: min(calc(72vh + 48px), 808px);
