@@ -2,9 +2,11 @@ import { appendFile, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 export const SOURCE = 'papettoTV/virtual_gamecenter';
 const sha = /^[a-f0-9]{40}$/;
+const firstPublicMain = '83e7825a82cf995893dc9555a6ccd943eda6e653';
 const firstReleaseMainRevisions = new Set([
+  '73cb5d9267c56f06f9f1150327ec6b8b3caa2bb9',
   '717af9cc139d88fc9d0ccca61395e2e540a5c252',
-  '83e7825a82cf995893dc9555a6ccd943eda6e653',
+  firstPublicMain,
 ]);
 export function executionContext(env = process.env) {
   const value = { repository: env.GITHUB_REPOSITORY, ref: env.GITHUB_REF,
@@ -20,7 +22,7 @@ export function executionContext(env = process.env) {
 export function readApi(token, request = fetch) {
   if (!token) throw Error('GitHubの一時読取認証がありません。');
   return async path => {
-    if (!/^(?:environments\/staging(?:-worker)?(?:\/deployment-branch-policies\?per_page=100)?|rulesets(?:\/[1-9][0-9]*|\?per_page=100)|git\/ref\/heads\/(?:ci-control|main))$/.test(path)) {
+    if (!/^(?:environments\/staging(?:-worker)?(?:\/deployment-branch-policies\?per_page=100)?|rulesets(?:\/[1-9][0-9]*|\?per_page=100)|git\/ref\/heads\/(?:ci-control|main|develop)|compare\/[a-f0-9]{40}\.\.\.[a-f0-9]{40}\?per_page=1)$/.test(path)) {
       throw Error('対象外APIを拒否しました。');
     }
     try {
@@ -42,11 +44,15 @@ export async function verifyProtection(api, execution, { requireSnapshot = true,
     if (!versions || typeof versions !== 'object' || Array.isArray(versions)) throw Error('保護設定版の形式が不正です。');
     const keys = Object.keys(versions).sort().join(',');
     const requestedMode = Object.hasOwn(versions, 'protectionMode') ? versions.protectionMode : 'strict';
-    if (!['ciControl,main', 'ciControl,main,protectionMode'].includes(keys)
+    if (!['ciControl,main', 'ciControl,main,protectionMode', 'ciControl,main,mainIntegrity,protectionMode'].includes(keys)
       || !['strict', 'construction'].includes(requestedMode)) {
       throw Error('保護モードはstrictまたはconstructionの明示指定だけを許可します。');
     }
     protectionMode = requestedMode;
+  }
+  const managedMain = protectionMode === 'strict' && typeof versions?.mainIntegrity === 'string';
+  if (Object.hasOwn(versions ?? {}, 'mainIntegrity') && !managedMain) {
+    throw Error('本番昇格用の保護設定版にはstrictが必要です。');
   }
   const releaseOnly = actors => Array.isArray(actors) && actors.length === 1
     && actors[0].actor_id === 5405029 && actors[0].actor_type === 'Integration'
@@ -96,10 +102,14 @@ export async function verifyProtection(api, execution, { requireSnapshot = true,
   const mainRules = rules.filter(item => item.name === 'main-release-app-only');
   if (mainRules.length !== 1 || !Number.isSafeInteger(mainRules[0].id) || mainRules[0].id < 1) throw Error('mainの更新禁止ルールを確認できません。');
   const mainRule = await api(`rulesets/${mainRules[0].id}`);
-  if (mainRule.enforcement !== 'active' || mainRule.target !== 'branch' || ('bypass_actors' in mainRule && mainRule.bypass_actors?.length !== 0)
+  const mainBypassMatches = managedMain ? releaseOnly(mainRule.bypass_actors)
+    : mainRule.bypass_actors?.length === 0 || (!requireSnapshot && releaseOnly(mainRule.bypass_actors));
+  if (mainRule.enforcement !== 'active' || mainRule.target !== 'branch'
+    || ('bypass_actors' in mainRule && !mainBypassMatches)
     || mainRule.conditions?.ref_name?.include?.length !== 1 || mainRule.conditions.ref_name.include[0] !== 'refs/heads/main'
-    || mainRule.conditions.ref_name.exclude?.length !== 0 || !mainRule.rules?.some(item => item.type === 'update')) {
-    throw Error('mainの更新禁止と例外なしを確認できません。');
+    || mainRule.conditions.ref_name.exclude?.length !== 0 || !mainRule.rules?.some(item => item.type === 'update')
+    || (managedMain && (mainRule.rules.length !== 1 || mainRule.rules[0].parameters?.update_allows_fetch_and_merge === true))) {
+    throw Error('mainの更新制限と指定された例外を確認できません。');
   }
   // GITHUB_TOKEN/public reads can omit bypass_actors. The human-managed staging
   // variable pins versions checked with the full lists; missing data is not [].
@@ -114,7 +124,35 @@ export async function verifyProtection(api, execution, { requireSnapshot = true,
   }
   if ((await api('git/ref/heads/ci-control')).object?.sha !== execution.controlSha) throw Error('制御ブランチが実行中のSHAから変わりました。');
   const mainSha = (await api('git/ref/heads/main')).object?.sha;
-  if (!firstReleaseMainRevisions.has(mainSha)) {
+  // The prepare job verifies read-only shape and ancestry. The credentialed
+  // publication job must still supply the human-managed strict snapshot.
+  const managedPreflight = !requireSnapshot && (!firstReleaseMainRevisions.has(mainSha) || releaseOnly(mainRule.bypass_actors));
+  if (managedMain || managedPreflight) {
+    const integrity = await api('rulesets/25520941');
+    const types = integrity.rules?.map(item => item.type).sort().join(',');
+    const checks = integrity.rules?.find(item => item.type === 'required_status_checks')?.parameters;
+    const refs = integrity.conditions?.ref_name;
+    if (!sha.test(mainSha ?? '') || integrity.target !== 'branch' || integrity.enforcement !== 'active'
+      || (managedMain && (!/^20\d\d-\d\d-\d\dT[0-9:.]+Z$/.test(versions.mainIntegrity)
+        || integrity.updated_at !== versions.mainIntegrity))
+      || refs?.include?.length !== 1 || refs.include[0] !== 'refs/heads/main' || refs.exclude?.length !== 0
+      || ('bypass_actors' in integrity && integrity.bypass_actors?.length !== 0)
+      || types !== 'deletion,non_fast_forward,required_status_checks'
+      || checks?.strict_required_status_checks_policy !== true || checks.do_not_enforce_on_create !== false
+      || checks.required_status_checks?.length !== 2 || !['verify', 'Automation control checks'].every(name =>
+        checks.required_status_checks.some(item => item.context === name && item.integration_id === 15368))) {
+      throw Error('mainの必須CI・削除禁止・force push禁止を確認できません。');
+    }
+    const developSha = (await api('git/ref/heads/develop')).object?.sha;
+    if (!sha.test(developSha ?? '')) throw Error('developが確認できません。');
+    for (const [base, head] of [[firstPublicMain, mainSha], [mainSha, developSha]]) {
+      if (base === head) continue;
+      const comparison = await api(`compare/${base}...${head}?per_page=1`);
+      if (comparison.status !== 'ahead' || comparison.merge_base_commit?.sha !== base) {
+        throw Error('mainが昇格で許可される履歴と一致しません。');
+      }
+    }
+  } else if (!firstReleaseMainRevisions.has(mainSha)) {
     throw Error('mainが初回リリース前のSHAまたは照合済み候補と一致しません。公開せず停止します。');
   }
   return { version: 1, mode: 'rehearsal-only', checkedAt: new Date().toISOString(), execution,
