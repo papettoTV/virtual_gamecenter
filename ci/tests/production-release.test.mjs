@@ -301,3 +301,96 @@ test('本番HTTPは公開URL・別名・運営者保護・SHAを確認し、ブ�
   } });
   assert.equal(result, 8);
 });
+
+for (const scenario of ['pages-rate-limit', 'worker-privacy', 'pages-changed']) {
+  test('鍵なし本番予行試験: ' + scenario, async t => {
+    const f = await fixture(t);
+    const { calls, state, options } = f;
+    let checksAfterDeploy = 0;
+    let pagesChecksAfterDeploy = 0;
+    let rollbackStarted = false;
+    let throttled = false;
+    const response = result => new Response(JSON.stringify({ success: true, result }));
+    options.cloudflare = productionCloudflare({
+      workerToken: 'fake-worker', pagesToken: 'fake-pages', pause: async () => {},
+      execute: async target => {
+        calls.push(target);
+        state[target] = structuredClone(after[target]);
+        return target === 'worker' ? state.worker.versionId : 'https://abcdef12.virtual-gamecenter.pages.dev';
+      },
+      request: async (url, { method, body }) => {
+        if (method === 'POST') {
+          assert.match(url, /workers\/scripts\/pulbase-production\/deployments$/);
+          assert.deepEqual(JSON.parse(body).versions, [{ version_id: before.worker.versionId, percentage: 100 }]);
+          calls.push('restore-worker');
+          rollbackStarted = true;
+          state.worker = { ...before.worker, deploymentId: id(7) };
+          return response({ id: id(7) });
+        }
+        assert.equal(method, 'GET');
+        if (url.endsWith('/subdomain')) {
+          if (state.worker.versionId === after.worker.versionId) checksAfterDeploy += 1;
+          const blocked = scenario === 'worker-privacy' && checksAfterDeploy >= 2 && !rollbackStarted;
+          return response({ enabled: false, previews_enabled: blocked });
+        }
+        if (url.includes('/workers/')) {
+          const active = { id: state.worker.deploymentId, created_on: '2026-11-15T00:00:00Z',
+            versions: [{ percentage: 100, version_id: state.worker.versionId }] };
+          return response({ deployments: [active, { ...active, id: id(99), created_on: '2026-11-16T00:00:00Z' }] });
+        }
+        if (state.worker.versionId === after.worker.versionId) pagesChecksAfterDeploy += 1;
+        if (scenario === 'pages-rate-limit' && pagesChecksAfterDeploy === 3 && !throttled) {
+          throttled = true;
+          return new Response('discarded', { status: 429 });
+        }
+        if (scenario === 'pages-changed' && pagesChecksAfterDeploy >= 3) {
+          state.pages = { ...state.pages, deploymentId: id(99) };
+        }
+        const config = project(state.pages);
+        config.canonical_deployment.url = 'https://abcdef12.virtual-gamecenter.pages.dev';
+        return response(config);
+      },
+    });
+    const report = await runApprovedProductionRelease(options);
+    if (scenario === 'pages-rate-limit') {
+      assert.equal(throttled, true);
+      assert.equal(report.success, true);
+      assert.deepEqual(calls, ['old-http', 'worker', 'pages', 'http', 'browser', 'main']);
+    } else {
+      assert.equal(report.success, false);
+      assert.deepEqual(report.attempted, ['worker']);
+      assert.equal(report.failure.step, 'before-pages');
+      if (scenario === 'worker-privacy') {
+        assert.deepEqual(report.failure, { step: 'before-pages', operation: 'worker-subdomain', reason: 'configuration' });
+        assert.deepEqual(report.rollback, { status: 'verified', pages: false, worker: true });
+        assert.deepEqual(calls, ['old-http', 'worker', 'restore-worker', 'old-http']);
+      } else {
+        assert.equal(report.rollback.status, 'needs-attention');
+        assert.equal(report.rollbackFailure.reason, 'deployment-changed');
+        assert.deepEqual(calls, ['old-http', 'worker']);
+      }
+    }
+  });
+}
+
+test('切り戻しAPIの障害は再送せず、HTTPステータスだけを返す', async () => {
+  let writes = 0;
+  const transport = productionCloudflare({
+    workerToken: 'fake-worker', pagesToken: 'fake-pages', execute: async () => {},
+    request: async (_url, { method }) => {
+      if (method === 'POST') {
+        writes += 1;
+        return new Response('non-public-response', { status: 503 });
+      }
+      return new Response(JSON.stringify({ success: true, result: { deployments: [{
+        id: after.worker.deploymentId, versions: [{ percentage: 100, version_id: after.worker.versionId }],
+      }] } }));
+    },
+  });
+  await assert.rejects(transport.rollback('worker', before.worker, after.worker), error => {
+    assert.deepEqual(error.diagnostic, { operation: 'worker-rollback', reason: 'http', status: 503 });
+    assert.doesNotMatch(JSON.stringify(error), /non-public-response/);
+    return true;
+  });
+  assert.equal(writes, 1);
+});
