@@ -18,6 +18,14 @@ function seededRandom(seed) {
   };
 }
 
+export function baseBulletSeedForMatch(matchId) {
+  let seed = 2166136261;
+  for (const character of matchId) {
+    seed = Math.imul(seed ^ character.codePointAt(0), 16777619);
+  }
+  return seed >>> 0;
+}
+
 // Each board owns its cursors. Timing, rendering, aiming and boss attacks must
 // never consume the pattern stream, even when one board advances more often.
 export function resetBaseBulletSequences(players, seed) {
