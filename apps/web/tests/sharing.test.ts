@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ResultSharingStore } from "../src/features/sharing/result-sharing";
 import { presentResult } from "../src/features/sharing/result-presenters";
-import { liveShareText, resultShareText } from "../src/features/sharing/share-service";
+import { liveShareText, resultShareText, shareLive, sharePanel } from "../src/features/sharing/share-service";
 import type { SharedResult, SharedResultDraft } from "../src/domain/shared-result";
 
 vi.mock("../src/features/platform/platform-client", () => ({ fetchPlatformBootstrap: vi.fn(async () => ({})) }));
@@ -68,6 +68,21 @@ describe("game-specific result presenters", () => {
 });
 
 describe("live invitation copy", () => {
+  it.each([["dot-wave", true], ["buzz-barrier", false], ["deep-sea-salvage", false]])(
+    "preserves spectator copy and selects the appropriate share panel for %s",
+    async (gameId, compactLive) => {
+      vi.stubGlobal("fetch", vi.fn(async () => new Response()));
+      vi.stubGlobal("window", new EventTarget());
+      vi.stubGlobal("location", { hostname: "example.test", origin: "https://example.test" });
+      try {
+        await shareLive({ gameId, cabinetId: "cabinet", role: "spectator", phase: "playing" });
+        expect(sharePanel.getSnapshot()).toMatchObject({ compactLive, status: "ready", text: expect.stringContaining("ライブを観戦中。") });
+        expect(new URL(sharePanel.getSnapshot()!.url).searchParams.get("watch")).toBe("1");
+      } finally {
+        sharePanel.close();
+      }
+    },
+  );
   const context = { gameId: "buzz-barrier", cabinetId: "cabinet", role: "player" as const, phase: "ready" as const };
   it("uses one sentence to describe the current sharing state", () => {
     const message = (overrides: Partial<Parameters<typeof liveShareText>[0]> = {}) =>
