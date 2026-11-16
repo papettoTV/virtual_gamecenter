@@ -72,7 +72,7 @@ export function GameScreen({ game }: GameScreenProps) {
         {tapReady && <section className="buzz-ready-guide" aria-label="操作と遊び方">
           <h2>READY</h2><h3>操作</h3><p>ゲーム画面をスライドして移動</p>
           <h3>遊び方</h3><p>弾をかすめてゲージをため、<br />無敵シールドをボスに当てよう。</p>
-          <p>右上の「▶」をタップして開始</p>
+          <p>ゲーム画面をタップして開始</p>
         </section>}
         {game.id === "buzz-barrier" && <button id="versus-sound-toggle" className="victory-sound-toggle" type="button" aria-pressed="false" hidden>ミュート</button>}
         {tapReady && <button className="touch-button buzz-ready-trigger" type="button" aria-label="ゲーム開始" data-ready-start=""
@@ -81,7 +81,7 @@ export function GameScreen({ game }: GameScreenProps) {
           onClick={() => {
             if (!document.querySelector(".platform-overlay, .share-overlay, .platform-profile-menu")) gameHost.requestPlay("start");
           }}>
-          <span aria-hidden="true">▶</span>
+          <span className="buzz-ready-icon" aria-hidden="true">▶</span>
         </button>}
         {game.id === "buzz-barrier" && <BuzzPauseOverlay compact={play.mobile || play.active} />}
         <FrameIntro game={game} />

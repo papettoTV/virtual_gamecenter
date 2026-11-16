@@ -227,8 +227,15 @@ for (const game of games) {
         expect(writes).toHaveLength(0);
         await share.getByRole('button', { name: '× 閉じる' }).tap();
       }
+      let useReadyEdge = false;
       const intent = async () => {
-        if (input === 'primary' && isMobile) await start.tap();
+        if (input === 'primary' && isMobile && game.id === 'buzz-barrier') {
+          const bounds = await start.boundingBox();
+          expect(bounds.width).toBeGreaterThan(150);
+          await start.tap({ position: useReadyEdge ? { x: 12, y: 24 } : { x: bounds.width / 2, y: bounds.height / 2 } });
+          useReadyEdge = true;
+        }
+        else if (input === 'primary' && isMobile) await start.tap();
         else if (input === 'primary' && game.id === 'dot-wave') await start.click();
         else { await page.locator('body').click({ position: { x: 2, y: 2 } }); await page.keyboard.press(game.key); }
       };
