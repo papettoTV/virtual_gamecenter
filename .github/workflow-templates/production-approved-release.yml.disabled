@@ -36,15 +36,19 @@ env:
   INPUT_STAGING_RUN_ID: ${{ inputs.staging_run_id }}
   INPUT_PREPARATION_RUN_ID: ${{ inputs.preparation_run_id }}
   PULBASE_EXPECTED_CONTROL_SHA: ${{ vars.PULBASE_CONTROL_EVIDENCE_SHA }}
+  PULBASE_PRODUCTION_ENABLED: ${{ vars.PULBASE_PRODUCTION_ENABLED }}
+  PULBASE_PRODUCTION_CD_REHEARSAL: ${{ vars.PULBASE_PRODUCTION_CD_REHEARSAL }}
 jobs:
   prepare:
     if: >-
       github.ref == 'refs/heads/ci-control' && github.run_attempt == 1 &&
-      vars.PULBASE_PRODUCTION_ENABLED == 'false' && vars.PULBASE_PRODUCTION_CD_REHEARSAL == 'true'
+      ((vars.PULBASE_PRODUCTION_ENABLED == 'false' && vars.PULBASE_PRODUCTION_CD_REHEARSAL == 'true') ||
+       (vars.PULBASE_PRODUCTION_ENABLED == 'true' && vars.PULBASE_PRODUCTION_CD_REHEARSAL == 'false'))
     runs-on: ubuntu-24.04
     timeout-minutes: 4
     outputs:
       fingerprint: ${{ steps.candidate.outputs.fingerprint }}
+      release_mode: ${{ steps.mode.outputs.release_mode }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -53,6 +57,14 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
+      - name: 承認先を固定
+        id: mode
+        run: |
+          if [ "$PULBASE_PRODUCTION_ENABLED" = true ]; then
+            echo 'release_mode=production' >> "$GITHUB_OUTPUT"
+          else
+            echo 'release_mode=rehearsal' >> "$GITHUB_OUTPUT"
+          fi
       - name: 承認対象のSHAと成果物を固定（鍵なし）
         id: candidate
         env:
@@ -60,7 +72,7 @@ jobs:
         run: node ci/production-candidate/handoff.mjs --prepare
   rehearse:
     needs: prepare
-    if: needs.prepare.outputs.fingerprint != ''
+    if: needs.prepare.outputs.fingerprint != '' && needs.prepare.outputs.release_mode == 'rehearsal' && vars.PULBASE_PRODUCTION_CD_REHEARSAL == 'true' && vars.PULBASE_PRODUCTION_ENABLED == 'false'
     runs-on: ubuntu-24.04
     timeout-minutes: 4
     environment: production-rehearsal
@@ -77,3 +89,36 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_BUNDLE_FINGERPRINT: ${{ needs.prepare.outputs.fingerprint }}
         run: node ci/production-candidate/handoff.mjs --after-approval
+  production:
+    needs: prepare
+    if: needs.prepare.outputs.fingerprint != '' && needs.prepare.outputs.release_mode == 'production' && vars.PULBASE_PRODUCTION_CD_REHEARSAL == 'false' && vars.PULBASE_PRODUCTION_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    environment: production
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: 固定公開ツールとChromiumを準備
+        run: |
+          npm ci --ignore-scripts --prefix ci/control/toolchain
+          node ci/control/toolchain/node_modules/@playwright/test/cli.js install --with-deps chromium
+          node ci/control/toolchain/prepare-browser-sandbox.mjs
+          node --input-type=module <<'JS'
+          import {chromium} from './ci/control/toolchain/node_modules/@playwright/test/index.mjs';
+          const browser = await chromium.launch({channel:'chromium',chromiumSandbox:true});
+          await browser.close();
+          JS
+      - name: 承認を確認して固定成果物を公開・回帰
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_BUNDLE_FINGERPRINT: ${{ needs.prepare.outputs.fingerprint }}
+          PULBASE_PRODUCTION_RULE_VERSIONS: ${{ vars.PULBASE_PRODUCTION_RULE_VERSIONS }}
+          PULBASE_RELEASE_APP_PRIVATE_KEY: ${{ secrets.PULBASE_RELEASE_APP_PRIVATE_KEY }}
+          CLOUDFLARE_WORKER_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKER_API_TOKEN }}
+          CLOUDFLARE_PAGES_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_API_TOKEN }}
+        run: node ci/production-candidate/handoff.mjs --production

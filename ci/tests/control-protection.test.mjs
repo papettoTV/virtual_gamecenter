@@ -62,7 +62,8 @@ test('読取APIだけを許可し、外部redirect・応答本文・認証値を
     assert.equal(options.method, 'GET'); assert.equal(options.redirect, 'error');
     return new Response('private response not-a-real-token', { status: 403 });
   });
-  for (const path of ['https://attacker.test', '../other', 'actions/runs/1/approve', 'git/ref/heads/develop']) await assert.rejects(api(path));
+  for (const path of ['https://attacker.test', '../other', 'actions/runs/1/approve', 'git/ref/heads/other',
+    'compare/main...develop?per_page=1']) await assert.rejects(api(path));
   assert.equal(count, 0);
   await assert.rejects(api('environments/staging'), error => !error.message.includes('not-a-real-token') && !error.message.includes('private response'));
 });

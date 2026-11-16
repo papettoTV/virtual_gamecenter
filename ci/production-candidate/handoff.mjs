@@ -32,7 +32,7 @@ export function bundleReader() {
   };
 }
 
-async function verifyArchive(bytes, scope) {
+async function verifyArchive(bytes, scope, consume) {
   const scratch = await mkdtemp(join(tmpdir(), 'pulbase-bundle-check-'));
   const archive = join(scratch, 'bundle.zip');
   const directory = join(scratch, 'bundle');
@@ -41,13 +41,13 @@ async function verifyArchive(bytes, scope) {
     const tool = fileURLToPath(new URL('../../tools/unpack-production-bundle.py', import.meta.url));
     execFileSync('python3', ['-I', '-B', tool, archive, directory],
       { timeout: 60000, stdio: ['ignore', 'pipe', 'pipe'], env: { PATH: process.env.PATH } });
-    return await verifyProductionBundle({ directory, ...scope });
+    return await consume(await verifyProductionBundle({ directory, ...scope }), directory);
   } finally {
     await rm(scratch, { recursive: true, force: true });
   }
 }
 
-export async function checkBundleHandoff(candidate, { api, load, preparationFiles, expectedFingerprint }) {
+export async function checkBundleHandoff(candidate, { api, load, preparationFiles, expectedFingerprint }, consume) {
   const { sha: revision, preparationRunId, fingerprint: candidateFingerprint } = candidate;
   requireMatch(sha.test(revision ?? '') && Number.isSafeInteger(preparationRunId) && preparationRunId > 0
     && hash.test(candidateFingerprint ?? ''), '候補の識別情報が不正です。');
@@ -78,23 +78,61 @@ export async function checkBundleHandoff(candidate, { api, load, preparationFile
   const bytes = await load(artifact.id);
   requireMatch(Buffer.isBuffer(bytes) && bytes.length === artifact.size_in_bytes
     && 'sha256:' + digest(bytes) === artifact.digest, '本番成果物ZIPが差し替わっています。');
-  const verified = await verifyArchive(bytes, { revision, tree: commit.tree.sha, run: String(preparationRunId), attempt: '1' });
-  const bundle = { artifactId: artifact.id, archiveDigest: artifact.digest, tree: commit.tree.sha, ...verified };
-  const fingerprint = digest(JSON.stringify({ candidateFingerprint, bundle }));
-  requireMatch(expectedFingerprint === undefined || fingerprint === expectedFingerprint,
-    '承認前に固定した本番成果物と一致しません。');
-  return { ...bundle, fingerprint };
+  const scope = { revision, tree: commit.tree.sha, run: String(preparationRunId), attempt: '1' };
+  return verifyArchive(bytes, scope, async (verified, directory) => {
+    const bundle = { artifactId: artifact.id, archiveDigest: artifact.digest, tree: commit.tree.sha, ...verified };
+    const fingerprint = digest(JSON.stringify({ candidateFingerprint, bundle }));
+    requireMatch(expectedFingerprint === undefined || fingerprint === expectedFingerprint,
+      '承認前に固定した本番成果物と一致しません。');
+    const result = { ...bundle, fingerprint };
+    if (consume) {
+      requireMatch(hash.test(expectedFingerprint ?? ''), '処理には承認前の固定値が必要です。');
+      return consume(result, directory, { ...scope, expectedDigest: verified.manifestDigest });
+    }
+    return result;
+  });
 }
 
 async function main() {
   const [, , mode] = process.argv;
-  requireMatch(process.argv.length === 3 && ['--prepare', '--after-approval'].includes(mode), '照合モードが不正です。');
-  const expectedFingerprint = mode === '--after-approval' ? process.env.RELEASE_BUNDLE_FINGERPRINT ?? '' : undefined;
+  requireMatch(process.argv.length === 3 && ['--prepare', '--after-approval', '--production'].includes(mode), '照合モードが不正です。');
+  const expectedFingerprint = mode === '--prepare' ? undefined : process.env.RELEASE_BUNDLE_FINGERPRINT ?? '';
   requireMatch(expectedFingerprint === undefined || hash.test(expectedFingerprint), '承認前の照合結果がありません。');
   const { candidateDiscoveryReader, checkRehearsalCandidate } = await import('./discover.mjs');
   const reader = candidateDiscoveryReader();
   const candidate = await checkRehearsalCandidate(reader, process.env);
   const policy = JSON.parse(await readFile(new URL('./policy.json', import.meta.url), 'utf8'));
+  if (mode === '--production') {
+    requireMatch(process.env.PULBASE_PRODUCTION_ENABLED === 'true' && process.env.PULBASE_PRODUCTION_CD_REHEARSAL === 'false',
+      '本番の実行フラグが不一致です。');
+    const { executeApprovedProduction } = await import('./production-operations.mjs');
+    const { productionGitHub } = await import('./github-release.mjs');
+    const { releaseAnnouncement } = await import('../release-announcement.mjs');
+    const context = { repository: process.env.GITHUB_REPOSITORY, ref: process.env.GITHUB_REF, event: process.env.GITHUB_EVENT_NAME,
+      attempt: process.env.GITHUB_RUN_ATTEMPT, runId: process.env.GITHUB_RUN_ID, controlSha: process.env.GITHUB_SHA };
+    const github = productionGitHub({ context, expectedControlSha: process.env.PULBASE_EXPECTED_CONTROL_SHA,
+      versions: JSON.parse(process.env.PULBASE_PRODUCTION_RULE_VERSIONS ?? '{}'), readToken: process.env.GH_TOKEN,
+      appKey: process.env.PULBASE_RELEASE_APP_PRIVATE_KEY });
+    const result = await checkBundleHandoff(candidate, { ...bundleReader(), preparationFiles: policy.preparationFiles, expectedFingerprint },
+      async (_bundle, artifact, scope) => {
+        const rechecked = await checkRehearsalCandidate(reader, process.env);
+        requireMatch(rechecked.fingerprint === candidate.fingerprint, '公開前に候補が変わりました。');
+        return executeApprovedProduction({ candidate, artifact, scope, context, github,
+          workerToken: process.env.CLOUDFLARE_WORKER_API_TOKEN, pagesToken: process.env.CLOUDFLARE_PAGES_API_TOKEN });
+      });
+    const receipt = JSON.stringify(result, null, 2);
+    console.log(receipt);
+    if (process.env.GITHUB_STEP_SUMMARY) {
+      await appendFile(process.env.GITHUB_STEP_SUMMARY, '## 本番リリース結果\n\n```json\n' + receipt + '\n```\n');
+      if (result.success) {
+        const draft = releaseAnnouncement({ sha: candidate.sha, confirmed: true,
+          text: 'バーチャルゲーセン PULBASEを更新しました。最新版はこちらから遊べます。 https://pulbase.com/' });
+        await appendFile(process.env.GITHUB_STEP_SUMMARY, draft.summary);
+      }
+    }
+    if (!result.success) process.exitCode = 1;
+    return;
+  }
   const bundle = await checkBundleHandoff(candidate, { ...bundleReader(), preparationFiles: policy.preparationFiles, expectedFingerprint });
   const rechecked = await checkRehearsalCandidate(reader, process.env);
   requireMatch(rechecked.fingerprint === candidate.fingerprint, '成果物検査中に本番候補が変わりました。');
