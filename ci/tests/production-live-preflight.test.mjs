@@ -99,6 +99,7 @@ test('本番公開計画は固定Worker・Pages mainを使い、公開前に保�
   assert.equal(worker.preview_urls,false);
   assert.equal(worker.build,undefined);
   let pages = false;
+  const pagesId = '00000000-0000-0000-0000-000000000001';
   const calls = [];
   const project = {
     name:'virtual-gamecenter', production_branch:'main', domains:['pulbase.com'],
@@ -106,9 +107,15 @@ test('本番公開計画は固定Worker・Pages mainを使い、公開前に保�
     build_config:{destination_dir:'apps/web/dist/client'},
   };
   const transport = {
-    project:async()=>({...project,canonical_deployment:pages ? {environment:'production',
+    project:async()=>({...project,canonical_deployment:pages ? {id:pagesId,environment:'production',
       latest_stage:{status:'success'},deployment_trigger:{metadata:{commit_hash:scope.revision}}} : {}}),
-    execute:async kind=>{calls.push(kind);if(kind==='pages') pages=true;},
+    execute:async kind=>{
+      calls.push(kind);
+      if(kind==='pages') {
+        pages=true;
+        return {deploymentId:pagesId};
+      }
+    },
   };
   await assert.rejects(executeProductionPublication(plan,{guard:async()=>{throw Error('approval missing');},transport}));
   assert.deepEqual(calls,[]);

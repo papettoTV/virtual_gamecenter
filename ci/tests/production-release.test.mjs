@@ -5,7 +5,7 @@ import { generateKeyPairSync } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import test from 'node:test';
 import { packProductionBundle } from '../production-candidate/build-bundle.mjs';
-import { prepareProductionPublication } from '../production-candidate/publication.mjs';
+import { pagesUploadConfigHash, prepareProductionPublication } from '../production-candidate/publication.mjs';
 import { ProductionPromotionRejected, runApprovedProductionRelease } from '../production-candidate/release.mjs';
 import { productionCloudflare } from '../production-candidate/cloudflare-release.mjs';
 import { checkPublicProductionBrowser, checkPublicProductionHttp } from '../production-candidate/public-regression.mjs';
@@ -394,3 +394,95 @@ test('切り戻しAPIの障害は再送せず、HTTPステータスだけを返�
   });
   assert.equal(writes, 1);
 });
+
+
+test('鍵なし予行試験: Wranglerが送るSHA-256の変更だけなら本番回帰と昇格へ進む', async t => {
+  const f = await fixture(t);
+  const { cloudflare, plan } = f.options;
+  const project = cloudflare.project;
+  let configHash = 'c'.repeat(64);
+  const beforeHash = configHash;
+  cloudflare.project = async () => {
+    const config = await project();
+    config.deployment_configs = {
+      production: { wrangler_config_hash: configHash, services: { BACKEND: { service: 'pulbase-production' } } },
+      preview: { services: { BACKEND: { service: 'pulbase-staging' } } },
+    };
+    return config;
+  };
+  const execute = cloudflare.execute;
+  cloudflare.execute = async (...args) => {
+    const receipt = await execute(...args);
+    if (args[0] === 'pages') {
+      configHash = await pagesUploadConfigHash(plan);
+      assert.notEqual(configHash, beforeHash);
+    }
+    return receipt;
+  };
+  const report = await runApprovedProductionRelease(f.options);
+  assert.equal(report.success, true);
+  assert.deepEqual(f.calls, ['old-http', 'worker', 'pages', 'http', 'browser', 'main']);
+});
+
+test('鍵なし予行試験: 切り戻しのAPIが旧配信を返すまで待ち、今回のハッシュが残っていても復元を確認する', async t => {
+  const f = await fixture(t);
+  const { cloudflare, plan } = f.options;
+  const project = cloudflare.project;
+  const current = cloudflare.current;
+  const execute = cloudflare.execute;
+  let configHash = 'c'.repeat(64);
+  let restoreChecks = 0;
+  let publishChecks = 0;
+  let waited = 0;
+  f.options.pause = async () => { waited += 1; };
+  cloudflare.project = async () => {
+    const config = await project();
+    config.deployment_configs = { production: { wrangler_config_hash: configHash } };
+    if (f.state.pages.revision === revision && ++publishChecks === 1) {
+      config.canonical_deployment = { ...config.canonical_deployment, id: before.pages.deploymentId,
+        deployment_trigger: { metadata: { commit_hash: mainSha } } };
+    }
+    return config;
+  };
+  cloudflare.current = async (...args) => {
+    const state = await current(...args);
+    if (f.calls.includes('restore-worker') && restoreChecks++ === 0) return structuredClone(after);
+    return state;
+  };
+  cloudflare.execute = async (...args) => {
+    const receipt = await execute(...args);
+    if (args[0] === 'pages') configHash = await pagesUploadConfigHash(plan);
+    return receipt;
+  };
+  f.options.regression.browser = async () => 7;
+  const report = await runApprovedProductionRelease(f.options);
+  assert.equal(report.failure.step, 'browser');
+  assert.equal(waited, 2);
+  assert.deepEqual(report.rollback, { status: 'verified', pages: true, worker: true });
+  assert.deepEqual(f.calls, ['old-http', 'worker', 'pages', 'http', 'restore-pages', 'restore-worker', 'old-http']);
+});
+
+for (const change of ['other-hash', 'build-output', 'preview-binding']) {
+  test('鍵なし予行試験: 実際の共有設定変更を昇格できない: ' + change, async t => {
+    const f = await fixture(t);
+    const { cloudflare, plan } = f.options;
+    const project = cloudflare.project;
+    cloudflare.project = async () => {
+      const config = await project();
+      config.deployment_configs = { production: { wrangler_config_hash: 'c'.repeat(64) },
+        preview: { services: { BACKEND: { service: 'pulbase-staging' } } } };
+      if (f.calls.includes('pages')) {
+        config.deployment_configs.production.wrangler_config_hash =
+          change === 'other-hash' ? 'd'.repeat(64) : await pagesUploadConfigHash(plan);
+        if (change === 'build-output') config.build_config.destination_dir = 'different';
+        if (change === 'preview-binding') config.deployment_configs.preview.services.BACKEND.service = 'different';
+      }
+      return config;
+    };
+    const report = await runApprovedProductionRelease(f.options);
+    assert.equal(report.failure.step, 'pages-configuration');
+    assert.deepEqual(report.rollback, { status: 'needs-attention', pages: true, worker: true });
+    assert.equal(report.rollbackFailure.step, 'pages-configuration');
+    assert.deepEqual(f.calls, ['old-http', 'worker', 'pages', 'restore-pages', 'restore-worker', 'old-http']);
+  });
+}
