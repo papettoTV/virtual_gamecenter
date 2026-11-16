@@ -138,7 +138,14 @@ for (const [game, filename] of artwork) {
       const dialog = page.getByRole('dialog');
       await expect(dialog).toHaveCount(1);
       await expect(fixture.getByRole('dialog')).toBeVisible();
-      await expect(dialog.locator('#share-text')).toBeVisible();
+      const compactLive = kind === 'live' && game === 'dot-wave';
+      if (compactLive) {
+        await expect(dialog).toHaveAccessibleName('観戦リンクを共有');
+        await expect(dialog.getByRole('button', { name: 'Xに投稿', exact: true })).toBeVisible();
+        await expect(dialog.locator('#share-text, .social-preview')).toHaveCount(0);
+      } else {
+        await expect(dialog.locator('#share-text')).toBeVisible();
+      }
       const shareUrl = new URL(await page.evaluate(async () => {
         const { sharePanel } = await import('/src/features/sharing/share-service.ts');
         return sharePanel.getSnapshot().url;
@@ -243,7 +250,7 @@ for (const [game, filename] of artwork) {
       }
       const image = dialog.locator('.social-link-card img');
       for (const target of ['X', 'Facebook']) {
-        if (kind === 'live') {
+        if (kind === 'live' && !compactLive) {
           await dialog.getByRole('button', { name: target, exact: true }).click();
           await expect(image).toHaveAttribute('src', new URL(`/social/${filename}-ogp-v2.jpg`, shareUrl).href);
           await image.scrollIntoViewIfNeeded();
@@ -251,10 +258,21 @@ for (const [game, filename] of artwork) {
           await expect.poll(() => image.evaluate(img => [img.complete, img.naturalWidth, img.naturalHeight])).toEqual([true, 1200, 630]);
         }
         // Capture handoff without sending a real social post.
-        await dialog.getByRole('button', { name: `${target}で共有`, exact: true }).click();
+        await dialog.getByRole('button', { name: compactLive ? `${target}に投稿` : `${target}で共有`, exact: true }).click();
         const handoff = new URL(await page.evaluate(() => window.__previewShareLinks.at(-1)));
         expect(handoff.searchParams.get(target === 'X' ? 'url' : 'u')).toBe(shareUrl.href);
         if (kind === 'result' && target === 'X') expect(handoff.searchParams.get('text')).toBe('編集した投稿文');
+        if (compactLive && target === 'X') expect(handoff.searchParams.get('text')).toContain('ドットウェーブのライブを観戦中。');
+      }
+      if (compactLive) {
+        await page.evaluate(() => {
+          Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async text => { window.__copied = text; } } });
+        });
+        await dialog.getByRole('button', { name: '投稿文とリンクをコピー', exact: true }).click();
+        await expect(dialog.getByRole('status')).toHaveText('コピーしました。');
+        const copied = await page.evaluate(() => window.__copied);
+        expect(copied).toContain('ドットウェーブのライブを観戦中。');
+        expect(copied.endsWith(shareUrl.href)).toBe(true);
       }
       if (kind === 'result') {
         const save = dialog.getByRole('button', { name: '結果画像を保存', exact: true });
