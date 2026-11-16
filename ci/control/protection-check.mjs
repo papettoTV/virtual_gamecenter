@@ -102,8 +102,10 @@ export async function verifyProtection(api, execution, { requireSnapshot = true,
   const mainRules = rules.filter(item => item.name === 'main-release-app-only');
   if (mainRules.length !== 1 || !Number.isSafeInteger(mainRules[0].id) || mainRules[0].id < 1) throw Error('mainの更新禁止ルールを確認できません。');
   const mainRule = await api(`rulesets/${mainRules[0].id}`);
+  const mainBypassMatches = managedMain ? releaseOnly(mainRule.bypass_actors)
+    : mainRule.bypass_actors?.length === 0 || (!requireSnapshot && releaseOnly(mainRule.bypass_actors));
   if (mainRule.enforcement !== 'active' || mainRule.target !== 'branch'
-    || ('bypass_actors' in mainRule && !(managedMain ? releaseOnly(mainRule.bypass_actors) : mainRule.bypass_actors?.length === 0))
+    || ('bypass_actors' in mainRule && !mainBypassMatches)
     || mainRule.conditions?.ref_name?.include?.length !== 1 || mainRule.conditions.ref_name.include[0] !== 'refs/heads/main'
     || mainRule.conditions.ref_name.exclude?.length !== 0 || !mainRule.rules?.some(item => item.type === 'update')
     || (managedMain && (mainRule.rules.length !== 1 || mainRule.rules[0].parameters?.update_allows_fetch_and_merge === true))) {
@@ -122,14 +124,17 @@ export async function verifyProtection(api, execution, { requireSnapshot = true,
   }
   if ((await api('git/ref/heads/ci-control')).object?.sha !== execution.controlSha) throw Error('制御ブランチが実行中のSHAから変わりました。');
   const mainSha = (await api('git/ref/heads/main')).object?.sha;
-  if (managedMain) {
+  // The prepare job verifies read-only shape and ancestry. The credentialed
+  // publication job must still supply the human-managed strict snapshot.
+  const managedPreflight = !requireSnapshot && (!firstReleaseMainRevisions.has(mainSha) || releaseOnly(mainRule.bypass_actors));
+  if (managedMain || managedPreflight) {
     const integrity = await api('rulesets/25520941');
     const types = integrity.rules?.map(item => item.type).sort().join(',');
     const checks = integrity.rules?.find(item => item.type === 'required_status_checks')?.parameters;
     const refs = integrity.conditions?.ref_name;
     if (!sha.test(mainSha ?? '') || integrity.target !== 'branch' || integrity.enforcement !== 'active'
-      || !/^20\d\d-\d\d-\d\dT[0-9:.]+Z$/.test(versions.mainIntegrity)
-      || integrity.updated_at !== versions.mainIntegrity
+      || (managedMain && (!/^20\d\d-\d\d-\d\dT[0-9:.]+Z$/.test(versions.mainIntegrity)
+        || integrity.updated_at !== versions.mainIntegrity))
       || refs?.include?.length !== 1 || refs.include[0] !== 'refs/heads/main' || refs.exclude?.length !== 0
       || ('bypass_actors' in integrity && integrity.bypass_actors?.length !== 0)
       || types !== 'deletion,non_fast_forward,required_status_checks'

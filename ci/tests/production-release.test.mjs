@@ -226,6 +226,12 @@ test('本番昇格後もstagingはstrictとmainの必須保護を確認する', 
   const result = await verifyProtection(api, { controlSha }, options);
   assert.equal(result.mainSha, revision);
   assert.equal(result.protectionMode, 'strict');
+  const prepare = await verifyProtection(api, { controlSha }, { requireSnapshot: false });
+  assert.equal(prepare.preflightReady, true);
+  assert.equal(prepare.protectionVerified, false);
+  await assert.rejects(verifyProtection(api, { controlSha }, { ruleVersions: JSON.stringify({
+    ciControl: timestamp, main: timestamp, protectionMode: 'strict',
+  }) }), /例外/);
   integrity.bypass_actors = responses['rulesets/25520943'].bypass_actors;
   await assert.rejects(verifyProtection(api, { controlSha }, options), /必須CI/);
 });
