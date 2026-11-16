@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getBaseBulletPattern, resetBaseBulletSequences } from "../../src/games/graze-duel/base-bullet-sequence";
+import { baseBulletSeedForMatch, getBaseBulletPattern, resetBaseBulletSequences } from "../../src/games/graze-duel/base-bullet-sequence";
 
 function boards(seed: number) {
   const players = [{}, {}] as any[];
@@ -19,6 +19,15 @@ function shot(player: any) {
 const series = (player: any, count = 2000) => Array.from({ length: count }, () => shot(player));
 
 describe("通常弾の共通シード系列", () => {
+  it("別々の端末でも共通の対戦IDならホストと挑戦者の系列が一致する", () => {
+    const matchId = "acf00000-0000-4000-8000-000000000001";
+    const [host] = boards(baseBulletSeedForMatch(matchId));
+    const [challenger] = boards(baseBulletSeedForMatch(matchId));
+    const [rematch] = boards(baseBulletSeedForMatch("acf00000-0000-4000-8000-000000000002"));
+    const expected = series(host);
+    expect(series(challenger)).toEqual(expected);
+    expect(series(rematch)).not.toEqual(expected);
+  });
   it("同一シードでは両盤面のパターン・連射数・休止時間が一致する", () => {
     for (const seed of [0, 1, 154, 0xffffffff]) {
       const [left, right] = boards(seed);

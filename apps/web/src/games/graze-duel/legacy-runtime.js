@@ -29,7 +29,7 @@ import { BUZZ_BARRIER } from "../../domain/game";
 import { recordWatchStarted } from "../../features/engagement/engagement-client";
 import { createCanvasRenderer } from "./rendering/canvas-renderer";
 import { createGameState } from "./state";
-import { resetBaseBulletSequences, getBaseBulletPattern } from "./base-bullet-sequence";
+import { baseBulletSeedForMatch, resetBaseBulletSequences, getBaseBulletPattern } from "./base-bullet-sequence";
 import { createSimulation } from "./simulation";
 import { createInputController } from "./input";
 import { createSpectatorPresence, hasSpectatorPeak, renderSpectatorGlow } from "../../features/game/spectator-presence";
@@ -361,13 +361,13 @@ export function mountGame(context) {
   if (RENDER_STATS_ENABLED && !THREE_RENDERER_REQUESTED) installRendererBadge();
 
 
-  function resetGame() {
+  function resetGame(baseBulletSeed = Math.floor(Math.random() * 0x100000000)) {
     victory.clear();
     spectatorPresence.reset();
     pausedForLiveShare = false;
     resultSharing.clear(BUZZ_BARRIER.id);
     sharedRunId = createUuid();
-    resetBaseBulletSequences(players, Math.floor(Math.random() * 0x100000000));
+    resetBaseBulletSequences(players, baseBulletSeed);
     for (const player of players) {
       player.x = player.fieldX + FIELD_WIDTH / 2;
       player.y = FIELD_BOTTOM - 58;
@@ -1297,7 +1297,7 @@ export function mountGame(context) {
 
   function prepareVersusReady(matchId) {
     if (versusMatchId !== matchId) return;
-    resetGame();
+    resetGame(baseBulletSeedForMatch(matchId));
     gameSessionActive = true;
     versusPhase = "ready";
     players[0].label = "YOU";
@@ -1329,7 +1329,8 @@ export function mountGame(context) {
   }
 
   function startVersusGameplay() {
-    resetGame();
+    if (!versusMatchId) return;
+    resetGame(baseBulletSeedForMatch(versusMatchId));
     players[0].label = "YOU";
     players[1].label = "RIVAL";
     players[1].cpu = false;
