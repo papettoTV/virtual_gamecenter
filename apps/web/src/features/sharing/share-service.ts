@@ -75,7 +75,7 @@ export async function getShareOrigin(): Promise<string> {
 
 export async function shareLive(context: LiveShareContext) {
   const shareId = createUuid();
-  const compactLive = context.role === "player";
+  const compactLive = context.role === "player" || context.gameId === "dot-wave";
   const state: SharePanelState = { kind: "live", gameId: context.gameId, targetId: context.cabinetId, shareId, title: compactLive ? "観戦リンクを共有" : "観戦に招待", text: liveShareText(context), url: "", status: "loading", compactLive };
   updatePanel(state);
   recordSharingEvent("share_opened", state);
