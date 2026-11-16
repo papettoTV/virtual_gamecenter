@@ -116,6 +116,32 @@ test('公開応答が不明で新しい配信を特定できない場合は切�
   assert.deepEqual(f.calls, ['old-http', 'worker']);
 });
 
+test('Pages公開前の失敗は今回のWorkerだけを戻して旧配信を確認する', async t => {
+  const f = await fixture(t);
+  const execute = f.options.cloudflare.execute;
+  f.options.cloudflare.execute = async (target, ...args) => {
+    if (target === 'pages') throw Error('Pages upload rejected');
+    return execute(target, ...args);
+  };
+  const result = await runApprovedProductionRelease(f.options);
+  assert.equal(result.success, false);
+  assert.equal(result.phase, 'pages');
+  assert.deepEqual(result.rollback, { status: 'verified', pages: false, worker: true });
+  assert.deepEqual(f.calls, ['old-http', 'worker', 'restore-worker', 'old-http']);
+});
+
+test('回帰の途中で別のPages配信が見つかったら両方の切り戻しを止める', async t => {
+  const f = await fixture(t);
+  f.options.regression.browser = async () => {
+    f.state.pages = { ...f.state.pages, deploymentId: id(99) };
+    throw Error('browser regression failed');
+  };
+  const result = await runApprovedProductionRelease(f.options);
+  assert.equal(result.success, false);
+  assert.deepEqual(result.rollback, { status: 'needs-attention', pages: false, worker: false });
+  assert.ok(!f.calls.some(call => call.startsWith('restore-') || call === 'main'));
+});
+
 test('main更新応答が不明でも実refが候補SHAなら切り戻さない', async t => {
   const f = await fixture(t);
   const promote = f.options.github.promote;
