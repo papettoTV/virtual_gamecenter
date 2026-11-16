@@ -1,5 +1,6 @@
 import { verifyProductionApproval } from './approval.mjs';
 import { executeProductionPublication } from './publication.mjs';
+import { samePagesConfiguration } from '../control/staging-publication.mjs';
 
 const sha = /^[a-f0-9]{40}$/;
 const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
@@ -32,6 +33,7 @@ export async function runApprovedProductionRelease({ candidate, plan, context, g
     attempted: [], rollback: { status: 'not-needed', pages: false, worker: false } };
   const owned = {};
   let before;
+  let beforePages;
   let mainWriteAttempted = false;
   let mainWriteUncertain = false;
 
@@ -46,6 +48,8 @@ export async function runApprovedProductionRelease({ candidate, plan, context, g
     report.phase = 'preflight';
     await github.preflight(candidate);
     before = checkState(await cloudflare.current());
+    beforePages = await cloudflare.project();
+    requireMatch(beforePages.canonical_deployment?.id === before.pages.deploymentId, '公開前にPagesの配信が変わりました。');
     report.previous = before;
     requireMatch(before.pages.revision === mainBefore, '切り戻し候補とmainのSHAが一致しません。');
     await regression.http(mainBefore);
@@ -115,6 +119,7 @@ export async function runApprovedProductionRelease({ candidate, plan, context, g
       requireMatch(restored.pages.deploymentId === before.pages.deploymentId
         && restored.worker.versionId === before.worker.versionId, '切り戻し先が一致しません。');
       await regression.http(mainBefore);
+      requireMatch(samePagesConfiguration(beforePages, await cloudflare.project()), 'Pagesの共有設定に差分があります。');
       report.rollback.status = 'verified';
     } catch {
       // Keep the last safe state in the report for manual inspection.
