@@ -1,7 +1,7 @@
 import { ProductionCloudflareError } from './cloudflare-release.mjs';
 import { verifyProductionApproval } from './approval.mjs';
-import { executeProductionPublication } from './publication.mjs';
-import { samePagesConfiguration } from '../control/staging-publication.mjs';
+import { setTimeout as delay } from 'node:timers/promises';
+import { assertProductionPagesConfiguration, executeProductionPublication, pagesUploadConfigHash } from './publication.mjs';
 
 const sha = /^[a-f0-9]{40}$/;
 const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
@@ -25,7 +25,7 @@ function checkState(state) {
   return state;
 }
 
-export async function runApprovedProductionRelease({ candidate, plan, context, github, cloudflare, regression }) {
+export async function runApprovedProductionRelease({ candidate, plan, context, github, cloudflare, regression, pause = delay }) {
   const revision = candidate.sha;
   const mainBefore = candidate.mainSha;
   requireMatch(sha.test(revision ?? '') && sha.test(mainBefore ?? '') && revision !== mainBefore
@@ -80,9 +80,10 @@ export async function runApprovedProductionRelease({ candidate, plan, context, g
         owned[target] = updated[target];
         report.published = { ...owned };
         operation = 'publication-guard';
+        return owned[target];
       },
     };
-    await executeProductionPublication(plan, { guard, transport });
+    await executeProductionPublication(plan, { guard, transport, pause });
 
     report.phase = operation = 'http';
     await guard();
@@ -97,6 +98,8 @@ export async function runApprovedProductionRelease({ candidate, plan, context, g
     await guard();
     const published = checkState(await cloudflare.current());
     requireMatch(targets.every(target => same(published[target], owned[target])), '回帰後に配信が変わりました。');
+    operation = 'main-pages-configuration';
+    assertProductionPagesConfiguration(beforePages, await cloudflare.project(), await pagesUploadConfigHash(plan));
     mainWriteAttempted = true;
     try {
       await github.promote(revision);
@@ -109,7 +112,7 @@ export async function runApprovedProductionRelease({ candidate, plan, context, g
     report.success = true;
   } catch (error) {
     const cause = error.cause ?? error;
-    report.failure = { step: operation, ...(cause instanceof ProductionCloudflareError ? cause.diagnostic : {}) };
+    report.failure = { step: error.phase?.startsWith('pages-') ? error.phase : operation, ...(cause instanceof ProductionCloudflareError ? cause.diagnostic : {}) };
     if (report.attempted.length === 0) return report;
     report.rollback.status = 'needs-attention';
     let rollbackStep = 'main';
@@ -139,12 +142,24 @@ export async function runApprovedProductionRelease({ candidate, plan, context, g
         await cloudflare.rollback(target, before[target], owned[target]);
         report.rollback[target] = true;
       }
-      rollbackStep = 'verify';
-      const restored = checkState(await cloudflare.current());
-      requireMatch(restored.pages.deploymentId === before.pages.deploymentId
-        && restored.worker.versionId === before.worker.versionId, '切り戻し先が一致しません。');
+      rollbackStep = 'deployment-readback';
+      // Poll reads only, and only while seeing the known rollout or the expected restore.
+      for (let attempt = 0; ; attempt += 1) {
+        const restored = checkState(await cloudflare.current());
+        const pagesRestored = same(restored.pages, before.pages);
+        const workerRestored = restored.worker.versionId === before.worker.versionId;
+        if (pagesRestored && workerRestored) break;
+        if ((!pagesRestored && !(owned.pages && same(restored.pages, owned.pages)))
+          || (!workerRestored && !(owned.worker && same(restored.worker, owned.worker)))) {
+          throw new ProductionCloudflareError('rollback-readback', 'deployment-changed');
+        }
+        if (attempt === 5) throw new ProductionCloudflareError('rollback-readback', 'restore-not-visible');
+        await pause(2000);
+      }
+      rollbackStep = 'http';
       await regression.http(mainBefore);
-      requireMatch(samePagesConfiguration(beforePages, await cloudflare.project()), 'Pagesの共有設定に差分があります。');
+      rollbackStep = 'pages-configuration';
+      assertProductionPagesConfiguration(beforePages, await cloudflare.project(), owned.pages ? await pagesUploadConfigHash(plan) : undefined);
       report.rollback.status = 'verified';
     } catch (error) {
       report.rollbackFailure = { step: rollbackStep, ...(error instanceof ProductionCloudflareError ? error.diagnostic : {}) };

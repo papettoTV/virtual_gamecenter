@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -62,7 +63,28 @@ export function productionCommands(plan) {
   };
 }
 
-export async function executeProductionPublication(plan,{ guard, transport }) {
+// Direct Upload sends this exact SHA-256 as wrangler_config_hash in its multipart request.
+export async function pagesUploadConfigHash(plan) {
+  return createHash('sha256').update(await readFile(join(plan.pagesDirectory, 'wrangler.jsonc'))).digest('hex');
+}
+
+export function assertProductionPagesConfiguration(before, after, uploadHash) {
+  function withoutUploadHash(project) {
+    const production = project.deployment_configs?.production;
+    if (!production || uploadHash === undefined || production.wrangler_config_hash !== uploadHash) return project;
+    return { ...project, deployment_configs: { ...project.deployment_configs, production: {
+      ...production, wrangler_config_hash: before.deployment_configs?.production?.wrangler_config_hash,
+    } } };
+  }
+  assertStagingPages(after);
+  const preview = project => ({ ...project, deployment_configs: { production: project.deployment_configs?.preview } });
+  ensure(samePagesConfiguration(before, withoutUploadHash(after))
+    && samePagesConfiguration(preview(before), preview(after))
+    && JSON.stringify(before.domains?.toSorted()) === JSON.stringify(after.domains?.toSorted()),
+  '共有Pages設定が変わりました。');
+}
+
+export async function executeProductionPublication(plan,{ guard, transport, pause }) {
   ensure(typeof guard === 'function' && typeof transport.project === 'function'
     && typeof transport.execute === 'function', '承認後の保護検査と固定transportが必要です。');
   const recheck = async () => {
@@ -78,6 +100,7 @@ export async function executeProductionPublication(plan,{ guard, transport }) {
     assertStagingPages(original); // Shared project: Git deployment must remain disabled for both environments.
     ensure(original.domains?.includes('pulbase.com'), '本番ドメインが一致しません。');
     await preservePagesBuildMetadata(plan,original);
+    const uploadHash = await pagesUploadConfigHash(plan);
     await recheck();
     phase = 'worker';
     await transport.execute('worker',commands.worker,plan.directory);
@@ -87,15 +110,23 @@ export async function executeProductionPublication(plan,{ guard, transport }) {
     const beforePages = await transport.project();
     assertStagingPages(beforePages);
     ensure(samePagesConfiguration(original,beforePages), '公開の途中で共有Pages設定が変更されました。');
-    await transport.execute('pages',commands.pages,plan.directory);
-    phase = 'readback';
-    const after = await transport.project();
-    assertStagingPages(after);
-    ensure(samePagesConfiguration(original,after)
-      && after.canonical_deployment?.environment === 'production'
-      && after.canonical_deployment?.latest_stage?.status === 'success'
-      && after.canonical_deployment?.deployment_trigger?.metadata?.commit_hash === plan.sha,
-    '共有Pagesまたは配信時のSHAを確認できません。');
+    const published = await transport.execute('pages',commands.pages,plan.directory);
+    phase = 'pages-readback';
+    for (let attempt = 0; ; attempt += 1) {
+      const after = await transport.project();
+      const active = after.canonical_deployment;
+      if (active?.id === published.deploymentId
+        && active.environment === 'production'
+        && active.latest_stage?.status === 'success'
+        && active.deployment_trigger?.metadata?.commit_hash === plan.sha) {
+        phase = 'pages-configuration';
+        assertProductionPagesConfiguration(original, after, uploadHash);
+        break;
+      }
+      ensure(attempt < 5 && active?.id === original.canonical_deployment?.id,
+        'Pagesの公開後配信ID・SHAが一致しません。');
+      await pause(2000);
+    }
     return { sha:plan.sha,workerUploaded,pagesUploaded:true };
   } catch (cause) {
     const error = Error('本番公開処理を停止しました。既存の配信状態を確認してください。', { cause });
