@@ -400,7 +400,10 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
       {e.mode === "cpu" && <span className="duel-inline-score" aria-label="通算スコア">SCORE {(e.score?.total ?? 0).toLocaleString()}</span>}
     </div>
     {!replica && !network?.matchId && (e.phase === "playing" || e.phase === "paused") &&
-      <button className="duel-pause-toggle" onClick={() => void pause()}>{e.phase === "paused" ? "再開" : "一時停止"}</button>}
+      <div className="duel-pause-actions">
+        <button className="duel-pause-toggle" onClick={() => void pause()}>{e.phase === "paused" ? "再開" : "一時停止"}</button>
+        {e.phase === "paused" && <button className="mobile-play-leave duel-pause-leave" type="button" onClick={() => navigate("/")}>別のゲームをする</button>}
+      </div>}
 
     <section ref={board} className={`duel-board${e.phase === "finished" && !next ? " has-final-result" : ""}`} onClick={event => { if (e.phase === "paused" && !replica && !(event.target instanceof Element && event.target.closest("button, a, input, select, [role=dialog]"))) void pause(); }}>
       {e.phase !== "intro" && <h2 className={busy.current || e.phase === "countdown" || e.phase === "playing" || e.phase === "impact" || (e.phase === "finished" && !next) ? "dot-sr-only" : undefined} aria-live="polite">{heading}</h2>}

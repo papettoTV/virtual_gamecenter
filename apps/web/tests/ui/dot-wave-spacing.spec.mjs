@@ -115,6 +115,25 @@ for (const size of sizes) {
     await expect(tap).toBeEnabled();
     await tap.click();
     await evidence(page, info, `${size.name}-playing`, await geometry(page, referenceTop));
+    const leave = main.locator('.duel-pause-leave');
+    const pause = main.locator('.duel-pause-toggle');
+    await expect(leave).toBeHidden();
+    await pause.click();
+    await expect(main).toHaveAttribute('data-phase', 'paused');
+    if (await page.evaluate(() => matchMedia('(max-width: 820px), (pointer: coarse)').matches)) {
+      await leave.click();
+      const confirmation = page.getByRole('dialog', { name: '別のゲームを選びますか？', exact: true });
+      await expect(confirmation).toContainText('使用したクレジットは戻りません。');
+      await expect(confirmation.getByRole('button', { name: '別のゲームをする', exact: true })).toBeVisible();
+      await confirmation.getByRole('button', { name: 'キャンセル', exact: true }).click();
+      await expect(confirmation).toBeHidden();
+      await expect(main).toHaveAttribute('data-phase', 'paused');
+    } else {
+      await expect(leave).toBeHidden();
+    }
+    await pause.click();
+    await expect(main).toHaveAttribute('data-phase', 'playing');
+    await expect(leave).toBeHidden();
 
     // Finish the engine already playing in this cabinet. The normal impact ->
     // finished transition must notify soloEnded; keep the real start receipt,

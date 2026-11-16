@@ -10,7 +10,7 @@ for (const width of [320, 390, 1280]) {
     const descriptions = page.locator('.showcase-description > p');
     await expect(descriptions).toHaveText([
       '弾幕かすり・無敵体当たり・対戦型シューティング',
-      'リズムで攻めて、リズムで守る、対戦プレイ対応のリズムバトル',
+      'リズムで攻撃・リズムで防御、対戦リズムゲーム',
       '深海に潜む、謎の生物を分析・探索ソロゲーム',
     ]);
     for (const description of await descriptions.all()) {
