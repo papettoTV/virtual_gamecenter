@@ -1,3 +1,4 @@
+import { ProductionCloudflareError } from './cloudflare-release.mjs';
 import { verifyProductionApproval } from './approval.mjs';
 import { executeProductionPublication } from './publication.mjs';
 import { samePagesConfiguration } from '../control/staging-publication.mjs';
@@ -13,7 +14,8 @@ function requireMatch(condition, description) {
 }
 
 function same(left, right) {
-  return left.deploymentId === right.deploymentId && left.versionId === right.versionId;
+  return left.deploymentId === right.deploymentId && left.versionId === right.versionId
+    && left.revision === right.revision;
 }
 
 function checkState(state) {
@@ -34,6 +36,7 @@ export async function runApprovedProductionRelease({ candidate, plan, context, g
   const owned = {};
   let before;
   let beforePages;
+  let operation = 'approval';
   let mainWriteAttempted = false;
   let mainWriteUncertain = false;
 
@@ -45,7 +48,7 @@ export async function runApprovedProductionRelease({ candidate, plan, context, g
 
   try {
     await guard();
-    report.phase = 'preflight';
+    report.phase = operation = 'preflight';
     await github.preflight(candidate);
     before = checkState(await cloudflare.current());
     beforePages = await cloudflare.project();
@@ -57,12 +60,17 @@ export async function runApprovedProductionRelease({ candidate, plan, context, g
       project: () => cloudflare.project(),
       execute: async (target, args, cwd) => {
         report.phase = target;
+        operation = 'before-' + target;
         const state = checkState(await cloudflare.current());
         for (const surface of targets) {
-          requireMatch(same(state[surface], owned[surface] ?? before[surface]), '配信中のデプロイが変わりました。');
+          if (!same(state[surface], owned[surface] ?? before[surface])) {
+            throw new ProductionCloudflareError(surface, 'deployment-changed');
+          }
         }
         report.attempted.push(target);
+        operation = 'publish-' + target;
         const publishedId = await cloudflare.execute(target, args, cwd);
+        operation = 'readback-' + target;
         const updated = checkState(await cloudflare.current());
         requireMatch(updated[target].deploymentId !== state[target].deploymentId
           && uuid.test(publishedId ?? '')
@@ -71,20 +79,21 @@ export async function runApprovedProductionRelease({ candidate, plan, context, g
         'この実行の公開先を確認できません。');
         owned[target] = updated[target];
         report.published = { ...owned };
+        operation = 'publication-guard';
       },
     };
     await executeProductionPublication(plan, { guard, transport });
 
-    report.phase = 'http';
+    report.phase = operation = 'http';
     await guard();
     await regression.http(revision);
     report.httpPassed = true;
-    report.phase = 'browser';
+    report.phase = operation = 'browser';
     await guard();
     requireMatch(await regression.browser(revision) === 8, '本番ブラウザ回帰8件が確認できません。');
     report.browserPassed = true;
 
-    report.phase = 'main';
+    report.phase = operation = 'main';
     await guard();
     const published = checkState(await cloudflare.current());
     requireMatch(targets.every(target => same(published[target], owned[target])), '回帰後に配信が変わりました。');
@@ -98,31 +107,47 @@ export async function runApprovedProductionRelease({ candidate, plan, context, g
     requireMatch(report.mainUpdated, 'mainの反映を確認できません。');
     report.phase = 'complete';
     report.success = true;
-  } catch {
+  } catch (error) {
+    const cause = error.cause ?? error;
+    report.failure = { step: operation, ...(cause instanceof ProductionCloudflareError ? cause.diagnostic : {}) };
     if (report.attempted.length === 0) return report;
     report.rollback.status = 'needs-attention';
+    let rollbackStep = 'main';
     try {
       if (mainWriteUncertain) return report;
       if (mainWriteAttempted && await github.main() !== mainBefore) return report;
-      const current = checkState(await cloudflare.current());
-      if (!targets.every(target => same(current[target], before[target])
-        || (owned[target] && same(current[target], owned[target])))) return report;
+      rollbackStep = 'ownership';
+      const readForRollback = async () => checkState(await cloudflare.current({ verifyWorkerPrivacy: false }));
+      const assertOwned = observed => {
+        for (const target of targets) {
+          if (!same(observed[target], before[target]) && !(owned[target] && same(observed[target], owned[target]))) {
+            throw new ProductionCloudflareError(target, 'deployment-changed');
+          }
+        }
+      };
+      const current = await readForRollback();
+      assertOwned(current);
 
       for (const target of ['pages', 'worker']) {
         if (same(current[target], before[target])) continue;
-        const observed = checkState(await cloudflare.current());
-        if (!same(observed[target], owned[target]) || await github.main() !== mainBefore) return report;
+        rollbackStep = 'restore-' + target;
+        const observed = await readForRollback();
+        // A Worker restore creates a fresh deployment ID. Pages restores its previous deployment ID.
+        assertOwned(observed);
+        if (same(observed[target], before[target])) continue;
+        if (await github.main() !== mainBefore) return report;
         await cloudflare.rollback(target, before[target], owned[target]);
         report.rollback[target] = true;
       }
+      rollbackStep = 'verify';
       const restored = checkState(await cloudflare.current());
       requireMatch(restored.pages.deploymentId === before.pages.deploymentId
         && restored.worker.versionId === before.worker.versionId, '切り戻し先が一致しません。');
       await regression.http(mainBefore);
       requireMatch(samePagesConfiguration(beforePages, await cloudflare.project()), 'Pagesの共有設定に差分があります。');
       report.rollback.status = 'verified';
-    } catch {
-      // Keep the last safe state in the report for manual inspection.
+    } catch (error) {
+      report.rollbackFailure = { step: rollbackStep, ...(error instanceof ProductionCloudflareError ? error.diagnostic : {}) };
     }
   }
   return report;

@@ -97,8 +97,8 @@ export async function executeProductionPublication(plan,{ guard, transport }) {
       && after.canonical_deployment?.deployment_trigger?.metadata?.commit_hash === plan.sha,
     '共有Pagesまたは配信時のSHAを確認できません。');
     return { sha:plan.sha,workerUploaded,pagesUploaded:true };
-  } catch {
-    const error = Error('本番公開処理を停止しました。既存の配信状態を確認してください。');
+  } catch (cause) {
+    const error = Error('本番公開処理を停止しました。既存の配信状態を確認してください。', { cause });
     error.phase = phase;
     error.workerUploaded = workerUploaded;
     throw error;
