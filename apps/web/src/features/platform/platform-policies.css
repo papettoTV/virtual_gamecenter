@@ -5,6 +5,7 @@ footer.platform-footer {
 
 .platform-footer-brand,
 .brand-logo-row { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.platform-footer-brand { flex-basis: 100%; justify-content: center; text-align: center; }
 
 .brand-beta-badge {
   display: inline-block;
