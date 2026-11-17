@@ -147,7 +147,7 @@ test('buzz-barrier: the mobile gauge fill follows grazing', async ({ page }) => 
   await expect(gauge).toBeVisible();
   await expect.poll(async () => (await sample()).ratio).toBeGreaterThan(0);
   const before = await sample();
-  expect(before.height).toBe(5);
+  expect(before.height).toBe(2.5);
   expect(before.visibleRatio).toBeCloseTo(before.ratio, 2);
   await expect.poll(async () => Math.abs((await sample()).ratio - before.ratio), { timeout: 15000 }).toBeGreaterThan(0.01);
   const after = await sample();

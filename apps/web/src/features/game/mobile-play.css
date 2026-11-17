@@ -168,7 +168,7 @@ body.is-game-screen:has(#game-screen[data-game-id="buzz-barrier"]) .platform-pro
 .buzz-mobile-gauge {
   position: absolute;
   inset: auto 0 1px;
-  height: 5px;
+  height: 2.5px;
   border-radius: 3px;
   overflow: hidden;
   background: #2a3448;
