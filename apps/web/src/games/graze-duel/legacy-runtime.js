@@ -391,6 +391,7 @@ export function mountGame(context) {
       player.attackCooldown = 0;
       player.levelUpFlash = 0;
       player.lightningPattern = null;
+      player.lightningSeed = 0;
       player.levelUpLabel = null;
       player.tilt = 0;
       player.targetTilt = 0;
@@ -448,6 +449,7 @@ export function mountGame(context) {
       player.attackCooldown = 0;
       player.levelUpFlash = 0;
       player.lightningPattern = null;
+      player.lightningSeed = 0;
       player.levelUpLabel = null;
       player.tilt = 0;
       player.targetTilt = 0;
@@ -1703,6 +1705,7 @@ export function mountGame(context) {
         attackFlash: player.attackFlash,
         levelUpFlash: player.levelUpFlash,
         lightningPattern: player.lightningPattern,
+        lightningSeed: player.lightningSeed,
         levelUpLabel: player.levelUpLabel,
         tilt: player.tilt,
         bullets: player.bullets.map((bullet) => ({
@@ -1782,6 +1785,7 @@ export function mountGame(context) {
         attackFlash: player.attackFlash,
         levelUpFlash: player.levelUpFlash,
         lightningPattern: player.lightningPattern,
+        lightningSeed: player.lightningSeed,
         levelUpLabel: player.levelUpLabel,
         tilt: player.tilt,
       })),
@@ -2161,6 +2165,7 @@ export function mountGame(context) {
         attackFlash: player.attackFlash,
         levelUpFlash: player.levelUpFlash,
         lightningPattern: player.lightningPattern,
+        lightningSeed: player.lightningSeed,
         levelUpLabel: player.levelUpLabel,
         tilt: player.tilt,
         bullets: player.bullets.map((bullet) => ({
@@ -3275,6 +3280,7 @@ export function mountGame(context) {
     attacker.levelUpInvincible = getNextInvincibleTime(attacker.levelUpInvincible);
     attacker.levelUpFlash = LEVEL_UP_FLASH_DURATION;
     attacker.lightningPattern = pickLightningPattern(attacker.lightningPattern);
+    attacker.lightningSeed = Math.floor(Math.random() * 0x100000000);
     attacker.levelUpLabel = createLevelUpLabel(attacker);
     attacker.attackFlash = 0.35;
     attacker.attackCooldown = AUTO_ATTACK_COOLDOWN;

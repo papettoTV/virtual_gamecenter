@@ -81,6 +81,7 @@ export function createGameState(settings) {
       attackCooldown: 0,
       levelUpFlash: 0,
       lightningPattern: null,
+      lightningSeed: 0,
       levelUpLabel: null,
       grazeIds: new Set(),
       tilt: 0,

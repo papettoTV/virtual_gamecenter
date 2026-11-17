@@ -69,6 +69,28 @@ it("稲妻10パターンの3方向は互いに離れ、一部のパターンは�
   expect(createLightningPaths(bounds, 0.25, 99)).toEqual(createLightningPaths(bounds, 0.25, 0));
 });
 
+it("同じ角度パターンでも放電ごとに形が変わり、放電中は先端を保って揺れる", () => {
+  const bounds = { left: -200, right: 200, top: -200, bottom: 200 };
+  const generate = (seed: number, remaining = 0.22) =>
+    createLightningPaths(bounds, remaining, 0, seed);
+  const first = generate(41);
+  expect(generate(41)).toEqual(first);
+  const main = (paths: typeof first) => paths.filter(path => path.length > 4);
+  const next = main(generate(42));
+  const moved = main(generate(41, 0.219));
+  for (const [index, path] of main(first).entries()) {
+    const tip = path.at(-1)!;
+    expect(next[index]!.at(-1)).toMatchObject({ x: tip.x, y: tip.y });
+    expect(moved[index]!.at(-1)).toMatchObject({ x: tip.x, y: tip.y });
+    expect(next[index]!.slice(1, -1)).not.toEqual(path.slice(1, -1));
+    expect(moved[index]!.slice(1, -1)).not.toEqual(path.slice(1, -1));
+    for (const [step, point] of path.entries()) {
+      const following = moved[index]![step]!;
+      expect(Math.hypot(following.x - point.x, following.y - point.y)).toBeLessThan(2);
+    }
+  }
+});
+
 it("初回は10通り、次のレベルアップは直前以外の9通りから選ぶ", () => {
   const options = (previous: number | null) => Array.from({ length: previous === null ? 10 : 9 },
     (_, index) => pickLightningPattern(previous, (index + 0.5) / (previous === null ? 10 : 9)));

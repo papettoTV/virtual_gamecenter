@@ -65,7 +65,7 @@ export function createPlayerEffects() {
         left: player.fieldX - player.x, right: player.fieldX + fieldWidth - player.x,
         top: fieldTop - player.y, bottom: fieldBottom - player.y,
       };
-      const paths = createLightningPaths(bounds, player.levelUpFlash, player.lightningPattern ?? 0);
+      const paths = createLightningPaths(bounds, player.levelUpFlash, player.lightningPattern ?? 0, player.lightningSeed);
       const { position, scale } = root.parent!;
       clipPlanes[0]!.constant = -position.x - bounds.left * scale.x;
       clipPlanes[1]!.constant = position.x + bounds.right * scale.x;

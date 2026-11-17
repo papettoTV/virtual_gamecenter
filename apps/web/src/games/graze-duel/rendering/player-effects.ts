@@ -34,39 +34,55 @@ export function lightningOpacity(remaining: number) {
   return Math.min(1, Math.max(0, remaining / 0.16)) ** 1.6;
 }
 
-export function createLightningPaths(bounds: Bounds, remaining: number, patternIndex = 0): LightningPoint[][] {
+export function createLightningPaths(bounds: Bounds, remaining: number, patternIndex = 0, seed = 0): LightningPoint[][] {
   if (!(remaining > 0)) return [];
   const age = Math.max(0, LEVEL_UP_FLASH_DURATION - remaining);
   const reach = Math.min(1, 0.34 + age / 0.045);
   const paths: LightningPoint[][] = [];
   const pattern = LIGHTNING_PATTERNS[patternIndex];
-  const phase = pattern ? patternIndex * 0.71 : 0;
+  const patternSeed = seed ^ Math.imul((pattern ? patternIndex : 0) + 1, 0x9e3779b9);
   for (const [index, [degrees, lengthRatio]] of (pattern ?? LIGHTNING_PATTERNS[0]).entries()) {
+    let randomState = (patternSeed ^ Math.imul(index + 1, 0x85ebca6b)) >>> 0;
+    const random = () => {
+      randomState = (Math.imul(randomState, 1664525) + 1013904223) >>> 0;
+      return randomState / 0x100000000;
+    };
     const angle = degrees * Math.PI / 180;
     const dx = Math.cos(angle);
     const dy = Math.sin(angle);
     const edge = Math.min((dx > 0 ? bounds.right : bounds.left) / dx, (dy > 0 ? bounds.bottom : bounds.top) / dy);
     const distance = (Math.max(0, edge) * lengthRatio + (lengthRatio === 1 ? 18 : 0)) * reach;
     const points: LightningPoint[] = [];
+    const bend = (random() * 2 - 1) * 0.65;
+    const wavePhase = random() * Math.PI * 2;
+    const branchStep = 2 + Math.floor(random() * 5);
+    const branchAngle = angle + (random() < 0.5 ? -1 : 1) * (0.48 + random() * 0.58);
+    const branchRatio = 0.17 + random() * 0.20;
+    const hasBranch = random() > 0.17;
     for (let step = 0; step <= BOLT_SEGMENTS; step += 1) {
-      const fraction = step / BOLT_SEGMENTS;
-      const wiggle = Math.sin(step * 2.27 + index * 3 + phase) * 0.8 + Math.sin(step * 3.8 + age * 65) * 0.2;
-      const offset = Math.min(40, distance * 0.15) * Math.sin(Math.PI * fraction) * wiggle;
-      const width = (4.5 + 3.5 * Math.sin(step * 2.4 + index) ** 2) * (1 - fraction * 0.42);
+      const spacing = (random() - 0.5) * 0.76;
+      const fraction = (step + (step === 0 || step === BOLT_SEGMENTS ? 0 : spacing)) / BOLT_SEGMENTS;
+      const kink = (random() * 2 - 1) * 0.74;
+      const ripple = Math.sin(age * 49 - fraction * 9 + wavePhase);
+      const offset = step === BOLT_SEGMENTS ? 0 : Math.min(57, distance * 0.2) * Math.sin(Math.PI * fraction)
+        * (bend + kink + ripple * 0.34);
+      const baseWidth = 3.2 + random() ** 1.35 * 8.8;
+      const taper = 1 - fraction * (lengthRatio < 1 ? 0.88 : 0.49);
+      const width = baseWidth * taper * (1 + ripple * 0.24);
       points.push({ x: dx * distance * fraction - dy * offset, y: dy * distance * fraction + dx * offset, width });
     }
     paths.push(points);
-    if (distance < 75) continue;
-    const start = points[3]!;
-    const branchAngle = angle + (index === 1 ? -0.65 : 0.72);
-    const branchLength = Math.min(90, distance * 0.28);
+    if (!hasBranch || distance < 75) continue;
+    const start = points[branchStep]!;
+    const branchLength = Math.min(105, distance * branchRatio);
     paths.push(Array.from({ length: BRANCH_SEGMENTS + 1 }, (_, step) => {
       const fraction = step / BRANCH_SEGMENTS;
-      const offset = step === 1 ? 5 : step === 2 ? -4 : 0;
+      const offset = Math.sin(Math.PI * fraction) * Math.min(15, branchLength * 0.33)
+        * (random() * 2 - 1 + Math.sin(age * 62 + step + wavePhase) * 0.25);
       return {
         x: start.x + Math.cos(branchAngle) * branchLength * fraction - Math.sin(branchAngle) * offset,
         y: start.y + Math.sin(branchAngle) * branchLength * fraction + Math.cos(branchAngle) * offset,
-        width: 1.9 * (1 - fraction * 0.94),
+        width: (1.35 + random() * 1.8) * (1 - fraction * 0.96),
       };
     }));
   }
@@ -112,9 +128,9 @@ export function drawPlayerShield(context: CanvasRenderingContext2D, x: number, y
   context.restore();
 }
 
-export function drawLevelUpLightning(context: CanvasRenderingContext2D, x: number, y: number, bounds: Bounds, remaining: number, patternIndex = 0) {
+export function drawLevelUpLightning(context: CanvasRenderingContext2D, x: number, y: number, bounds: Bounds, remaining: number, patternIndex = 0, seed = 0) {
   if (!(remaining > 0)) return;
-  const paths = createLightningPaths({ left: bounds.left - x, top: bounds.top - y, right: bounds.right - x, bottom: bounds.bottom - y }, remaining, patternIndex);
+  const paths = createLightningPaths({ left: bounds.left - x, top: bounds.top - y, right: bounds.right - x, bottom: bounds.bottom - y }, remaining, patternIndex, seed);
   const alpha = context.globalAlpha * lightningOpacity(remaining);
   context.save();
   context.beginPath();
