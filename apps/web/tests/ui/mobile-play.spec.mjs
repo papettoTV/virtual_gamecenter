@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { test, expect } from '../../../../ci/ui-fixtures.mjs';
 
 // Exercise the real UI and sharing store without replacing authentication,
@@ -133,6 +134,25 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }
     await expect(panel).toBeHidden();
   });
 }
+
+test('buzz-barrier: the mobile gauge fill follows grazing', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`http://127.0.0.1:5174/cabinets/${randomUUID()}?game=buzz-barrier&promoCapture=1&renderer=canvas`);
+  const gauge = page.getByRole('meter', { name: 'レベルアップゲージ' });
+  const sample = () => gauge.evaluate(element => {
+    const track = element.getBoundingClientRect();
+    const fill = element.querySelector('.buzz-mobile-gauge-fill').getBoundingClientRect();
+    return { ratio: Number(element.getAttribute('aria-valuenow')), visibleRatio: fill.width / track.width, height: track.height };
+  });
+  await expect(gauge).toBeVisible();
+  await expect.poll(async () => (await sample()).ratio).toBeGreaterThan(0);
+  const before = await sample();
+  expect(before.height).toBe(5);
+  expect(before.visibleRatio).toBeCloseTo(before.ratio, 2);
+  await expect.poll(async () => Math.abs((await sample()).ratio - before.ratio), { timeout: 15000 }).toBeGreaterThan(0.01);
+  const after = await sample();
+  expect(after.visibleRatio).toBeCloseTo(after.ratio, 2);
+});
 
 test('desktop and spectator keep the regular page', async ({ page, isMobile }) => {
   test.skip(isMobile, 'PCのポインター条件で確認する');

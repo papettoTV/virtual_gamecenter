@@ -165,7 +165,22 @@ body.is-game-screen:has(#game-screen[data-game-id="buzz-barrier"]) .platform-pro
   font: 700 clamp(7px, 2.6cqw, 12px) / 1.2 system-ui;
   white-space: nowrap;
 }
-.buzz-mobile-status meter { position: absolute; bottom: 0; left: 0; width: 100%; height: 4px; }
+.buzz-mobile-gauge {
+  position: absolute;
+  inset: auto 0 1px;
+  height: 5px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: #2a3448;
+}
+.buzz-mobile-gauge-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #69f7ff;
+  transform: scaleX(var(--buzz-gauge-fill, 0));
+  transform-origin: left;
+}
 #game-screen[data-mobile-play][data-game-id="buzz-barrier"] #touch-pause::after {
   content: attr(data-icon);
   font-size: 22px;
