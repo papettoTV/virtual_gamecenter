@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
 import * as THREE from "three";
-import { drawLevelUpLightning, drawPlayerShield, lightningFrame, shieldAppearance } from "../../src/games/graze-duel/rendering/player-effects";
+import { createLightningPaths, drawLevelUpLightning, drawPlayerShield, LEVEL_UP_FLASH_DURATION, LIGHTNING_PATTERNS, lightningOpacity, pickLightningPattern, shieldAppearance } from "../../src/games/graze-duel/rendering/player-effects";
 import { createPlayerEffects } from "../../src/games/graze-duel/rendering/three-player-effects";
 import type { PlayerRenderState } from "../../src/games/graze-duel/rendering/scene-renderer";
 
@@ -15,31 +15,98 @@ function brush() {
 const asContext = (context: ReturnType<typeof brush>) => context as unknown as CanvasRenderingContext2D;
 const player: PlayerRenderState = {
   fieldX: 0, x: 100, y: 100, color: "#69f7ff", tilt: 0, invincible: 1,
-  levelUpInvincible: 1, barrierRatio: 1, levelUpFlash: 0.42, bullets: [],
+  levelUpInvincible: 1, barrierRatio: 1, levelUpFlash: LEVEL_UP_FLASH_DURATION, bullets: [],
 };
+const field = { left: 0, right: 390, top: 0, bottom: 500 };
 afterEach(() => vi.unstubAllGlobals());
 
-it("稲妻のフレーム上下限・10本各7節・決定性・終了を維持する", () => {
-  expect([2, 0.42, 0.21, 0.001, 0, -1].map(lightningFrame)).toEqual([0, 0, 13, 25, 25, 25]);
-  const a = brush();
-  const b = brush();
-  drawLevelUpLightning(asContext(a), 128, 128, player.color, 0.3);
-  drawLevelUpLightning(asContext(b), 128, 128, player.color, 0.3);
-  expect(a.moveTo).toHaveBeenCalledTimes(10);
-  expect(a.lineTo).toHaveBeenCalledTimes(70);
-  expect(a.lineTo.mock.calls).toEqual(b.lineTo.mock.calls);
-  expect(a.stroke).toHaveBeenCalledTimes(10);
-  expect(a.arc).toHaveBeenCalledTimes(1);
-  const empty = brush();
-  for (const remaining of [0, -1]) drawLevelUpLightning(asContext(empty), 0, 0, player.color, remaining);
-  expect(empty.save).not.toHaveBeenCalled();
+it("3方向に伸び、約30msでプレイ領域の端に到達して消える", () => {
+  const local = { left: -100, right: 290, top: -100, bottom: 400 };
+  const opening = createLightningPaths(local, LEVEL_UP_FLASH_DURATION).filter(path => path.length > 4);
+  const peak = createLightningPaths(local, LEVEL_UP_FLASH_DURATION - 0.04).filter(path => path.length > 4);
+  expect(opening).toHaveLength(3);
+  expect(peak).toHaveLength(3);
+  for (const path of peak) expect(Math.hypot(path[0]!.x, path[0]!.y)).toBe(0);
+  expect(peak[0]!.at(-1)!.y).toBeLessThan(local.top);
+  expect(peak[1]!.at(-1)!.x).toBeGreaterThan(local.right);
+  expect(peak[2]!.at(-1)!.x).toBeLessThan(local.left);
+  expect(opening[1]!.at(-1)!.x).toBeLessThan(local.right);
+  expect(lightningOpacity(LEVEL_UP_FLASH_DURATION - 0.1)).toBe(1);
+  expect(lightningOpacity(0.02)).toBeLessThan(0.05);
+  expect(createLightningPaths(local, 0)).toEqual([]);
+  const active = brush();
+  drawLevelUpLightning(asContext(active), 100, 100, field, LEVEL_UP_FLASH_DURATION - 0.04);
+  expect(active.rect).toHaveBeenCalledWith(0, 0, 390, 500);
+  expect(active.clip).toHaveBeenCalledOnce();
+  expect(active.fill).toHaveBeenCalled();
+  const inactive = brush();
+  drawLevelUpLightning(asContext(inactive), 100, 100, field, 0);
+  expect(inactive.fill).not.toHaveBeenCalled();
+});
+
+it("稲妻10パターンの3方向は互いに離れ、一部のパターンは短い枝ではなく短い主雷を持つ", () => {
+  expect(LIGHTNING_PATTERNS).toHaveLength(10);
+  const bounds = { left: -200, right: 200, top: -200, bottom: 200 };
+  let mixedLengths = 0;
+  for (const [index, pattern] of LIGHTNING_PATTERNS.entries()) {
+    const main = createLightningPaths(bounds, LEVEL_UP_FLASH_DURATION - 0.04, index).filter(path => path.length > 4);
+    expect(main).toHaveLength(3);
+    const angles = main.map(path => {
+      const point = path.at(-1)!;
+      return Math.atan2(point.y, point.x) * 180 / Math.PI;
+    });
+    for (const [bolt, angle] of angles.entries()) {
+      const gap = (angles[(bolt + 1) % 3]! - angle + 360) % 360;
+      expect(gap).toBeGreaterThanOrEqual(75);
+      const tip = main[bolt]!.at(-1)!;
+      const extent = Math.max(Math.abs(tip.x), Math.abs(tip.y));
+      if (pattern[bolt]![1] === 1) expect(extent).toBeGreaterThan(200);
+      else expect(extent).toBeLessThan(160);
+    }
+    if (pattern.some(([, ratio]) => ratio < 1)) mixedLengths += 1;
+  }
+  expect(mixedLengths).toBe(4);
+  expect(createLightningPaths(bounds, 0.25, 99)).toEqual(createLightningPaths(bounds, 0.25, 0));
+});
+
+it("同じ角度パターンでも放電ごとに形が変わり、放電中は先端を保って揺れる", () => {
+  const bounds = { left: -200, right: 200, top: -200, bottom: 200 };
+  const generate = (seed: number, remaining = 0.22) =>
+    createLightningPaths(bounds, remaining, 0, seed);
+  const first = generate(41);
+  expect(generate(41)).toEqual(first);
+  const main = (paths: typeof first) => paths.filter(path => path.length > 4);
+  const next = main(generate(42));
+  const moved = main(generate(41, 0.219));
+  for (const [index, path] of main(first).entries()) {
+    const tip = path.at(-1)!;
+    expect(next[index]!.at(-1)).toMatchObject({ x: tip.x, y: tip.y });
+    expect(moved[index]!.at(-1)).toMatchObject({ x: tip.x, y: tip.y });
+    expect(next[index]!.slice(1, -1)).not.toEqual(path.slice(1, -1));
+    expect(moved[index]!.slice(1, -1)).not.toEqual(path.slice(1, -1));
+    for (const [step, point] of path.entries()) {
+      const following = moved[index]![step]!;
+      expect(Math.hypot(following.x - point.x, following.y - point.y)).toBeLessThan(2);
+    }
+  }
+});
+
+it("初回は10通り、次のレベルアップは直前以外の9通りから選ぶ", () => {
+  const options = (previous: number | null) => Array.from({ length: previous === null ? 10 : 9 },
+    (_, index) => pickLightningPattern(previous, (index + 0.5) / (previous === null ? 10 : 9)));
+  expect(options(null)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  for (const previous of options(null)) {
+    expect(options(previous)).toEqual(options(null).filter(index => index !== previous));
+  }
 });
 
 it("共有シールドは外側ほど透明になる単一の膜だけを描き縮小と透明点滅を維持する", () => {
   const context = brush();
   drawPlayerShield(asContext(context), 0, 0, 46);
   expect(context.createRadialGradient.mock.results[0]!.value.addColorStop.mock.calls).toEqual([
-    [0, "rgba(105, 247, 255, 0.46)"], [0.48, "rgba(105, 247, 255, 0.28)"], [0.78, "rgba(105, 247, 255, 0.12)"], [1, "rgba(105, 247, 255, 0)"],
+    [0, "rgba(255, 253, 255, 1)"], [0.36, "rgba(248, 241, 255, 0.98)"],
+    [0.62, "rgba(185, 146, 255, 0.93)"], [0.81, "rgba(126, 84, 255, 0.72)"],
+    [0.94, "rgba(106, 69, 255, 0.32)"], [1, "rgba(106, 69, 255, 0)"],
   ]);
   expect(context.createRadialGradient).toHaveBeenCalledOnce();
   expect(context.fill).toHaveBeenCalledOnce();
@@ -52,60 +119,37 @@ it("共有シールドは外側ほど透明になる単一の膜だけを描き�
   expect(shieldAppearance(0, 0.51, 0).opacity).toBe(1);
 });
 
-it("Three.jsは共有Canvasアトラスを再利用してUV更新し色変更・終了・破棄時に解放する", () => {
-  const contexts: ReturnType<typeof brush>[] = [];
-  const canvases: { width: number; height: number; getContext: () => ReturnType<typeof brush> }[] = [];
-  vi.stubGlobal("document", { createElement: () => {
-    const context = brush();
-    contexts.push(context);
-    const canvas = { width: 0, height: 0, getContext: () => context };
-    canvases.push(canvas);
-    return canvas;
-  } });
+it("Three.js は描画バッファを再利用し、稲妻が消えた後もシールドを維持する", () => {
+  const canvas = brush();
+  const createElement = vi.fn(() => ({ getContext: () => canvas }));
+  vi.stubGlobal("document", { createElement });
   const effects = createPlayerEffects();
-  expect(contexts[0]!.createRadialGradient).toHaveBeenCalledOnce();
-  effects.update(player, 0);
-  const lightning = effects.root.children[1] as THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
-  const texture = lightning.material.map!;
-  expect(canvases[1]).toMatchObject({ width: 1536, height: 1280 });
-  expect(contexts[1]!.moveTo).toHaveBeenCalledTimes(260);
-  expect(contexts[1]!.lineTo).toHaveBeenCalledTimes(1820);
-  expect(lightning.renderOrder).toBe(3.5);
-  expect(effects.shield.renderOrder).toBe(3);
-  expect(lightning.material.blending).toBe(THREE.NormalBlending);
-  expect(effects.shield.material.blending).toBe(THREE.NormalBlending);
-  expect(texture.colorSpace).toBe(THREE.SRGBColorSpace);
-  expect(effects.shield.material.map!.colorSpace).toBe(THREE.SRGBColorSpace);
-  expect(texture.offset.toArray()).toEqual([0, 0.8]);
-  const version = texture.version;
-  const disposeTexture = vi.spyOn(texture, "dispose");
-  const disposeMaterial = vi.spyOn(lightning.material, "dispose");
-  const disposeGeometry = vi.spyOn(lightning.geometry, "dispose");
-  effects.update({ ...player, levelUpFlash: 0.001 }, 0.1);
-  expect(texture.offset.toArray()).toEqual([1 / 6, 0]);
-  expect(texture.version).toBe(version);
-  expect(canvases).toHaveLength(2);
-  expect(contexts[1]!.moveTo).toHaveBeenCalledTimes(260);
-  effects.update({ ...player, color: "#ff3355" }, 0.2);
-  for (const spy of [disposeTexture, disposeMaterial, disposeGeometry]) expect(spy).toHaveBeenCalledOnce();
-  const replacement = effects.root.children[1] as typeof lightning;
-  const endTexture = vi.spyOn(replacement.material.map!, "dispose");
-  const endMaterial = vi.spyOn(replacement.material, "dispose");
-  const endGeometry = vi.spyOn(replacement.geometry, "dispose");
-  effects.update({ ...player, levelUpFlash: 0, levelUpInvincible: 0.1, barrierRatio: 0 }, 0);
-  expect(effects.root.children).toHaveLength(1);
+  const ship = new THREE.Group();
+  ship.position.set(-200, 150, 0);
+  ship.scale.setScalar(0.9);
+  ship.add(effects.root);
+  const lightning = effects.root.children.slice(1) as THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>[];
+  const meshes = lightning.map(mesh => mesh.geometry.getAttribute("position"));
+  expect(lightning).toHaveLength(3);
+  expect(effects.shield.renderOrder).toBeGreaterThan(4);
+  expect(lightning.every(mesh => !mesh.visible)).toBe(true);
+  effects.update(player, 0, 390, 0, 500);
+  expect(lightning.every(mesh => mesh.visible && mesh.geometry.drawRange.count > 0)).toBe(true);
+  expect(lightning[2]!.material.clippingPlanes?.map(plane => plane.constant)).toEqual([290, 61, 240, 210]);
+  expect(lightning[2]!.material.color.getHexString()).toBe("fffaff");
+  effects.update({ ...player, levelUpFlash: 0.02 }, 0.1, 390, 0, 500);
+  expect(lightning[2]!.material.opacity).toBeLessThan(0.05);
+  expect(lightning.map(mesh => mesh.geometry.getAttribute("position"))).toEqual(meshes);
+  expect(createElement).toHaveBeenCalledOnce();
+  effects.update({ ...player, levelUpFlash: 0, levelUpInvincible: 0.1, barrierRatio: 0 }, 0, 390, 0, 500);
+  expect(lightning.every(mesh => !mesh.visible)).toBe(true);
   expect(effects.shield.visible).toBe(true);
   expect(effects.shield.scale.x).toBe(shieldAppearance(0, 0.1, 0).radius);
   expect(effects.shield.material.opacity).toBe(0.28);
-  for (const spy of [endTexture, endMaterial, endGeometry]) expect(spy).toHaveBeenCalledOnce();
-  effects.update({ ...player, levelUpFlash: -1, levelUpInvincible: 0 }, 0);
-  expect(effects.shield.visible).toBe(false);
-  effects.update(player, 0);
-  const final = effects.root.children[1] as typeof lightning;
-  const finalTexture = vi.spyOn(final.material.map!, "dispose");
+  const disposeGeometry = vi.spyOn(lightning[0]!.geometry, "dispose");
   const shieldTexture = vi.spyOn(effects.shield.material.map!, "dispose");
   effects.dispose();
-  expect(finalTexture).toHaveBeenCalledOnce();
+  expect(disposeGeometry).toHaveBeenCalledOnce();
   expect(shieldTexture).toHaveBeenCalledOnce();
   expect(effects.root.children).toHaveLength(0);
 });

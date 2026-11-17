@@ -8,7 +8,7 @@ import { GRAZE_SPARK_WIDTH, sparkFade, clipSpark } from "../graze-sparks";
 import { drawLevelUpLabel } from "../level-up-label";
 
 export function createCanvasRenderer(options) {
-  let { context, getAttackCost, randomRange, createLightningBolt } = options;
+  let { context, getAttackCost } = options;
   const {
     WIDTH,
     HEIGHT,
@@ -45,8 +45,6 @@ export function createCanvasRenderer(options) {
       context = null;
       frame = null;
       getAttackCost = null;
-      randomRange = null;
-      createLightningBolt = null;
     },
   };
 
@@ -304,6 +302,12 @@ export function createCanvasRenderer(options) {
     const isHitInvincible = player.invincible > 0 && !isLevelInvincible;
     const invincibleBlink = Math.floor(frame.elapsedRound * 18) % 2 === 0;
     context.globalAlpha = isHitInvincible && invincibleBlink ? 0.45 : 1;
+    if (player.levelUpFlash > 0) {
+      drawLevelUpLightning(context, player.x, player.y, {
+        left: player.fieldX, right: player.fieldX + FIELD_WIDTH, top: FIELD_TOP, bottom: FIELD_BOTTOM,
+      }, player.levelUpFlash, player.lightningPattern ?? 0, player.lightningSeed);
+    }
+    drawPixelPlayerShip(player);
     if (isLevelInvincible) {
       context.save();
       const appearance = shieldAppearance(player.barrierRatio, player.levelUpInvincible, frame.elapsedRound);
@@ -311,10 +315,6 @@ export function createCanvasRenderer(options) {
       drawPlayerShield(context, player.x, player.y, appearance.radius);
       context.restore();
     }
-    if (player.levelUpFlash > 0) {
-      drawLevelUpLightning(context, player.x, player.y, player.color, player.levelUpFlash);
-    }
-    drawPixelPlayerShip(player);
 
     context.shadowBlur = 0;
     const isWarning = isLevelInvincible && player.levelUpInvincible <= INVINCIBLE_WARNING_TIME;

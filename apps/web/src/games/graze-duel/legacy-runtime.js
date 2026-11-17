@@ -28,6 +28,7 @@ import { createLevelUpLabel, tickLevelUpLabel } from "./level-up-label";
 import { BUZZ_BARRIER } from "../../domain/game";
 import { recordWatchStarted } from "../../features/engagement/engagement-client";
 import { createCanvasRenderer } from "./rendering/canvas-renderer";
+import { LEVEL_UP_FLASH_DURATION, pickLightningPattern } from "./rendering/player-effects";
 import { createGameState } from "./state";
 import { baseBulletSeedForMatch, resetBaseBulletSequences, getBaseBulletPattern } from "./base-bullet-sequence";
 import { createSimulation } from "./simulation";
@@ -316,8 +317,6 @@ export function mountGame(context) {
       HIT_MARKER_RADIUS,
     },
     getAttackCost,
-    randomRange,
-    createLightningBolt,
   });
 
   scope.own(() => canvasRenderer.dispose());
@@ -391,6 +390,8 @@ export function mountGame(context) {
       player.attackFlash = 0;
       player.attackCooldown = 0;
       player.levelUpFlash = 0;
+      player.lightningPattern = null;
+      player.lightningSeed = 0;
       player.levelUpLabel = null;
       player.tilt = 0;
       player.targetTilt = 0;
@@ -447,6 +448,8 @@ export function mountGame(context) {
       player.attackFlash = 0;
       player.attackCooldown = 0;
       player.levelUpFlash = 0;
+      player.lightningPattern = null;
+      player.lightningSeed = 0;
       player.levelUpLabel = null;
       player.tilt = 0;
       player.targetTilt = 0;
@@ -1701,6 +1704,8 @@ export function mountGame(context) {
         hitInvincible: player.hitInvincible,
         attackFlash: player.attackFlash,
         levelUpFlash: player.levelUpFlash,
+        lightningPattern: player.lightningPattern,
+        lightningSeed: player.lightningSeed,
         levelUpLabel: player.levelUpLabel,
         tilt: player.tilt,
         bullets: player.bullets.map((bullet) => ({
@@ -1779,6 +1784,8 @@ export function mountGame(context) {
         hitInvincible: player.hitInvincible,
         attackFlash: player.attackFlash,
         levelUpFlash: player.levelUpFlash,
+        lightningPattern: player.lightningPattern,
+        lightningSeed: player.lightningSeed,
         levelUpLabel: player.levelUpLabel,
         tilt: player.tilt,
       })),
@@ -2157,6 +2164,8 @@ export function mountGame(context) {
         hitInvincible: player.hitInvincible,
         attackFlash: player.attackFlash,
         levelUpFlash: player.levelUpFlash,
+        lightningPattern: player.lightningPattern,
+        lightningSeed: player.lightningSeed,
         levelUpLabel: player.levelUpLabel,
         tilt: player.tilt,
         bullets: player.bullets.map((bullet) => ({
@@ -3231,7 +3240,7 @@ export function mountGame(context) {
         player.score += 42;
         player.gauge = Math.min(getAttackCost(player) * 3, player.gauge + gaugeGain);
         emitGrazeSparks(particles, player.x, player.y, bullet.x, bullet.y, MAX_PARTICLES, Math.random, player.fieldX);
-        playGrazeSound(player.combo);
+        if (player === players[0]) playGrazeSound(player.combo);
         if (player.gauge >= getAttackCost(player) && player.attackCooldown <= 0) {
           tryAutoAttack(player, getOpponent(player));
           player.hitInvincible = player.hitInvincible || player.levelUpInvincible > 0;
@@ -3269,7 +3278,9 @@ export function mountGame(context) {
     attacker.gauge -= attackCost;
     attacker.level += 1;
     attacker.levelUpInvincible = getNextInvincibleTime(attacker.levelUpInvincible);
-    attacker.levelUpFlash = 0.42;
+    attacker.levelUpFlash = LEVEL_UP_FLASH_DURATION;
+    attacker.lightningPattern = pickLightningPattern(attacker.lightningPattern);
+    attacker.lightningSeed = Math.floor(Math.random() * 0x100000000);
     attacker.levelUpLabel = createLevelUpLabel(attacker);
     attacker.attackFlash = 0.35;
     attacker.attackCooldown = AUTO_ATTACK_COOLDOWN;
@@ -3360,23 +3371,6 @@ export function mountGame(context) {
       addBullet(defender, centerX + index * 34, centerY - 18, index * 8, 118 + level * 2, 16, "#ff4e8a", "boss");
     }
   }
-
-  function createLightningBolt(cx, cy, radius, angle, jaggedness) {
-    const points = [];
-    const segments = 7;
-    for (let index = 0; index <= segments; index += 1) {
-      const progress = index / segments;
-      const distance = radius * progress;
-      const offset = index === 0 || index === segments ? 0 : randomRange(-jaggedness, jaggedness);
-      const sideAngle = angle + Math.PI / 2;
-      points.push({
-        x: cx + Math.cos(angle) * distance + Math.cos(sideAngle) * offset,
-        y: cy + Math.sin(angle) * distance + Math.sin(sideAngle) * offset,
-      });
-    }
-    return points;
-  }
-
 
   function burst(x, y, color, count) {
     if (particles.length > MAX_PARTICLES) return;
