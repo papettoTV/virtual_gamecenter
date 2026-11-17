@@ -1,0 +1,22 @@
+{
+  "gameId": "buzz-barrier",
+  "savedAt": "2026-11-18",
+  "capturedAt": "2026-11-18",
+  "sourceRevision": "5a6d1c75ce0b28425f1a4a18a4646222b72a3d6b",
+  "source": "BUZZ BARRIER のローカル撮影モードで、ボス被弾時の飛散を削除した後の初代ボス戦を録画。",
+  "video": {
+    "file": "boss-demo-v2.mp4",
+    "sha256": "886e3cad046110663994f82aefbf5795424a2cb61b56166a92d13e50955b1ceb",
+    "width": 392,
+    "height": 536,
+    "fps": 30,
+    "durationSeconds": 8.7,
+    "audioStreams": 0
+  },
+  "poster": {
+    "file": "boss-demo-v2.jpg",
+    "videoTimeSeconds": 4.3,
+    "sha256": "714ce49096b222aed9fa4b74eae1db870b719d4974f8fb44cce14fb6cfc64b70"
+  },
+  "usage": "トップページと筐体選択画面の無音ループデモ。ライブ映像ではない。"
+}

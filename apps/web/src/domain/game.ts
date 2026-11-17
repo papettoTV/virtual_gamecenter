@@ -47,8 +47,8 @@ export const BUZZ_BARRIER: GameDefinition = {
   currentVersion: "prototype-score-ranking-1",
   creditCost: 1,
   iconUrl: "/assets/buzz-barrier-icon.png",
-  promoVideoUrl: "/demos/buzz-barrier/boss-demo-v1.mp4",
-  promoPosterUrl: "/demos/buzz-barrier/boss-demo-v1.jpg",
+  promoVideoUrl: "/demos/buzz-barrier/boss-demo-v2.mp4",
+  promoPosterUrl: "/demos/buzz-barrier/boss-demo-v2.jpg",
   status: "active",
 };
 
