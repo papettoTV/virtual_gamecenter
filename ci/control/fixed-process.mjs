@@ -63,8 +63,8 @@ function browserError(error){
  const text=String(error?.message??'').slice(0,65536),stack=String(error?.stack??'').slice(0,65536);
  const category=/timeout|timed out/i.test(text)?'timeout':/strict mode violation|resolved to .*elements/i.test(text)?'locator':/expect\(|Expected:|Received:/i.test(text)?'assertion':/browserType\.launch|executable doesn't exist|browser closed/i.test(text)?'browser-start':'other';
  const file=String(error?.location?.file??'');
- const match=stack.match(/(?:^|\/)regression\.spec\.mjs:(\d{1,4}):\d{1,4}(?:\D|$)/);
- const line=file.endsWith('/regression.spec.mjs')?boundedInteger(error.location.line,9999):match?Number(match[1]):null;
+ const match=stack.match(/(?:^|\/)(?:regression|production)\.spec\.mjs:(\d{1,4}):\d{1,4}(?:\D|$)/);
+ const line=/(?:^|\/)(?:regression|production)\.spec\.mjs$/.test(file)?boundedInteger(error.location.line,9999):match?Number(match[1]):null;
  return {category,line};
 }
 export function browserDiagnostics(raw,exitCode){

@@ -4,6 +4,9 @@ test.beforeEach(async ({context}) => {
   await context.routeWebSocket('**/*', socket => new URL(socket.url()).origin === 'wss://develop.virtual-gamecenter.pages.dev' ? socket.connectToServer() : socket.close());
 });
 const sha = process.env.PULBASE_EXPECTED_SHA;
+const buzzBarrierPlay = page => page
+  .locator('article[aria-labelledby="showcase-buzz-barrier"]')
+  .locator('button[data-showcase-play="buzz-barrier"]');
 test('home renders active games and versioned Worker/Pages', async ({ page }) => {
   const exceptions = [];
   page.on('pageerror', error => exceptions.push(error.message));
@@ -14,7 +17,7 @@ test('home renders active games and versioned Worker/Pages', async ({ page }) =>
   await expect(page.getByRole('img', { name: 'PULBASE', exact: true })).toBeVisible();
   await expect(page.getByRole('region', { name: 'ゲームを見て回る' })).toBeVisible();
   await expect(page.locator('.game-showcase h2').first()).toBeVisible();
-  await expect(page.getByRole('button', { name: /^遊ぶ/ }).first()).toBeVisible();
+  await expect(buzzBarrierPlay(page)).toBeVisible();
   expect(exceptions).toEqual([]);
 });
 for (const [path, marker] of [['/legal/terms', '利用規約'], ['/legal/privacy', 'プライバシー']]) {
@@ -33,12 +36,12 @@ test('game navigation allows declining credit and returning before play', async 
   });
   await page.goto('/');
   await page.getByRole('button', { name: '拒否する', exact: true }).click();
-  await page.getByRole('button', { name: /^遊ぶ/ }).first().click();
+  await buzzBarrierPlay(page).click();
   await expect(page).toHaveURL(/\/cabinets\//);
   const cabinet = new URL(page.url());
   cabinet.searchParams.delete('start');
   const cabinetUrl = cabinet.href;
-  expect(cabinet.searchParams.get('game')).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+  expect(cabinet.searchParams.get('game')).toBe('buzz-barrier');
   await expect(page.getByRole('button', { name: 'プロフィールを表示', exact: true })).toBeVisible();
   const badge = page.locator('.platform-credit-badge');
   await expect(badge).toBeVisible();
