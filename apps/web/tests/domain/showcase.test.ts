@@ -60,6 +60,7 @@ describe("arcade showcases", () => {
     expect(html.indexOf("showcase-dot-wave")).toBeLessThan(html.indexOf("showcase-deep-sea-salvage"));
     expect(html.indexOf("showcase-deep-sea-salvage")).toBeLessThan(html.indexOf("COMING SOON"));
     expect(html.match(/class="showcase-watch" disabled=""/g)).toHaveLength(3);
+    expect(html.match(/data-showcase-play="buzz-barrier"/g)).toHaveLength(1);
     expect(html.match(/>遊ぶ /g)).toHaveLength(3);
     expect(html).not.toContain("showcase-window-link");
     expect(html).toContain('class="showcase-coming-content"');
