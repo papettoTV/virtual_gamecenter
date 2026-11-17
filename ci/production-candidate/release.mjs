@@ -1,5 +1,6 @@
 import { ProductionCloudflareError } from './cloudflare-release.mjs';
 import { verifyProductionApproval } from './approval.mjs';
+import { sanitizeBrowserFailure } from '../control/fixed-process.mjs';
 import { setTimeout as delay } from 'node:timers/promises';
 import { assertProductionPagesConfiguration, executeProductionPublication, pagesUploadConfigHash } from './publication.mjs';
 
@@ -113,6 +114,7 @@ export async function runApprovedProductionRelease({ candidate, plan, context, g
   } catch (error) {
     const cause = error.cause ?? error;
     report.failure = { step: error.phase?.startsWith('pages-') ? error.phase : operation, ...(cause instanceof ProductionCloudflareError ? cause.diagnostic : {}) };
+    if (operation === 'browser' && cause.browserFailure) report.browserFailure = sanitizeBrowserFailure(cause.browserFailure);
     if (report.attempted.length === 0) return report;
     report.rollback.status = 'needs-attention';
     let rollbackStep = 'main';

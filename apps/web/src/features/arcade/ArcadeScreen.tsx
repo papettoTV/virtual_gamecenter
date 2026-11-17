@@ -62,7 +62,7 @@ function GameShowcase({ game, onSelectGame }: { game: GameDefinition; onSelectGa
       <div className="showcase-actions">
         <button type="button" className="showcase-watch" disabled={!cabinet} onClick={watch}
           title={cabinet ? undefined : "プレイ中の筐体がないため観戦できません"}>観戦する <span aria-hidden="true">↗</span></button>
-        <button type="button" onClick={() => onSelectGame(game.id)}>{cabinet ? "自分も遊ぶ" : "遊ぶ"} <span aria-hidden="true">→</span></button>
+        <button type="button" data-showcase-play={game.id} onClick={() => onSelectGame(game.id)}>{cabinet ? "自分も遊ぶ" : "遊ぶ"} <span aria-hidden="true">→</span></button>
       </div>
       <GameHelp game={game} />
     </div>

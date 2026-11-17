@@ -37,7 +37,7 @@ export async function checkPublicProductionHttp(revision, request = fetch) {
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { parseBrowserReport, publicToolEnvironment, runFixedTool } from '../control/fixed-process.mjs';
+import { browserDiagnostics, parseBrowserReport, publicToolEnvironment, runFixedTool } from '../control/fixed-process.mjs';
 
 
 export async function checkPublicProductionBrowser(revision, { command = runFixedTool, listOnly = false } = {}) {
@@ -64,9 +64,15 @@ export default defineConfig({
       cwd: folder, timeout: 270000, env: { ...publicToolEnvironment(), HOME: process.env.HOME,
         PULBASE_BROWSER_ENVIRONMENT: 'production', PULBASE_EXPECTED_SHA: revision },
     });
-    if (result.exitCode !== 0) throw Error('本番ブラウザ回帰が不合格です。');
-    const parsed = parseBrowserReport(result.stdout, { listOnly });
-    return listOnly ? parsed.listedTests : parsed.stats.expected;
+    try {
+      if (result.exitCode !== 0) throw Error();
+      const parsed = parseBrowserReport(result.stdout, { listOnly });
+      return listOnly ? parsed.listedTests : parsed.stats.expected;
+    } catch {
+      const error = Error('本番ブラウザ回帰が不合格です。');
+      error.browserFailure = browserDiagnostics(result.stdout, result.exitCode);
+      throw error;
+    }
   } finally {
     await rm(folder, { recursive: true, force: true });
   }

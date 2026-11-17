@@ -12,7 +12,7 @@ const reviewPolicy=JSON.parse(await readFile(new URL('../control/review-trust.js
 const now=Date.parse('2026-10-28T12:00:00Z'),revision='a'.repeat(40),treeSha='b'.repeat(40);
 test('人用配置で置き換える信頼定義と検証回帰のblobも本番候補の読取定義に一致する',async()=>{
  assert.equal(policy.mode,'keyless-only');assert.equal(policy.reviewPolicyDigest,trustPolicy(reviewPolicy));
- for(const path of ['ci/control/review-trust.mjs','ci/control/review-trust.json','ci/control/toolchain/browser/regression.spec.mjs']){
+ for(const path of ['ci/control/review-trust.mjs','ci/control/review-trust.json','ci/control/fixed-process.mjs','ci/control/toolchain/browser/regression.spec.mjs']){
   const b=await readFile(new URL('../../'+path,import.meta.url));
   const blob=createHash('sha1').update(Buffer.concat([Buffer.from(`blob ${b.length}\0`),b])).digest('hex');
   assert.equal(policy.controlFiles[path],blob,path);

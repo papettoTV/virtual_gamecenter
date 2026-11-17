@@ -302,6 +302,36 @@ test('本番HTTPは公開URL・別名・運営者保護・SHAを確認し、ブ�
   assert.equal(result, 8);
 });
 
+test('本番ブラウザ失敗は固定ケース・端末・分類・行だけを残し、公開を切り戻す', async t => {
+  const f = await fixture(t);
+  const message = 'Timeout: PRIVATE_BROWSER_VALUE at https://example.invalid/';
+  const cases = ['home renders active games and versioned Worker/Pages', 'legal navigation /legal/terms',
+    'legal navigation /legal/privacy', 'game navigation allows declining credit and returning before play'];
+  const stdout = JSON.stringify({ errors: [], suites: [{ specs: cases.map((title, index) => ({
+    title, tests: ['desktop', 'mobile'].map(projectName => ({
+      projectName, results: index !== 3 || projectName === 'desktop'
+        ? [{ status: 'passed', duration: 25 }]
+        : [{ status: 'timedOut', duration: 5000, errors: [{ message,
+          location: { file: '/private/work/production.spec.mjs', line: 42 } }],
+          attachments: [{ path: message }] }],
+    })),
+  })) }] });
+  f.options.regression.browser = revision => checkPublicProductionBrowser(revision, {
+    command: async () => ({ exitCode: 1, stdout }),
+  });
+  const result = await runApprovedProductionRelease(f.options);
+  assert.equal(result.success, false);
+  assert.equal(result.failure.step, 'browser');
+  assert.equal(result.rollback.status, 'verified');
+  assert.equal(result.mainUpdated, false);
+  assert.equal(result.browserFailure.kind, 'test-results');
+  assert.deepEqual(result.browserFailure.cases.filter(item => item.status !== 'passed'), [{
+    case: 'game-navigation', project: 'mobile', status: 'timedOut', durationMs: 5000,
+    errors: [{ category: 'timeout', line: 42 }],
+  }]);
+  assert.doesNotMatch(JSON.stringify(result), /PRIVATE_BROWSER_VALUE|example\.invalid|\/private\/work/);
+});
+
 for (const scenario of ['pages-rate-limit', 'worker-privacy', 'pages-changed']) {
   test('鍵なし本番予行試験: ' + scenario, async t => {
     const f = await fixture(t);
