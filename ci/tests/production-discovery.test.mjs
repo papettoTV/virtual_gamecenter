@@ -76,6 +76,29 @@ test('検証が模擬、保護が不一致、成果物が差し替わった場�
   }
 });
 
+test('旧制御で取り消したSHAは再登録せず、新しいSHAの証跡だけで候補を選ぶ', async () => {
+  const f = fixture();
+  const previous = { id: 50, head_repository: { full_name: repo }, head_branch: 'ci-control',
+    head_sha: 'd'.repeat(40), status: 'completed', conclusion: 'cancelled', display_title: '本番候補 ' + target };
+  f.data[releasePath] = { total_count: 1, workflow_runs: [previous] };
+  assert.equal(await discoverRelease(f.options), null);
+  assert.ok(!f.calls.includes('actions/runs/30/artifacts?per_page=100'));
+
+  const fresh = 'e'.repeat(40);
+  f.data['git/ref/heads/develop'].object.sha = fresh;
+  for (const path of [ciPath, prepPath]) {
+    f.data[path.replace(target, fresh)] = f.data[path];
+    delete f.data[path];
+  }
+  f.ci.head_sha = fresh;
+  f.prep.head_sha = fresh;
+  assert.equal(await discoverRelease(f.options), null);
+
+  f.record.sha = fresh;
+  assert.deepEqual(await discoverRelease(f.options),
+    { sha: fresh, mainSha: main, controlSha: control, ciRunId: 10, preparationRunId: 20, stagingRunId: 30 });
+});
+
 test('照合後にdevelopが進んだ場合は起動対象を返さない', async () => {
   const f=fixture(), read=f.options.api; let count=0;
   f.options.api=async path => path==='git/ref/heads/develop' && ++count===2 ? {object:{sha:main}} : read(path);
