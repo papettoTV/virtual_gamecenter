@@ -49,8 +49,8 @@ describe("arcade showcases", () => {
     expect(BRAND.tagline).toBe("本気のプレイが、人を呼ぶ。");
   });
   it("uses the saved updated boss demo and matching poster", () => {
-    expect(BUZZ_BARRIER.promoVideoUrl).toBe("/demos/buzz-barrier/boss-demo-v1.mp4");
-    expect(BUZZ_BARRIER.promoPosterUrl).toBe("/demos/buzz-barrier/boss-demo-v1.jpg");
+    expect(BUZZ_BARRIER.promoVideoUrl).toBe("/demos/buzz-barrier/boss-demo-v2.mp4");
+    expect(BUZZ_BARRIER.promoPosterUrl).toBe("/demos/buzz-barrier/boss-demo-v2.jpg");
   });
   it("shows four showcases including Coming Soon and disabled watch actions when no one is playing", () => {
     vi.stubGlobal("document", { visibilityState: "visible" });

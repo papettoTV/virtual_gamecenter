@@ -2363,7 +2363,6 @@ export function mountGame(context) {
     queueSyncEvent({ type: "bossState", boss: createBossSyncState() });
     player.hitInvincible = player.levelUpInvincible > 0 || player.invincible > 0;
     player.score += 250;
-    burst(boss.x, boss.y, "#ffd166", 8);
     playBossHitSound();
     if (boss.hp <= 0) {
       handleBossDefeated();

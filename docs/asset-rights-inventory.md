@@ -58,7 +58,7 @@ node --test apps/web/tests/asset-policy.test.mjs
 
 | 動画 | 長さ | 音声トラック | 確認したSHA-256の先頭12桁 |
 | --- | --- | --- | --- |
-| `demos/buzz-barrier/boss-demo-v1.mp4` | 12秒 | 0 | `b73d55e3d7af` |
+| `demos/buzz-barrier/boss-demo-v2.mp4` | 8.7秒 | 0 | `886e3cad0461` |
 | `graze-duel-promo.mp4` | 約9.867秒 | 0 | `d8d7e511da2c` |
 | `dot-wave-promo.mp4` | 約6.667秒 | 0 | `911993e59808` |
 
@@ -76,7 +76,7 @@ node --test apps/web/tests/asset-policy.test.mjs
 | 深海モデル：`public/assets/deep-sea-salvage/models/*.glb` | `scripts/generate-deep-sea-models.mjs`、`generate-deep-sea-creatures.mjs`、モデルREADMEとmanifestあり | WebGL・図鑑 | 配布中の各ファイルが生成物または許諾済み改変物であること、外部テクスチャ等の有無を確認 |
 | 図鑑画像：`public/assets/deep-sea-salvage/encyclopedia/*.png` | Blender撮影用`scripts/render-deep-sea-model-catalog.py`とREADMEあり | ゲーム内図鑑 | 使用モデルの確認に追随 |
 | 背景：`public/assets/showroom/arcade-ambient-v1.jpg` | 隣接JSONにOpenAI生成・プロンプト・用途記録あり | トップ背景 | 運営者による入力素材・利用条件確認 |
-| 現行BUZZデモ：`public/demos/buzz-barrier/boss-demo-v1.{mp4,jpg}` | 隣接JSONに宣伝素材のキャプチャ元・リビジョン・ハッシュを記録。音声トラック0本を実査 | 無音ループ映像。ライブではない | 元ゲーム・元映像の権利に追随 |
+| 現行BUZZデモ：`public/demos/buzz-barrier/boss-demo-v2.{mp4,jpg}` | 隣接JSONに初代ボス戦の撮影元・リビジョン・ハッシュを記録。音声トラック0本を実査 | 無音ループ映像。ライブではない | 元ゲーム・元映像の権利に追随 |
 | 旧BUZZデモ：`assets/archive/site-public/graze-duel-promo.mp4`、`graze-duel-promo-poster.jpg`（リポジトリルートから） | 旧デモを内容維持で保管。音声トラック0本を実査 | 現行配布から除外 | R-05承認により保管先へ移動。過去の音声監査とのハッシュ照合を維持 |
 | DOT WAVEデモ：`public/dot-wave-promo.mp4`、`dot-wave-promo-poster.jpg` | ファイルとゲーム定義の参照あり。音声トラック0本を実査 | トップ・筐体のデモ | 撮影元・映像の許諾を確認 |
 | ブランド：`public/brand/*` | `deliverables/pulbase-brand-final/`に正本・生成スクリプト・manifestあり。文字とシンボルはパス構成 | ロゴ・favicon・OGP | 作者・素材契約・画像化した文字の利用条件、商標・ドメインの最終確認 |
