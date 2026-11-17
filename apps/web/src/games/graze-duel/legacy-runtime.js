@@ -842,7 +842,7 @@ export function mountGame(context) {
       return;
     }
     if (versusUiMode === "ready" && action === "primary" && versusMatchId) {
-      audio.unlock();
+      void audio.preloadGrazeSound();
       const matchId = versusMatchId;
       void versusCreditReady.then(ready => {
         if (ready && !scope.disposed && versusMatchId === matchId) cabinetClient.send({ type: "versusReady", matchId });
@@ -3604,6 +3604,9 @@ export function mountGame(context) {
   }
 
   return {
+    onPlayRequested() {
+      void audio.preloadGrazeSound();
+    },
     async prepareSolo() {
       if (scope.disposed) return;
       if (currentCabinetId && cabinetClient.role === "player") { showScreen("game"); return; }
