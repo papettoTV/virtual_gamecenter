@@ -305,7 +305,7 @@ export function createCanvasRenderer(options) {
     if (player.levelUpFlash > 0) {
       drawLevelUpLightning(context, player.x, player.y, {
         left: player.fieldX, right: player.fieldX + FIELD_WIDTH, top: FIELD_TOP, bottom: FIELD_BOTTOM,
-      }, player.levelUpFlash);
+      }, player.levelUpFlash, player.lightningPattern ?? 0);
     }
     drawPixelPlayerShip(player);
     if (isLevelInvincible) {

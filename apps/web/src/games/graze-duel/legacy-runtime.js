@@ -28,7 +28,7 @@ import { createLevelUpLabel, tickLevelUpLabel } from "./level-up-label";
 import { BUZZ_BARRIER } from "../../domain/game";
 import { recordWatchStarted } from "../../features/engagement/engagement-client";
 import { createCanvasRenderer } from "./rendering/canvas-renderer";
-import { LEVEL_UP_FLASH_DURATION } from "./rendering/player-effects";
+import { LEVEL_UP_FLASH_DURATION, pickLightningPattern } from "./rendering/player-effects";
 import { createGameState } from "./state";
 import { baseBulletSeedForMatch, resetBaseBulletSequences, getBaseBulletPattern } from "./base-bullet-sequence";
 import { createSimulation } from "./simulation";
@@ -390,6 +390,7 @@ export function mountGame(context) {
       player.attackFlash = 0;
       player.attackCooldown = 0;
       player.levelUpFlash = 0;
+      player.lightningPattern = null;
       player.levelUpLabel = null;
       player.tilt = 0;
       player.targetTilt = 0;
@@ -446,6 +447,7 @@ export function mountGame(context) {
       player.attackFlash = 0;
       player.attackCooldown = 0;
       player.levelUpFlash = 0;
+      player.lightningPattern = null;
       player.levelUpLabel = null;
       player.tilt = 0;
       player.targetTilt = 0;
@@ -1700,6 +1702,7 @@ export function mountGame(context) {
         hitInvincible: player.hitInvincible,
         attackFlash: player.attackFlash,
         levelUpFlash: player.levelUpFlash,
+        lightningPattern: player.lightningPattern,
         levelUpLabel: player.levelUpLabel,
         tilt: player.tilt,
         bullets: player.bullets.map((bullet) => ({
@@ -1778,6 +1781,7 @@ export function mountGame(context) {
         hitInvincible: player.hitInvincible,
         attackFlash: player.attackFlash,
         levelUpFlash: player.levelUpFlash,
+        lightningPattern: player.lightningPattern,
         levelUpLabel: player.levelUpLabel,
         tilt: player.tilt,
       })),
@@ -2156,6 +2160,7 @@ export function mountGame(context) {
         hitInvincible: player.hitInvincible,
         attackFlash: player.attackFlash,
         levelUpFlash: player.levelUpFlash,
+        lightningPattern: player.lightningPattern,
         levelUpLabel: player.levelUpLabel,
         tilt: player.tilt,
         bullets: player.bullets.map((bullet) => ({
@@ -3269,6 +3274,7 @@ export function mountGame(context) {
     attacker.level += 1;
     attacker.levelUpInvincible = getNextInvincibleTime(attacker.levelUpInvincible);
     attacker.levelUpFlash = LEVEL_UP_FLASH_DURATION;
+    attacker.lightningPattern = pickLightningPattern(attacker.lightningPattern);
     attacker.levelUpLabel = createLevelUpLabel(attacker);
     attacker.attackFlash = 0.35;
     attacker.attackCooldown = AUTO_ATTACK_COOLDOWN;

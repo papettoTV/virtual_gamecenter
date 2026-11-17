@@ -25,6 +25,7 @@ export type PlayerRenderState = {
   levelUpInvincible: number;
   barrierRatio: number;
   levelUpFlash: number;
+  lightningPattern?: number | null;
   bullets: BulletRenderState[];
 };
 

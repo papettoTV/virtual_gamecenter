@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
 import * as THREE from "three";
-import { createLightningPaths, drawLevelUpLightning, drawPlayerShield, LEVEL_UP_FLASH_DURATION, lightningOpacity, shieldAppearance } from "../../src/games/graze-duel/rendering/player-effects";
+import { createLightningPaths, drawLevelUpLightning, drawPlayerShield, LEVEL_UP_FLASH_DURATION, LIGHTNING_PATTERNS, lightningOpacity, pickLightningPattern, shieldAppearance } from "../../src/games/graze-duel/rendering/player-effects";
 import { createPlayerEffects } from "../../src/games/graze-duel/rendering/three-player-effects";
 import type { PlayerRenderState } from "../../src/games/graze-duel/rendering/scene-renderer";
 
@@ -42,6 +42,40 @@ it("3方向に伸び、約30msでプレイ領域の端に到達して消える",
   const inactive = brush();
   drawLevelUpLightning(asContext(inactive), 100, 100, field, 0);
   expect(inactive.fill).not.toHaveBeenCalled();
+});
+
+it("稲妻10パターンの3方向は互いに離れ、一部のパターンは短い枝ではなく短い主雷を持つ", () => {
+  expect(LIGHTNING_PATTERNS).toHaveLength(10);
+  const bounds = { left: -200, right: 200, top: -200, bottom: 200 };
+  let mixedLengths = 0;
+  for (const [index, pattern] of LIGHTNING_PATTERNS.entries()) {
+    const main = createLightningPaths(bounds, LEVEL_UP_FLASH_DURATION - 0.04, index).filter(path => path.length > 4);
+    expect(main).toHaveLength(3);
+    const angles = main.map(path => {
+      const point = path.at(-1)!;
+      return Math.atan2(point.y, point.x) * 180 / Math.PI;
+    });
+    for (const [bolt, angle] of angles.entries()) {
+      const gap = (angles[(bolt + 1) % 3]! - angle + 360) % 360;
+      expect(gap).toBeGreaterThanOrEqual(75);
+      const tip = main[bolt]!.at(-1)!;
+      const extent = Math.max(Math.abs(tip.x), Math.abs(tip.y));
+      if (pattern[bolt]![1] === 1) expect(extent).toBeGreaterThan(200);
+      else expect(extent).toBeLessThan(160);
+    }
+    if (pattern.some(([, ratio]) => ratio < 1)) mixedLengths += 1;
+  }
+  expect(mixedLengths).toBe(4);
+  expect(createLightningPaths(bounds, 0.25, 99)).toEqual(createLightningPaths(bounds, 0.25, 0));
+});
+
+it("初回は10通り、次のレベルアップは直前以外の9通りから選ぶ", () => {
+  const options = (previous: number | null) => Array.from({ length: previous === null ? 10 : 9 },
+    (_, index) => pickLightningPattern(previous, (index + 0.5) / (previous === null ? 10 : 9)));
+  expect(options(null)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  for (const previous of options(null)) {
+    expect(options(previous)).toEqual(options(null).filter(index => index !== previous));
+  }
 });
 
 it("共有シールドは外側ほど透明になる単一の膜だけを描き縮小と透明点滅を維持する", () => {

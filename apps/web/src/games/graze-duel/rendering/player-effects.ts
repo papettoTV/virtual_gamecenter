@@ -11,25 +11,46 @@ export const LIGHTNING_LAYERS = [
 type Bounds = { left: number; top: number; right: number; bottom: number };
 type LightningPoint = { x: number; y: number; width: number };
 
+export const LIGHTNING_PATTERNS = [
+  [[-112, 1], [-11, 1], [135, 1]],
+  [[-155, 1], [-44, 1], [78, 1]],
+  [[-82, 1], [28, 0.63], [161, 1]],
+  [[-170, 1], [-65, 1], [53, 1]],
+  [[-130, 0.72], [-18, 1], [103, 0.56]],
+  [[-59, 1], [61, 1], [176, 1]],
+  [[-145, 1], [-28, 1], [93, 0.65]],
+  [[-101, 1], [17, 1], [151, 1]],
+  [[-176, 0.59], [-57, 0.74], [62, 1]],
+  [[-117, 1], [8, 1], [119, 1]],
+] as const;
+
+export function pickLightningPattern(previous: number | null, sample = Math.random()) {
+  const skip = previous !== null && previous >= 0 && previous < LIGHTNING_PATTERNS.length;
+  const next = Math.floor(sample * (LIGHTNING_PATTERNS.length - Number(skip)));
+  return skip && next >= previous ? next + 1 : next;
+}
+
 export function lightningOpacity(remaining: number) {
   return Math.min(1, Math.max(0, remaining / 0.16)) ** 1.6;
 }
 
-export function createLightningPaths(bounds: Bounds, remaining: number): LightningPoint[][] {
+export function createLightningPaths(bounds: Bounds, remaining: number, patternIndex = 0): LightningPoint[][] {
   if (!(remaining > 0)) return [];
   const age = Math.max(0, LEVEL_UP_FLASH_DURATION - remaining);
   const reach = Math.min(1, 0.34 + age / 0.045);
   const paths: LightningPoint[][] = [];
-  const directions = [-1.95, -0.2, 2.35];
-  for (const [index, angle] of directions.entries()) {
+  const pattern = LIGHTNING_PATTERNS[patternIndex];
+  const phase = pattern ? patternIndex * 0.71 : 0;
+  for (const [index, [degrees, lengthRatio]] of (pattern ?? LIGHTNING_PATTERNS[0]).entries()) {
+    const angle = degrees * Math.PI / 180;
     const dx = Math.cos(angle);
     const dy = Math.sin(angle);
     const edge = Math.min((dx > 0 ? bounds.right : bounds.left) / dx, (dy > 0 ? bounds.bottom : bounds.top) / dy);
-    const distance = (Math.max(0, edge) + 18) * reach;
+    const distance = (Math.max(0, edge) * lengthRatio + (lengthRatio === 1 ? 18 : 0)) * reach;
     const points: LightningPoint[] = [];
     for (let step = 0; step <= BOLT_SEGMENTS; step += 1) {
       const fraction = step / BOLT_SEGMENTS;
-      const wiggle = Math.sin(step * 2.27 + index * 3) * 0.8 + Math.sin(step * 3.8 + age * 65) * 0.2;
+      const wiggle = Math.sin(step * 2.27 + index * 3 + phase) * 0.8 + Math.sin(step * 3.8 + age * 65) * 0.2;
       const offset = Math.min(40, distance * 0.15) * Math.sin(Math.PI * fraction) * wiggle;
       const width = (4.5 + 3.5 * Math.sin(step * 2.4 + index) ** 2) * (1 - fraction * 0.42);
       points.push({ x: dx * distance * fraction - dy * offset, y: dy * distance * fraction + dx * offset, width });
@@ -91,9 +112,9 @@ export function drawPlayerShield(context: CanvasRenderingContext2D, x: number, y
   context.restore();
 }
 
-export function drawLevelUpLightning(context: CanvasRenderingContext2D, x: number, y: number, bounds: Bounds, remaining: number) {
+export function drawLevelUpLightning(context: CanvasRenderingContext2D, x: number, y: number, bounds: Bounds, remaining: number, patternIndex = 0) {
   if (!(remaining > 0)) return;
-  const paths = createLightningPaths({ left: bounds.left - x, top: bounds.top - y, right: bounds.right - x, bottom: bounds.bottom - y }, remaining);
+  const paths = createLightningPaths({ left: bounds.left - x, top: bounds.top - y, right: bounds.right - x, bottom: bounds.bottom - y }, remaining, patternIndex);
   const alpha = context.globalAlpha * lightningOpacity(remaining);
   context.save();
   context.beginPath();
