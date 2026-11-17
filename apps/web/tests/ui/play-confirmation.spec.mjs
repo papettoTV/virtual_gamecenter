@@ -412,7 +412,8 @@ for (const game of games) {
           const status = screen.locator('.buzz-mobile-status');
           await expect(status).toContainText('LV');
           await expect(status).toContainText('♥');
-          const cells = await status.locator('span').evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().toJSON()));
+          const cells = await status.locator('span[data-buzz-status]').evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().toJSON()));
+          expect(cells).toHaveLength(4);
           for (let i = 1; i < cells.length; i++) expect(cells[i].x).toBeGreaterThanOrEqual(cells[i - 1].right);
           expect(cells.at(-1).right).toBeLessThanOrEqual(control.x);
 
@@ -671,7 +672,7 @@ for (const game of games) {
         readPhase = 'spectator-exit';
         try {
           await leaveToDirectory(page, game.id, !occupied
-            ? '.spectator-availability .showcase-actions button:last-child'
+            ? '.spectator-waiting > .cabinet-return-link'
             : game.id === 'dot-wave' ? null : '#spectator-game-back');
           if (delayedExit) exitProbe.verify();
           readPhase = 'spectator-post-exit-wallet';

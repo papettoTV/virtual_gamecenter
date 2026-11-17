@@ -10,7 +10,8 @@ export function createGrazeAudio() {
   let output: GainNode;
   let muted = false;
   let disposed = false;
-  let grazeBuffer: Promise<AudioBuffer> | null = null;
+  let grazeBuffer: AudioBuffer | null = null;
+  let grazeLoad: Promise<AudioBuffer | null> | null = null;
   let lastGrazeTime = -Infinity;
   let pendingGrazes = 0;
   const grazeVoices = new Map<AudioBufferSourceNode, GainNode>();
@@ -31,24 +32,44 @@ export function createGrazeAudio() {
     return audioContext;
   }
 
+  function loadGrazeBuffer(audio: AudioContext) {
+    grazeLoad ??= fetch(grazeSoundUrl)
+      .then(response => {
+        if (!response.ok) throw new Error("Graze sound could not be loaded.");
+        return response.arrayBuffer();
+      })
+      .then(data => disposed ? null : audio.decodeAudioData(data))
+      .then(buffer => disposed ? null : (grazeBuffer = buffer))
+      .catch(error => {
+        if (!disposed) console.warn("Graze sound could not be loaded.", error);
+        return null;
+      })
+      .finally(() => { grazeLoad = null; });
+    return grazeLoad;
+  }
+
+  async function preloadGrazeSound(): Promise<void> {
+    if (disposed || !(window.AudioContext ?? (window as AudioWindow).webkitAudioContext)) return;
+    try {
+      const audio = getAudioContext();
+      if (!grazeBuffer) await loadGrazeBuffer(audio);
+    } catch (error) {
+      if (!disposed) console.warn("Graze audio could not be prepared.", error);
+    }
+  }
+
   async function playGrazeSound(_combo: number): Promise<void> {
     if (disposed) return;
-    const audio = getAudioContext();
-    const now = audio.currentTime;
-    if (now - lastGrazeTime < 0.03 || pendingGrazes + grazeVoices.size >= 8) return;
-    lastGrazeTime = now;
-    pendingGrazes += 1;
+    let pending = false;
     try {
-      if (!grazeBuffer) {
-        grazeBuffer = fetch(grazeSoundUrl)
-          .then(response => {
-            if (!response.ok) throw new Error("Graze sound could not be loaded.");
-            return response.arrayBuffer();
-          })
-          .then(data => audio.decodeAudioData(data));
-      }
-      const buffer = await grazeBuffer;
-      if (disposed) return;
+      const audio = getAudioContext();
+      const now = audio.currentTime;
+      if (now - lastGrazeTime < 0.03 || pendingGrazes + grazeVoices.size >= 8) return;
+      lastGrazeTime = now;
+      pendingGrazes += 1;
+      pending = true;
+      const buffer = grazeBuffer ?? await loadGrazeBuffer(audio);
+      if (disposed || !buffer) return;
       const source = audio.createBufferSource();
       const gain = audio.createGain();
       source.buffer = buffer;
@@ -63,10 +84,9 @@ export function createGrazeAudio() {
       };
       source.start(audio.currentTime);
     } catch (error) {
-      grazeBuffer = null;
       if (!disposed) console.warn("Graze sound playback failed.", error);
     } finally {
-      pendingGrazes -= 1;
+      if (pending) pendingGrazes -= 1;
     }
   }
 
@@ -143,6 +163,7 @@ export function createGrazeAudio() {
     unlock() {
       if (!disposed && (window.AudioContext ?? (window as AudioWindow).webkitAudioContext)) getAudioContext();
     },
+    preloadGrazeSound,
     cheer(delay: number) {
       if (!muted && audioContext) return playVictoryCheer(audioContext, output, delay);
     },
@@ -157,6 +178,7 @@ export function createGrazeAudio() {
       const closingContext = audioContext;
       audioContext = null;
       grazeBuffer = null;
+      grazeLoad = null;
       for (const [source, gain] of grazeVoices) {
         source.onended = null;
         source.stop();

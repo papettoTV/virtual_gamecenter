@@ -842,7 +842,7 @@ export function mountGame(context) {
       return;
     }
     if (versusUiMode === "ready" && action === "primary" && versusMatchId) {
-      audio.unlock();
+      void audio.preloadGrazeSound();
       const matchId = versusMatchId;
       void versusCreditReady.then(ready => {
         if (ready && !scope.disposed && versusMatchId === matchId) cabinetClient.send({ type: "versusReady", matchId });
@@ -3436,8 +3436,14 @@ export function mountGame(context) {
       }
       const gauge = document.querySelector('[data-buzz-status="gauge"]');
       if (gauge) {
-        gauge.value = Math.min(1, player.gauge / getAttackCost(player));
-        gauge.setAttribute("aria-valuetext", player.gauge >= getAttackCost(player) ? "AUTO ATTACK" : `GAUGE ${Math.floor(player.gauge)} / ${getAttackCost(player)}`);
+        const attackCost = getAttackCost(player);
+        const ratio = String(clamp(player.gauge / attackCost, 0, 1));
+        if (gauge.getAttribute("aria-valuenow") !== ratio) {
+          gauge.style.setProperty("--buzz-gauge-fill", ratio);
+          gauge.setAttribute("aria-valuenow", ratio);
+        }
+        const description = player.gauge >= attackCost ? "AUTO ATTACK" : `GAUGE ${Math.floor(player.gauge)} / ${attackCost}`;
+        if (gauge.getAttribute("aria-valuetext") !== description) gauge.setAttribute("aria-valuetext", description);
       }
     }
     canvasRenderer.render({
@@ -3598,6 +3604,9 @@ export function mountGame(context) {
   }
 
   return {
+    onPlayRequested() {
+      void audio.preloadGrazeSound();
+    },
     async prepareSolo() {
       if (scope.disposed) return;
       if (currentCabinetId && cabinetClient.role === "player") { showScreen("game"); return; }

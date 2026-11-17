@@ -159,7 +159,9 @@ export function GameScreen({ game }: GameScreenProps) {
           {game.id === "buzz-barrier" && <div className="buzz-mobile-status" aria-label="ゲームステータス">
             <span data-buzz-status="score" /><span data-buzz-status="time" />
             <span data-buzz-status="level" /><span data-buzz-status="lives" />
-            <meter data-buzz-status="gauge" aria-label="攻撃ゲージ" min="0" max="1" />
+            <div className="buzz-mobile-gauge" data-buzz-status="gauge" role="meter" aria-label="レベルアップゲージ" aria-valuemin={0} aria-valuemax={1} aria-valuenow={0}>
+              <span className="buzz-mobile-gauge-fill" aria-hidden="true" />
+            </div>
           </div>}
           <TouchActions game={game} />
           <button id="touch-pause" className="touch-button" type="button">一時停止</button>

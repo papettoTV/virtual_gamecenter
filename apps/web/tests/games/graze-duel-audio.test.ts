@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createGrazeAudio } from "../../src/games/graze-duel/audio";
+import { GameHost } from "../../src/game-sdk/game-host";
 
 function setup() {
   const sources: Array<ReturnType<typeof sourceNode>> = [];
@@ -27,6 +28,38 @@ function setup() {
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe("selected U3 graze sound", () => {
+  it("starts preloading on the play gesture and plays immediately from the decoded buffer", async () => {
+    const { audio, context, sources, buffer, fetchSound } = setup();
+    const host = new GameHost();
+    const play = vi.fn();
+    const preload = vi.fn(audio.preloadGrazeSound);
+    host.attach({ onPlayRequested: preload, play, dispose: audio.dispose });
+    host.subscribe(() => expect(fetchSound).toHaveBeenCalledOnce());
+    host.requestPlay("start");
+    await Promise.all([preload.mock.results[0]!.value, audio.preloadGrazeSound()]);
+    expect(play).not.toHaveBeenCalled();
+    expect(context.decodeAudioData).toHaveBeenCalledOnce();
+    expect(sources).toHaveLength(0);
+    const playing = audio.playGrazeSound(1);
+    expect(sources[0]!.buffer).toBe(buffer);
+    expect(sources[0]!.start).toHaveBeenCalledWith(0);
+    await playing;
+    expect(fetchSound).toHaveBeenCalledOnce();
+    audio.dispose();
+  });
+
+  it("retries a failed preload on the first graze", async () => {
+    const { audio, sources, fetchSound } = setup();
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    fetchSound.mockRejectedValueOnce(new Error("offline"));
+    await audio.preloadGrazeSound();
+    expect(sources).toHaveLength(0);
+    await audio.playGrazeSound(1);
+    expect(sources).toHaveLength(1);
+    expect(fetchSound).toHaveBeenCalledTimes(2);
+    audio.dispose();
+  });
+
   it("plays the selected one-shot without adding a pitched accent or changing its speed", async () => {
     const { audio, context, sources, gains, buffer, fetchSound } = setup();
     await audio.playGrazeSound(1);

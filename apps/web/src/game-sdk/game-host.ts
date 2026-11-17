@@ -16,6 +16,7 @@ export class GameHost {
 
   requestPlay(action: PlayAction) {
     if (!this.instance) return;
+    this.instance.onPlayRequested?.();
     for (const listener of this.listeners) listener(action);
   }
 

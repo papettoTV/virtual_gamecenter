@@ -59,7 +59,6 @@ export function createCanvasRenderer(options) {
       drawCenterInfo();
       drawBoss();
       if (frame.versusParticipant || frame.versusSpectator) drawOpponentBoss();
-      drawBossSpawnHint();
 
       for (const player of frame.players) {
         drawBullets(player);
@@ -97,7 +96,6 @@ export function createCanvasRenderer(options) {
 
     if (!frame.mobileHud) drawPlayerHud(selectedPlayer);
     if (frame.versusParticipant || frame.versusSpectator) drawOpponentInfoHud(otherPlayer);
-    if (playerIndex === 0) drawBossSpawnHint();
     drawCenterInfo();
   }
 
@@ -153,26 +151,6 @@ export function createCanvasRenderer(options) {
     context.textAlign = "center";
     context.fillText(phase.name, labelX, FIELD_TOP + 10);
     context.textAlign = "left";
-  }
-
-  function drawBossSpawnHint() {
-    if (frame.bossEncounterInProgress || frame.clearGame || frame.boss.phaseIndex >= BOSS_PHASES.length) return;
-    const nextPhase = BOSS_PHASES[frame.boss.phaseIndex];
-    const compact = frame.compact;
-    const labelX = compact ? WIDTH / 2 : LEFT_X + FIELD_WIDTH / 2;
-    const labelWidth = compact ? 220 : 248;
-    const label = compact
-      ? `${nextPhase.name} AT LV ${frame.boss.nextSpawnLevel}`
-      : `${nextPhase.name} APPEARS AT LV ${frame.boss.nextSpawnLevel}`;
-    context.save();
-    context.fillStyle = "rgba(0,0,0,0.38)";
-    roundRect(labelX - labelWidth / 2, FIELD_TOP + 14, labelWidth, 26, 10);
-    context.fill();
-    context.fillStyle = "rgba(255,255,255,0.78)";
-    context.font = "800 12px system-ui";
-    context.textAlign = "center";
-    context.fillText(label, labelX, FIELD_TOP + 32);
-    context.restore();
   }
 
   function drawBackground() {
