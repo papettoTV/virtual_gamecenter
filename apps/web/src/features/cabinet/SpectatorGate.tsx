@@ -1,9 +1,9 @@
 import { useEffect, useState, type ReactNode } from "react";
 import type { GameDefinition } from "../../domain/game";
 import { CABINET_PRESENCE_EVENT, type CabinetPresence } from "../../realtime/cabinet-presence";
+import { CabinetReturnLink } from "./CabinetReturnLink";
 import { GameHelp } from "./GameHelp";
 import { startNewGame } from "./play-navigation";
-import { navigate } from "../../shared/navigation";
 
 export function SpectatorGate({ game, url, preview, children }: { game: GameDefinition; url: URL; preview: boolean; children: ReactNode }) {
   if (preview || url.searchParams.get("watch") !== "1") return <>{children}</>;
@@ -22,15 +22,17 @@ function WatchAvailability({ game, cabinetId, children }: { game: GameDefinition
   }, [cabinetId, game.id]);
   const unavailable = playerCount === 0;
   return <>
-    {unavailable && <section className="spectator-availability" aria-label="プレイの開始待ち・終了">
-      <h2>{game.title}</h2>
-      <p>プレイは終了したか、まだ始まっていません。プレイが始まると、自動で観戦画面を表示します。</p>
-      <div className="showcase-actions">
-        <button type="button" onClick={() => startNewGame(game.id)}>自分も遊ぶ</button>
-        <button type="button" onClick={() => navigate("/")}>ほかのゲームを見る</button>
-      </div>
-      <GameHelp game={game} />
-    </section>}
+    {unavailable && <div className="spectator-waiting">
+      <CabinetReturnLink />
+      <section className="spectator-availability" aria-label="プレイの開始待ち・終了">
+        <h2>{game.title}</h2>
+        <p>プレイは終了したか、まだ始まっていません。プレイが始まると、自動で観戦画面を表示します。</p>
+        <div className="showcase-actions cabinet-waiting-actions">
+          <button type="button" onClick={() => startNewGame(game.id)}>自分も遊ぶ</button>
+        </div>
+        <GameHelp game={game} inline />
+      </section>
+    </div>}
     <div className={unavailable ? "spectator-offline" : undefined}>{children}</div>
   </>;
 }

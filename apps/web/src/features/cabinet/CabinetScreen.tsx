@@ -1,12 +1,13 @@
 import type { GameDefinition } from "../../domain/game";
 import { gameHost } from "../../game-sdk/game-host";
-import { navigate } from "../../shared/navigation";
+import { CabinetReturnLink } from "./CabinetReturnLink";
 import { GameHelp } from "./GameHelp";
 import { startNewGame } from "./play-navigation";
 
 export function CabinetScreen({ game }: { game: GameDefinition }) {
   const watch = new URLSearchParams(location.search).get("watch") === "1";
   return <section className="cabinet-screen is-hidden" id="cabinet-screen">
+    <CabinetReturnLink id="back-to-arcade" />
     <div className="arcade-card">
       <p className="eyebrow" id="cabinet-id-label">{game.localizedTitle}</p>
       <h2>{game.title}</h2>
@@ -16,11 +17,10 @@ export function CabinetScreen({ game }: { game: GameDefinition }) {
         <button id="start-solo" type="button" onClick={() => gameHost.requestPlay("start")}>ゲームスタート</button>
         <small id="cabinet-copy-status" />
       </div>
-      <div className="cabinet-waiting-actions">
-        {watch && <button type="button" onClick={() => startNewGame(game.id)}>自分も遊ぶ</button>}
-        <button id="back-to-arcade" type="button" onClickCapture={event => { event.stopPropagation(); navigate("/"); }}>ほかのゲームを見る</button>
-      </div>
-      <GameHelp game={game} />
+      {watch && <div className="showcase-actions cabinet-waiting-actions">
+        <button type="button" onClick={() => startNewGame(game.id)}>自分も遊ぶ</button>
+      </div>}
+      <GameHelp game={game} inline />
     </div>
   </section>;
 }
