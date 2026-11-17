@@ -31,6 +31,7 @@ it("3方向に伸び、約30msでプレイ領域の端に到達して消える",
   expect(peak[1]!.at(-1)!.x).toBeGreaterThan(local.right);
   expect(peak[2]!.at(-1)!.x).toBeLessThan(local.left);
   expect(opening[1]!.at(-1)!.x).toBeLessThan(local.right);
+  expect(lightningOpacity(LEVEL_UP_FLASH_DURATION - 0.1)).toBe(1);
   expect(lightningOpacity(0.02)).toBeLessThan(0.05);
   expect(createLightningPaths(local, 0)).toEqual([]);
   const active = brush();
