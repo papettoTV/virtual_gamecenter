@@ -78,10 +78,12 @@ export function drawPlayerShield(context: CanvasRenderingContext2D, x: number, y
   if (!(radius > 0)) return;
   context.save();
   const gradient = context.createRadialGradient(x, y, 0, x, y, radius);
-  gradient.addColorStop(0, "rgba(105, 247, 255, 0.46)");
-  gradient.addColorStop(0.48, "rgba(105, 247, 255, 0.28)");
-  gradient.addColorStop(0.78, "rgba(105, 247, 255, 0.12)");
-  gradient.addColorStop(1, "rgba(105, 247, 255, 0)");
+  gradient.addColorStop(0, "rgba(255, 253, 255, 1)");
+  gradient.addColorStop(0.36, "rgba(248, 241, 255, 0.98)");
+  gradient.addColorStop(0.62, "rgba(185, 146, 255, 0.93)");
+  gradient.addColorStop(0.81, "rgba(126, 84, 255, 0.72)");
+  gradient.addColorStop(0.94, "rgba(106, 69, 255, 0.32)");
+  gradient.addColorStop(1, "rgba(106, 69, 255, 0)");
   context.fillStyle = gradient;
   context.beginPath();
   context.arc(x, y, radius, 0, Math.PI * 2);

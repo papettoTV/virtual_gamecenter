@@ -27,7 +27,7 @@ export function createPlayerEffects() {
   const { canvas, context } = artwork(256, 256);
   drawPlayerShield(context, 128, 128, 126);
   const shield = new THREE.Mesh(new THREE.PlaneGeometry(256 / 126, 256 / 126), material(new THREE.CanvasTexture(canvas)));
-  shield.renderOrder = 3;
+  shield.renderOrder = 4.5;
   shield.visible = false;
   root.add(shield);
   const clipPlanes = [

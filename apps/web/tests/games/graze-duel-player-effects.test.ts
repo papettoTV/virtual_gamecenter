@@ -48,7 +48,9 @@ it("共有シールドは外側ほど透明になる単一の膜だけを描き�
   const context = brush();
   drawPlayerShield(asContext(context), 0, 0, 46);
   expect(context.createRadialGradient.mock.results[0]!.value.addColorStop.mock.calls).toEqual([
-    [0, "rgba(105, 247, 255, 0.46)"], [0.48, "rgba(105, 247, 255, 0.28)"], [0.78, "rgba(105, 247, 255, 0.12)"], [1, "rgba(105, 247, 255, 0)"],
+    [0, "rgba(255, 253, 255, 1)"], [0.36, "rgba(248, 241, 255, 0.98)"],
+    [0.62, "rgba(185, 146, 255, 0.93)"], [0.81, "rgba(126, 84, 255, 0.72)"],
+    [0.94, "rgba(106, 69, 255, 0.32)"], [1, "rgba(106, 69, 255, 0)"],
   ]);
   expect(context.createRadialGradient).toHaveBeenCalledOnce();
   expect(context.fill).toHaveBeenCalledOnce();
@@ -73,6 +75,7 @@ it("Three.js は描画バッファを再利用し、稲妻が消えた後もシ�
   const lightning = effects.root.children.slice(1) as THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>[];
   const meshes = lightning.map(mesh => mesh.geometry.getAttribute("position"));
   expect(lightning).toHaveLength(3);
+  expect(effects.shield.renderOrder).toBeGreaterThan(4);
   expect(lightning.every(mesh => !mesh.visible)).toBe(true);
   effects.update(player, 0, 390, 0, 500);
   expect(lightning.every(mesh => mesh.visible && mesh.geometry.drawRange.count > 0)).toBe(true);
