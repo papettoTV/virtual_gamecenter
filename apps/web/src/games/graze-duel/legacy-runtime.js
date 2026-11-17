@@ -28,6 +28,7 @@ import { createLevelUpLabel, tickLevelUpLabel } from "./level-up-label";
 import { BUZZ_BARRIER } from "../../domain/game";
 import { recordWatchStarted } from "../../features/engagement/engagement-client";
 import { createCanvasRenderer } from "./rendering/canvas-renderer";
+import { LEVEL_UP_FLASH_DURATION } from "./rendering/player-effects";
 import { createGameState } from "./state";
 import { baseBulletSeedForMatch, resetBaseBulletSequences, getBaseBulletPattern } from "./base-bullet-sequence";
 import { createSimulation } from "./simulation";
@@ -316,8 +317,6 @@ export function mountGame(context) {
       HIT_MARKER_RADIUS,
     },
     getAttackCost,
-    randomRange,
-    createLightningBolt,
   });
 
   scope.own(() => canvasRenderer.dispose());
@@ -3269,7 +3268,7 @@ export function mountGame(context) {
     attacker.gauge -= attackCost;
     attacker.level += 1;
     attacker.levelUpInvincible = getNextInvincibleTime(attacker.levelUpInvincible);
-    attacker.levelUpFlash = 0.42;
+    attacker.levelUpFlash = LEVEL_UP_FLASH_DURATION;
     attacker.levelUpLabel = createLevelUpLabel(attacker);
     attacker.attackFlash = 0.35;
     attacker.attackCooldown = AUTO_ATTACK_COOLDOWN;
@@ -3360,23 +3359,6 @@ export function mountGame(context) {
       addBullet(defender, centerX + index * 34, centerY - 18, index * 8, 118 + level * 2, 16, "#ff4e8a", "boss");
     }
   }
-
-  function createLightningBolt(cx, cy, radius, angle, jaggedness) {
-    const points = [];
-    const segments = 7;
-    for (let index = 0; index <= segments; index += 1) {
-      const progress = index / segments;
-      const distance = radius * progress;
-      const offset = index === 0 || index === segments ? 0 : randomRange(-jaggedness, jaggedness);
-      const sideAngle = angle + Math.PI / 2;
-      points.push({
-        x: cx + Math.cos(angle) * distance + Math.cos(sideAngle) * offset,
-        y: cy + Math.sin(angle) * distance + Math.sin(sideAngle) * offset,
-      });
-    }
-    return points;
-  }
-
 
   function burst(x, y, color, count) {
     if (particles.length > MAX_PARTICLES) return;

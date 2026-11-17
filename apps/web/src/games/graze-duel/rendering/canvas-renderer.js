@@ -8,7 +8,7 @@ import { GRAZE_SPARK_WIDTH, sparkFade, clipSpark } from "../graze-sparks";
 import { drawLevelUpLabel } from "../level-up-label";
 
 export function createCanvasRenderer(options) {
-  let { context, getAttackCost, randomRange, createLightningBolt } = options;
+  let { context, getAttackCost } = options;
   const {
     WIDTH,
     HEIGHT,
@@ -45,8 +45,6 @@ export function createCanvasRenderer(options) {
       context = null;
       frame = null;
       getAttackCost = null;
-      randomRange = null;
-      createLightningBolt = null;
     },
   };
 
@@ -312,7 +310,9 @@ export function createCanvasRenderer(options) {
       context.restore();
     }
     if (player.levelUpFlash > 0) {
-      drawLevelUpLightning(context, player.x, player.y, player.color, player.levelUpFlash);
+      drawLevelUpLightning(context, player.x, player.y, {
+        left: player.fieldX, right: player.fieldX + FIELD_WIDTH, top: FIELD_TOP, bottom: FIELD_BOTTOM,
+      }, player.levelUpFlash);
     }
     drawPixelPlayerShip(player);
 

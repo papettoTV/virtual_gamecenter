@@ -361,7 +361,7 @@ function updatePlayerVisuals(
     const hitInvincible = player.invincible > 0 && !levelInvincible;
     const warning = levelInvincible && player.levelUpInvincible <= 0.5;
     visual.ship.material.opacity = hitInvincible && Math.floor(elapsed * 18) % 2 === 0 ? 0.45 : 1;
-    visual.effects.update(player, elapsed);
+    visual.effects.update(player, elapsed, options.fieldWidth, options.fieldTop, options.fieldBottom);
     visual.hitMarker.material.color.set(levelInvincible ? 0xd9fdff : hitInvincible ? 0xffd166 : 0xff3355);
     visual.hitMarker.material.opacity = warning && Math.floor(elapsed * 18) % 2 === 0 ? 0.25 : 1;
   }
