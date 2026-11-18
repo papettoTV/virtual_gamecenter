@@ -34,3 +34,4 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   }).then(() => console.log('手動投稿用の文面を保存しました。Xへの投稿は行っていません。'))
     .catch(() => { console.error('文面の生成に失敗しました。入力と回帰テスト結果を確認してください。'); process.exitCode = 1; });
 }
+// 保守ヘルパーでの1回承認を確認した記録。
