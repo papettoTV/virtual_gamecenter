@@ -4,11 +4,11 @@ import { rewriteLivePage } from "../src/worker/live-metadata";
 import { rewriteResultPage } from "../src/worker/shared-results";
 
 it.each([
-  ["buzz-barrier", "buzz-barrier"], ["dot-wave", "dot-wave"], ["deep-sea-salvage", "deep-sea-salvage"],
+  ["buzz-barrier", "buzz-barrier-ogp-v3"], ["dot-wave", "dot-wave-ogp-v2"], ["deep-sea-salvage", "deep-sea-salvage-ogp-v2"],
 ])("renders fixed live and result server metadata for %s", async (gameId, filename) => {
   for (const origin of ["https://develop.virtual-gamecenter.pages.dev", "https://example.test:8443"]) {
     const image = socialImage(gameId, origin);
-    expect(image.url).toBe(`${origin}/social/${filename}-ogp-v2.jpg`);
+    expect(image.url).toBe(`${origin}/social/${filename}.jpg`);
     const shell = () => new Response('<html><head><meta property="og:image" content="old"><meta name="twitter:image" content="old"></head><body></body></html>', { headers: { "Content-Type": "text/html" } });
     const live = rewriteLivePage(shell(), new URL(`${origin}/cabinets/test?game=${gameId}&watch=1`));
     const result = rewriteResultPage(shell(), {

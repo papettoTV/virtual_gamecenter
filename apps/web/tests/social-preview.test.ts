@@ -30,7 +30,7 @@ function copy(node: ReactNode): string {
 it.each(["facebook", "x"] as const)("uses saved metadata, edits and actual OGP image for the %s reference preview", target => {
   const tree = SocialPostPreview({ panel, text: "編集した本文", target, onChange: vi.fn() });
   const image = elements(tree).find(element => element.type === "img");
-  expect(image?.props.src).toBe("http://localhost:5174/social/buzz-barrier-ogp-v2.jpg");
+  expect(image?.props.src).toBe("http://localhost:5174/social/buzz-barrier-ogp-v3.jpg");
   expect(copy(tree)).toContain("編集した本文");
   expect(copy(tree)).toContain("実際のSNSのレイアウトやカード表示とは異なる");
   expect(copy(tree).includes("本文を貼り付けた場合")).toBe(target === "facebook");

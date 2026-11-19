@@ -51,13 +51,13 @@ async function checkResultLayout(page, dialog, testInfo, name, url) {
 }
 
 const artwork = [
-  ['buzz-barrier', 'buzz-barrier', '78936b2ab3f306b4646e6ef72dc168bb5b7a79a3a3c1e42f7d82f5de6fe28dc8'],
-  ['dot-wave', 'dot-wave', 'dd016c80592ca966d5bd47a8f3e6096314772e0d8526124fed2fe117b234c7b2'],
-  ['deep-sea-salvage', 'deep-sea-salvage', '3041d2378eddda0aed1a8a9d2d1f3a8b06d6b9daf260f41b47d29cf61faf5251'],
+  ['buzz-barrier', 'buzz-barrier-ogp-v3', 'e8afca104dfeeefbbdbdde28982b17bbf3e1b16303713e27eb3228a89fdef9c5'],
+  ['dot-wave', 'dot-wave-ogp-v2', 'dd016c80592ca966d5bd47a8f3e6096314772e0d8526124fed2fe117b234c7b2'],
+  ['deep-sea-salvage', 'deep-sea-salvage-ogp-v2', '3041d2378eddda0aed1a8a9d2d1f3a8b06d6b9daf260f41b47d29cf61faf5251'],
 ];
 for (const [game, filename, hash] of artwork) {
   test(`${game} serves approved artwork and live HTML`, async ({ page, request, baseURL }) => {
-    const path = `/social/${filename}-ogp-v2.jpg`;
+    const path = `/social/${filename}.jpg`;
     const response = await request.get(path);
     expect(response.status()).toBe(200);
     expect(response.headers()['content-type']).toMatch(/^image\/jpeg(?:;|$)/);
@@ -252,7 +252,7 @@ for (const [game, filename] of artwork) {
       for (const target of ['X', 'Facebook']) {
         if (kind === 'live' && !compactLive) {
           await dialog.getByRole('button', { name: target, exact: true }).click();
-          await expect(image).toHaveAttribute('src', new URL(`/social/${filename}-ogp-v2.jpg`, shareUrl).href);
+          await expect(image).toHaveAttribute('src', new URL(`/social/${filename}.jpg`, shareUrl).href);
           await image.scrollIntoViewIfNeeded();
           await expect(image).toBeInViewport();
           await expect.poll(() => image.evaluate(img => [img.complete, img.naturalWidth, img.naturalHeight])).toEqual([true, 1200, 630]);
