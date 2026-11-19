@@ -181,6 +181,16 @@ for (const game of games) {
     if (isMobile || game.id !== 'buzz-barrier') {
       const readyButton = page.locator('button[data-ready-start]:visible');
       await expect(readyButton).toBeVisible();
+      expect(await readyButton.evaluate(element => {
+        const blurred = [];
+        for (let current = element; current; current = current.parentElement) {
+          const style = getComputedStyle(current);
+          const backdrop = style.getPropertyValue('backdrop-filter')
+            || style.getPropertyValue('-webkit-backdrop-filter');
+          if (/blur\(/.test(backdrop) || /blur\(/.test(style.filter)) blurred.push(current.tagName);
+        }
+        return blurred;
+      })).toEqual([]);
       if (isMobile || game.id === 'dot-wave') await expect(readyButton.and(start)).toHaveCount(1);
     } else {
       await expect(page.locator('[data-ready-start-key]:visible')).toHaveAttribute('data-ready-start-key', game.key);
