@@ -117,8 +117,8 @@ body:has(#game-screen[data-mobile-play][data-game-id="buzz-barrier"]) .notificat
   padding: 0;
   border: 0;
   background: transparent;
-  backdrop-filter: none;
   -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   box-shadow: none;
   touch-action: pan-y;
 }

@@ -1,6 +1,26 @@
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
+
+test('公開ビルドで最適化してもREADYボタンの標準ぼかし解除を残す', async () => {
+  const { build } = await import('vite');
+  const result = await build({
+    configFile: false,
+    logLevel: 'silent',
+    publicDir: false,
+    build: {
+      write: false,
+      rolldownOptions: { input: fileURLToPath(new URL('../src/features/game/mobile-play.css', import.meta.url)) },
+    },
+  });
+  const css = [result].flat().flatMap(bundle => bundle.output)
+    .filter(asset => asset.type === 'asset' && asset.fileName.endsWith('.css'))
+    .map(asset => String(asset.source)).join('\n');
+  const ready = css.match(/#game-screen \.buzz-ready-trigger\{([^}]+)\}/)?.[1];
+  assert.ok(ready, '開始ボタンのCSSが含まれていること');
+  assert.match(ready, /(?:^|;)backdrop-filter:none(?:;|$)/);
+});
 
 const styles = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
 const screen = readFileSync(new URL('../src/features/game/GameScreen.tsx', import.meta.url), 'utf8');
