@@ -35,6 +35,7 @@ export async function runApprovedProductionRelease({ candidate, plan, context, g
     httpPassed: false, browserPassed: false, mainUpdated: false,
     attempted: [], rollback: { status: 'not-needed', pages: false, worker: false } };
   const owned = {};
+  const pending = {};
   let before;
   let beforePages;
   let operation = 'approval';
@@ -45,6 +46,32 @@ export async function runApprovedProductionRelease({ candidate, plan, context, g
     await verifyProductionApproval({ api: github.api, context });
     await github.guard(candidate);
     requireMatch(await github.main() === mainBefore, '本番公開中にmainが変わりました。');
+  };
+
+  const observePublication = observed => {
+    for (const target of targets) {
+      if (same(observed[target], owned[target] ?? before[target])) continue;
+      const expected = pending[target];
+      if (expected && observed[target].deploymentId !== before[target].deploymentId
+        && (target === 'worker' ? observed.worker.versionId === expected
+          : observed.pages.deploymentId === expected && observed.pages.revision === revision)) {
+        owned[target] = observed[target];
+        delete pending[target];
+        report.published = { ...owned };
+        continue;
+      }
+      throw new ProductionCloudflareError(target, 'deployment-changed');
+    }
+  };
+
+  const waitForPublication = async (read, target) => {
+    for (let attempt = 0; ; attempt += 1) {
+      const observed = checkState(await read());
+      observePublication(observed);
+      if (target ? owned[target] : Object.keys(pending).length === 0) return observed;
+      if (attempt === 15) throw new ProductionCloudflareError('publication-readback', 'publication-not-visible');
+      await pause(2000);
+    }
   };
 
   try {
@@ -72,14 +99,11 @@ export async function runApprovedProductionRelease({ candidate, plan, context, g
         operation = 'publish-' + target;
         const publishedId = await cloudflare.execute(target, args, cwd);
         operation = 'readback-' + target;
-        const updated = checkState(await cloudflare.current());
-        requireMatch(updated[target].deploymentId !== state[target].deploymentId
-          && uuid.test(publishedId ?? '')
-          && (target === 'worker' ? updated.worker.versionId === publishedId && publishedId !== state.worker.versionId
-            : updated.pages.deploymentId === publishedId && updated.pages.revision === revision),
-        'この実行の公開先を確認できません。');
-        owned[target] = updated[target];
-        report.published = { ...owned };
+        requireMatch(uuid.test(publishedId ?? '')
+          && publishedId !== (target === 'worker' ? state.worker.versionId : state.pages.deploymentId),
+        'この実行の公開識別子を確認できません。');
+        pending[target] = publishedId;
+        await waitForPublication(() => cloudflare.current(), target);
         operation = 'publication-guard';
         return owned[target];
       },
@@ -130,7 +154,7 @@ export async function runApprovedProductionRelease({ candidate, plan, context, g
           }
         }
       };
-      const current = await readForRollback();
+      const current = await waitForPublication(readForRollback);
       assertOwned(current);
 
       for (const target of ['pages', 'worker']) {
