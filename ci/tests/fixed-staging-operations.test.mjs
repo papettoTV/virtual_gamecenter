@@ -76,6 +76,14 @@ test('browserは検証originだけにBasicを送り、外部HTTP/WSとService Wo
  assert.ok(config.includes("origin:'https://develop.virtual-gamecenter.pages.dev'"));assert.ok(config.includes("serviceWorkers:'block'"));assert.ok(!config.includes('outputFile:'));assert.ok(spec.includes('routeWebSocket'));assert.ok(spec.includes('route.abort()'));assert.ok(spec.includes('socket.close()'));
 });
 
+test('開始準備だけを15秒まで待ち、開始とキャンセルの検査は維持する',async()=>{
+ const spec=await readFile(new URL('../control/toolchain/browser/regression.spec.mjs',import.meta.url),'utf8');
+ assert.match(spec,/await expect\(startButton\.or\(keyboardStart\)\)\.toHaveCount\(1, \{ timeout: 15000 \}\)/);
+ assert.equal((spec.match(/timeout: 15000/g)??[]).length,1);
+ for(const marker of ['await page.keyboard.press(key)', 'await startButton.tap()', 'await expect(welcome.or(gate)).toBeVisible()', "await gate.locator('.platform-cancel-button').click()", 'await expect(badge).toHaveText(balance)', 'expect(reservations).toEqual([])'])assert.ok(spec.includes(marker),marker);
+ assert.doesNotMatch(spec,/waitForTimeout/);
+});
+
 test('公開途中で失敗したらWorker反映・Pages結果不明を記録し再試行しない',async t=>{
  const f=await fixture(t);f.mode='live';f.credentials={cloudflareToken:'dummy-cf',username:'dummy',password:'dummy'};let calls=0;
  f.ports={request:async()=>Response.json({success:true,result:{name:'virtual-gamecenter',production_branch:'main',build_config:{destination_dir:'dist/client'}}}),process:async()=>({exitCode:++calls===1?0:1,stdout:'private'})};

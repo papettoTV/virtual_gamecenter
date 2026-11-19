@@ -148,6 +148,33 @@ async function leaveToDirectory(page, gameId, selector = null) {
     page.off('dialog', onDialog);
   }
 }
+test('buzz-barrier: slow first runtime load becomes ready without reserving credit', async ({ page, isMobile }) => {
+  const reservations = [];
+  page.on('request', request => {
+    if (request.method() === 'POST' && new URL(request.url()).pathname.startsWith('/api/platform/credit-reservations')) reservations.push(request.url());
+  });
+  let delayed = false;
+  await page.route(/\/src\/games\/graze-duel\/runtime(?:\.ts)?(?:\?|$)/, async route => {
+    delayed = true;
+    await new Promise(resolve => setTimeout(resolve, 6500));
+    await route.continue();
+  });
+  await navigateGuest(page, origin + '/');
+  await page.getByRole('button', { name: '拒否する', exact: true }).click();
+  const started = Date.now();
+  await page.locator('button[data-showcase-play="buzz-barrier"]').click();
+  await expect(page).toHaveURL(/\/cabinets\//);
+  const startButton = page.locator('button[data-ready-start]:visible');
+  const keyboardStart = page.locator('[data-ready-start-key]:visible');
+  await expect(startButton.or(keyboardStart)).toHaveCount(1, { timeout: 15000 });
+  expect(delayed).toBe(true);
+  expect(Date.now() - started).toBeGreaterThanOrEqual(6500);
+  await expect.poll(() => phase(page, 'buzz-barrier')).toBe('ready');
+  if (isMobile) await startButton.click({ trial: true });
+  else await expect(keyboardStart).toHaveAttribute('data-ready-start-key', 'Space');
+  expect(reservations).toEqual([]);
+});
+
 for (const game of games) {
   test(`${game.id}: unpaid ready exits immediately and another game remains unpaid`, async ({ page }) => {
     await prepareGuest(page);

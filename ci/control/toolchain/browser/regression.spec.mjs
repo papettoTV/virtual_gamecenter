@@ -42,6 +42,9 @@ test('game navigation allows declining credit and returning before play', async 
   cabinet.searchParams.delete('start');
   const cabinetUrl = cabinet.href;
   expect(cabinet.searchParams.get('game')).toBe('buzz-barrier');
+  const startButton = page.locator('button[data-ready-start]:visible');
+  const keyboardStart = page.locator('[data-ready-start-key]:visible');
+  await expect(startButton.or(keyboardStart)).toHaveCount(1, { timeout: 15000 });
   await expect(page.getByRole('button', { name: 'プロフィールを表示', exact: true })).toBeVisible();
   const badge = page.locator('.platform-credit-badge');
   await expect(badge).toBeVisible();
@@ -50,9 +53,6 @@ test('game navigation allows declining credit and returning before play', async 
   const gate = page.getByRole('dialog', { name: /クレジットが不足しています|ゲームを開始しますか/ });
   await expect(welcome).toBeHidden();
   await expect(gate).toBeHidden();
-  const startButton = page.locator('button[data-ready-start]:visible');
-  const keyboardStart = page.locator('[data-ready-start-key]:visible');
-  await expect(startButton.or(keyboardStart)).toHaveCount(1);
   expect(reservations).toEqual([]);
   if (await startButton.isVisible()) {
     if (isMobile) await startButton.tap();

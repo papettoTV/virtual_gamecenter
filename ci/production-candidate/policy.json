@@ -33,7 +33,7 @@
     "ci/control/staging-publication.mjs": "ee43e79244ec5faffe2c14dda3adc16f300a4767",
     "ci/control/staging-regression.mjs": "3ef3185a09af24c13bd343d2e5c00b7efa4e4bc8",
     "ci/control/staging-target.json": "70b327d99138e6db471e7f7312b17d087a07c629",
-    "ci/control/toolchain/browser/regression.spec.mjs": "567c1eb1aca853ccd8ab325fbe46b03e37b3f3b5",
+    "ci/control/toolchain/browser/regression.spec.mjs": "e3192d42b8787caafb4ed5f4529d8ef44f74e666",
     "ci/control/toolchain/package-lock.json": "6329677a8a199f2fcf2f50e39eeb617de9dbf723",
     "ci/control/toolchain/package.json": "390755439e6bb27537c6b47537cea859c91d2444",
     "ci/control/toolchain/prepare-browser-sandbox.mjs": "4731c3999fbfe0da5f313734dff41bcd8e75ac73",
