@@ -41,6 +41,22 @@ async function phase(page, gameId, phase, role = 'player') {
 }
 
 for (const viewport of [{ width: 390, height: 844 }, { width: 412, height: 915 }]) {
+  test(`READY overlay stays sharp and tappable ${viewport.width}`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const screen = await mount(page, 'buzz-barrier');
+    await page.getByRole('button', { name: '拒否する', exact: true }).click();
+    const guide = screen.getByRole('region', { name: '操作と遊び方' });
+    await expect(guide.getByRole('heading', { name: 'READY', exact: true })).toBeVisible();
+    const readyStart = screen.getByRole('button', { name: 'ゲーム開始', exact: true });
+    await expect(readyStart).toBeVisible();
+    expect(await readyStart.evaluate(element => {
+      const style = getComputedStyle(element);
+      return style.getPropertyValue("backdrop-filter")
+        || style.getPropertyValue("-webkit-backdrop-filter");
+    })).toBe("none");
+    await readyStart.click({ trial: true });
+  });
+
   test(`mobile viewport, invitation, rotation and restoration ${viewport.width}`, async ({ page }) => {
     await page.setViewportSize(viewport);
     const screen = await mount(page, 'buzz-barrier');
