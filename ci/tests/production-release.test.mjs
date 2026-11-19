@@ -98,6 +98,104 @@ test('本番承認がない場合は公開もmain更新も行わない', async t
   assert.deepEqual(f.calls, []);
 });
 
+test('Worker反映が遅れても公開を再送せず、今回のバージョン確認後だけPagesへ進む', async t => {
+  const f = await fixture(t);
+  let waiting = false;
+  let reads = 0;
+  const execute = f.options.cloudflare.execute;
+  f.options.cloudflare.execute = async (target, ...args) => {
+    const published = await execute(target, ...args);
+    if (target === 'worker') {
+      f.state.worker = structuredClone(before.worker);
+      waiting = true;
+    }
+    return published;
+  };
+  f.options.pause = async milliseconds => {
+    if (!waiting) return;
+    assert.equal(milliseconds, 2000);
+    if (++reads === 3) {
+      f.state.worker = structuredClone(after.worker);
+      waiting = false;
+    }
+  };
+  const result = await runApprovedProductionRelease(f.options);
+  assert.equal(result.success, true);
+  assert.equal(reads, 3);
+  assert.equal(f.calls.filter(call => call === 'worker').length, 1);
+});
+
+test('反映確認が失敗してからWorkerが反映されても今回のバージョンだけ切り戻す', async t => {
+  const f = await fixture(t);
+  const execute = f.options.cloudflare.execute;
+  let published = false;
+  let checks = 0;
+  f.options.cloudflare.execute = async (target, ...args) => {
+    const result = await execute(target, ...args);
+    published = true;
+    f.state.worker = structuredClone(before.worker);
+    return result;
+  };
+  const current = f.options.cloudflare.current;
+  f.options.cloudflare.current = async options => {
+    if (published && ++checks === 1) throw Error('readback failed');
+    if (published && checks === 3) f.state.worker = structuredClone(after.worker);
+    return current(options);
+  };
+  f.options.pause = async () => {};
+  const result = await runApprovedProductionRelease(f.options);
+  assert.deepEqual(result.rollback, { status: 'verified', pages: false, worker: true });
+  assert.deepEqual(f.calls, ['old-http', 'worker', 'restore-worker', 'old-http']);
+});
+
+test('未反映が上限を超えたら旧版に見えても復旧済みとは扱わない', async t => {
+  const f = await fixture(t);
+  let pauses = 0;
+  f.options.cloudflare.execute = async target => {
+    f.calls.push(target);
+    return after.worker.versionId;
+  };
+  f.options.pause = async () => { pauses += 1; };
+  const result = await runApprovedProductionRelease(f.options);
+  assert.equal(result.success, false);
+  assert.equal(result.failure.reason, 'publication-not-visible');
+  assert.equal(result.rollback.status, 'needs-attention');
+  assert.equal(pauses, 30);
+  assert.deepEqual(f.calls, ['old-http', 'worker']);
+});
+
+test('通常の反映待ち上限の後に反映されたWorkerも切り戻して検証する', async t => {
+  const f = await fixture(t);
+  const execute = f.options.cloudflare.execute;
+  let pauses = 0;
+  f.options.cloudflare.execute = async (target, ...args) => {
+    const result = await execute(target, ...args);
+    f.state.worker = structuredClone(before.worker);
+    return result;
+  };
+  f.options.pause = async () => {
+    if (++pauses === 16) f.state.worker = structuredClone(after.worker);
+  };
+  const result = await runApprovedProductionRelease(f.options);
+  assert.equal(result.failure.reason, 'publication-not-visible');
+  assert.deepEqual(result.rollback, { status: 'verified', pages: false, worker: true });
+  assert.deepEqual(f.calls, ['old-http', 'worker', 'restore-worker', 'old-http']);
+});
+
+test('反映待ち中の別バージョンは公開・切り戻しとも上書きしない', async t => {
+  const f = await fixture(t);
+  const execute = f.options.cloudflare.execute;
+  f.options.cloudflare.execute = async (target, ...args) => {
+    const result = await execute(target, ...args);
+    f.state.worker = { deploymentId: id(98), versionId: id(99) };
+    return result;
+  };
+  const result = await runApprovedProductionRelease(f.options);
+  assert.equal(result.failure.reason, 'deployment-changed');
+  assert.equal(result.rollback.status, 'needs-attention');
+  assert.deepEqual(f.calls, ['old-http', 'worker']);
+});
+
 test('回帰失敗時はPagesとWorkerを前の配信に戻してHTTPを再確認する', async t => {
   const f = await fixture(t);
   f.options.regression.browser = async () => 7;
