@@ -40,7 +40,10 @@ async function phase(page, gameId, phase, role = 'player') {
   }, { gameId, cabinetId: 'presentation-only', role, phase });
 }
 
-for (const viewport of [{ width: 390, height: 844 }, { width: 412, height: 915 }]) {
+for (const viewport of [
+  { width: 320, height: 740 }, { width: 390, height: 844 },
+  { width: 412, height: 915 }, { width: 428, height: 926 },
+]) {
   test(`READY overlay stays sharp and tappable ${viewport.width}`, async ({ page }) => {
     await page.setViewportSize(viewport);
     const screen = await mount(page, 'buzz-barrier');
@@ -56,7 +59,9 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 412, height: 915 }
     })).toBe("none");
     await readyStart.click({ trial: true });
   });
+}
 
+for (const viewport of [{ width: 390, height: 844 }, { width: 412, height: 915 }]) {
   test(`mobile viewport, invitation, rotation and restoration ${viewport.width}`, async ({ page }) => {
     await page.setViewportSize(viewport);
     const screen = await mount(page, 'buzz-barrier');
