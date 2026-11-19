@@ -6,6 +6,19 @@ import { createHash } from "node:crypto";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+test("BUZZ sharing artwork matches the latest approved demo frame and its provenance", async () => {
+  const root = new URL("../public/", import.meta.url);
+  const metadata = JSON.parse(await readFile(new URL("social/buzz-barrier-ogp-v3.json", root), "utf8"));
+  const hash = bytes => createHash("sha256").update(bytes).digest("hex");
+  assert.equal(hash(await readFile(new URL("social/" + metadata.file, root))), metadata.sha256);
+  assert.equal(hash(await readFile(new URL(metadata.source.poster, root))), metadata.source.posterSha256);
+  const demo = JSON.parse(await readFile(new URL("demos/buzz-barrier/boss-demo-v2.json", root), "utf8"));
+  assert.equal(metadata.source.posterSha256, demo.poster.sha256);
+  assert.equal(metadata.source.videoTimeSeconds, demo.poster.videoTimeSeconds);
+  assert.equal(metadata.source.sourceRevision, demo.sourceRevision);
+  assert.deepEqual([metadata.width, metadata.height], [1200, 630]);
+});
+
 test("published notices preserve current browser dependency licenses and versions", async () => {
   const notices = await readFile(new URL("../public/third-party-notices.html", import.meta.url), "utf8");
   assert.ok(notices.includes('<meta charset="utf-8">'));

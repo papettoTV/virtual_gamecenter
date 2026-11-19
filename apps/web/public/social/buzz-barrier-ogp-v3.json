@@ -1,0 +1,18 @@
+{
+  "gameId": "buzz-barrier",
+  "createdAt": "2026-11-20",
+  "file": "buzz-barrier-ogp-v3.jpg",
+  "sha256": "e8afca104dfeeefbbdbdde28982b17bbf3e1b16303713e27eb3228a89fdef9c5",
+  "width": 1200,
+  "height": 630,
+  "source": {
+    "poster": "demos/buzz-barrier/boss-demo-v2.jpg",
+    "posterSha256": "714ce49096b222aed9fa4b74eae1db870b719d4974f8fb44cce14fb6cfc64b70",
+    "video": "demos/buzz-barrier/boss-demo-v2.mp4",
+    "videoTimeSeconds": 4.3,
+    "sourceRevision": "5a6d1c75ce0b28425f1a4a18a4646222b72a3d6b",
+    "description": "承認済みの最新実プレイ収録から、初代ボス戦の稲妻と無敵シールドが同時に映るフレームを使用。ラスボスは含めない。"
+  },
+  "layout": "従来の横長カードを維持。1200×630、上部534pxに中央800px幅・object-fit:cover・object-position:center 50%で実プレイ画像を配置し、下部96pxにゲーム名とbrand/pulbase-wordmark.svgを表示。",
+  "usage": "観戦・結果共有のOGP、Twitter Card、SNS投稿プレビュー。旧v2は既存リンクの参照のため保持。"
+}

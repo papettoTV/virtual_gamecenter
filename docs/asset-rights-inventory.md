@@ -81,6 +81,7 @@ node --test apps/web/tests/asset-policy.test.mjs
 | DOT WAVEデモ：`public/dot-wave-promo.mp4`、`dot-wave-promo-poster.jpg` | ファイルとゲーム定義の参照あり。音声トラック0本を実査 | トップ・筐体のデモ | 撮影元・映像の許諾を確認 |
 | ブランド：`public/brand/*` | `deliverables/pulbase-brand-final/`に正本・生成スクリプト・manifestあり。文字とシンボルはパス構成 | ロゴ・favicon・OGP | 作者・素材契約・画像化した文字の利用条件、商標・ドメインの最終確認 |
 | SNS固定画像：`public/social/*-ogp-v2.jpg`（3点） | #90の承認添付3枚と一致。#107で追加、#114でプレビュー定義を共通化 | 観戦/結果URLのOGP・X/FB共有パネル | 見た目の承認は元素材の許諾ではない。ゲーム画像・画像化された文字等の確認に追随。外部SNSでのキャッシュ・再配布を含む用途確認 |
+| 現行BUZZ SNS画像：`public/social/buzz-barrier-ogp-v3.jpg` | #250。承認済みの最新デモの4.3秒時点の初代ボス・稲妻・シールドを使用。隣接JSONに出典・ハッシュ・配置を記録 | 観戦/結果のOGPと投稿プレビュー。旧v2は既存参照用に保持 | 承認済み実プレイ素材と既存ブランド素材の権利に追随 |
 | 音楽・効果音：BUZZ/DOTの`audio.ts`、DOTの`duel/audio.ts` | Web Audioの発振器・生成ノイズ。publicの音源ファイルは今回の走査でなし | ゲーム中の合成音 | コード由来であることと、既存楽曲・旋律の権利確認は別。宣伝素材側のBGMは下記の別管理 |
 | UIフォント | CSSのsystem-ui / monospace等。publicにTTF/OTF/WOFFの配布なし | 端末のフォントを使用 | 将来Webフォント追加時は再確認。ロゴPNG内の文字は上のブランド項目で別確認 |
 | React / React DOM / Scheduler / Three.js | インストール済み各パッケージのLICENSE全文とバージョンを収録 | `/third-party-notices.html`、フッター「ライセンス」 | 更新時は`test:release`が現行LICENSE・バージョンとの不一致を検出。新たなブラウザ依存追加時は対象一覧も更新 |
@@ -92,10 +93,11 @@ node --test apps/web/tests/asset-policy.test.mjs
 | ファイル | SHA-256 | 検証証跡 |
 | --- | --- | --- |
 | `social/buzz-barrier-ogp-v2.jpg` | `78936b2ab3f306b4646e6ef72dc168bb5b7a79a3a3c1e42f7d82f5de6fe28dc8` | [#90受け入れ記録](https://github.com/papettoTV/virtual_gamecenter/issues/90#issuecomment-6588423106) |
+| `social/buzz-barrier-ogp-v3.jpg` | `e8afca104dfeeefbbdbdde28982b17bbf3e1b16303713e27eb3228a89fdef9c5` | #250。最新デモから作成、出典は隣接JSON。配信検証はPR/Issueの証跡に記録 |
 | `social/dot-wave-ogp-v2.jpg` | `dd016c80592ca966d5bd47a8f3e6096314772e0d8526124fed2fe117b234c7b2` | 同上 |
 | `social/deep-sea-salvage-ogp-v2.jpg` | `3041d2378eddda0aed1a8a9d2d1f3a8b06d6b9daf260f41b47d29cf61faf5251` | [#113受け入れ記録](https://github.com/papettoTV/virtual_gamecenter/issues/113#issuecomment-6588423560) |
 
-3点ともJPEG/1200×630。上記は2026-11-03のローカルハッシュと、検証環境`d626999`での既存受け入れ証跡の対応であり、本番配信・SNS実投稿の確認ではない。
+旧v2の3点はJPEG/1200×630。v2の記録は2026-11-03のローカルハッシュと、検証環境`d626999`での既存受け入れ証跡の対応であり、本番配信・SNS実投稿の確認ではない。BUZZ v3もJPEG/1200×630で、2026-11-20に最新デモから作成した。
 
 パスの`public/`、`scripts/`は`apps/web/`からの相対。これらを確認済みの素材だけに差し替えたり削除したりする作業は、見た目・ゲームを変えるため別途判断する。
 
