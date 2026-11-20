@@ -10,7 +10,7 @@ Issueへの自動ラベル付与、実装、PR作成、レビュー、developマ
 
 - `PULBASE_CODEX_ENABLED=true`。
 - 新経路専用のRepository variable `PULBASE_DEVELOP_AUTO_MERGE_ENABLED=true`。未登録・falseなら自動マージしない。
-- `PULBASE_CONTROL_EVIDENCE_ENABLED=true`、固定制御SHA `2c883a1cdd961510a0557742f74294739752f445` を維持する。
+- `PULBASE_CONTROL_EVIDENCE_ENABLED=true`。現在の固定制御SHAは `98e5d49fc5bb27cf2dd6f1d0b01bcae1f79ddbe3`。起動コードの `CONTROL_SHA`・workflowの固定checkout・管理変数・実際のci-control refを一致させる。
 - 旧経路の `PULBASE_AUTO_MERGE_ENABLED` と `PULBASE_STAGING_DEPLOY_ENABLED` は未使用。削除してよい。
 - production・Xのフラグはfalseのまま。
 
@@ -25,6 +25,23 @@ developの必須CIはGitHub Actions発行のverify / Automation control checks�
 ci-controlとmainのbypassは空、保護モードstrictのまま。固定した保護設定版から変更されたら停止する。設定版・制御SHAを今後更新するときは、人が保護設定と固定コードを確認して新起動側の固定値も更新する。自動マージの開始ジョブはautomation、実公開は人の承認が必要なstagingに分離する。
 
 ## 停止時の扱い
+
+### 2026-11-21：起動側固定値の整合（Issue #256）
+
+PR #255のCI・独立レビューは成功したが、自動マージ44837989650は起動コードの旧固定SHA `cc46fbb...` と管理変数・ci-control実ref `98e5d49...` の不一致で停止した。起動側だけを通常の手元PRで更新する。保護設定版は実ルールの更新日時をUTCへ正規化し、staging/staging-workerの確認済み変数と照合した次の値へ固定する。
+
+| 項目 | 固定値 |
+| --- | --- |
+| ciControl | `2026-11-19T22:57:43.361Z` |
+| main | `2026-11-16T03:54:57.667Z` |
+| mainIntegrity | `2026-10-21T03:07:09.139Z` |
+| protectionMode | `strict` |
+
+ci-controlのbypass空と4種の禁止ルール、mainの既存release App限定更新・integrity、developのstrict・管理者適用・必須CIを維持する。ルール、管理変数、Secret、ci-control、main自体は変更しないため、この整合のための管理者用トークン入力・PEM配置・一時例外追加は不要。
+
+起動側はルールセットAPIの`updated_at`だけを、明示されたタイムゾーンを使ってUTCミリ秒へ正規化してから固定制御へ渡す。`+09:00`など同じ時刻の表記差だけを吸収し、日時以外の保護内容を保持する。タイムゾーンなし・不正な日時・ミリ秒を超える精度は拒否し、1ミリ秒でも設定版が変われば従来の照合で停止する。
+
+管理修正をdevelopへマージ後、PR #255はGitHubのUpdate branch相当の管理上のbase同期だけを行う。旧レビューrunの再実行や手動のマージ代行はせず、新headの初回CI・独立レビューと既存の自動マージを経由する。通知の自動実装担当は維持し、手元でゲーム実装や別の通知PRを作らない。
 
 古いbase/head、再実行、CI/レビュー失敗、24時間を超えた証跡、許可範囲外の変更、定義改変、公開なし試験、担当変更はマージしない。自動再試行や古い候補の強制マージは行わない。baseの更新や修正が必要な場合は、担当ルールを維持した修正PR/新しいheadのCI・レビューで確認する。
 
