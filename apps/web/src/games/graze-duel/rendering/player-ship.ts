@@ -19,7 +19,7 @@ function drawEvolvedShip(context: CanvasRenderingContext2D, color: string, stage
     [[11, -12], [17, -6], [17, 14], [12, 7]],
   ] : [
     [[-3, -7], [-7, -3], [-7, 4], [-3, 8], [3, 8], [7, 4], [7, -3], [3, -7]],
-    [[-4, 8], [-11, 17], [-9, 19], [9, 19], [11, 17], [4, 8]],
+    [[-4, 8], [-11, 19], [-5, 16], [5, 16], [11, 19], [4, 8]],
   ];
   if (stage === 3 && layer !== "body") drawPlayerWings(context, color, getPlayerWingRotation(elapsed));
   if (layer === "wings") return;

@@ -96,7 +96,18 @@ it("第3段階の本体後部は先細りではなくスカート状に広がり
   const lower = skirt.filter(point => point[1] === 19);
   const width = (points: number[][]) => Math.max(...points.map(point => point[0]!)) - Math.min(...points.map(point => point[0]!));
   expect(width(upper)).toBe(8);
-  expect(width(lower)).toBe(18);
+  expect(width(lower)).toBe(22);
+  for (const tipIndex of [1, 4]) {
+    const tip = skirt[tipIndex]!;
+    const previous = skirt[tipIndex - 1]!;
+    const next = skirt[tipIndex + 1]!;
+    const previousX = previous[0]! - tip[0]!;
+    const previousY = previous[1]! - tip[1]!;
+    const nextX = next[0]! - tip[0]!;
+    const nextY = next[1]! - tip[1]!;
+    const cosine = (previousX * nextX + previousY * nextY) / (Math.hypot(previousX, previousY) * Math.hypot(nextX, nextY));
+    expect(Math.acos(cosine)).toBeLessThan(Math.PI / 4);
+  }
   expect(body.points).toEqual(render(30, 0.6, "body").points);
 });
 
