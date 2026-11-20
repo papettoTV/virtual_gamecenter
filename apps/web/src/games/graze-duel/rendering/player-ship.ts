@@ -1,3 +1,5 @@
+import { drawPlayerWings } from "./player-wing-geometry";
+
 export type PlayerShipStage = 1 | 2 | 3;
 export type PlayerShipLayer = "all" | "body" | "wings";
 
@@ -17,21 +19,17 @@ function drawEvolvedShip(context: CanvasRenderingContext2D, color: string, stage
     [[11, -12], [17, -6], [17, 14], [12, 7]],
   ] : [
     [[-3, -7], [-7, -3], [-7, 4], [-3, 8], [3, 8], [7, 4], [7, -3], [3, -7]],
-    [[-3, -18], [-12, -17], [-17, -11], [-16, 2], [-11, -5], [-4, -9]],
-    [[3, -18], [12, -17], [17, -11], [16, 2], [11, -5], [4, -9]],
     [[-2, 10], [0, 19], [2, 10]],
   ];
+  if (stage === 3 && layer !== "body") drawPlayerWings(context, color, getPlayerWingRotation(elapsed));
+  if (layer === "wings") return;
   context.fillStyle = "rgba(6, 26, 53, 0.78)";
   context.strokeStyle = color;
   context.lineWidth = 1.5;
-  const wingScale = stage === 3 ? Math.cos(getPlayerWingRotation(elapsed)) : 1;
-  for (const [index, panel] of panels.entries()) {
-    const wing = stage === 3 && (index === 1 || index === 2);
-    if (layer === "body" && wing || layer === "wings" && !wing) continue;
-    const scale = wing ? wingScale : 1;
+  for (const panel of panels) {
     context.beginPath();
-    context.moveTo(panel[0]![0]! * scale, panel[0]![1]!);
-    for (const point of panel.slice(1)) context.lineTo(point[0]! * scale, point[1]!);
+    context.moveTo(panel[0]![0]!, panel[0]![1]!);
+    for (const point of panel.slice(1)) context.lineTo(point[0]!, point[1]!);
     context.closePath();
     context.fill();
     context.stroke();
@@ -48,13 +46,6 @@ function drawEvolvedShip(context: CanvasRenderingContext2D, color: string, stage
     context.lineTo(-12, 5);
     context.moveTo(9, -3);
     context.lineTo(12, 5);
-  } else if (layer !== "body") {
-    context.moveTo(-14 * wingScale, -9);
-    context.lineTo(-11 * wingScale, -13);
-    context.lineTo(-6 * wingScale, -14);
-    context.moveTo(14 * wingScale, -9);
-    context.lineTo(11 * wingScale, -13);
-    context.lineTo(6 * wingScale, -14);
   }
   context.stroke();
   context.fillStyle = "#d9fdff";
