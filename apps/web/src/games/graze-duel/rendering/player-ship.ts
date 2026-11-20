@@ -1,10 +1,16 @@
 export type PlayerShipStage = 1 | 2 | 3;
+export type PlayerShipLayer = "all" | "body" | "wings";
+
+export function getPlayerWingRotation(elapsed = 0) {
+  return elapsed * Math.PI * 2 / 2.4;
+}
 
 export function getPlayerShipStage(level = 0): PlayerShipStage {
   return level >= 30 ? 3 : level >= 10 ? 2 : 1;
 }
 
-function drawEvolvedShip(context: CanvasRenderingContext2D, color: string, stage: PlayerShipStage) {
+function drawEvolvedShip(context: CanvasRenderingContext2D, color: string, stage: PlayerShipStage,
+  { elapsed = 0, layer = "all" }: { elapsed?: number; layer?: PlayerShipLayer }) {
   const panels = stage === 2 ? [
     [[0, -18], [-6, -9], [-6, 12], [-3, 17], [3, 17], [6, 12], [6, -9]],
     [[-11, -12], [-17, -6], [-17, 14], [-12, 7]],
@@ -18,10 +24,14 @@ function drawEvolvedShip(context: CanvasRenderingContext2D, color: string, stage
   context.fillStyle = "rgba(6, 26, 53, 0.78)";
   context.strokeStyle = color;
   context.lineWidth = 1.5;
-  for (const panel of panels) {
+  const wingScale = stage === 3 ? Math.cos(getPlayerWingRotation(elapsed)) : 1;
+  for (const [index, panel] of panels.entries()) {
+    const wing = stage === 3 && (index === 1 || index === 2);
+    if (layer === "body" && wing || layer === "wings" && !wing) continue;
+    const scale = wing ? wingScale : 1;
     context.beginPath();
-    context.moveTo(panel[0]![0]!, panel[0]![1]!);
-    for (const point of panel.slice(1)) context.lineTo(point[0]!, point[1]!);
+    context.moveTo(panel[0]![0]! * scale, panel[0]![1]!);
+    for (const point of panel.slice(1)) context.lineTo(point[0]! * scale, point[1]!);
     context.closePath();
     context.fill();
     context.stroke();
@@ -38,20 +48,21 @@ function drawEvolvedShip(context: CanvasRenderingContext2D, color: string, stage
     context.lineTo(-12, 5);
     context.moveTo(9, -3);
     context.lineTo(12, 5);
-  } else {
-    context.moveTo(-14, -9);
-    context.lineTo(-11, -13);
-    context.lineTo(-6, -14);
-    context.moveTo(14, -9);
-    context.lineTo(11, -13);
-    context.lineTo(6, -14);
+  } else if (layer !== "body") {
+    context.moveTo(-14 * wingScale, -9);
+    context.lineTo(-11 * wingScale, -13);
+    context.lineTo(-6 * wingScale, -14);
+    context.moveTo(14 * wingScale, -9);
+    context.lineTo(11 * wingScale, -13);
+    context.lineTo(6 * wingScale, -14);
   }
   context.stroke();
   context.fillStyle = "#d9fdff";
   if (stage === 2) context.fillRect(-1, 17, 2, 2);
 }
 
-export function drawPlayerShip(context: CanvasRenderingContext2D, color: string, glowScale = 1, level = 0) {
+export function drawPlayerShip(context: CanvasRenderingContext2D, color: string, glowScale = 1, level = 0,
+  options: { elapsed?: number; layer?: PlayerShipLayer } = {}) {
   context.save();
   context.lineJoin = "miter";
   context.lineCap = "square";
@@ -59,8 +70,12 @@ export function drawPlayerShip(context: CanvasRenderingContext2D, color: string,
   context.shadowColor = color;
 
   const stage = getPlayerShipStage(level);
+  if (options.layer === "wings" && stage !== 3) {
+    context.restore();
+    return;
+  }
   if (stage !== 1) {
-    drawEvolvedShip(context, color, stage);
+    drawEvolvedShip(context, color, stage, options);
     context.restore();
     return;
   }

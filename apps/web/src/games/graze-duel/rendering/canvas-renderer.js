@@ -324,7 +324,7 @@ export function createCanvasRenderer(options) {
     context.save();
     context.translate(player.x + bankOffset, player.y);
     context.scale(bankScale, 1);
-    drawPlayerShip(context, player.color, 1, player.level);
+    drawPlayerShip(context, player.color, 1, player.level, { elapsed: frame.elapsedRound });
     context.restore();
   }
 
