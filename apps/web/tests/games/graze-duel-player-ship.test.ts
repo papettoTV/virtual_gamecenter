@@ -65,7 +65,7 @@ it("第3段階の翼は厚い立体で前後軸を回り、90度でも細い線�
   for (let index = 0; index <= 240; index += 1) {
     const points = projectPlayerWings(getPlayerWingRotation(index / 100));
     const width = Math.max(...points.map(point => point[0])) - Math.min(...points.map(point => point[0]));
-    expect(width).toBeGreaterThan(33.7);
+    expect(width).toBeGreaterThan(29.4);
     expect(width).toBeLessThanOrEqual(34.000001);
     expect(points.map(point => point[1])).toEqual(PLAYER_WING_MODEL.vertices.map(point => point[1]));
   }
@@ -91,7 +91,7 @@ it("Three.jsは翼の立体メッシュのみをY軸回転し、毎フレーム�
 
 it("翼は奥行きと端面のある閉じた立体で、板状の形状ではない", () => {
   const points = PLAYER_WING_MODEL.vertices;
-  expect(Math.max(...points.map(point => point[2])) - Math.min(...points.map(point => point[2]))).toBeGreaterThan(33);
+  expect(Math.max(...points.map(point => point[2])) - Math.min(...points.map(point => point[2]))).toBeGreaterThan(29.4);
   const edges = new Map<string, number>();
   for (const face of PLAYER_WING_MODEL.faces) {
     for (const [index, first] of face.entries()) {
@@ -101,6 +101,20 @@ it("翼は奥行きと端面のある閉じた立体で、板状の形状では�
     }
   }
   expect([...edges.values()].every(count => count === 2)).toBe(true);
+});
+
+it("2枚の翼の間に60度の隙間を残し、面や輪郭でつながない", () => {
+  const half = PLAYER_WING_MODEL.vertices.length / 2;
+  for (const [index, point] of PLAYER_WING_MODEL.vertices.entries()) {
+    const [pointX, , pointZ] = point;
+    const center = index < half ? 0 : Math.PI;
+    const angle = Math.atan2(pointZ, pointX);
+    const difference = Math.atan2(Math.sin(angle - center), Math.cos(angle - center));
+    expect(Math.abs(difference)).toBeLessThanOrEqual(Math.PI / 3 + 1e-10);
+  }
+  for (const indices of [...PLAYER_WING_MODEL.faces, ...PLAYER_WING_MODEL.edges, ...PLAYER_WING_MODEL.seams]) {
+    expect(indices.every(index => index < half) || indices.every(index => index >= half)).toBe(true);
+  }
 });
 
 it("回転しても元の描画範囲を超えず、同じゲーム時刻では同じ姿になる", () => {

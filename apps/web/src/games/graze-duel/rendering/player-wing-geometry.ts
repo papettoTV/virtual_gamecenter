@@ -10,7 +10,7 @@ function createWingSectors() {
   for (const center of [0, Math.PI]) {
     const offset = vertices.length;
     for (let step = 0; step <= segments; step += 1) {
-      const angle = center + (step / segments - 0.5) * Math.PI * 165 / 180;
+      const angle = center + (step / segments - 0.5) * Math.PI * 120 / 180;
       for (const [radius, height] of profile) vertices.push([radius * Math.cos(angle), height, radius * Math.sin(angle)]);
     }
     for (let step = 0; step < segments; step += 1) {
