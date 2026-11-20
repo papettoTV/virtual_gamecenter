@@ -19,7 +19,7 @@ function drawEvolvedShip(context: CanvasRenderingContext2D, color: string, stage
     [[11, -12], [17, -6], [17, 14], [12, 7]],
   ] : [
     [[-3, -7], [-7, -3], [-7, 4], [-3, 8], [3, 8], [7, 4], [7, -3], [3, -7]],
-    [[-2, 10], [0, 19], [2, 10]],
+    [[-4, 8], [-11, 17], [-9, 19], [9, 19], [11, 17], [4, 8]],
   ];
   if (stage === 3 && layer !== "body") drawPlayerWings(context, color, getPlayerWingRotation(elapsed));
   if (layer === "wings") return;
@@ -46,6 +46,11 @@ function drawEvolvedShip(context: CanvasRenderingContext2D, color: string, stage
     context.lineTo(-12, 5);
     context.moveTo(9, -3);
     context.lineTo(12, 5);
+  } else {
+    context.moveTo(-2, 10);
+    context.lineTo(-5, 17);
+    context.moveTo(2, 10);
+    context.lineTo(5, 17);
   }
   context.stroke();
   context.fillStyle = "#d9fdff";

@@ -89,6 +89,17 @@ it("Three.jsは翼の立体メッシュのみをY軸回転し、毎フレーム�
   expect(visual.root.children).toHaveLength(3);
 });
 
+it("第3段階の本体後部は先細りではなくスカート状に広がり、翼と一緒に回らない", () => {
+  const body = render(30, 0, "body");
+  const skirt = body.panels[1]!;
+  const upper = skirt.filter(point => point[1] === 8);
+  const lower = skirt.filter(point => point[1] === 19);
+  const width = (points: number[][]) => Math.max(...points.map(point => point[0]!)) - Math.min(...points.map(point => point[0]!));
+  expect(width(upper)).toBe(8);
+  expect(width(lower)).toBe(18);
+  expect(body.points).toEqual(render(30, 0.6, "body").points);
+});
+
 it("翼は奥行きと端面のある閉じた立体で、板状の形状ではない", () => {
   const points = PLAYER_WING_MODEL.vertices;
   expect(Math.max(...points.map(point => point[2])) - Math.min(...points.map(point => point[2]))).toBeGreaterThan(29.4);
