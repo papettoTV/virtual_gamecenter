@@ -1,6 +1,7 @@
 import { createPlayerEffects } from "./three-player-effects";
+import { createPlayerWingVisual } from "./three-player-wings";
 import * as THREE from "three";
-import { drawPlayerShip } from "./player-ship";
+import { drawPlayerShip, getPlayerShipStage, getPlayerWingRotation, type PlayerShipStage } from "./player-ship";
 import { GRAZE_SPARK_WIDTH, sparkFade, clipSpark } from "../graze-sparks";
 import { createBossModels, getBossAppearance, getBossRotation, writeBossPositions, type BossModel } from "./boss-geometry";
 import type {
@@ -174,7 +175,9 @@ export function createThreeGameRenderer(width: number, height: number): GameScen
 type PlayerVisual = {
   root: THREE.Group;
   ship: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
+  wings: ReturnType<typeof createPlayerWingVisual>;
   shipColor: string;
+  shipStage: PlayerShipStage;
   effects: ReturnType<typeof createPlayerEffects>;
   hitMarker: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
 };
@@ -212,17 +215,18 @@ function createPlayerVisual(): PlayerVisual {
     new THREE.MeshBasicMaterial({ map: createPlayerShipTexture(shipColor), transparent: true, depthTest: false, depthWrite: false }),
   );
   const effects = createPlayerEffects();
+  const wings = createPlayerWingVisual();
   const hitMarker = new THREE.Mesh(
     new THREE.CircleGeometry(3, 20),
     new THREE.MeshBasicMaterial({ color: 0xff3355, transparent: true, depthTest: false }),
   );
   ship.renderOrder = 4;
   hitMarker.renderOrder = 5;
-  root.add(effects.root, ship, hitMarker);
-  return { root, ship, shipColor, effects, hitMarker };
+  root.add(effects.root, wings.root, ship, hitMarker);
+  return { root, ship, wings, shipColor, shipStage: 1, effects, hitMarker };
 }
 
-function createPlayerShipTexture(color: string): THREE.CanvasTexture {
+function createPlayerShipTexture(color: string, level = 0): THREE.CanvasTexture {
   const canvas = document.createElement("canvas");
   canvas.width = 320;
   canvas.height = 320;
@@ -230,7 +234,7 @@ function createPlayerShipTexture(color: string): THREE.CanvasTexture {
   if (!context) throw new Error("Unable to create player ship texture");
   context.scale(4, 4);
   context.translate(40, 40);
-  drawPlayerShip(context, color, 4);
+  drawPlayerShip(context, color, 4, level, { layer: "body" });
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   return texture;
@@ -352,15 +356,21 @@ function updatePlayerVisuals(
     visual.root.scale.setScalar(transform.scale);
     visual.ship.scale.x = 1 - Math.min(0.48, Math.abs(player.tilt) * 0.48);
     visual.ship.position.x = player.tilt * 4;
-    if (visual.shipColor !== player.color) {
+    const shipStage = getPlayerShipStage(player.level);
+    if (visual.shipColor !== player.color || visual.shipStage !== shipStage) {
       visual.ship.material.map?.dispose();
-      visual.ship.material.map = createPlayerShipTexture(player.color);
+      visual.ship.material.map = createPlayerShipTexture(player.color, player.level);
       visual.shipColor = player.color;
+      visual.shipStage = shipStage;
     }
     const levelInvincible = player.levelUpInvincible > 0;
     const hitInvincible = player.invincible > 0 && !levelInvincible;
     const warning = levelInvincible && player.levelUpInvincible <= 0.5;
     visual.ship.material.opacity = hitInvincible && Math.floor(elapsed * 18) % 2 === 0 ? 0.45 : 1;
+    visual.wings.root.visible = shipStage === 3;
+    visual.wings.root.scale.x = visual.ship.scale.x;
+    visual.wings.root.position.x = visual.ship.position.x;
+    if (shipStage === 3) visual.wings.update(getPlayerWingRotation(elapsed), player.color, visual.ship.material.opacity);
     visual.effects.update(player, elapsed, options.fieldWidth, options.fieldTop, options.fieldBottom);
     visual.hitMarker.material.color.set(levelInvincible ? 0xd9fdff : hitInvincible ? 0xffd166 : 0xff3355);
     visual.hitMarker.material.opacity = warning && Math.floor(elapsed * 18) % 2 === 0 ? 0.25 : 1;

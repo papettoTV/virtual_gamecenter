@@ -16,6 +16,7 @@ export type BulletRenderState = {
 };
 
 export type PlayerRenderState = {
+  level?: number;
   fieldX: number;
   x: number;
   y: number;
