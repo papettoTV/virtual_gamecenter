@@ -84,9 +84,11 @@
   padding: 0;
   font-size: 0;
 }
-body:has(#game-screen[data-mobile-play][data-game-id="buzz-barrier"]) .notification-center {
+body:has(#game-screen[data-mobile-play]) .notification-center {
+  /* Reserve the top control row for pause, including narrow/rotated screens. */
+  top: calc(max(8px, env(safe-area-inset-top)) + 52px);
   left: max(8px, env(safe-area-inset-left));
-  right: calc(max(8px, env(safe-area-inset-right)) + 108px);
+  right: max(8px, env(safe-area-inset-right));
   width: auto;
   max-width: 560px;
   transform: none;

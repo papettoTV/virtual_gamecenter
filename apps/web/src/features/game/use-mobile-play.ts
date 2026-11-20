@@ -39,11 +39,25 @@ export function useMobilePlay(screen: RefObject<HTMLElement | null>) {
     Object.assign(document.body.style, { position: "fixed", top: `-${y}px`, left: `-${x}px`, width: "100%", overflow: "hidden" });
     // Exclude the rest of the page from keyboard and assistive navigation too.
     const siblings: Array<[HTMLElement, boolean]> = [];
+    const notices = document.querySelector<HTMLElement>(".notification-center");
+    const isolate = (element: HTMLElement) => {
+      // Keep only the notification branch interactive, even when a wrapper
+      // contains both notifications and unrelated background controls.
+      if (element === notices) return;
+      if (notices && element.contains(notices)) {
+        for (const child of element.children) {
+          if (child instanceof HTMLElement) isolate(child);
+        }
+        return;
+      }
+      siblings.push([element, element.inert]);
+      element.inert = true;
+    };
     let branch: HTMLElement = root;
     while (branch.parentElement) {
       for (const sibling of branch.parentElement.children) {
         if (sibling !== branch && sibling instanceof HTMLElement) {
-          siblings.push([sibling, sibling.inert]); sibling.inert = true;
+          isolate(sibling);
         }
       }
       branch = branch.parentElement;
