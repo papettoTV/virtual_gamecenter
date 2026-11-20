@@ -2,10 +2,22 @@
 import {readFile,writeFile,appendFile,lstat,readdir} from 'node:fs/promises';
 import {pathToFileURL} from 'node:url';
 import {resolve} from 'node:path';
-export const CONTROL_SHA='cc46fbb5d38c016ada3a137366acc6e7b6c5d7d2';
-export const RULE_VERSIONS={ciControl:'2026-11-14T06:49:46.159Z',main:'2026-10-21T20:32:35.191Z',protectionMode:'strict'};
+export const CONTROL_SHA='98e5d49fc5bb27cf2dd6f1d0b01bcae1f79ddbe3';
+export const RULE_VERSIONS={ciControl:'2026-11-19T22:57:43.361Z',main:'2026-11-16T03:54:57.667Z',mainIntegrity:'2026-10-21T03:07:09.139Z',protectionMode:'strict'};
 const repository='papettoTV/virtual_gamecenter',sha=v=>/^[a-f0-9]{40}$/.test(v??''),id=v=>/^[1-9][0-9]*$/.test(String(v??''));
 function need(v,m){if(!v)throw Error(m);}
+export function protectionVersionApi(api){
+ return async path=>{
+  const result=await api(path);
+  if(!/^rulesets\/[1-9][0-9]*$/.test(path))return result;
+  const stamp=result?.updated_at;
+  const parts=typeof stamp==='string'?stamp.match(/^(20\d{2}-\d{2}-\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/):null;
+  need(parts&&Number(parts[2])<24&&Number(parts[3])<60&&Number(parts[4])<60
+   &&Number.isFinite(Date.parse(stamp))&&Number.isFinite(Date.parse(`${parts[1]}T00:00:00Z`))
+   &&new Date(`${parts[1]}T00:00:00Z`).toISOString().slice(0,10)===parts[1],'保護設定版の日時が不正です');
+  return {...result,updated_at:new Date(stamp).toISOString()};
+ };
+}
 export function context(env=process.env){
  need(env.GITHUB_REPOSITORY===repository&&env.GITHUB_REF==='refs/heads/develop'&&env.GITHUB_EVENT_NAME==='workflow_run'
   &&env.GITHUB_RUN_ATTEMPT==='1'&&env.SOURCE_ATTEMPT==='1'&&id(env.GITHUB_RUN_ID)&&id(env.REVIEW_RUN_ID)
@@ -58,7 +70,7 @@ async function main(){
  const x=context(),root=resolve('fixed-control/ci/control');
  const load=name=>import(pathToFileURL(resolve(root,name)));
  const [e,p,d,m]=await Promise.all(['candidate-evidence.mjs','protection-check.mjs','premerge-decision.mjs','develop-merge.mjs'].map(load));
- const api=e.apiRead(process.env.GH_TOKEN),protectionApi=p.readApi(process.env.GH_TOKEN),run=process.env.REVIEW_RUN_ID;
+ const api=e.apiRead(process.env.GH_TOKEN),protectionApi=protectionVersionApi(p.readApi(process.env.GH_TOKEN)),run=process.env.REVIEW_RUN_ID;
  const control={...d,...m,verifyProtection:p.verifyProtection,protectionApi};
  const policy=JSON.parse(await readFile(resolve(root,'review-trust.json'),'utf8'));
  if(process.argv[2]==='locate'){

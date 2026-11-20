@@ -5,13 +5,14 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {readFile} from 'node:fs/promises';
 import {parse} from 'yaml';
-import {context,mergeTransport,performAutoMerge,readReceipt,CONTROL_SHA,RULE_VERSIONS,failureReport} from '../develop-auto-merge.mjs';
+import {context,mergeTransport,performAutoMerge,readReceipt,CONTROL_SHA,RULE_VERSIONS,failureReport,protectionVersionApi} from '../develop-auto-merge.mjs';
 import {mergeReviewedCandidate} from '../control/develop-merge.mjs';
 const head='a'.repeat(40),base='b'.repeat(40),tree='c'.repeat(40),merged='d'.repeat(40);
 const env={GITHUB_REPOSITORY:'papettoTV/virtual_gamecenter',GITHUB_REF:'refs/heads/develop',GITHUB_EVENT_NAME:'workflow_run',GITHUB_RUN_ATTEMPT:'1',SOURCE_ATTEMPT:'1',GITHUB_RUN_ID:'100',REVIEW_RUN_ID:'90',GITHUB_SHA:base,PULBASE_CODEX_ENABLED:'true',PULBASE_DEVELOP_AUTO_MERGE_ENABLED:'true',EXPECTED_CONTROL_SHA:CONTROL_SHA};
 test('developの初回レビュー完了イベント・専用フラグ・固定制御SHAを必須にする',()=>{
  assert.equal(context(env).environment,'automation');
  assert.throws(()=>context({...env,EXPECTED_CONTROL_SHA:'2c883a1cdd961510a0557742f74294739752f445'}));
+ assert.throws(()=>context({...env,EXPECTED_CONTROL_SHA:'cc46fbb5d38c016ada3a137366acc6e7b6c5d7d2'}));
  for(const patch of [{GITHUB_REF:'refs/heads/main'},{GITHUB_REF:'refs/heads/ci-control'},{GITHUB_EVENT_NAME:'workflow_dispatch'},{GITHUB_RUN_ATTEMPT:'2'},{SOURCE_ATTEMPT:'2'},{PULBASE_DEVELOP_AUTO_MERGE_ENABLED:'false'},{EXPECTED_CONTROL_SHA:head},{REVIEW_RUN_ID:'90\nanything'}])assert.throws(()=>context({...env,...patch}));
 });
 test('書込transportは同じPR・headのsquashだけを許し、main更新・dispatch・別PR・forceを拒否する',async()=>{
@@ -21,6 +22,22 @@ test('書込transportは同じPR・headのsquashだけを許し、main更新・d
  assert.equal(calls,0);await api('PUT','pulls/8/merge',{sha:head,merge_method:'squash'});assert.equal(calls,1);
  const bad=mergeTransport('dummy-key',{pullNumber:'8',head},async()=>new Response('dummy-key-private-response',{status:403}));
  await assert.rejects(bad('GET','branches/develop/protection'),e=>!e.message.includes('dummy-key'));
+});
+test('設定版の同一時刻だけをUTCへ正規化し、保護内容は保持する',async()=>{
+ for(const stamp of ['2026-11-19T22:57:43.361Z','2026-11-20T07:57:43.361+09:00','2026-11-19T17:57:43.361-05:00']){
+  const original={updated_at:stamp,bypass_actors:[{actor_id:1}],enforcement:'active'};
+  const api=protectionVersionApi(async()=>original);
+  const normalized=await api('rulesets/25676153');
+  assert.equal(normalized.updated_at,RULE_VERSIONS.ciControl);
+  assert.deepEqual(normalized.bypass_actors,original.bypass_actors);
+  assert.equal(original.updated_at,stamp);
+  assert.equal(await api('environments/staging'),original);
+ }
+ for(const stamp of [undefined,'2026-11-19T22:57:43.361','2026-11-19T22:57:43.3610001Z','2026-02-30T00:00:00Z','2026-11-19T24:00:00Z','2026-11-19T22:57:43.361Zextra']){
+  await assert.rejects(protectionVersionApi(async()=>({updated_at:stamp}))('rulesets/25676153'));
+ }
+ const changed=await protectionVersionApi(async()=>({updated_at:'2026-11-20T07:57:43.362+09:00'}))('rulesets/25676153');
+ assert.notEqual(changed.updated_at,RULE_VERSIONS.ciControl);
 });
 function fixture(){
  let checks=0,puts=0,afterFailure=false;
@@ -74,7 +91,7 @@ test('固定された実モジュールを接続し、現在の自動Issue・CI�
  const {verifyProtection}=await import('../control/protection-check.mjs');
  const policy=JSON.parse(await readFile(new URL('../control/review-trust.json',import.meta.url),'utf8'));
  const repo='papettoTV/virtual_gamecenter',url=`https://api.github.com/repos/${repo}`,candidate='e'.repeat(40),at='2026-10-27T00:00:00Z';
- for(const variant of ['valid','manual','evidence-only','changed-definition','stale-head','failed-review']){
+ for(const variant of ['valid','manual','evidence-only','changed-definition','stale-head','failed-review','control-bypass','changed-control-version','changed-main-version','changed-main-integrity','changed-integrity-checks']){
   let puts=0;
   const receipt={version:1,repository:repo,pullNumber:'8',head,base,candidate,tree,reviewRun:'90',reviewAttempt:'1',buildRun:'80',buildAttempt:'1',buildArtifact:'70',pass:true,findings:[]};
   const run=(id,workflow)=>({id,run_attempt:1,status:'completed',conclusion:'success',head_sha:head,event:'pull_request',path:`.github/workflows/${workflow}.yml`,head_repository:{full_name:repo},created_at:at,pull_requests:[{number:8,base:{ref:'develop',sha:base,repo:{url}},head:{sha:head,repo:{url}}}]});
@@ -94,10 +111,13 @@ test('固定された実モジュールを接続し、現在の自動Issue・CI�
   const protectionApi=async path=>{
    if(path==='environments/staging')return {can_admins_bypass:false,deployment_branch_policy:{protected_branches:false,custom_branch_policies:true},protection_rules:[{type:'required_reviewers',reviewers:[{type:'User',reviewer:{login:'papettoTV'}}]}]};
    if(path.startsWith('environments/staging/deployment-branch'))return {total_count:1,branch_policies:[{name:'ci-control',type:'branch'}]};
-   if(path==='rulesets?per_page=100')return [{id:1,name:'ci-control-human-managed'},{id:2,name:'main-release-app-only'}];
-   if(path==='rulesets/1')return {enforcement:'active',target:'branch',bypass_actors:[],updated_at:RULE_VERSIONS.ciControl,conditions:{ref_name:{include:['refs/heads/ci-control'],exclude:[]}},rules:['creation','update','deletion','non_fast_forward'].map(type=>({type}))};
-   if(path==='rulesets/2')return {enforcement:'active',target:'branch',bypass_actors:[],updated_at:RULE_VERSIONS.main,conditions:{ref_name:{include:['refs/heads/main'],exclude:[]}},rules:[{type:'update'}]};
-   if(path==='git/ref/heads/main')return {object:{sha:'73cb5d9267c56f06f9f1150327ec6b8b3caa2bb9'}};
+   if(path==='rulesets?per_page=100')return [{id:1,name:'ci-control-human-managed'},{id:2,name:'main-release-app-only'},{id:25520941,name:'main-release-integrity'}];
+   if(path==='rulesets/1')return {enforcement:'active',target:'branch',bypass_actors:variant==='control-bypass'?[{actor_id:5405029,actor_type:'Integration',bypass_mode:'always'}]:[],updated_at:variant==='changed-control-version'?'2026-11-01T00:00:00.000Z':RULE_VERSIONS.ciControl,conditions:{ref_name:{include:['refs/heads/ci-control'],exclude:[]}},rules:['creation','update','deletion','non_fast_forward'].map(type=>({type}))};
+   if(path==='rulesets/2')return {enforcement:'active',target:'branch',bypass_actors:[{actor_id:5405029,actor_type:'Integration',bypass_mode:'always'}],updated_at:variant==='changed-main-version'?'2026-11-01T00:00:00.000Z':RULE_VERSIONS.main,conditions:{ref_name:{include:['refs/heads/main'],exclude:[]}},rules:[{type:'update'}]};
+   if(path==='rulesets/25520941')return {enforcement:'active',target:'branch',bypass_actors:[],updated_at:variant==='changed-main-integrity'?'2026-11-01T00:00:00.000Z':RULE_VERSIONS.mainIntegrity,conditions:{ref_name:{include:['refs/heads/main'],exclude:[]}},rules:[{type:'deletion'},{type:'non_fast_forward'},{type:'required_status_checks',parameters:{strict_required_status_checks_policy:variant!=='changed-integrity-checks',do_not_enforce_on_create:false,required_status_checks:['verify','Automation control checks'].map(context=>({context,integration_id:15368}))}}]};
+   if(path==='git/ref/heads/main')return {object:{sha:'83e7825a82cf995893dc9555a6ccd943eda6e653'}};
+   if(path==='git/ref/heads/develop')return {object:{sha:base}};
+   if(path.startsWith('compare/'))return {status:'ahead',merge_base_commit:{sha:path.slice('compare/'.length).split('...')[0]}};
    if(path==='git/ref/heads/ci-control')return {object:{sha:CONTROL_SHA}};
    throw Error('unexpected protection '+path);
   };
