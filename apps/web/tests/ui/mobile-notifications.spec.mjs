@@ -74,11 +74,17 @@ for (const gameId of ['buzz-barrier', 'deep-sea-salvage']) {
         document.querySelector('.notification-center').parentElement.append(sibling);
         const prior = document.createElement('button'); prior.id = 'previously-inert'; prior.inert = true;
         sibling.parentElement.append(prior);
-        sibling.focus();
+        // READY and playing have different document heights in BUZZ BARRIER.
+        // Keep the saved position reachable in both layouts, rather than
+        // relying on focus scrolling to the READY layout's bottom edge.
+        document.getElementById('presentation-fixture').style.minHeight = '3000px';
+        sibling.focus({ preventScroll: true });
         document.body.style.overflow = 'auto';
+        window.scrollTo(0, 240);
       });
       const originalStyle = await page.evaluate(() => document.body.getAttribute('style'));
       const originalScroll = await page.evaluate(() => ({ x: scrollX, y: scrollY }));
+      expect(originalScroll).toEqual({ x: 0, y: 240 });
       await phase(page, gameId, 'playing');
       await expect(screen).toHaveAttribute('data-mobile-play', 'true');
       await page.setViewportSize(viewport);
