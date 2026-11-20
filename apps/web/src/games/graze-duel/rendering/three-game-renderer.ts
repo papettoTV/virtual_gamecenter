@@ -1,6 +1,6 @@
 import { createPlayerEffects } from "./three-player-effects";
 import * as THREE from "three";
-import { drawPlayerShip } from "./player-ship";
+import { drawPlayerShip, getPlayerShipStage, type PlayerShipStage } from "./player-ship";
 import { GRAZE_SPARK_WIDTH, sparkFade, clipSpark } from "../graze-sparks";
 import { createBossModels, getBossAppearance, getBossRotation, writeBossPositions, type BossModel } from "./boss-geometry";
 import type {
@@ -175,6 +175,7 @@ type PlayerVisual = {
   root: THREE.Group;
   ship: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
   shipColor: string;
+  shipStage: PlayerShipStage;
   effects: ReturnType<typeof createPlayerEffects>;
   hitMarker: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
 };
@@ -219,10 +220,10 @@ function createPlayerVisual(): PlayerVisual {
   ship.renderOrder = 4;
   hitMarker.renderOrder = 5;
   root.add(effects.root, ship, hitMarker);
-  return { root, ship, shipColor, effects, hitMarker };
+  return { root, ship, shipColor, shipStage: 1, effects, hitMarker };
 }
 
-function createPlayerShipTexture(color: string): THREE.CanvasTexture {
+function createPlayerShipTexture(color: string, level = 0): THREE.CanvasTexture {
   const canvas = document.createElement("canvas");
   canvas.width = 320;
   canvas.height = 320;
@@ -230,7 +231,7 @@ function createPlayerShipTexture(color: string): THREE.CanvasTexture {
   if (!context) throw new Error("Unable to create player ship texture");
   context.scale(4, 4);
   context.translate(40, 40);
-  drawPlayerShip(context, color, 4);
+  drawPlayerShip(context, color, 4, level);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   return texture;
@@ -352,10 +353,12 @@ function updatePlayerVisuals(
     visual.root.scale.setScalar(transform.scale);
     visual.ship.scale.x = 1 - Math.min(0.48, Math.abs(player.tilt) * 0.48);
     visual.ship.position.x = player.tilt * 4;
-    if (visual.shipColor !== player.color) {
+    const shipStage = getPlayerShipStage(player.level);
+    if (visual.shipColor !== player.color || visual.shipStage !== shipStage) {
       visual.ship.material.map?.dispose();
-      visual.ship.material.map = createPlayerShipTexture(player.color);
+      visual.ship.material.map = createPlayerShipTexture(player.color, player.level);
       visual.shipColor = player.color;
+      visual.shipStage = shipStage;
     }
     const levelInvincible = player.levelUpInvincible > 0;
     const hitInvincible = player.invincible > 0 && !levelInvincible;

@@ -1,9 +1,67 @@
-export function drawPlayerShip(context: CanvasRenderingContext2D, color: string, glowScale = 1) {
+export type PlayerShipStage = 1 | 2 | 3;
+
+export function getPlayerShipStage(level = 0): PlayerShipStage {
+  return level >= 30 ? 3 : level >= 10 ? 2 : 1;
+}
+
+function drawEvolvedShip(context: CanvasRenderingContext2D, color: string, stage: PlayerShipStage) {
+  const panels = stage === 2 ? [
+    [[0, -18], [-6, -9], [-6, 12], [-3, 17], [3, 17], [6, 12], [6, -9]],
+    [[-11, -12], [-17, -6], [-17, 14], [-12, 7]],
+    [[11, -12], [17, -6], [17, 14], [12, 7]],
+  ] : [
+    [[-3, -18], [-7, -12], [-7, 0], [-3, 5], [3, 5], [7, 0], [7, -12], [3, -18]],
+    [[-8, -9], [-14, -10], [-17, -5], [-17, 14], [-12, 4]],
+    [[8, -9], [14, -10], [17, -5], [17, 14], [12, 4]],
+    [[-2, 7], [0, 19], [2, 7]],
+  ];
+  context.fillStyle = "rgba(6, 26, 53, 0.78)";
+  context.strokeStyle = color;
+  context.lineWidth = 1.5;
+  for (const panel of panels) {
+    context.beginPath();
+    context.moveTo(panel[0]![0]!, panel[0]![1]!);
+    for (const point of panel.slice(1)) context.lineTo(point[0]!, point[1]!);
+    context.closePath();
+    context.fill();
+    context.stroke();
+  }
+  context.strokeStyle = "#bdfcff";
+  context.lineWidth = 1;
+  context.beginPath();
+  if (stage === 2) {
+    context.moveTo(0, -13);
+    context.lineTo(0, -3);
+    context.moveTo(0, 5);
+    context.lineTo(0, 13);
+    context.moveTo(-9, -3);
+    context.lineTo(-12, 5);
+    context.moveTo(9, -3);
+    context.lineTo(12, 5);
+  } else {
+    context.moveTo(-9, -6);
+    context.lineTo(-14, -3);
+    context.moveTo(9, -6);
+    context.lineTo(14, -3);
+  }
+  context.stroke();
+  context.fillStyle = "#d9fdff";
+  if (stage === 2) context.fillRect(-1, 17, 2, 2);
+}
+
+export function drawPlayerShip(context: CanvasRenderingContext2D, color: string, glowScale = 1, level = 0) {
   context.save();
   context.lineJoin = "miter";
   context.lineCap = "square";
   context.shadowBlur = 16 * glowScale;
   context.shadowColor = color;
+
+  const stage = getPlayerShipStage(level);
+  if (stage !== 1) {
+    drawEvolvedShip(context, color, stage);
+    context.restore();
+    return;
+  }
 
   context.fillStyle = "#d9fdff";
   context.beginPath();
