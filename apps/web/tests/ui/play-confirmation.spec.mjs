@@ -880,6 +880,12 @@ test.describe('notifications during real mobile game input', () => {
         await page.getByRole('dialog', { name: 'ゲームを開始しますか？', exact: true })
           .getByRole('button', { name: '1クレジットで開始', exact: true }).click();
         expect((await (await capture).json()).status).toBe('captured');
+        // Close the real credit receipt with normal touch input before adding
+        // the persistent notice. Two stacked notices cover the landscape
+        // salvage slide path; keep one visible throughout movement and pause.
+        const receipt = page.locator('.notification', { hasText: '1クレジットを使用しました。' });
+        await receipt.getByRole('button', { name: '通知を閉じる' }).tap();
+        await expect(receipt).toHaveCount(0);
         await expect.poll(() => phase(page, game.id)).toBe('playing');
         await expect(screen).toHaveAttribute('data-mobile-play', 'true');
         await page.setViewportSize(viewport);
