@@ -897,19 +897,31 @@ test.describe('notifications during real mobile game input', () => {
         const release = () => touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
         const slide = async () => {
           const rect = await screen.locator('#game').boundingBox();
-          // Use image coordinates so portrait letterboxing cannot consume the gesture.
+          // Map image coordinates into displayed CSS pixels, including letterboxing.
           const canvasSize = await screen.locator('#game').evaluate(el => ({ width: el.width, height: el.height }));
           const scale = Math.min(rect.width / canvasSize.width, rect.height / canvasSize.height);
           const left = rect.x + (rect.width - canvasSize.width * scale) / 2;
           const top = rect.y + (rect.height - canvasSize.height * scale) / 2;
-          const x = left + canvasSize.width * .5, y = top + canvasSize.height * .57;
+          const x = left + canvasSize.width * scale * .5;
+          const y = top + canvasSize.height * scale * .57;
+          const points = Array.from({ length: 9 }, (_, step) => ({
+            x: x + canvasSize.width * scale * .1 * step / 8,
+            y: y + canvasSize.height * scale * .12 * step / 8,
+          }));
+          // Check the entire path before pointer capture: neither clipping nor a
+          // notification/HUD overlay may intercept an ordinary touch here.
+          const hits = await screen.locator('#game').evaluate((canvas, points) => {
+            const frame = canvas.closest('.game-frame').getBoundingClientRect();
+            return points.map(({ x, y }) => ({
+              insideFrame: x > frame.left && x < frame.right && y > frame.top && y < frame.bottom,
+              hitsCanvas: document.elementFromPoint(x, y) === canvas,
+            }));
+          }, points);
+          expect(hits).toEqual(points.map(() => ({ insideFrame: true, hitsCanvas: true })));
           // Browser touch input performs normal hit testing and invokes the actual handlers.
-          await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
-          for (let step = 1; step <= 8; step++) {
-            await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{
-              x: x + canvasSize.width * scale * .1 * step / 8,
-              y: y + canvasSize.height * scale * .12 * step / 8,
-            }] });
+          await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [points[0]] });
+          for (const point of points.slice(1)) {
+            await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [point] });
           }
         };
         const before = position();
