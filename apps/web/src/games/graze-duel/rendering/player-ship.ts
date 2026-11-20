@@ -10,10 +10,10 @@ function drawEvolvedShip(context: CanvasRenderingContext2D, color: string, stage
     [[-11, -12], [-17, -6], [-17, 14], [-12, 7]],
     [[11, -12], [17, -6], [17, 14], [12, 7]],
   ] : [
-    [[-3, -18], [-7, -12], [-7, 0], [-3, 5], [3, 5], [7, 0], [7, -12], [3, -18]],
-    [[-8, -9], [-14, -10], [-17, -5], [-17, 14], [-12, 4]],
-    [[8, -9], [14, -10], [17, -5], [17, 14], [12, 4]],
-    [[-2, 7], [0, 19], [2, 7]],
+    [[-3, -7], [-7, -3], [-7, 4], [-3, 8], [3, 8], [7, 4], [7, -3], [3, -7]],
+    [[-3, -18], [-12, -17], [-17, -11], [-16, 2], [-11, -5], [-4, -9]],
+    [[3, -18], [12, -17], [17, -11], [16, 2], [11, -5], [4, -9]],
+    [[-2, 10], [0, 19], [2, 10]],
   ];
   context.fillStyle = "rgba(6, 26, 53, 0.78)";
   context.strokeStyle = color;
@@ -39,10 +39,12 @@ function drawEvolvedShip(context: CanvasRenderingContext2D, color: string, stage
     context.moveTo(9, -3);
     context.lineTo(12, 5);
   } else {
-    context.moveTo(-9, -6);
-    context.lineTo(-14, -3);
-    context.moveTo(9, -6);
-    context.lineTo(14, -3);
+    context.moveTo(-14, -9);
+    context.lineTo(-11, -13);
+    context.lineTo(-6, -14);
+    context.moveTo(14, -9);
+    context.lineTo(11, -13);
+    context.lineTo(6, -14);
   }
   context.stroke();
   context.fillStyle = "#d9fdff";
