@@ -1,3 +1,5 @@
+import versions from "./game-versions.json" with { type: "json" };
+
 export type GameId = string;
 export type GameMode = "solo" | "versus" | "coop";
 export type PlaySessionStatus = "waitingStart" | "playing" | "finished" | "cancelled";
@@ -44,7 +46,7 @@ export const BUZZ_BARRIER: GameDefinition = {
     mobile: ["画面内をタッチし、スライドして移動", "ゲーム画面をタップして開始、右上のボタンで一時停止"],
     tips: ["レベルアップの無敵時間を活用して、弾幕とボスに近づこう。"],
   },
-  currentVersion: "prototype-score-ranking-1",
+  currentVersion: String(versions["buzz-barrier"]),
   creditCost: 1,
   iconUrl: "/assets/buzz-barrier-icon.png",
   promoVideoUrl: "/demos/buzz-barrier/boss-demo-v2.mp4",
@@ -67,7 +69,7 @@ export const DEEP_SEA_SALVAGE: GameDefinition = {
     mobile: ["画面内のタッチ操作で潜水艦を移動", "画面下のボタンで開始・ポーズ・図鑑"],
     tips: ["深海の水流や高速魚を避けながら、巨大深海魚を追おう。"],
   },
-  currentVersion: "prototype-survey-dive-2",
+  currentVersion: String(versions["deep-sea-salvage"]),
   creditCost: 1,
   iconUrl: "/assets/deep-sea-salvage-icon.svg",
   promoVideoUrl: "",
@@ -82,7 +84,7 @@ export const MOCHI_BEAT: GameDefinition = {
   localizedTitle: "もちつきビート",
   shortTitle: "MB",
   description: "お手本を聞いて、トン・トン！うさぎとおもちをつくワンボタンリズムゲーム",
-  currentVersion: "mochi-beat-sets-2",
+  currentVersion: String(versions["mochi-beat"]),
   creditCost: 1,
   iconUrl: "/assets/mochi-beat-icon.svg",
   promoVideoUrl: "",
@@ -101,7 +103,7 @@ export const DOT_WAVE: GameDefinition = {
     mobile: ["画面のリズムボタンをタップ", "音を出してプレイしてください。"],
     tips: ["音を出して、まずはお手本をよく聞こう。"],
   },
-  currentVersion: "dot-wave-online-1", creditCost: 1, iconUrl: "/assets/dot-wave-icon.svg",
+  currentVersion: String(versions["dot-wave"]), creditCost: 1, iconUrl: "/assets/dot-wave-icon.svg",
   promoVideoUrl: "/dot-wave-promo.mp4?v=20261007", promoPosterUrl: "/dot-wave-promo-poster.jpg?v=20261007", status: "active",
 };
 export const GAME_CATALOG: readonly GameDefinition[] = [BUZZ_BARRIER, DOT_WAVE, DEEP_SEA_SALVAGE];

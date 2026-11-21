@@ -1,0 +1,16 @@
+.game-version {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  z-index: 6;
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: #aab4c4;
+  background: #050713b3;
+  font: 400 10px / 1.4 ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  user-select: none;
+}
+
+.salvage-screen .game-version { right: auto; left: 8px; }

@@ -1,4 +1,5 @@
 import { LeaveGameConfirmation } from "./LeaveGameConfirmation";
+import { GameVersion } from "./GameVersion";
 import { gameHost } from "../../game-sdk/game-host";
 import { useRef } from "react";
 import { useMobilePlay } from "./use-mobile-play";
@@ -52,6 +53,7 @@ export function GameScreen({ game }: GameScreenProps) {
       <DebugPanel hidden={ui.debugPanelHidden} />
 
       <div className="game-frame">
+        <GameVersion game={game} />
         <div className="spectator-presence-edge" id="player-crowd-pulse" aria-hidden="true" />
         {game.id === "deep-sea-salvage" && <p id="salvage-paused-spectators" className="spectator-presence-caption salvage-paused-spectators" hidden />}
         {!play.inviteOnly && <button
