@@ -1,4 +1,4 @@
-import versions from "./game-versions.json";
+import versions from "./game-versions.json" with { type: "json" };
 
 export type GameId = string;
 export type GameMode = "solo" | "versus" | "coop";

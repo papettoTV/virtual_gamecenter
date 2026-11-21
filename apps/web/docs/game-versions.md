@@ -5,9 +5,9 @@
 更新PRでは、ゲームを変更したときだけ対象の更新種類を明示して実行します。省略や未知の種類はエラーになり、番号は変わりません。
 
 ```sh
-npm --prefix apps/web run game:version -- buzz-barrier patch
-npm --prefix apps/web run game:version -- dot-wave minor
-npm --prefix apps/web run game:version -- deep-sea-salvage major
+node apps/web/scripts/bump-game-version.mjs buzz-barrier patch
+node apps/web/scripts/bump-game-version.mjs dot-wave minor
+node apps/web/scripts/bump-game-version.mjs deep-sea-salvage major
 ```
 
 | 更新種類 | 判断の目安 | 例 |

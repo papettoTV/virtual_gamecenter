@@ -6,14 +6,6 @@
 - Cloudflare上の変更・デプロイは、ローカルの準備やGitのpushと分けて扱う。実施していない作業を完了扱いにしない。
 - 公開準備の詳細は `docs/production-environments.md` と `docs/production-launch-checklist.md` を参照する。
 
-# ゲームのバージョン更新
-
-- ゲームの挙動・演出・表示・バランスを変更するPRでは、対象ゲームごとに `npm --prefix apps/web run game:version -- <game-id> <major|minor|patch>` を実行する。初期値は `1.0.0`。
-- PRごとに更新種類を判断し、本文に対象ゲーム・更新前後の番号・更新種類と理由を記載する。majorは大幅なルール・体験の変更、minorは追加要素、patchは不具合修正や小さな調整を目安とする。
-- 番号の正本は `apps/web/src/domain/game-versions.json`。画面と新規結果記録は同じ番号を使用する。既存結果の番号は書き換えない。
-- 1つのPR内の修正・テスト再実行ごとには増やさない。並行PRで同じ番号になった場合はマージ前に最新developより大きい番号にする。
-- サイト共通機能のみ・資料のみ・テストのみの変更では増やさない。複数ゲームの表示や挙動を変える場合は各ゲームを更新する。
-
 # GitHub Issue・PRの言語
 
 - 作成するGitHub IssueとPull Requestのタイトル・本文は日本語で記述する。自動化が作成するものも同様とする。
