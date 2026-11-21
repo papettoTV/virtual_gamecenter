@@ -105,7 +105,7 @@ for (const size of sizes) {
     await enter(page, 'dot-wave');
     const main = page.locator('main.dot-wave');
     await expect(main).toHaveAttribute('data-phase', 'intro');
-    await expect(main.locator('.game-version')).toHaveText(/^v[1-9]\d*$/);
+    await expect(main.locator('.game-version')).toHaveText(/^v\d+\.\d+\.\d+$/);
     await expect(main.locator('.game-version')).toHaveCSS('pointer-events', 'none');
     await expect(page.locator('.dot-cabinet-bar > span')).toContainText('あなたの筐体');
     await accountWorks(page);
