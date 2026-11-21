@@ -2,7 +2,7 @@
   position: absolute;
   right: 8px;
   bottom: 6px;
-  z-index: 4;
+  z-index: 6;
   padding: 1px 4px;
   border-radius: 3px;
   color: #aab4c4;
@@ -12,3 +12,5 @@
   pointer-events: none;
   user-select: none;
 }
+
+.salvage-screen .game-version { right: auto; left: 8px; }
