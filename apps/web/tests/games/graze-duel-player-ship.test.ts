@@ -18,7 +18,7 @@ function render(level?: number, elapsed = 0, layer: PlayerShipLayer = "all") {
   return { points, panels, brush };
 }
 
-it.each([[0, 1], [9, 1], [10, 2], [29, 2], [30, 3], [100, 3]])("LV %iで第%i段階になる", (level, stage) => {
+it.each([[0, 1], [9, 1], [10, 1], [29, 1], [30, 2], [59, 2], [60, 3], [100, 3]])("LV %iで第%i段階になる", (level, stage) => {
   expect(getPlayerShipStage(level)).toBe(stage);
 });
 
@@ -28,7 +28,7 @@ it("レベルがない既存描画・観戦データは基本形で描ける", (
 });
 
 it("3段階とも同じ34×37の表示範囲で中央座標や倍率を変更しない", () => {
-  for (const level of [0, 10, 30]) {
+  for (const level of [0, 30, 60]) {
     const { points, brush } = render(level);
     expect([
       Math.min(...points.map(point => point[0]!)), Math.max(...points.map(point => point[0]!)),
@@ -39,13 +39,19 @@ it("3段階とも同じ34×37の表示範囲で中央座標や倍率を変更し
   }
 });
 
-it("10と30の境界だけで本体形状が変わり、再スタート時は基本形に戻る", () => {
-  expect(render(9).points).toEqual(render(0).points);
-  expect(render(10).points).not.toEqual(render(9).points);
-  expect(render(29).points).toEqual(render(10).points);
-  expect(render(30).points).not.toEqual(render(29).points);
-  expect(render(100).points).toEqual(render(30).points);
-  expect(render(0).points).not.toEqual(render(30).points);
+it("30と60の境界だけで本体形状が変わり、再スタート時は基本形に戻る", () => {
+  const basic = render(0).points;
+  const second = render(30).points;
+  const third = render(60).points;
+  expect(render(10).points).toEqual(basic);
+  expect(render(29).points).toEqual(basic);
+  expect(second).not.toEqual(basic);
+  expect(render(59).points).toEqual(second);
+  expect(third).not.toEqual(second);
+  expect(third).not.toEqual(basic);
+  expect(render(100).points).toEqual(third);
+  expect(render(0).points).toEqual(basic);
+  expect(render().points).toEqual(basic);
 });
 
 it("第3段階は左右の翼を前方に置き、コアの前を囲む盾形にする", () => {
@@ -58,8 +64,8 @@ it("第3段階は左右の翼を前方に置き、コアの前を囲む盾形に
 
 it("第3段階の翼は厚い立体で前後軸を回り、90度でも細い線にならない", () => {
   expect(getPlayerWingRotation(2.4)).toBeCloseTo(Math.PI * 2);
-  const front = render(30, 0, "wings");
-  const edge = render(30, 0.6, "wings");
+  const front = render(60, 0, "wings");
+  const edge = render(60, 0.6, "wings");
   expect(front.panels).toHaveLength(100);
   expect(edge.points).not.toEqual(front.points);
   for (let index = 0; index <= 240; index += 1) {
@@ -69,8 +75,8 @@ it("第3段階の翼は厚い立体で前後軸を回り、90度でも細い線�
     expect(width).toBeLessThanOrEqual(34.000001);
     expect(points.map(point => point[1])).toEqual(PLAYER_WING_MODEL.vertices.map(point => point[1]));
   }
-  expect(render(30, 0, "body").points).toEqual(render(30, 0.6, "body").points);
-  for (const level of [0, 10]) {
+  expect(render(60, 0, "body").points).toEqual(render(60, 0.6, "body").points);
+  for (const level of [0, 10, 29, 30, 59]) {
     expect(render(level, 0).points).toEqual(render(level, 0.6).points);
     expect(render(level, 0, "wings").points).toEqual([]);
   }
@@ -90,7 +96,7 @@ it("Three.jsは翼の立体メッシュのみをY軸回転し、毎フレーム�
 });
 
 it("第3段階の本体後部は先細りではなくスカート状に広がり、翼と一緒に回らない", () => {
-  const body = render(30, 0, "body");
+  const body = render(60, 0, "body");
   const skirt = body.panels[1]!;
   const upper = skirt.filter(point => point[1] === 8);
   const lower = skirt.filter(point => point[1] === 19);
@@ -108,7 +114,7 @@ it("第3段階の本体後部は先細りではなくスカート状に広がり
     const cosine = (previousX * nextX + previousY * nextY) / (Math.hypot(previousX, previousY) * Math.hypot(nextX, nextY));
     expect(Math.acos(cosine)).toBeLessThan(Math.PI / 4);
   }
-  expect(body.points).toEqual(render(30, 0.6, "body").points);
+  expect(body.points).toEqual(render(60, 0.6, "body").points);
 });
 
 it("翼は奥行きと端面のある閉じた立体で、板状の形状ではない", () => {
@@ -142,8 +148,8 @@ it("2枚の翼の間に60度の隙間を残し、面や輪郭でつながない"
 it("回転しても元の描画範囲を超えず、同じゲーム時刻では同じ姿になる", () => {
   for (let index = 0; index <= 24; index += 1) {
     const elapsed = index / 10;
-    const { points } = render(30, elapsed);
+    const { points } = render(60, elapsed);
     expect(points.every(([pointX, pointY]) => Math.abs(pointX!) <= 17 && pointY! >= -18 && pointY! <= 19)).toBe(true);
-    expect(points).toEqual(render(30, elapsed).points);
+    expect(points).toEqual(render(60, elapsed).points);
   }
 });
