@@ -851,3 +851,114 @@ for (const game of games.filter(game => game.id === 'buzz-barrier')) {
     });
   }
 }
+
+
+// Exercise mounted runtimes, not the presentation-only notification fixture.
+// Observe their existing live protocol without replacing input or accounting.
+test.describe('notifications during real mobile game input', () => {
+  test.use({ hasTouch: true });
+  for (const game of games.filter(game => game.id !== 'dot-wave')) {
+    for (const viewport of [{ width: 320, height: 740 }, { width: 390, height: 844 }, { width: 844, height: 390 }]) {
+      test(`${game.id}: notification preserves movement and pause ${viewport.width}`, async ({ page }, info) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        let latest;
+        page.on('websocket', socket => {
+          if (!/^\/api\/cabinets\/[^/]+\/ws$/.test(new URL(socket.url()).pathname)) return;
+          socket.on('framesent', ({ payload }) => {
+            const message = JSON.parse(String(payload));
+            if (!['gameKeyframe', 'gameMotionFrame'].includes(message.type)) return;
+            const frame = message.snapshot ?? message.frame;
+            latest = game.id === 'buzz-barrier' ? frame : frame.state;
+          });
+        });
+        await prepareGuest(page);
+        await navigateGuest(page, `${origin}/cabinets/${randomUUID()}?game=${game.id}`);
+        await expect.poll(() => phase(page, game.id)).toBe('ready');
+        const screen = page.locator('#game-screen');
+        await screen.getByRole('button', { name: game.button, exact: true }).click();
+        const capture = page.waitForResponse(r => r.request().method() === 'POST' && r.url().endsWith('/capture'));
+        await page.getByRole('dialog', { name: 'ゲームを開始しますか？', exact: true })
+          .getByRole('button', { name: '1クレジットで開始', exact: true }).click();
+        expect((await (await capture).json()).status).toBe('captured');
+        // Close the real credit receipt with normal touch input before adding
+        // the persistent notice. Two stacked notices cover the landscape
+        // salvage slide path; keep one visible throughout movement and pause.
+        const receipt = page.locator('.notification', { hasText: '1クレジットを使用しました。' });
+        await receipt.getByRole('button', { name: '通知を閉じる' }).tap();
+        await expect(receipt).toHaveCount(0);
+        await expect.poll(() => phase(page, game.id)).toBe('playing');
+        await expect(screen).toHaveAttribute('data-mobile-play', 'true');
+        await page.setViewportSize(viewport);
+        await page.evaluate(async () => {
+          const { notifications } = await import('/src/features/notifications/notifications.ts');
+          notifications.show({ id: 'input-regression', type: 'error', message: 'ゲーム操作中の通知' });
+        });
+        const notice = page.locator('.notification', { hasText: 'ゲーム操作中の通知' });
+        await expect(notice).toBeVisible();
+        await expect.poll(() => latest?.paused).toBe(false);
+        const position = () => game.id === 'buzz-barrier'
+          ? { x: latest.players[0].x, y: latest.players[0].y }
+          : { x: latest.subX, y: latest.subDepth };
+        const touch = await page.context().newCDPSession(page);
+        const release = () => touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        const slide = async () => {
+          const rect = await screen.locator('#game').boundingBox();
+          // Map image coordinates into displayed CSS pixels, including letterboxing.
+          const canvasSize = await screen.locator('#game').evaluate(el => ({ width: el.width, height: el.height }));
+          const scale = Math.min(rect.width / canvasSize.width, rect.height / canvasSize.height);
+          const left = rect.x + (rect.width - canvasSize.width * scale) / 2;
+          const top = rect.y + (rect.height - canvasSize.height * scale) / 2;
+          const x = left + canvasSize.width * scale * .5;
+          const y = top + canvasSize.height * scale * .57;
+          const points = Array.from({ length: 9 }, (_, step) => ({
+            x: x + canvasSize.width * scale * .1 * step / 8,
+            y: y + canvasSize.height * scale * .12 * step / 8,
+          }));
+          // Check the entire path before pointer capture: neither clipping nor a
+          // notification/HUD overlay may intercept an ordinary touch here.
+          const hits = await screen.locator('#game').evaluate((canvas, points) => {
+            const frame = canvas.closest('.game-frame').getBoundingClientRect();
+            return points.map(({ x, y }) => ({
+              insideFrame: x > frame.left && x < frame.right && y > frame.top && y < frame.bottom,
+              hitsCanvas: document.elementFromPoint(x, y) === canvas,
+            }));
+          }, points);
+          expect(hits).toEqual(points.map(() => ({ insideFrame: true, hitsCanvas: true })));
+          // Browser touch input performs normal hit testing and invokes the actual handlers.
+          await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [points[0]] });
+          for (const point of points.slice(1)) {
+            await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [point] });
+          }
+        };
+        const before = position();
+        await slide();
+        try {
+          await expect.poll(() => position().x).toBeGreaterThan(before.x + 1);
+          await expect.poll(() => position().y).toBeGreaterThan(before.y + 1);
+        } finally { await release(); }
+        await expect(notice).toBeVisible();
+        const pause = screen.locator('#touch-pause');
+        await pause.tap();
+        await expect.poll(() => phase(page, game.id)).toBe('paused');
+        await expect.poll(() => latest?.paused).toBe(true);
+        await info.attach(`${game.id}-${viewport.width}-notification-paused`, {
+          body: await page.screenshot(), contentType: 'image/png',
+        });
+        await expect(notice).toBeVisible();
+        await pause.tap();
+        await expect.poll(() => phase(page, game.id)).toBe('playing');
+        await expect.poll(() => latest?.paused).toBe(false);
+        const resumed = position();
+        await slide();
+        try { await expect.poll(() => position().x).toBeGreaterThan(resumed.x + 1); }
+        finally { await release(); }
+        await expect(notice).toBeVisible();
+        await info.attach(`${game.id}-${viewport.width}-notification-input`, {
+          body: await page.screenshot(), contentType: 'image/png',
+        });
+        await notice.getByRole('button', { name: '通知を閉じる' }).tap();
+        await expect(notice).toHaveCount(0);
+      });
+    }
+  }
+});
