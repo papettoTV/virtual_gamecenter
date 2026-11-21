@@ -32,6 +32,10 @@ async function mount(page, gameId, role = 'player', initialPhase = 'ready') {
     }
   }).toBe(true);
   await screen.evaluate(el => el.classList.remove('is-hidden'));
+  const version = screen.locator('.game-version');
+  await expect(version).toHaveText(/^v[1-9]\d*$/);
+  await expect(version).toHaveCSS('pointer-events', 'none');
+  await expect(version).toHaveCSS('font-size', '10px');
   return screen;
 }
 async function phase(page, gameId, phase, role = 'player') {

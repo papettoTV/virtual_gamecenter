@@ -1,4 +1,6 @@
 import { PlayCreditConfirmation } from "../../../features/platform/PlayCreditConfirmation";
+import { DOT_WAVE } from "../../../domain/game";
+import { GameVersion } from "../../../features/game/GameVersion";
 import { LeaveGameConfirmation } from "../../../features/game/LeaveGameConfirmation";
 import { createVictoryCelebration } from "../../../features/game/victory-celebration";
 import { notifications } from "../../../features/notifications/notifications";
@@ -409,6 +411,7 @@ export default function MochiDuel({ players, network, sharedAudio, boardNotice, 
       {e.phase !== "intro" && <h2 className={busy.current || e.phase === "countdown" || e.phase === "playing" || e.phase === "impact" || (e.phase === "finished" && !next) ? "dot-sr-only" : undefined} aria-live="polite">{heading}</h2>}
       {!(e.phase === "finished" && !next) && <DotScene engine={e} viewSide={viewSide} players={players} musicOverride={musicOverride.current} />}
       <div className="duel-board-notice">{boardNotice}</div>
+      <GameVersion game={DOT_WAVE} />
       <div ref={glow} className="spectator-presence-edge" aria-hidden="true" />
       {e.phase === "countdown" && <div className="duel-start-countdown" role="status" aria-label={`開始まで${Math.max(1, Math.ceil(-e.seconds))}秒`}><strong key={Math.ceil(-e.seconds)}>{Math.max(1, Math.min(3, Math.ceil(-e.seconds)))}</strong></div>}
       {e.phase === "intro" && !busy.current && <div className="duel-state-overlay duel-start-panel">
