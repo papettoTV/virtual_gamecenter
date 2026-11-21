@@ -8,7 +8,7 @@ export function getPlayerWingRotation(elapsed = 0) {
 }
 
 export function getPlayerShipStage(level = 0): PlayerShipStage {
-  return level >= 30 ? 3 : level >= 10 ? 2 : 1;
+  return level >= 60 ? 3 : level >= 30 ? 2 : 1;
 }
 
 function drawEvolvedShip(context: CanvasRenderingContext2D, color: string, stage: PlayerShipStage,
