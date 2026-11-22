@@ -22,7 +22,7 @@ async function operator() {
   const account = await env.DB.prepare("SELECT account_id FROM players WHERE id = ?").bind(playerId).first<{ account_id: string }>();
   return { playerId, cookie, accountId: account!.account_id };
 }
-const operatorRequest = (cookie = "", path = "/operator/feedback") => new Request("https://staging.example" + path, { headers: { Cookie: cookie } });
+const operatorRequest = (cookie = "", path = "/operator/feedback", origin = "https://staging.example") => new Request(origin + path, { headers: { Cookie: cookie } });
 const localOptions = { APP_ENV: "local", DEVELOPER_AUTH_ENABLED: "true", DB: env.DB };
 const localRequest = (cookie = "", path = "/operator/feedback", origin = "http://localhost") => new Request(origin + path, { headers: { Cookie: cookie } });
 async function developer() {
@@ -81,7 +81,7 @@ it("never enables developer operator access remotely or when developer auth is d
   }
   expect((await handleFeedback(localRequest(owner.cookie), { ...localOptions, DEVELOPER_AUTH_ENABLED: "false" }))!.status).toBe(404);
   expect((await handleFeedback(localRequest(owner.cookie), { ...localOptions, DEVELOPER_AUTH_ENABLED: undefined }))!.status).toBe(404);
-  expect((await handleFeedback(localRequest(owner.cookie), { ...localOptions, APP_ENV: "production" }))!.status).toBe(404);
+  expect((await handleFeedback(localRequest(owner.cookie), { ...localOptions, APP_ENV: "production" }))!.status).toBe(503);
   const account = await env.DB.prepare("SELECT account_id FROM players WHERE id = ?").bind(owner.playerId).first<{ account_id: string }>();
   expect((await handleFeedback(operatorRequest(owner.cookie), { ...localOptions, APP_ENV: "staging", OPERATOR_ACCOUNT_IDS: account!.account_id }))!.status).toBe(403);
 });
@@ -162,12 +162,11 @@ it("protects the operator page with the shared read limiter", async () => {
   expect((await limitRequest(operatorRequest(), { APP_ENV: "staging", API_READ_LIMITER: { limit: async () => ({ success: false }) } }))!.status).toBe(429);
 });
 
-it("only lets configured, active Google operators read feedback and escapes all text", async () => {
+it.each(["staging", "production"])("only lets configured, active Google operators read feedback and escapes all text in %s", async APP_ENV => {
   const owner = await operator();
-  const config = { ...options, OPERATOR_ACCOUNT_IDS: owner.accountId };
+  const config = { ...options, APP_ENV, OPERATOR_ACCOUNT_IDS: owner.accountId };
   expect((await handleFeedback(operatorRequest(), config))!.status).toBe(401);
-  expect((await handleFeedback(operatorRequest(owner.cookie), options))!.status).toBe(503);
-  expect((await handleFeedback(operatorRequest(owner.cookie), { ...config, APP_ENV: "production" }))!.status).toBe(404);
+  expect((await handleFeedback(operatorRequest(owner.cookie), { ...options, APP_ENV }))!.status).toBe(503);
   expect((await handleFeedback(operatorRequest(owner.cookie), { ...config, OPERATOR_ACCOUNT_IDS: "other" }))!.status).toBe(403);
   await send({ ...payload(), message: '<script>alert("x")</script>' });
   const response = (await handleFeedback(operatorRequest(owner.cookie), config))!;
@@ -181,6 +180,7 @@ it("only lets configured, active Google operators read feedback and escapes all 
   expect(html).toContain("日時（日本時間）");
   expect(html).toContain("<th>日時（日本時間）</th><th>内容</th><th>プレイヤー名</th><th>端末 / ブラウザ</th><th>種別</th><th>対象</th>");
   expect(html).toMatch(/<td>[^<]+ JST<\/td><td style="white-space:pre-wrap;overflow-wrap:anywhere">&lt;script&gt;/);
+  expect(html.includes('href="/operator/operations"')).toBe(APP_ENV === "staging");
   expect(html).toContain("JST");
   expect(html).toContain("未記録");
   expect((await handleFeedback(operatorRequest(owner.cookie, "/api/operator/feedback?page=1"), config))!.status).toBe(200);
@@ -191,4 +191,52 @@ it("only lets configured, active Google operators read feedback and escapes all 
   expect((await handleFeedback(operatorRequest(owner.cookie, "/api/operator/feedback?page=999"), config))!.status).toBe(200);
   await env.DB.prepare("UPDATE player_sessions SET expires_at = '2000-01-01' WHERE player_id = ?").bind(owner.playerId).run();
   expect((await handleFeedback(operatorRequest(owner.cookie), config))!.status).toBe(401);
+});
+
+it.each(["/operator/feedback", "/api/operator/feedback"])("enforces production authorization and request validation for %s", async path => {
+  const owner = await operator();
+  const config = { APP_ENV: "production", DB: env.DB, OPERATOR_ACCOUNT_IDS: ` , ${owner.accountId}, ` };
+  const read = (cookie = owner.cookie, suffix = "", changes: RequestInit = {}) =>
+    new Request("https://pulbase.example" + path + suffix, { headers: { Cookie: cookie }, ...changes });
+  const assertDenied = async (request: Request, status: number, overrides = {}) => {
+    const response = (await handleFeedback(request, { ...config, ...overrides }))!;
+    expect(response.status).toBe(status);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+    expect(response.headers.get("X-Robots-Tag")).toBe("noindex, nofollow");
+    expect(await response.text()).not.toContain("production-private-feedback");
+  };
+  const body = { ...payload(), message: "production-private-feedback" };
+  await send(body);
+  const response = (await handleFeedback(read(), config))!;
+  expect(response.status).toBe(200);
+  if (path.startsWith("/api/")) {
+    expect(await response.json()).toMatchObject({ feedback: [{ id: body.id, message: body.message }], page: 1 });
+  } else {
+    const html = await response.text();
+    expect(html).toContain(body.message);
+    expect(html).not.toContain("/operator/operations");
+  }
+  await assertDenied(read(), 503, { OPERATOR_ACCOUNT_IDS: " , " });
+  await assertDenied(read(""), 401);
+  await assertDenied(read("vgc_session=" + "a".repeat(129)), 401);
+  await assertDenied(read(), 403, { OPERATOR_ACCOUNT_IDS: "different-account" });
+  for (const APP_ENV of [undefined, "", "preview", "Production"]) await assertDenied(read(), 404, { APP_ENV });
+  await assertDenied(read(owner.cookie, "", { method: "POST" }), 405);
+  await assertDenied(read(owner.cookie, "", { headers: { Cookie: owner.cookie, "Sec-Fetch-Site": "cross-site" } }), 403);
+  for (const query of ["?page=0", "?page=-1", "?page=1000", "?page=1.5", "?page=<script>", "?sql=SELECT"]) {
+    await assertDenied(read(owner.cookie, query), 400);
+  }
+  const guest = (await handlePlatformRequest(new Request("http://localhost/api/platform/bootstrap"), env.DB))!;
+  const guestCookie = guest.headers.getSetCookie().map(value => value.split(";", 1)[0]).join("; ");
+  await assertDenied(read(guestCookie), 403);
+  const dev = await developer();
+  const devAccount = await env.DB.prepare("SELECT account_id FROM players WHERE id = ?").bind(dev.playerId).first<{ account_id: string }>();
+  await assertDenied(read(dev.cookie), 403, { OPERATOR_ACCOUNT_IDS: devAccount!.account_id, DEVELOPER_AUTH_ENABLED: "true" });
+  await env.DB.prepare("UPDATE players SET deletion_requested_at = CURRENT_TIMESTAMP WHERE id = ?").bind(owner.playerId).run();
+  await assertDenied(read(), 401);
+  await env.DB.prepare("UPDATE players SET deletion_requested_at = NULL WHERE id = ?").bind(owner.playerId).run();
+  await env.DB.prepare("DELETE FROM account_identities WHERE account_id = ? AND provider = 'google'").bind(owner.accountId).run();
+  await assertDenied(read(), 403);
+  await env.DB.prepare("DELETE FROM player_sessions WHERE player_id = ?").bind(owner.playerId).run();
+  await assertDenied(read(), 401);
 });

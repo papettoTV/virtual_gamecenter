@@ -27,6 +27,14 @@ it("only serves fixed staging routes and fails closed without operator configura
   expect(fetcher).not.toHaveBeenCalled();
 });
 
+it.each(["/operator/operations", "/api/operator/operations"])("keeps %s unavailable to allowlisted Google operators in production", async path => {
+  const owner = await player();
+  const fetcher = vi.fn();
+  const response = (await handleOperatorRequest(request(owner.cookie, path), { ...config, APP_ENV: "production", OPERATOR_ACCOUNT_IDS: owner.accountId }, fetcher))!;
+  expect(response.status).toBe(404);
+  expect(fetcher).not.toHaveBeenCalled();
+});
+
 it("rejects missing sessions, guests, unrelated accounts and method/query/cross-site attempts without querying metrics", async () => {
   const owner = await player(), guest = await player(false), other = await player();
   const options = { ...config, OPERATOR_ACCOUNT_IDS: owner.accountId }, fetcher = vi.fn();
