@@ -3,7 +3,7 @@ import { hashIdentifier } from "./identity-hash";
 export async function operatorAccess(request: Request, env: { APP_ENV?: string; DEVELOPER_AUTH_ENABLED?: string; OPERATOR_ACCOUNT_IDS?: string; DB: D1Database }) {
   const local = env.APP_ENV === "local";
   const url = new URL(request.url);
-  if (local ? !["localhost", "127.0.0.1", "[::1]"].includes(url.hostname) || env.DEVELOPER_AUTH_ENABLED !== "true" : env.APP_ENV !== "staging") return { status: 404, message: "この環境では利用できません。" };
+  if (local ? !["localhost", "127.0.0.1", "[::1]"].includes(url.hostname) || env.DEVELOPER_AUTH_ENABLED !== "true" : env.APP_ENV !== "staging" && env.APP_ENV !== "production") return { status: 404, message: "この環境では利用できません。" };
   const allowed = (env.OPERATOR_ACCOUNT_IDS ?? "").split(",").map(value => value.trim()).filter(Boolean);
   if (!local && !allowed.length) return { status: 503, message: "運営者権限が設定されていません。" };
   const loginMessage = local ? "開発者ユーザーでログインしてください。" : "Googleログインが必要です。";
