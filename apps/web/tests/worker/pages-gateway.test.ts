@@ -176,7 +176,8 @@ describe("Pages to Worker gateway", () => {
       const response = await send(site, path, { headers: { Authorization: authorization } });
       expect(response.status).toBe(503);
       expect(await response.json()).toEqual({ error: "運営者権限が設定されていません。" });
-      expect(response.headers.get("cache-control")).toBe("private, no-store");
+      // secureResponse normalizes 503 responses to no-store.
+      expect(response.headers.get("cache-control")).toBe("no-store");
       expect(response.headers.get("x-robots-tag")).toContain("noindex");
     }
     const purchase = await send(site, "/api/platform/credit-purchases/checkout", {
@@ -215,7 +216,8 @@ describe("Pages to Worker gateway", () => {
         const response = await send(path, allowed, session);
         expect(response.status).toBe(status);
         expect(await response.json()).toEqual({ error });
-        expect(response.headers.get("cache-control")).toBe("private, no-store");
+        // Full Worker denial responses use no-store; handler tests retain the stricter header assertion.
+        expect(response.headers.get("cache-control")).toBe("no-store");
         expect(response.headers.get("x-robots-tag")).toContain("noindex");
       }
       const response = await send(path, account!.account_id, cookie);
