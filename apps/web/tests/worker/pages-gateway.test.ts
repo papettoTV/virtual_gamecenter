@@ -4,6 +4,8 @@ import gateway from "../../src/pages/gateway.mjs";
 import worker from "../../src/worker/index";
 import { migrateTestDatabase } from "../migrate-test-database";
 import type { ServerMessage } from "../../src/shared/protocol";
+import { handlePlatformRequest } from "../../src/worker/platform";
+import { registerGoogleAccount } from "../../src/worker/google-auth";
 import { hashIdentifier } from "../../src/worker/identity-hash";
 
 beforeAll(migrateTestDatabase);
@@ -167,8 +169,15 @@ describe("Pages to Worker gateway", () => {
     for (const path of ["/operator/feedback", "/api/operator/operations", "/api/platform/dev/retention"]) {
       expect((await send(site, path)).status).toBe(401);
     }
-    for (const path of ["/api/operator/operations", "/api/operator/feedback"]) {
+    for (const path of ["/operator/operations", "/api/operator/operations"]) {
       expect((await send(site, path, { headers: { Authorization: authorization } })).status).toBe(404);
+    }
+    for (const path of ["/operator/feedback", "/api/operator/feedback"]) {
+      const response = await send(site, path, { headers: { Authorization: authorization } });
+      expect(response.status).toBe(503);
+      expect(await response.json()).toEqual({ error: "運営者権限が設定されていません。" });
+      expect(response.headers.get("cache-control")).toBe("private, no-store");
+      expect(response.headers.get("x-robots-tag")).toContain("noindex");
     }
     const purchase = await send(site, "/api/platform/credit-purchases/checkout", {
       method: "POST", headers: { Origin: site }, body: "{}",
@@ -180,6 +189,51 @@ describe("Pages to Worker gateway", () => {
     });
     expect(crossOrigin.status).toBe(403);
     expect(await crossOrigin.json()).toEqual({ error: "invalid_origin" });
+  });
+
+  it("requires an allowed Google session for production feedback through Pages", async () => {
+    const bootstrap = (await handlePlatformRequest(new Request("http://localhost/api/platform/bootstrap"), env.DB))!;
+    const cookie = bootstrap.headers.get("set-cookie")!.split(";", 1)[0]!;
+    const { playerId } = await bootstrap.json() as { playerId: string };
+    await registerGoogleAccount(env.DB, { playerId, token: cookie.split("=")[1]!, secureCookie: false }, {
+      sub: crypto.randomUUID(), name: "Gateway operator",
+    });
+    const account = await env.DB.prepare("SELECT account_id FROM players WHERE id = ?").bind(playerId).first<{ account_id: string }>();
+    const send = (path: string, allowed: string, session = "") => gateway.fetch(new Request("https://pulbase.com" + path, {
+      headers: { Authorization: authorization, Cookie: session, "CF-Connecting-IP": "192.0.2.93" },
+    }), { APP_ENV: "production", BACKEND: { fetch(request: Request) {
+      return worker.fetch(request as Parameters<typeof worker.fetch>[0], {
+        ...env, APP_ENV: "production", PUBLIC_BETA_ENABLED: "true",
+        BASIC_AUTH_USERNAME: "test", BASIC_AUTH_PASSWORD: "test", OPERATOR_ACCOUNT_IDS: allowed,
+      } as unknown as Env);
+    } } });
+    for (const path of ["/operator/feedback", "/api/operator/feedback"]) {
+      for (const [allowed, session, status, error] of [
+        [account!.account_id, "", 401, "Googleログインが必要です。"],
+        ["another-account", cookie, 403, "運営者権限がありません。"],
+      ] as const) {
+        const response = await send(path, allowed, session);
+        expect(response.status).toBe(status);
+        expect(await response.json()).toEqual({ error });
+        expect(response.headers.get("cache-control")).toBe("private, no-store");
+        expect(response.headers.get("x-robots-tag")).toContain("noindex");
+      }
+      const response = await send(path, account!.account_id, cookie);
+      expect(response.status).toBe(200);
+      expect(response.headers.get("cache-control")).toBe("private, no-store");
+      expect(response.headers.get("x-robots-tag")).toContain("noindex");
+      if (path.startsWith("/api/")) {
+        expect(await response.json()).toMatchObject({ feedback: expect.any(Array), page: 1 });
+      } else {
+        expect(response.headers.get("content-security-policy")).toContain("default-src 'none'");
+        const html = await response.text();
+        expect(html).toContain("<h1>フィードバック</h1>");
+        expect(html).not.toContain("/operator/operations");
+      }
+    }
+    for (const path of ["/operator/operations", "/api/operator/operations"]) {
+      expect((await send(path, account!.account_id, cookie)).status).toBe(404);
+    }
   });
 
   it("keeps Google login callback and return URL on the Pages host", async () => {
