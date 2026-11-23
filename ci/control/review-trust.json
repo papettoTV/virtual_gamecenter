@@ -15,7 +15,7 @@
     "ci/issue-routing.mjs": "2249309f414984a7a47057e6b869a4c5bec2df95",
     "ci/ci-evidence.mjs": "74f9abed7c550116f4c4093b5dbdeef34240c7ad",
     "ci/staging-artifact.mjs": "8e7c5c6530f54c82e345b90ad7afd4d83cfda825",
-    "ci/check-workflows.mjs": "8b1c28b1febb9a79f80d91681540e5d3af295fba",
+    "ci/check-workflows.mjs": "2796c8c0a923884ea3274f5085041a51825f56eb",
     "ci/package.json": "7a3095aeb8ef4c236ca8e813313338026775becb",
     "ci/package-lock.json": "f24bd7c4b6bb4de691e9b2ddcc0abffd7a857dff",
     "apps/web/package.json": "f6b9371154eee01a1605c87016faeffe0f0a4237",
