@@ -44,3 +44,5 @@ Repository variablesで不要なのは次の3件だけ。コードから値を�
 - Repository variableの `PULBASE_RELEASE_APP_ID` を削除。稼働中のリリース用Appとその鍵は使用を継続する。
 - 旧Environmentの `announcement` と `release-preflight` を削除。後者に含まれていた旧Basic認証2件も削除した。
 - GitHubの `production` に残っていた旧Basic認証2件とGoogle OAuth資格情報2件を削除。現行のリリース鍵・Workerトークン・Pagesトークンの3件を確認した。Cloudflare側の資格情報と検証環境のBasic認証は変更していない。
+
+初回構築時の設定監査は固定のmainと当時の環境を検査するもので、公開中の設定監査には使わない。現行の事前照合は保護された `ci-control` の予行・本番ワークフローで確認する。
