@@ -36,3 +36,13 @@ Repository variablesで不要なのは次の3件だけ。コードから値を�
 ## 検証
 
 残るNodeテスト112件・workflow/template10件を確認。削除したコードだけを対象にしたテストを整理したため件数は減ったが、現行の証跡・マージ・公開・回帰・本番告知のテストは保持する。固定manifestのGit blob一致検査、本番テンプレートと依存ソースの差分なし、残る実行コードのローカルimport先の存在を確認する。実公開は人のstaging承認前には行わない。
+
+## 2026-11-24の追加整理
+
+[PR #265](https://github.com/papettoTV/virtual_gamecenter/pull/265)で旧公開経路を削除し、[Issue #266](https://github.com/papettoTV/virtual_gamecenter/issues/266)でGitHub Actions設定を整理した。
+
+- Repository variableの `PULBASE_RELEASE_APP_ID` を削除。稼働中のリリース用Appとその鍵は使用を継続する。
+- 旧Environmentの `announcement` と `release-preflight` を削除。後者に含まれていた旧Basic認証2件も削除した。
+- GitHubの `production` に残っていた旧Basic認証2件とGoogle OAuth資格情報2件を削除。現行のリリース鍵・Workerトークン・Pagesトークンの3件を確認した。Cloudflare側の資格情報と検証環境のBasic認証は変更していない。
+
+初回構築時の設定監査は固定のmainと当時の環境を検査するもので、公開中の設定監査には使わない。現行の事前照合は保護された `ci-control` の予行・本番ワークフローで確認する。

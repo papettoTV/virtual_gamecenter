@@ -4,14 +4,14 @@
 
 同じdevelop SHAの初回Web checks、本番準備CI、検証公開と回帰が揃うと、GitHub Actionsが自動で保護済みci-controlに候補を渡す。候補選択・起動・SHA入力は自動で行う。
 
-人の操作はGitHub Actionsで本番候補と変更範囲を確認し、productionの「Approve and deploy」で承認する1回。古い候補、証跡の変更、再実行は停止する。承認後の処理は固定成果物の再照合、main昇格、WorkerとPagesの反映、本番HTTP・PC/スマホ回帰、成功時の手動X投稿文提示。
+人の操作はGitHub Actionsで本番候補と変更範囲を確認し、productionの「Approve and deploy」で承認する1回。古い候補、証跡の変更、再実行は停止する。承認後は固定成果物を再照合し、WorkerとPagesを反映する。本番HTTPとPC・スマホの回帰が合格してからmainを昇格し、手動X投稿用の文面を提示する。
 
 ## 権限分離
 
 - developの起動workflowは本番鍵を持たない。候補探索は読取だけ、起動ジョブはActions書込だけを追加する。
 - 本番承認を受けるproduction環境は、保護されたci-controlだけに限定する。現在の承認者と管理者bypass禁止を維持する。
 - mainへの昇格に例外が必要なら本番専用GitHub Appだけに付与し、別ルールの必須CI・force push禁止・削除禁止は維持する。Appの鍵と本番Cloudflare書込認証はproductionのみに保管し、管理者PATはCIに置かない。
-- 承認後は候補、成果物、本番設定を再確認する。D1移行を伴う場合は対象DB、移行一覧、復元点を確認する。Workerの一般公開設定は維持する。
+- 承認後は候補、成果物、本番設定を再確認する。D1移行の差分がある候補は自動公開を停止する。Workerの一般公開設定は維持する。
 - 公開コマンドが返した識別子を先に記録し、配信確認は最大16回・待機間隔2秒の読み取りだけで行う。旧配信以外の未知の配信が見えたら停止し、公開操作は再送しない。確認失敗後も同じ識別子だけを対象に遅延反映を確認してから切り戻す。未確認の公開が残る場合は、旧配信が見えていても復旧済みとは扱わない。
 
 ## ブラウザ回帰の対象と失敗診断
@@ -28,8 +28,6 @@
 3. 同じ `develop` SHAの候補が既に発行されている場合は、取り消し済みでも再登録しない。通常の修正・記録PRを `develop` にマージし、新SHAの初回CIと新制御での検証公開・回帰を待つ。
 4. 新しい候補の制御SHAとアプリSHAを確認し、管理者がその候補を承認する。旧ジョブの再実行や承認、保護ルールの緩和で代用しない。
 
-## 現段階
+## 鍵なし予行
 
-自動候補選択、固定ブランチへの起動、鍵なし予行試験を追加する。developの本番名workflowは登録だけを行う。予行試験テンプレートはci-controlへ配置し、ci-control限定・承認必須・Secretなしのproduction-rehearsal環境を利用する。予行試験は本番フラグfalseと予行試験フラグtrueを要求する。
-
-実公開ジョブ、鍵なしビルド成果物の引き渡し、main保護定義の同期、本番切り戻しへの接続は後続。今回の変更では環境・権限・本番配信を変更しない。
+`production-rehearsal` はci-control限定・承認必須・Secretなし。予行時は `PULBASE_PRODUCTION_ENABLED=false`、`PULBASE_PRODUCTION_CD_REHEARSAL=true` にし、候補と成果物の承認前後の一致を確認する。完了後は通常運用の `true`、`false` に戻す。[2026-11-24の鍵なし予行](https://github.com/papettoTV/virtual_gamecenter/actions/runs/45265052229)で確認済み。

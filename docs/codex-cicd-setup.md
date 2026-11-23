@@ -1,12 +1,10 @@
 # Codex・GitHub CI/CD の設定
 
-更新日：2026-11-03。develop向けの通常運用だけを有効化する。main反映・本番公開・X投稿は行わない。初期構築時の古い公開手順・初回認証試験・旧フラグの一括有効化手順は整理した。過去の実装と検証経緯はGit履歴とActions履歴で参照できる。
-
-[削除対象と保持理由の監査記録](cicd-cleanup.md)を参照する。本番準備文書に残る旧stagingフラグ等への言及は当時の記録であり、現行の設定は本書を優先する。
+更新日：2026-11-24。[不要経路の整理記録](cicd-cleanup.md)と[本番リリースの運用](production-one-approval-cd.md)も参照する。
 
 ## 現行の実行経路
 
-`実装:自動` のラベル付与 → Codex実装 → AppによるPR作成 → 必須CIと独立Codexレビュー → 同じ候補と固定定義を再照合 → developへ自動マージ → 実マージSHAの初回push CI → ci-controlから公開処理を自動起動 → 人のstaging承認1回 → Worker/Pages公開1回・HTTP/ブラウザ回帰1回。
+`実装:自動` のラベル付与 → Codex実装 → AppによるPR作成 → 必須CIと独立Codexレビュー → 同じ候補と固定定義を再照合 → developへ自動マージ → 実マージSHAの初回push CI → ci-controlから公開処理を自動起動 → 検証Worker公開1回・HTTP/ブラウザ回帰1回。共有Pagesの更新が必要な候補は、stagingで人が1回承認してから公開する。
 
 ラベルなしのIssueはチャットから手元実装する。担当ラベルを併用せず、同じIssueでPRを重複作成しない。失敗時は停止し、修正PRで対応する。古いhead/base・証跡の再実行・候補差替えを強制的に通さない。新しいdevelopが出ると、公開前の古いstaging承認待ちは[自動整理](staging-workflow-cancellation.md)する。公開中や確認できない実行は変更しない。
 
@@ -22,8 +20,9 @@
 | PULBASE_DEVELOP_AUTO_MERGE_ENABLED | true | 現行のdevelop自動マージ |
 | PULBASE_CONTROL_EVIDENCE_ENABLED | true | 実マージCIからの検証公開起動 |
 | PULBASE_CONTROL_EVIDENCE_SHA | 人が配置・確認した40桁のci-control SHA | 人が確認した固定制御SHA。通常のアプリ変更では更新しない |
-| PULBASE_PRODUCTION_ENABLED | false | 未接続の本番経路の無効化。保持する |
-| PULBASE_RELEASE_APP_ID | 5405029 | 未接続の本番用App。保持する |
+| PULBASE_STAGING_WORKER_AUTO | true | 検証Workerだけの更新は人の承認なしで実行 |
+| PULBASE_PRODUCTION_ENABLED | true | 本番候補の受付。実公開にはproductionでの人の承認が必要 |
+| PULBASE_PRODUCTION_CD_REHEARSAL | false | 鍵なし予行時に限り、本番受付をfalseにしてこの変数をtrueにする |
 
 旧 `PULBASE_STAGING_DEPLOY_ENABLED` / `PULBASE_AUTO_MERGE_ENABLED` / `PULBASE_X_ENABLED` は実行経路から参照されないため削除してよい。現行の `PULBASE_DEVELOP_AUTO_MERGE_ENABLED` と取り違えない。変数の停止だけでは実行中の処理が終了したことにはならず、必要な場合は人がActions画面で状態を確認する。
 
@@ -31,10 +30,12 @@
 
 - codex：OPENAI_API_KEY。自動実装と独立レビューに使用。
 - automation：PULBASE_APP_PRIVATE_KEY。開発用Appだけを対象リポジトリに限定して使用。
-- staging：CLOUDFLARE_API_TOKEN、PULBASE_CHECK_USERNAME、PULBASE_CHECK_PASSWORD。公開ジョブでだけ使用。
-- production / release-preflight / announcement：本番準備に関係するため今回の整理では変更・削除しない。詳細は[本番準備](production-cicd-preparation.md)を参照。
+- staging：CLOUDFLARE_API_TOKEN、PULBASE_CHECK_USERNAME、PULBASE_CHECK_PASSWORD。共有Pagesを含む検証公開で使用。
+- staging-worker：CLOUDFLARE_WORKER_API_TOKEN、PULBASE_CHECK_USERNAME、PULBASE_CHECK_PASSWORD。検証Workerだけを更新する経路で使用。
+- production：PULBASE_RELEASE_APP_PRIVATE_KEY、CLOUDFLARE_WORKER_API_TOKEN、CLOUDFLARE_PAGES_API_TOKEN。本番承認後に使用。
+- production-rehearsal：鍵なし予行の承認ゲート。Secretなし。
 
-stagingはBranch型ci-controlだけ、papettoTV承認必須、管理者bypass禁止。ci-control/mainのbypassは空、stagingのPULBASE_CONTROL_RULE_VERSIONSは人が確認した更新日時とprotectionMode=strictを保持する。Secret値はチャットやGitへ記載しない。
+公開・予行に使う4環境はBranch型ci-controlだけを許可し、管理者bypassを禁止する。staging、production、production-rehearsalには人の承認を設定する。ci-controlのbypassは空に保ち、main更新ルールの例外は本番専用GitHub Appに限定する。stagingとstaging-workerの保護設定版はprotectionMode=strictを保持する。Secret値はチャットやGitへ記載しない。
 
 developはPRとGitHub Actions発行のverify / Automation control checksを必須とし、strict・管理者への適用を維持する。公開コード・レビュー信頼定義はci-controlの固定版を使い、PRのコードや自己申告で置き換えない。保護された定義を更新する場合は、通常のアプリPRとは別の管理手順を準備する。
 
@@ -46,26 +47,6 @@ developはPRとGitHub Actions発行のverify / Automation control checksを必�
 
 Node 22で `npm ci --ignore-scripts --prefix ci`、`npm test --prefix ci`、`npm run check --prefix ci` を行う。アプリのテスト・ビルドは通常のWeb checksに従う。削除した初回試験や旧配置ツールを再利用しない。
 
-## 将来の本番リリース・X設定（既存案を保持、今は有効化しない）
+## 本番公開と告知
 
-1. 公開チェックリストと環境分離・本番リソース・Secret・復旧手順を確認する。
-2. productionの人の承認、main保護とリリース用App、Pages/Workersの自動公開停止を確認する。利用するAction/CLIのバージョンもレビューし、必要に応じてコミットSHAへ固定する。
-3. 別途許可を受けて `.github/workflow-templates/production-release.yml.disabled` を `.github/workflows/production-release.yml` に配置し、デフォルトのdevelopで登録したうえでmainにも反映する。実行時の対象refはmainに限定する。
-4. `PULBASE_PRODUCTION_ENABLED=true` にする。mainから手動実行し、stagingで確認済みのdevelopの40桁SHAと、人が確認したX告知文を指定する。告知文は今回の実装では保守的に140 Unicode文字まで。
-5. prepareでローカルテスト・本番設定ビルド・stagingのSHA照合を行う。人が同じSHAと告知文・既存公開判定の残課題を確認し、productionを承認する。
-6. 承認後にmainを指定SHAへfast-forwardする。mainがdevelop候補の祖先でない場合は停止し、履歴を人が整理する。勝手なマージ・force pushはしない。
-7. 本番Worker/Pagesを公開し、HTTP・リビジョン・ブラウザ回帰確認が成功した場合だけ手動投稿用の文面を提示する。
-
-本番公開/回帰確認に失敗した場合はX告知を実施せず、Actionsの失敗通知と証跡を確認する。main更新後・Worker公開後・Pages公開後の部分失敗があり得るため、mainが進んだことだけで公開完了としない。自動DBロールバックは行わない。既知の正常Worker/Pagesへ戻す操作とデータ整合確認は運営者が判断する。コードのロールバックだけでDB/DOデータが元へ戻るとは扱わない。
-
-### Xは手動投稿（2026-10-21の方針変更）
-
-Xへの自動送信を廃止し、本番公開・回帰確認が成功した後に日本語のリリース文面だけを提示する。X App・API Key・Access Token・投稿用Secret・`automation-state` ブランチは不要。`PULBASE_X_ENABLED` は文面提示の条件に使っておらず、旧フラグは削除してよい。
-
-リリース準備時にCodexが対象変更から利用者向けの日本語告知案を用意し、人が内容を確認する。workflowの `announcement` 入力へその告知案を渡す。現在の保守的な上限は140 Unicode文字。公開前の承認サマリーには「未投稿の案」として示し、本番公開後の回帰確認に失敗した場合は手動投稿用の成功成果物を作らない。
-
-回帰確認成功後、Actionsの `announce` ジョブのサマリーにコピー用の文面・リリースSHA・未投稿である旨を表示する。同じ文面を `manual-release-announcement-<SHA>` artifactの `release-announcement.txt` と `release-announcement.md` に14日保存する。運営者が確認してXへ手動投稿する。手動で投稿したかどうかをCIは取得・記録しないので、投稿前にX上で確認する。
-
-文面提示ジョブはEnvironment・GitHub App token・X資格情報を使用せず、Xへの送信やGitHubの投稿状態書込を行わない。文面生成に失敗した場合は入力を確認し、そのジョブだけを再実行する。本番公開全体を文面生成のために再実行しない。
-
-告知先を追加する場合も、まず配布用文面として準備する。自動投稿への再変更は別途指示を受ける。ユーザー向けGitHub Releasesやサイト内告知は今回作成しない。
+通常運用では、検証済みの候補が自動でproductionの承認待ちになる。承認後は[本番リリースの運用](production-one-approval-cd.md)に沿って反映し、回帰合格後にmainを昇格する。Xへの告知は、成功時に提示する日本語文面を確認して手動投稿する。
