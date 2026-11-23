@@ -1,6 +1,6 @@
 # 人の承認付き本番リリースの準備
 
-2026-10-28追記：現在の公開なし準備は[本番を変更しない準備](production-predeployment.md)を参照する。以下の構築時点の記録にあるrelease Appのmain例外・Pages自動公開・旧staging/Xフラグ等を現状として扱わない。現在はmainのbypassゼロ・本番フラグfalse。旧本番テンプレートはドラフトであり、そのまま有効化しない。
+> 初回本番公開前の記録です。環境、鍵、変数の現行設定は[CI/CDの設定](codex-cicd-setup.md)と[本番リリースの運用](production-one-approval-cd.md)を参照してください。初回設定用の監査と配置手順は当時の状態を前提とします。
 
 更新日：2026-10-21。準備はdevelopだけで行う。mainへのコード反映、本番デプロイ、X投稿は未実施。本番用テンプレートは `.github/workflow-templates/production-release.yml.disabled` のまま維持し、`PULBASE_PRODUCTION_ENABLED` と `PULBASE_X_ENABLED` はfalse。
 

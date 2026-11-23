@@ -1,5 +1,7 @@
 # 本番を変更しない準備（2026-10-28）
 
+> 初回本番公開前の記録です。環境、鍵、変数の現行設定は[CI/CDの設定](codex-cicd-setup.md)と[本番リリースの運用](production-one-approval-cd.md)を参照してください。初回設定用の監査と配置手順は当時の状態を前提とします。
+
 ## 今回進める範囲
 
 production-preparation workflowは、develop向けPRまたはdevelopでの手動実行で、本番構成の静的検査・空DB移行のローカルリハーサル・本番ビルド・Worker dry-run・ブラウザ定義の読込だけを行う。Environment・Secret・GitHub書込権限は持たず、mainへのpush・本番Worker/Pagesへのupload・本番DB操作・本番URLの閲覧・X投稿は行わない。既存の本番リリーステンプレートは無効のまま。
