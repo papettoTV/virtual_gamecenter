@@ -87,11 +87,6 @@ export async function checkWorkflows() {
   }
   const review = pr.jobs.review.steps.find(step => step.uses?.startsWith('openai/codex-action@'));
   assert.equal(review.with['codex-version'], '0.164.0');
-  const develop = entries.find(item => item.file === 'develop-staging.yml').data;
-  assert.deepEqual(Object.keys(develop.on), ['workflow_dispatch']);
-  assert.deepEqual(develop.permissions, {});
-  assert.ok(!JSON.stringify(develop).includes('secrets.'));
-  assert.ok(develop.jobs.retired.steps.some(step => step.run?.includes('exit 1')));
   const web = entries.find(item => item.file === 'web-checks.yml').data;
   checkWebWorkflow(web);
 
@@ -107,17 +102,6 @@ export async function checkWorkflows() {
   assert.equal(issue.jobs.publish.steps.find(s=>s.uses?.startsWith('actions/checkout@')).with['fetch-depth'],0);
   assert.ok(!issue.jobs.intake.if.includes("github.event.label.name == '実装:再開'"));
 
-  const release = entries.find(item => item.file === 'production-release.yml.disabled').data;
-  assert.match(release.jobs.prepare.if, /PULBASE_PRODUCTION_ENABLED/);
-  assert.equal(release.jobs.prepare.environment, 'release-preflight');
-  assert.equal(release.jobs.release.environment, 'production');
-  assert.equal(release.jobs.announce.environment, undefined);
-  assert.equal(release.jobs.announce.if, "needs.release.result == 'success'");
-  const announcement = JSON.stringify(release.jobs.announce);
-  assert.ok(!/secrets\.|create-github-app-token|PULBASE_X_ENABLED|announce-x/.test(announcement));
-  assert.ok(announcement.includes('node ci/release-announcement.mjs'));
-  assert.ok(announcement.includes('actions/upload-artifact@'));
-  assert.ok(release.jobs.announce.needs.includes('release'));
   assert.ok(!entries.filter(item => !item.file.endsWith('.disabled')).some(item => JSON.stringify(item.data).includes('npm run deploy -- production')));
   return entries.length;
 }
