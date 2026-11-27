@@ -9,6 +9,8 @@ import type { createGameState } from "../../src/games/graze-duel/state";
 const mocks = vi.hoisted(() => ({
   leave: vi.fn(), send: vi.fn(), rendererDispose: vi.fn(), requestPlay: vi.fn(),
   setResult: vi.fn(), clearResult: vi.fn(), setLiveContext: vi.fn(), overlay: false,
+  join: vi.fn(), delayed: false, admissionRole: "player",
+  receive: null as null | ((message: unknown) => void),
   state: null as ReturnType<typeof createGameState> | null,
 }));
 vi.mock("../../src/games/graze-duel/state", async importOriginal => {
@@ -24,9 +26,12 @@ vi.mock("../../src/features/sharing/result-sharing", () => ({
 vi.mock("../../src/features/sharing/share-service", () => ({ setLiveContext: mocks.setLiveContext }));
 vi.mock("../../src/realtime/cabinet-client", () => ({
   createCabinetClient: (handlers: { onConnectionChange(value: boolean): void; onMessage(message: unknown): void }) => ({
-    join() {
+    join(cabinetId: string) {
+      mocks.join(cabinetId);
+      mocks.receive = handlers.onMessage;
       handlers.onConnectionChange(true);
-      handlers.onMessage({ type: "joinedCabinet", role: "player" });
+      if (mocks.delayed) return;
+      handlers.onMessage({ type: "joinedCabinet", role: mocks.admissionRole });
       handlers.onMessage({ type: "cabinetState", state: { status: "occupied", spectatorCount: 0 } });
     },
     leave: mocks.leave,
@@ -40,7 +45,7 @@ vi.mock("../../src/realtime/cabinet-client", () => ({
 }));
 vi.mock("../../src/features/notifications/notifications", () => ({ notifications: { clearScope: vi.fn(), show: vi.fn() } }));
 vi.mock("../../src/features/ranking/ranking-client", () => ({ fetchScoreRanking: vi.fn(), loadRankingWithNotice: vi.fn(), submitRankingEntry: vi.fn() }));
-vi.mock("../../src/features/platform/platform-client", () => ({ reservePlayCredit: vi.fn(), releasePlayCredit: vi.fn(), capturePlayCredit: vi.fn() }));
+vi.mock("../../src/features/platform/platform-client", () => ({ ensurePlatformSession: vi.fn(async () => ({})), reservePlayCredit: vi.fn(), releasePlayCredit: vi.fn(), capturePlayCredit: vi.fn() }));
 vi.mock("../../src/features/engagement/engagement-client", () => ({ recordWatchStarted: vi.fn() }));
 vi.mock("../../src/game-sdk/game-host", () => ({ gameHost: { requestPlay: mocks.requestPlay } }));
 vi.mock("../../src/games/graze-duel/rendering/canvas-renderer", () => ({ createCanvasRenderer: () => ({ render: vi.fn(), dispose: mocks.rendererDispose }) }));
@@ -57,7 +62,7 @@ describe("BUZZ BARRIER instance lifecycle", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.overlay = false; mocks.state = null;
+    mocks.overlay = false; mocks.state = null; mocks.delayed = false; mocks.admissionRole = "player"; mocks.receive = null;
     frames = new Map();
     let nextFrame = 1;
     vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
@@ -89,7 +94,7 @@ describe("BUZZ BARRIER instance lifecycle", () => {
     vi.stubGlobal("history", { pushState: vi.fn() });
   });
 
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
   it("prepares, plays, removes listeners and releases render/session/RAF resources", async () => {
     const lifetime = new GameLifetime();
@@ -119,6 +124,66 @@ describe("BUZZ BARRIER instance lifecycle", () => {
     keyboard.dispatchEvent(keyEvent("KeyR"));
     expect(mocks.requestPlay).toHaveBeenCalledTimes(1);
     expect(await instance.play("retry", "reservation")).toBe(false);
+  });
+
+  it("retains the selected URL after >5s admission and requires authorization on late retry", async () => {
+    vi.useFakeTimers();
+    Object.assign(keyboard, { setTimeout, clearTimeout });
+    mocks.delayed = true;
+    Object.assign(window.location, { pathname: "/cabinets/selected", search: "?game=buzz-barrier&renderer=canvas" });
+    const instance = mountGame({ game: BUZZ_BARRIER, lifetime: new GameLifetime() });
+    const prepared = instance.prepareSolo?.();
+    await vi.advanceTimersByTimeAsync(6000);
+    await prepared;
+    expect(mocks.join).toHaveBeenCalledExactlyOnceWith("selected");
+    expect(history.pushState).not.toHaveBeenCalled();
+    expect(bodyClasses.has("is-game-screen")).toBe(true);
+    const retry = instance.prepareSolo?.();
+    const unauthorized = instance.play("start", "reservation");
+    await vi.advanceTimersByTimeAsync(5000);
+    await retry;
+    expect(await unauthorized).toBe(false);
+    expect(mocks.send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "startSolo" }));
+    mocks.receive!({ type: "joinedCabinet", role: "player" });
+    await instance.prepareSolo?.();
+    expect(await instance.play("start")).toBe(false);
+    const starts = await Promise.all([instance.play("start", "reservation"), instance.play("start", "duplicate")]);
+    expect(starts.filter(Boolean)).toHaveLength(1);
+    expect(mocks.send.mock.calls.filter(([message]) => message.type === "startSolo")).toHaveLength(1);
+    expect(mocks.join).toHaveBeenCalledTimes(1);
+    expect(history.pushState).not.toHaveBeenCalled();
+    instance.dispose();
+  });
+
+  it("does not create a replacement cabinet when disposed during delayed preparation", async () => {
+    vi.useFakeTimers();
+    Object.assign(keyboard, { setTimeout, clearTimeout });
+    mocks.delayed = true;
+    Object.assign(window.location, { pathname: "/cabinets/selected" });
+    const lifetime = new GameLifetime();
+    const instance = mountGame({ game: BUZZ_BARRIER, lifetime });
+    const prepared = instance.prepareSolo?.();
+    lifetime.dispose();
+    await prepared;
+    mocks.receive!({ type: "joinedCabinet", role: "player" });
+    await vi.advanceTimersByTimeAsync(6000);
+    expect(mocks.join).toHaveBeenCalledExactlyOnceWith("selected");
+    expect(history.pushState).not.toHaveBeenCalled();
+    expect(bodyClasses.has("is-game-screen")).toBe(false);
+    expect(await instance.play("start", "reservation")).toBe(false);
+  });
+
+  it("still creates a solo cabinet for an explicit spectator solo request", async () => {
+    mocks.admissionRole = "spectator";
+    Object.assign(window.location, { pathname: "/cabinets/watching" });
+    const instance = mountGame({ game: BUZZ_BARRIER, lifetime: new GameLifetime() });
+    mocks.admissionRole = "player";
+    await instance.prepareSolo?.();
+    expect(mocks.join).toHaveBeenCalledTimes(2);
+    expect(mocks.join.mock.calls[0]![0]).toBe("watching");
+    expect(mocks.join.mock.calls[1]![0]).not.toBe("watching");
+    expect(history.pushState).toHaveBeenCalledTimes(1);
+    instance.dispose();
   });
 
   it("keeps the top pause/resume button, Space and READY credit confirmation working", async () => {
