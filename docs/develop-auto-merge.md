@@ -10,7 +10,7 @@ Issueへの自動ラベル付与、実装、PR作成、レビュー、developマ
 
 - `PULBASE_CODEX_ENABLED=true`。
 - 新経路専用のRepository variable `PULBASE_DEVELOP_AUTO_MERGE_ENABLED=true`。未登録・falseなら自動マージしない。
-- `PULBASE_CONTROL_EVIDENCE_ENABLED=true`。現在の固定制御SHAは `98e5d49fc5bb27cf2dd6f1d0b01bcae1f79ddbe3`。起動コードの `CONTROL_SHA`・workflowの固定checkout・管理変数・実際のci-control refを一致させる。
+- `PULBASE_CONTROL_EVIDENCE_ENABLED=true`。現在の固定制御SHAは `fb366c77da36830d4e3d49d6813a46a4566967bf`。起動コードの `CONTROL_SHA`・workflowの固定checkout・管理変数・実際のci-control refを一致させる。
 - 旧経路の `PULBASE_AUTO_MERGE_ENABLED` と `PULBASE_STAGING_DEPLOY_ENABLED` は未使用。削除してよい。
 - production・Xのフラグはfalseのまま。
 

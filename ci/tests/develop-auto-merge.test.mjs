@@ -24,7 +24,7 @@ test('書込transportは同じPR・headのsquashだけを許し、main更新・d
  await assert.rejects(bad('GET','branches/develop/protection'),e=>!e.message.includes('dummy-key'));
 });
 test('設定版の同一時刻だけをUTCへ正規化し、保護内容は保持する',async()=>{
- for(const stamp of ['2026-11-19T22:57:43.361Z','2026-11-20T07:57:43.361+09:00','2026-11-19T17:57:43.361-05:00']){
+ for(const stamp of ['2026-11-23T20:39:12.584Z','2026-11-24T05:39:12.584+09:00','2026-11-23T15:39:12.584-05:00']){
   const original={updated_at:stamp,bypass_actors:[{actor_id:1}],enforcement:'active'};
   const api=protectionVersionApi(async()=>original);
   const normalized=await api('rulesets/25676153');
@@ -33,10 +33,10 @@ test('設定版の同一時刻だけをUTCへ正規化し、保護内容は保�
   assert.equal(original.updated_at,stamp);
   assert.equal(await api('environments/staging'),original);
  }
- for(const stamp of [undefined,'2026-11-19T22:57:43.361','2026-11-19T22:57:43.3610001Z','2026-02-30T00:00:00Z','2026-11-19T24:00:00Z','2026-11-19T22:57:43.361Zextra']){
+ for(const stamp of [undefined,'2026-11-19T22:57:43.361','2026-11-19T22:57:43.3610001Z','2026-02-30T00:00:00Z','2026-11-19T24:00:00Z','2026-11-23T20:39:12.584Zextra']){
   await assert.rejects(protectionVersionApi(async()=>({updated_at:stamp}))('rulesets/25676153'));
  }
- const changed=await protectionVersionApi(async()=>({updated_at:'2026-11-20T07:57:43.362+09:00'}))('rulesets/25676153');
+ const changed=await protectionVersionApi(async()=>({updated_at:'2026-11-24T05:39:12.585+09:00'}))('rulesets/25676153');
  assert.notEqual(changed.updated_at,RULE_VERSIONS.ciControl);
 });
 function fixture(){
