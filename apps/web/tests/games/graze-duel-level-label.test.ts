@@ -36,7 +36,7 @@ describe("level-up label", () => {
     expect(context.fillText).toHaveBeenNthCalledWith(1, "LEVEL", 626, 352);
     expect(context.fillText).toHaveBeenNthCalledWith(2, "12", 684, 352);
     expect(context.font).toBe("300 44px system-ui");
-    expect(context.fillStyle).toBe("rgba(85, 72, 145, 0.7)");
+    expect(context.fillStyle).toBe("rgba(228, 223, 247, 0.9)");
     drawLevelUpLabel(context, { x: 0, y: 20, level: 13, remaining: 1 }, 44, 392, 74, 690);
     expect(context.fillText).toHaveBeenNthCalledWith(3, "LEVEL", 52, 100);
     expect(context.fillText).toHaveBeenLastCalledWith("13", 110, 100);
@@ -44,7 +44,7 @@ describe("level-up label", () => {
     expect(context.fillText).toHaveBeenCalledTimes(4);
   });
 
-  it("dims twice at a relaxed pace without a glow", () => {
+  it("flashes soft white twice at a relaxed pace without a glow", () => {
     const colors = [0.7, 0.49, 0.35, 0.14, 0.001].map(remaining => {
       const context = {
         save: vi.fn(), restore: vi.fn(), measureText: () => ({ width: 50 }), fillText: vi.fn(),
@@ -55,7 +55,7 @@ describe("level-up label", () => {
       return context.fillStyle;
     });
     const normal = "rgba(153, 133, 255, 0.9)";
-    const dimmed = "rgba(85, 72, 145, 0.7)";
-    expect(colors).toEqual([normal, dimmed, normal, dimmed, normal]);
+    const softWhite = "rgba(228, 223, 247, 0.9)";
+    expect(colors).toEqual([normal, softWhite, normal, softWhite, normal]);
   });
 });

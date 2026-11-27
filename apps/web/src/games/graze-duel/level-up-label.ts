@@ -17,8 +17,8 @@ export function drawLevelUpLabel(context: CanvasRenderingContext2D, label: Level
   context.textAlign = "left";
   context.textBaseline = "middle";
   const phase = Math.max(0, duration - label.remaining) % (duration / 2);
-  const dimmed = phase >= 0.18 && phase < 0.30;
-  context.fillStyle = dimmed ? "rgba(85, 72, 145, 0.7)" : "rgba(153, 133, 255, 0.9)";
+  const flashing = phase >= 0.18 && phase < 0.30;
+  context.fillStyle = flashing ? "rgba(228, 223, 247, 0.9)" : "rgba(153, 133, 255, 0.9)";
   const titleWidth = context.measureText("LEVEL").width;
   const number = String(label.level);
   context.font = "300 44px system-ui";
