@@ -44,8 +44,8 @@ describe("level-up label", () => {
     expect(context.fillText).toHaveBeenCalledTimes(4);
   });
 
-  it("repeatedly dips from blue-violet to dark violet without a glow", () => {
-    const colors = [0.7, 0.62, 0.56, 0.06, 0.001].map(remaining => {
+  it("dims twice at a relaxed pace without a glow", () => {
+    const colors = [0.7, 0.49, 0.35, 0.14, 0.001].map(remaining => {
       const context = {
         save: vi.fn(), restore: vi.fn(), measureText: () => ({ width: 50 }), fillText: vi.fn(),
       } as unknown as CanvasRenderingContext2D;
