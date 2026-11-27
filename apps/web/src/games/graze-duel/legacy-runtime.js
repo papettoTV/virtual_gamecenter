@@ -321,6 +321,9 @@ export function mountGame(context) {
 
   scope.own(() => canvasRenderer.dispose());
 
+  let cabinetSelectionGeneration = 0;
+  let soloPlayPending = false;
+
   const cabinetClient = createCabinetSession({
     gameId: GAME_ID,
     lifetime: scope,
@@ -964,6 +967,7 @@ export function mountGame(context) {
 
   function enterCabinet(cabinetId, updateUrl = true) {
     if (!cabinetId) return;
+    cabinetSelectionGeneration++;
     if (currentCabinetId && currentCabinetId !== cabinetId) cabinetClient.leave();
     currentCabinetId = cabinetId;
     cabinetRole = "joining";
@@ -1058,6 +1062,7 @@ export function mountGame(context) {
   }
 
   function leaveCabinet(updateUrl = true) {
+    cabinetSelectionGeneration++;
     victory.clear();
     if (soundToggle) soundToggle.hidden = true;
     cabinetClient.leave();
@@ -3609,28 +3614,35 @@ export function mountGame(context) {
     async prepareSolo() {
       if (scope.disposed) return;
       if (currentCabinetId && cabinetClient.role === "player") { showScreen("game"); return; }
-      if (currentCabinetId && cabinetRole === "joining") {
-        const joined = await cabinetClient.waitForPlayer();
-        if (scope.disposed) return;
-        if (joined) { showScreen("game"); return; }
-      }
-      enterCabinet(createUuid());
+      // A pending admission still belongs to the selected cabinet. Only an
+      // explicit solo request from a spectator (or the directory) needs a new one.
+      if (!currentCabinetId || cabinetRole === "spectator") enterCabinet(createUuid());
+      const selectionGeneration = cabinetSelectionGeneration;
       const ready = await cabinetClient.waitForPlayer();
-      if (scope.disposed) return;
-      if (!ready) throw new Error("Solo cabinet could not be prepared.");
+      if (scope.disposed || cabinetSelectionGeneration !== selectionGeneration) return;
+      // Keep READY available after the admission budget expires. play() still
+      // requires player admission and startSolo authorization on every attempt.
+      if (!ready) notifications.show({ id: "cabinet-admission", type: "error", message: "筐体への参加を待っています。時間をおいて再度開始してください。" });
       showScreen("game");
     },
     async play(action, reservationId) {
-      if (scope.disposed || !currentCabinetId) return false;
+      if (scope.disposed || !currentCabinetId || soloPlayPending) return false;
       if (action !== "start" && action !== "retry") return false;
       if (isVersusParticipant()) return false;
-      const ready = await cabinetClient.waitForPlayer();
-      if (scope.disposed || !ready) return false;
-      if (!reservationId || !await cabinetClient.startSolo(reservationId) || scope.disposed) return false;
-      const started = startSoloPlay(reservationId, true);
-      if (started) { waitingForStart = false; paused = false; updatePauseButton(); }
-      if (started && action === "retry") rankingSubmitPanel?.classList.remove("is-visible");
-      return started;
+      const selectionGeneration = cabinetSelectionGeneration;
+      soloPlayPending = true;
+      try {
+        const ready = await cabinetClient.waitForPlayer();
+        if (scope.disposed || !ready || selectionGeneration !== cabinetSelectionGeneration) return false;
+        if (!reservationId || !await cabinetClient.startSolo(reservationId) || scope.disposed
+          || selectionGeneration !== cabinetSelectionGeneration) return false;
+        const started = startSoloPlay(reservationId, true);
+        if (started) { waitingForStart = false; paused = false; updatePauseButton(); }
+        if (started && action === "retry") rankingSubmitPanel?.classList.remove("is-visible");
+        return started;
+      } finally {
+        soloPlayPending = false;
+      }
     },
     dispose() {
       scope.dispose();
