@@ -1,7 +1,8 @@
 export type LevelUpLabel = { x: number; y: number; level: number; remaining: number };
+const duration = 0.7;
 
 export function createLevelUpLabel(player: { x: number; y: number; fieldX: number; level: number }): LevelUpLabel {
-  return { x: player.x - player.fieldX, y: player.y - 42, level: player.level, remaining: 1 };
+  return { x: player.x - player.fieldX, y: player.y - 42, level: player.level, remaining: duration };
 }
 
 export function tickLevelUpLabel(label: LevelUpLabel | null | undefined, delta: number): LevelUpLabel | null {
@@ -15,14 +16,14 @@ export function drawLevelUpLabel(context: CanvasRenderingContext2D, label: Level
   context.font = "300 16px system-ui";
   context.textAlign = "left";
   context.textBaseline = "middle";
-  const age = 1 - label.remaining;
-  const discharge = age < 0.055 || (age >= 0.105 && age < 0.17);
+  const phase = Math.max(0, duration - label.remaining) % 0.22;
+  const discharge = phase < 0.055 || (phase >= 0.105 && phase < 0.17);
   if (discharge) {
     context.fillStyle = "#f1ebff";
     context.shadowColor = "#9774ff";
     context.shadowBlur = 5;
   } else {
-    context.fillStyle = age < 0.22 ? "rgba(153, 133, 255, 0.62)" : "rgba(153, 133, 255, 0.9)";
+    context.fillStyle = "rgba(153, 133, 255, 0.62)";
   }
   const titleWidth = context.measureText("LEVEL").width;
   const number = String(label.level);
