@@ -15,7 +15,15 @@ export function drawLevelUpLabel(context: CanvasRenderingContext2D, label: Level
   context.font = "300 16px system-ui";
   context.textAlign = "left";
   context.textBaseline = "middle";
-  context.fillStyle = "rgba(153, 133, 255, 0.9)";
+  const age = 1 - label.remaining;
+  const discharge = age < 0.055 || (age >= 0.105 && age < 0.17);
+  if (discharge) {
+    context.fillStyle = "#f1ebff";
+    context.shadowColor = "#9774ff";
+    context.shadowBlur = 5;
+  } else {
+    context.fillStyle = age < 0.22 ? "rgba(153, 133, 255, 0.62)" : "rgba(153, 133, 255, 0.9)";
+  }
   const titleWidth = context.measureText("LEVEL").width;
   const number = String(label.level);
   context.font = "300 44px system-ui";

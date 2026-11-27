@@ -43,4 +43,16 @@ describe("level-up label", () => {
     drawLevelUpLabel(context, null, 44, 392, 74, 690);
     expect(context.fillText).toHaveBeenCalledTimes(4);
   });
+
+  it("flashes twice on entry without making the number disappear", () => {
+    const colors = [1, 0.92, 0.86, 0.8, 0.5].map(remaining => {
+      const context = {
+        save: vi.fn(), restore: vi.fn(), measureText: () => ({ width: 50 }), fillText: vi.fn(),
+      } as unknown as CanvasRenderingContext2D;
+      drawLevelUpLabel(context, { x: 160, y: 350, level: 30, remaining }, 0, 392, 74, 690);
+      expect(context.fillText).toHaveBeenCalledTimes(2);
+      return context.fillStyle;
+    });
+    expect(colors).toEqual(["#f1ebff", "rgba(153, 133, 255, 0.62)", "#f1ebff", "rgba(153, 133, 255, 0.62)", "rgba(153, 133, 255, 0.9)"]);
+  });
 });
