@@ -36,7 +36,7 @@ describe("level-up label", () => {
     expect(context.fillText).toHaveBeenNthCalledWith(1, "LEVEL", 626, 352);
     expect(context.fillText).toHaveBeenNthCalledWith(2, "12", 684, 352);
     expect(context.font).toBe("300 44px system-ui");
-    expect(context.fillStyle).toBe("rgba(153, 133, 255, 0.62)");
+    expect(context.fillStyle).toBe("rgba(85, 72, 145, 0.7)");
     drawLevelUpLabel(context, { x: 0, y: 20, level: 13, remaining: 1 }, 44, 392, 74, 690);
     expect(context.fillText).toHaveBeenNthCalledWith(3, "LEVEL", 52, 100);
     expect(context.fillText).toHaveBeenLastCalledWith("13", 110, 100);
@@ -44,15 +44,18 @@ describe("level-up label", () => {
     expect(context.fillText).toHaveBeenCalledTimes(4);
   });
 
-  it("repeats the double flash through the final frame", () => {
+  it("repeatedly dips from blue-violet to dark violet without a glow", () => {
     const colors = [0.7, 0.62, 0.56, 0.06, 0.001].map(remaining => {
       const context = {
         save: vi.fn(), restore: vi.fn(), measureText: () => ({ width: 50 }), fillText: vi.fn(),
       } as unknown as CanvasRenderingContext2D;
       drawLevelUpLabel(context, { x: 160, y: 350, level: 30, remaining }, 0, 392, 74, 690);
       expect(context.fillText).toHaveBeenCalledTimes(2);
+      expect(context.shadowBlur ?? 0).toBe(0);
       return context.fillStyle;
     });
-    expect(colors).toEqual(["#f1ebff", "rgba(153, 133, 255, 0.62)", "#f1ebff", "rgba(153, 133, 255, 0.62)", "#f1ebff"]);
+    const normal = "rgba(153, 133, 255, 0.9)";
+    const dimmed = "rgba(85, 72, 145, 0.7)";
+    expect(colors).toEqual([normal, dimmed, normal, dimmed, normal]);
   });
 });
